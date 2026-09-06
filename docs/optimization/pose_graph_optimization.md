@@ -557,7 +557,11 @@ The full state vector containing all $N$ pose keyframes is $X = \{T_1, T_2, \dot
 
 #### Relative Edge Measurements
 
-An edge $e_{ij}$ between nodes $i$ and $j$ represents a relative transformation measurement ${z_{ij} = {\tilde{T}_{ij} \in \mathrm{SE}(3)}}$ (e.g., from ICP scan matching or visual odometry), accompanied by an information matrix ${\Omega_{ij} = {\Sigma_{ij}^{-1} \in \mathbb{R}^{6 \times 6}}}$ representing measurement confidence.
+An edge $e_{ij}$ between nodes $i$ and $j$ represents a relative transformation measurement 
+
+$${z_{ij} = {\tilde{T}_{ij} \in \mathrm{SE}(3)}}$$ 
+
+(e.g., from ICP scan matching or visual odometry), accompanied by an information matrix ${\Omega_{ij} = {\Sigma_{ij}^{-1} \in \mathbb{R}^{6 \times 6}}}$ representing measurement confidence.
 
 ### 2. Residual Vector Formulation on $\mathrm{SE}(3)$
 
@@ -613,7 +617,13 @@ Linearizing the residual $r_{ij}$ with respect to local perturbations ${\boldsym
 
 $$r_{ij}(X \oplus \boldsymbol{\delta}) \approx r_{ij}(X) + J_i \, \boldsymbol{\xi}_i + J_j \, \boldsymbol{\xi}_j$$
 
-Where the Jacobians ${J_i = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_i}}$ and ${J_j = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_j}}$ are derived using the **Right Inverse Baker-Campbell-Hausdorff (BCH) approximation**:
+Where the Jacobians
+
+$$
+J_i = \frac{\partial r_{ij}}{\partial \pmb{\xi}_i}
+$$
+
+and ${J_j = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_j}}$ are derived using the **Right Inverse Baker-Campbell-Hausdorff (BCH) approximation**:
 
 $${J_j = J_r^{-1}(r_{ij})}$$
 
