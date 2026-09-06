@@ -546,6 +546,8 @@ Use **Global BA** for offline reconstruction — meshes, NeRF/Gaussian-Splatting
 
 `bundle_adjustment.py`'s three solvers (`run_ba_landmarks_only`, `run_ba_poses_only`, `run_bundle_adjustment`) are all single-batch joint solves over the whole toy scene — closest in spirit to a (tiny) Global BA pass. It has no windowing, no covisibility graph, and no incremental registration, so it doesn't model Local BA's real-time system behavior at all.
 
+`bundle_adjustment_advanced.py` fills that gap: a camera moves keyframe-by-keyframe through a landmark corridor, a covisibility graph is built incrementally, and every new keyframe triggers a bounded local-BA solve over an active window (new keyframe + covisible neighbors, with every other observing keyframe held fixed as a rigid anchor — this section's diagram, made concrete), while a periodic Global BA pass over the whole map runs alongside it for direct comparison. Measuring wall-clock solve time confirms both halves of this section's "Scaling" row in code: the local window's cost stays roughly flat as the map grows, while the Global BA pass's cost grows with it. It also demonstrates *why* an occasional Global BA pass helps — accumulated front-end drift — and, just as informatively, that its benefit is modest without an actual loop closure to supply a genuinely new constraint (see the script's own module docstring for that finding).
+
 ---
 
 ## 14. One sentence to remember

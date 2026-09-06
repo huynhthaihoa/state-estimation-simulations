@@ -66,6 +66,25 @@ the full index, or [docs/frontend_backend.md](docs/frontend_backend.md) /
   on the first two camera poses, then Umeyama-aligned to ground truth before
   reporting absolute error, since monocular BA only recovers the scene up to
   an unknown similarity transform).
+- [bundle_adjustment_advanced.py](use_numpy/bundle_adjustment_advanced.py):
+  Local **and** Global bundle adjustment, run back to back for direct
+  comparison — the real-time-system-behavior counterpart to
+  `bundle_adjustment.py`'s single-batch scene. A camera moves
+  keyframe-by-keyframe along a forward-facing arc through a landmark
+  corridor instead of sitting on a static ring; a covisibility graph builds
+  incrementally, and every new keyframe triggers a bounded local
+  Gauss-Newton/Levenberg-Marquardt solve over an active window (new
+  keyframe + covisible neighbors, with every other observing keyframe held
+  fixed as a rigid anchor), while a periodic Global BA pass jointly
+  re-solves the whole map so far for contrast. Keyframes 0/1 are hard-fixed
+  forever as the gauge anchor — no prior factor needed, unlike
+  `bundle_adjustment.py`, since a hard anchor already pins the gauge with
+  no residual freedom left to constrain. Guards against Gauss-Newton
+  divergence (Levenberg-Marquardt damping) and the classic
+  point-behind-camera reflection ambiguity (`passes_cheirality`/
+  `cull_invalid_points`) that a weakly-constrained, forward-motion scene
+  can hit but `bundle_adjustment.py`'s densely-observed toy scene never
+  does.
 
 ### [use_manif/](use_manif/) — same simulations, on `manifpy`
 
@@ -86,6 +105,11 @@ the full index, or [docs/frontend_backend.md](docs/frontend_backend.md) /
   chaining `manifpy`'s own `inverse`/`act` Jacobian out-parameters instead of
   a hand-rolled closed form; landmarks stay plain numpy R^3 vectors (manif
   has no notion of those), same as `pointcloud_pose_tracking.py`.
+- [bundle_adjustment_advanced.py](use_manif/bundle_adjustment_advanced.py):
+  same Local + Global BA comparison as the `use_numpy` version, with
+  camera-pose Jacobians obtained by chaining `manifpy`'s own `inverse`/
+  `act` Jacobian out-parameters, matching `bundle_adjustment.py`'s own
+  manif version.
 
 ### Root
 
@@ -306,5 +330,86 @@ uv run python use_numpy/bundle_adjustment.py --n-cameras 8 --n-landmarks 60 --ca
 - `--min-observations`: minimum observing cameras a landmark needs to be kept; must be `>= 2` (default `2`)
 - `--gn-tol`: Gauss-Newton convergence tolerance (default `1e-6`)
 - `--gn-max-iters`: maximum Gauss-Newton iterations (default `30`)
+- `--seed`: RNG seed (default `0`)
+- `--out`: save the figure to this path instead of showing it (default: show)
+
+### 7. Local + Global bundle adjustment: bounded windows vs. whole-map re-solves
+
+`use_numpy/bundle_adjustment_advanced.py` / `use_manif/bundle_adjustment_advanced.py`
+
+`docs/optimization/bundle_adjustment.md`'s Local-vs-Global-BA section (§13)
+notes that `bundle_adjustment.py`'s solvers are all single-batch joint
+solves with no windowing, no covisibility graph, and no incremental
+registration — this script is what fills that gap. `n_keyframes` keyframes
+move one at a time along a forward-facing arc through a corridor of
+landmarks scattered near the path (not a static ring around a shared
+centroid), with a field-of-view **and** `--max-view-range` cutoff so a
+landmark is only visible from a short run of nearby keyframes — real
+feature detectors have a finite effective range, and without this cutoff a
+forward-facing camera would see nearly every landmark from nearly every
+keyframe, destroying the locality the whole exercise depends on. Each
+keyframe arrives with a front-end pose estimate built by chaining a noisy
+relative motion onto the previous one (`simulate_frontend_trajectory`, the
+same dead-reckoning pattern as `pose_graph.py`), so small per-step errors
+compound into real drift.
+
+The incremental loop (`run_incremental_local_ba`) runs keyframe-by-keyframe:
+
+- **Reveal + triangulate**: each keyframe's observations are revealed one
+  at a time; a landmark is triangulated (closed-form ray intersection, then
+  a few Gauss-Newton iterations) the moment it crosses `--min-observations`
+  observers, and committed only if it passes a cheirality (positive-depth)
+  check — a weakly-constrained point can otherwise converge to a
+  reflection behind a camera that still fits that view's pixel almost
+  exactly, since `pixel = f*x/z` is invariant under negating a whole
+  camera-frame point.
+- **Bounded local BA window** (`build_active_window` + `run_local_ba_step`):
+  the new keyframe plus its strongest covisible neighbors (up to
+  `--max-window-keyframes`) are optimized together; every other keyframe
+  that also observes one of the window's landmarks is held fixed as a
+  rigid anchor. Keyframes 0/1 are hard-fixed forever as the gauge anchor —
+  no prior factor needed, since a hard anchor already pins the gauge.
+- **Periodic Global BA** (`run_global_ba`): every `--global-ba-interval`
+  keyframes (plus once at the end), every keyframe and landmark seen so far
+  is jointly re-solved in one system, for direct comparison against the
+  bounded local window.
+
+Both solvers share one Levenberg-Marquardt core (`run_windowed_gn_lm`):
+a step is only accepted if it actually reduces total reprojection error,
+otherwise the damping grows and the step is retried — plain fixed-damping
+Gauss-Newton (as `bundle_adjustment.py` uses for its densely-observed,
+prior-anchored toy scene) was found to diverge explosively on this script's
+weakly-constrained early windows. The incremental loop runs twice off the
+same scene — once with Global BA disabled, once with it enabled — and
+prints/plots wall-clock solve time (should stay flat for the local window,
+grow for Global BA as the map grows) and a trailing-window RMS trajectory
+error (drift accumulating vs. periodically corrected). One finding worth
+being upfront about: this path never revisits a place, so Global BA has no
+*new* geometric constraint to exploit beyond what the overlapping local
+windows already used — it still helps on most noise draws, just not as
+dramatically as an actual loop closure would (see
+`docs/optimization/pose_graph_optimization.md`).
+
+```
+uv run python use_numpy/bundle_adjustment_advanced.py --n-keyframes 50 --path-radius 15.0 --arc-span-deg 90 --landmarks-per-keyframe 8 --lateral-spread 2.0 --vertical-spread 1.0 --fov-deg 70 --max-view-range 6.0 --image-width 640 --image-height 480 --focal-length 800 --min-observations 3 --min-shared-for-covisibility 2 --max-window-keyframes 6 --global-ba-interval 8 --relative-pose-noise-std 0.02 --pixel-noise-std 1.0 --gn-tol 1e-6 --gn-max-iters 15 --seed 0 --out out.png
+```
+
+- `--n-keyframes`: number of keyframes along the path (default `50`)
+- `--path-radius`: radius of the arc the path follows, m (default `15.0`)
+- `--arc-span-deg`: total angular span of the path, deg (default `90`)
+- `--landmarks-per-keyframe`: landmarks scattered per keyframe station (default `8`)
+- `--lateral-spread`, `--vertical-spread`: half-width of the lateral/vertical landmark offset, m (default `2.0`/`1.0`)
+- `--fov-deg`: camera full field-of-view angle, deg (default `70`)
+- `--max-view-range`: maximum camera-to-landmark detection range, m — bounds covisibility to nearby keyframes (default `6.0`)
+- `--image-width`, `--image-height`: image size in pixels, sets `cx`/`cy` (default `640`/`480`)
+- `--focal-length`: shared `fx=fy` focal length in pixels (default `800`)
+- `--min-observations`: minimum observing keyframes before a landmark is triangulated; must be `>= 2` (default `3`)
+- `--min-shared-for-covisibility`: minimum shared-landmark count for a covisibility edge between two keyframes (default `2`)
+- `--max-window-keyframes`: maximum active keyframes per local BA window, including the new one (default `6`)
+- `--global-ba-interval`: run a full Global BA pass every this many keyframes, plus once at the end (default `8`)
+- `--relative-pose-noise-std`: std-dev of the se3 twist noise added to each frame-to-frame front-end pose estimate, mixed m/rad — compounds into drift (default `0.02`)
+- `--pixel-noise-std`: std-dev of Gaussian pixel measurement noise, px (default `1.0`)
+- `--gn-tol`: Levenberg-Marquardt convergence tolerance (default `1e-6`)
+- `--gn-max-iters`: maximum accepted GN/LM steps per solve (default `15`)
 - `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
