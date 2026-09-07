@@ -417,7 +417,7 @@ So $J_l$ and $J_r$ are still exactly what Section 10 says a Jacobian always is â
 
 Near the identity ($\varphi \to 0$) there's no rotation yet to disagree about "whose frame," so the two notions collapse: $J_l(0) = J_r(0) = I$. This is exactly the flat-tangent-plane picture from Section 6 â€” right at the point of linearization, the manifold looks flat and left/right don't matter yet. The distinction only shows up once you're linearizing *away* from the identity, i.e. around some existing rotation.
 
-### 11.4 Closed form for SO(3)
+### 11.4 Closed form for $SO(3)$
 
 With $\theta = \lVert\varphi\rVert$ and $[\varphi]_\times$ the skew-symmetric matrix of $\varphi$:
 
