@@ -50,13 +50,13 @@ Start at [docs/README.md](docs/README.md) for the full index, or [docs/frontend_
   comparing a recursive **EKF**, a recursive **invariant EKF** (body-frame
   residual, state-independent measurement Jacobian), and a **batch
   Gauss-Newton** smoother over the whole trajectory, reusing `lie_utils.py`'s
-  SE(3) Exp/Log/inverse-right-Jacobian math plus a hand-rolled adjoint/
+  $SE(3)$ $Exp$ / $Log$ /inverse-right-Jacobian math plus a hand-rolled adjoint/
   right-Jacobian for the motion-model Jacobians. Also reports empirical
   per-step time and peak memory for each of the four approaches.
 - [pose_graph.py](use_numpy/pose_graph.py): a small closed-loop 3D
   pose-graph relaxation (odometry drift + one loop closure), jointly
-  optimized via Levenberg-Marquardt, reusing the same `lie_utils.py` SE(3)
-  Exp/Log/inverse-right-Jacobian/adjoint math as `pointcloud_pose_tracking.py`.
+  optimized via Levenberg-Marquardt, reusing the same `lie_utils.py` $SE(3)$
+  $Exp$ / $Log$ / inverse-right-Jacobian/adjoint math as `pointcloud_pose_tracking.py`.
 - [bundle_adjustment.py](use_numpy/bundle_adjustment.py): jointly refines
   camera poses **and** 3D landmarks against pinhole reprojection error —
   cameras on an arc around a landmark cluster, with a field-of-view cutoff
@@ -92,7 +92,7 @@ Start at [docs/README.md](docs/README.md) for the full index, or [docs/frontend_
 - [imu_integration_comparison.py](use_manif/imu_integration_comparison.py)
 - [robot_imu_simulation.py](use_manif/robot_imu_simulation.py)
 - [imu_preintegration.py](use_manif/imu_preintegration.py): same bias-Jacobian
-  preintegration bundle, with the SO(3) Exp map / right Jacobian / skew(hat)
+  preintegration bundle, with the $SO(3)$ $Exp$ map / right Jacobian / skew(hat)
   math delegated to manif's `rplus` Jacobian out-parameters and
   `SO3Tangent.hat()` instead of hand-rolled formulas.
 - [pointcloud_pose_tracking.py](use_manif/pointcloud_pose_tracking.py): same
