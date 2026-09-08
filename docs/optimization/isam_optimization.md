@@ -464,17 +464,17 @@ And **iSAM2** takes this further by using a **Bayes tree** to efficiently identi
 
 1. Dellaert, F., & Kaess, M. (2006). *Square Root SAM: Simultaneous Localization and Mapping via
    Square Root Information Smoothing*. International Journal of Robotics Research, 25(12),
-   1181–1203. https://doi.org/10.1177/0278364906072768 — the sparse QR/square-root-information
+   1181–1203. https://doi.org/10.1177/0278364906072768 - the sparse QR/square-root-information
    factorization behind §3's $A \approx QR$ and the claim that most of the previous factorization
    stays reusable.
 2. Kaess, M., Ranganathan, A., & Dellaert, F. (2008). *iSAM: Incremental Smoothing and Mapping*.
-   IEEE Transactions on Robotics, 24(6), 1365–1378. https://doi.org/10.1109/TRO.2008.2006706 —
+   IEEE Transactions on Robotics, 24(6), 1365–1378. https://doi.org/10.1109/TRO.2008.2006706 -
    the original iSAM algorithm (incremental QR updates via Givens rotations, with periodic
    variable reordering) behind §1, §2, §4–§6, and §9.
 3. Kaess, M., Johannsson, H., Roberts, R., Ila, V., Leonard, J. J., & Dellaert, F. (2012). *iSAM2:
    Incremental Smoothing and Mapping Using the Bayes Tree*. International Journal of Robotics
-   Research, 31(2), 216–235. https://doi.org/10.1177/0278364911430419 — the Bayes-tree data
+   Research, 31(2), 216–235. https://doi.org/10.1177/0278364911430419 - the Bayes-tree data
    structure and fluid relinearization behind §7, §11, and §13's iSAM2 description.
 4. Dellaert, F., & Kaess, M. (2017). *Factor Graphs for Robot Perception*. Foundations and Trends
-   in Robotics, 6(1–2), 1–139. https://doi.org/10.1561/2300000043 — general reference for the
+   in Robotics, 6(1–2), 1–139. https://doi.org/10.1561/2300000043 - general reference for the
    factor-graph formulation underlying §3 and §11.

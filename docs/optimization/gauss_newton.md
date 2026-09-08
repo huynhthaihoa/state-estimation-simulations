@@ -278,7 +278,7 @@ $$
 
 Solve it → update all poses and landmarks → repeat.
 
-One caveat: landmarks $p_j\in\mathbb{R}^3$ really do just get $p_j \leftarrow p_j+\Delta p_j$. Poses $T_i$ don't — they live on the $SE(3)$ manifold, so the update is a **retraction** through the exponential map, $T_i \leftarrow T_i\cdot\mathrm{Exp}(\Delta x_i)$, not plain addition. See [pose_graph_optimization.md](pose_graph_optimization.md) for the full derivation.
+One caveat: landmarks $p_j\in\mathbb{R}^3$ really do just get $p_j \leftarrow p_j+\Delta p_j$. Poses $T_i$ don't - they live on the $SE(3)$ manifold, so the update is a **retraction** through the exponential map, $T_i \leftarrow T_i\cdot\mathrm{Exp}(\Delta x_i)$, not plain addition. See [pose_graph_optimization.md](pose_graph_optimization.md) for the full derivation.
 
 That's essentially the core optimization mechanism behind many **[bundle adjustment](bundle_adjustment.md) and [graph-SLAM](pose_graph_optimization.md) systems**.
 

@@ -226,7 +226,7 @@ Then compare:
 
 $${\text{error}_{ij} = z_{ij}^{-1}(T_i^{-1}T_j)}$$
 
-That comparison is still a **group element** ($SE(2)$ / $SE(3)$, not a plain vector), so to actually measure "how big" it is — and to compute the Jacobians the optimizer needs — we take its **Log map**, which turns it into a tangent-space vector:
+That comparison is still a **group element** ($SE(2)$ / $SE(3)$, not a plain vector), so to actually measure "how big" it is - and to compute the Jacobians the optimizer needs - we take its **Log map**, which turns it into a tangent-space vector:
 
 $${e_{ij} = \text{Log}(\text{error}_{ij}) = \text{Log}\big(z_{ij}^{-1}(T_i^{-1}T_j)\big)}$$
 
@@ -262,7 +262,7 @@ So in plain English:
 
 > **Find the poses that make all the measured relative transformations agree as much as possible.**
 
-One subtlety this formula hides: since every constraint is *relative*, rigidly translating and rotating the entire graph together leaves every $e_{ij}$ completely unchanged — the optimization has a flat direction with zero curvature, called **gauge freedom**. In practice this is fixed by anchoring one pose (usually $T_0$), e.g. by giving it an enormous information weight so the linear system solved at each step has a unique solution instead of infinitely many equally-good ones.
+One subtlety this formula hides: since every constraint is *relative*, rigidly translating and rotating the entire graph together leaves every $e_{ij}$ completely unchanged - the optimization has a flat direction with zero curvature, called **gauge freedom**. In practice this is fixed by anchoring one pose (usually $T_0$), e.g. by giving it an enormous information weight so the linear system solved at each step has a unique solution instead of infinitely many equally-good ones.
 
 ---
 
@@ -483,10 +483,10 @@ $${\min_X \sum_{(i,j) \in \mathcal{E}} e_{ij}^T \Omega_{ij} e_{ij}}$$
 
 where $\Omega_{ij}$ is related to the **information/covariance** of the measurement.
 
-This is why sensor uncertainty matters — though it's worth noting that `pose_graph.py` (both the
+This is why sensor uncertainty matters - though it's worth noting that `pose_graph.py` (both the
 `use_numpy/` and `use_manif/` versions), the toy implementations accompanying this doc, keep things
 simple: they share one identity `info_matrix` across every edge (odometry and loop-closure alike),
-so they don't actually exploit per-edge weighting the way $\Omega_{ij}$ above suggests — even
+so they don't actually exploit per-edge weighting the way $\Omega_{ij}$ above suggests - even
 though the loop-closure edge is generated with a different noise level than the odometry edges.
 Per-edge weighting like this is a natural extension, not something the default scripts do.
 
@@ -575,7 +575,7 @@ $${E_{ij} = \tilde{T}_{ij}^{-1} \left( T_i^{-1} T_j \right)}$$
 
 #### Mapping Error to Tangent Space ${\mathfrak{se}(3)}$
 
-Because optimization requires a 6-dimensional Euclidean vector space, the matrix error ${E_{ij}}$ is mapped to its local tangent space (Lie algebra ${\mathfrak{se}(3)}$) via the logarithmic map ${\log: \mathrm{SE}(3) \to \mathfrak{se}(3)}$, and flattened into a vector ${\mathbb{R}^6}$ using the **${\vee}$ operator** ${(\cdot)^\vee}$ — together, ${\mathrm{Log}(\cdot) = (\log(\cdot))^\vee: \mathrm{SE}(3) \to \mathbb{R}^6}$, mirroring the lowercase/uppercase convention already used for ${\exp}$ / ${\mathrm{Exp}}$ below:
+Because optimization requires a 6-dimensional Euclidean vector space, the matrix error ${E_{ij}}$ is mapped to its local tangent space (Lie algebra ${\mathfrak{se}(3)}$) via the logarithmic map ${\log: \mathrm{SE}(3) \to \mathfrak{se}(3)}$, and flattened into a vector ${\mathbb{R}^6}$ using the **${\vee}$ operator** ${(\cdot)^\vee}$ - together, ${\mathrm{Log}(\cdot) = (\log(\cdot))^\vee: \mathrm{SE}(3) \to \mathbb{R}^6}$, mirroring the lowercase/uppercase convention already used for ${\exp}$ / ${\mathrm{Exp}}$ below:
 
 $${r_{ij}(X) = \left( \log \left( \tilde{T}_{ij}^{-1} T_i^{-1} T_j \right) \right)^\vee \in \mathbb{R}^6}$$
 
@@ -736,11 +736,11 @@ $$s_{ij} = \min\left(1, \; \frac{2 \Phi}{\Phi + e_{ij}^2}\right)$$
 | **DCS** | Redescending ($\to 0$) | $\propto \frac{1}{e^4}$ | **Very High** (Effectively turns off bad edges) |
 | **Geman-McClure** | Saturation / Bounded | $\propto \frac{1}{(1 + e^2)^2}$ | **Very High** |
 
-Note the distinction in the first column: Geman-McClure's cost $\rho(e)=e^2/(1+e^2)$ genuinely **saturates**, monotonically approaching a constant ($1$) as $e\to\infty$. DCS's effective cost $s_{ij}^2 e_{ij}^2 = \frac{4\Phi^2 e^2}{(\Phi+e^2)^2}$ is stronger than that — for $e^2>\Phi$ it is *decreasing* in $e$ and decays all the way back to $0$ as $e\to\infty$ (differentiate w.r.t. $x=e^2$: $\frac{d}{dx}\frac{4\Phi^2 x}{(\Phi+x)^2} = \frac{4\Phi^2(\Phi-x)}{(\Phi+x)^3} < 0$ for $x>\Phi$). This **redescending** behavior is why DCS suppresses extreme outliers even more aggressively than Geman-McClure, and also why it's every bit as non-convex — the "Graduated Non-Convexity" caveat below applies to it for exactly this reason.
+Note the distinction in the first column: Geman-McClure's cost $\rho(e)=e^2/(1+e^2)$ genuinely **saturates**, monotonically approaching a constant ($1$) as $e\to\infty$. DCS's effective cost $s_{ij}^2 e_{ij}^2 = \frac{4\Phi^2 e^2}{(\Phi+e^2)^2}$ is stronger than that - for $e^2>\Phi$ it is *decreasing* in $e$ and decays all the way back to $0$ as $e\to\infty$ (differentiate w.r.t. $x=e^2$: $\frac{d}{dx}\frac{4\Phi^2 x}{(\Phi+x)^2} = \frac{4\Phi^2(\Phi-x)}{(\Phi+x)^3} < 0$ for $x>\Phi$). This **redescending** behavior is why DCS suppresses extreme outliers even more aggressively than Geman-McClure, and also why it's every bit as non-convex - the "Graduated Non-Convexity" caveat below applies to it for exactly this reason.
 
 ### Practical Considerations in Implementation
 
 1. **Threshold Tuning ($\delta, k, \Phi$):** The parameters set the boundary between inliers and outliers. In $\mathrm{SE}(3)$ PGO, error $e^2$ follows a Chi-Square distribution ($\chi^2$) with 6 degrees of freedom. Setting $\Phi$ or $k^2$ corresponding to the 95% or 99% quantile of $\chi^2(6)$ (e.g., $\Phi \approx 12.59$) provides a sound baseline.
 2. **Graduated Non-Convexity (GNC):** Highly non-convex robust functions (like DCS or Geman-McClure) can introduce local minima if applied from a poor initial guess. Modern solvers use GNC to start with a convex $L_2$ loss and gradually harden the robust kernel as iterations progress.
 
-This section is theory only: neither `use_numpy/pose_graph.py` nor `use_manif/pose_graph.py` implements Huber, Cauchy, or DCS reweighting — both scripts still use a single, unweighted `info_matrix = np.eye(6)` shared by every edge, odometry and loop-closure alike (the same gap already noted for per-edge $\Omega_{ij}$ weighting earlier in this doc). Robust loss reweighting is a natural extension a reader could add, not something the accompanying scripts exercise.
+This section is theory only: neither `use_numpy/pose_graph.py` nor `use_manif/pose_graph.py` implements Huber, Cauchy, or DCS reweighting - both scripts still use a single, unweighted `info_matrix = np.eye(6)` shared by every edge, odometry and loop-closure alike (the same gap already noted for per-edge $\Omega_{ij}$ weighting earlier in this doc). Robust loss reweighting is a natural extension a reader could add, not something the accompanying scripts exercise.

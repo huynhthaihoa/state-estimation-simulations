@@ -253,13 +253,13 @@ where:
 * $P_j$ = 3D landmark `j`
 * $z_{ij}$ = observed pixel
 * $\pi(T_iP_j)$ = predicted pixel
-* $\mathcal{O}$ = the set of (camera, landmark) pairs that were actually observed — not every camera sees every landmark, so the sum only runs over real observations, not all $i,j$ combinations
+* $\mathcal{O}$ = the set of (camera, landmark) pairs that were actually observed - not every camera sees every landmark, so the sum only runs over real observations, not all $i,j$ combinations
 
 In plain English:
 
 > **Find the camera poses and 3D points that make the predicted image points match the actual image points as closely as possible.**
 
-Real implementations usually wrap the squared reprojection error in a **robust loss** (e.g. Huber) instead of squaring it directly, so a handful of bad feature matches can't drag the whole reconstruction toward them — see [pose_graph_optimization.md](pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures)'s "Robust loss functions" section for the exact same idea applied to pose graphs. `bundle_adjustment.py` keeps the plain, un-robustified squared error above, matching the objective as written here.
+Real implementations usually wrap the squared reprojection error in a **robust loss** (e.g. Huber) instead of squaring it directly, so a handful of bad feature matches can't drag the whole reconstruction toward them - see [pose_graph_optimization.md](pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures)'s "Robust loss functions" section for the exact same idea applied to pose graphs. `bundle_adjustment.py` keeps the plain, un-robustified squared error above, matching the objective as written here.
 
 ---
 
@@ -476,7 +476,7 @@ That's **Bundle Adjustment**.
 
 ## 12. Block sparsity and the Schur complement
 
-Section 10 already named the sparsity that makes large BA problems tractable; here's the mechanics of how solvers actually exploit it. The same structural fact drives everything below: a residual for point $P_j$ seen by camera $T_i$ depends **only** on $T_i$ and $P_j$ — it's completely independent of any other camera or point.
+Section 10 already named the sparsity that makes large BA problems tractable; here's the mechanics of how solvers actually exploit it. The same structural fact drives everything below: a residual for point $P_j$ seen by camera $T_i$ depends **only** on $T_i$ and $P_j$ - it's completely independent of any other camera or point.
 
 ```text
 Camera variables ─── Landmark variables
@@ -484,7 +484,7 @@ Camera variables ─── Landmark variables
        └──── observations ──┘
 ```
 
-That independence gives the linearized normal-equations Hessian ${H = J^\top J}$ a distinctive **arrow-head** block structure: block-diagonal camera-camera blocks, block-diagonal point-point blocks, and off-diagonal camera-point coupling blocks — with no direct camera-camera or point-point coupling anywhere.
+That independence gives the linearized normal-equations Hessian ${H = J^\top J}$ a distinctive **arrow-head** block structure: block-diagonal camera-camera blocks, block-diagonal point-point blocks, and off-diagonal camera-point coupling blocks - with no direct camera-camera or point-point coupling anywhere.
 
 ```text
         Cameras          Points
@@ -497,15 +497,15 @@ Pts   │ coupling │     block-     │
       └──────────┴────────────────┘
 ```
 
-Since real scenes usually have far more points than cameras, solvers exploit this with the **Schur complement trick**: marginalize out the point block first (cheap, since it's block-diagonal — each point's own small block inverts independently), solve the much smaller reduced camera-only system, then cheaply back-substitute to recover the points. It's the same style of sparsity exploitation that makes [pose_graph_optimization.md](pose_graph_optimization.md#5-solving-the-linear-system-gauss-newton-step)'s sparse Cholesky factorization tractable at scale.
+Since real scenes usually have far more points than cameras, solvers exploit this with the **Schur complement trick**: marginalize out the point block first (cheap, since it's block-diagonal - each point's own small block inverts independently), solve the much smaller reduced camera-only system, then cheaply back-substitute to recover the points. It's the same style of sparsity exploitation that makes [pose_graph_optimization.md](pose_graph_optimization.md#5-solving-the-linear-system-gauss-newton-step)'s sparse Cholesky factorization tractable at scale.
 
-`bundle_adjustment.py` doesn't need this trick — its toy scenes are small enough (a handful of cameras and landmarks) that `run_bundle_adjustment` just solves the full dense joint system directly every iteration. Schur-complement marginalization is what a production solver (COLMAP, g2o, GTSAM, Ceres) does under the hood at real scene sizes, not something this demo implements.
+`bundle_adjustment.py` doesn't need this trick - its toy scenes are small enough (a handful of cameras and landmarks) that `run_bundle_adjustment` just solves the full dense joint system directly every iteration. Schur-complement marginalization is what a production solver (COLMAP, g2o, GTSAM, Ceres) does under the hood at real scene sizes, not something this demo implements.
 
 ---
 
 ## 13. Local vs. Global Bundle Adjustment (real systems)
 
-Local BA and Global BA solve the *exact same* objective from Section 6 — they differ only in how much of the problem gets optimized at once, a choice driven by very different system constraints.
+Local BA and Global BA solve the *exact same* objective from Section 6 - they differ only in how much of the problem gets optimized at once, a choice driven by very different system constraints.
 
 | Metric | **Local BA** (e.g. ORB-SLAM) | **Global BA** (e.g. COLMAP) |
 | --- | --- | --- |
@@ -532,21 +532,21 @@ Re-optimizing the entire map on every camera move is impossible in real time, so
 * **Active points**: every 3D point observed by an active keyframe.
 * **Fixed keyframes**: other keyframes that also see an active point, held fixed as rigid anchors so the local window can't drift the map's global frame.
 
-Because a covisibility neighborhood's size stays roughly constant regardless of total map size, Local BA runs in bounded, real-time-friendly time — at the cost of letting small errors accumulate into global drift over a long trajectory. SLAM systems correct that separately, via loop closure + pose-graph optimization ([pose_graph_optimization.md](pose_graph_optimization.md)) or an occasional Global BA pass.
+Because a covisibility neighborhood's size stays roughly constant regardless of total map size, Local BA runs in bounded, real-time-friendly time - at the cost of letting small errors accumulate into global drift over a long trajectory. SLAM systems correct that separately, via loop closure + pose-graph optimization ([pose_graph_optimization.md](pose_graph_optimization.md)) or an occasional Global BA pass.
 
 ### Global BA (COLMAP)
 
-Offline SfM pipelines sacrifice real-time speed for maximum accuracy: as COLMAP incrementally registers new images, it periodically re-optimizes **every** camera and **every** point jointly in one large least-squares problem, then uses the resulting global residuals to prune bad matches and re-triangulate points — something a local window can never do, since it never sees the whole map at once. The cost is that even after the Schur complement from Section 12, the reduced camera-only system still grows cubically with the number of camera poses — and assembling that Schur complement in the first place costs roughly linear time in the number of points/observations — so this can only run periodically or as a final step, not every frame.
+Offline SfM pipelines sacrifice real-time speed for maximum accuracy: as COLMAP incrementally registers new images, it periodically re-optimizes **every** camera and **every** point jointly in one large least-squares problem, then uses the resulting global residuals to prune bad matches and re-triangulate points - something a local window can never do, since it never sees the whole map at once. The cost is that even after the Schur complement from Section 12, the reduced camera-only system still grows cubically with the number of camera poses - and assembling that Schur complement in the first place costs roughly linear time in the number of points/observations - so this can only run periodically or as a final step, not every frame.
 
 ### Choosing between them
 
 Use **Local BA** for real-time robotics/AR/VR where sub-30ms latency matters more than perfect global consistency (loop closure repairs that later). 
 
-Use **Global BA** for offline reconstruction — meshes, NeRF/Gaussian-Splatting input scenes, photogrammetric surveys — where total geometric fidelity matters more than runtime.
+Use **Global BA** for offline reconstruction - meshes, NeRF/Gaussian-Splatting input scenes, photogrammetric surveys - where total geometric fidelity matters more than runtime.
 
-`bundle_adjustment.py`'s three solvers (`run_ba_landmarks_only`, `run_ba_poses_only`, `run_bundle_adjustment`) are all single-batch joint solves over the whole toy scene — closest in spirit to a (tiny) Global BA pass. It has no windowing, no covisibility graph, and no incremental registration, so it doesn't model Local BA's real-time system behavior at all.
+`bundle_adjustment.py`'s three solvers (`run_ba_landmarks_only`, `run_ba_poses_only`, `run_bundle_adjustment`) are all single-batch joint solves over the whole toy scene - closest in spirit to a (tiny) Global BA pass. It has no windowing, no covisibility graph, and no incremental registration, so it doesn't model Local BA's real-time system behavior at all.
 
-`bundle_adjustment_advanced.py` fills that gap: a camera moves keyframe-by-keyframe through a landmark corridor, a covisibility graph is built incrementally, and every new keyframe triggers a bounded local-BA solve over an active window (new keyframe + covisible neighbors, with every other observing keyframe held fixed as a rigid anchor — this section's diagram, made concrete), while a periodic Global BA pass over the whole map runs alongside it for direct comparison. Measuring wall-clock solve time confirms both halves of this section's "Scaling" row in code: the local window's cost stays roughly flat as the map grows, while the Global BA pass's cost grows with it. It also demonstrates *why* an occasional Global BA pass helps — accumulated front-end drift — and, just as informatively, that its benefit is modest without an actual loop closure to supply a genuinely new constraint (see the script's own module docstring for that finding).
+`bundle_adjustment_advanced.py` fills that gap: a camera moves keyframe-by-keyframe through a landmark corridor, a covisibility graph is built incrementally, and every new keyframe triggers a bounded local-BA solve over an active window (new keyframe + covisible neighbors, with every other observing keyframe held fixed as a rigid anchor - this section's diagram, made concrete), while a periodic Global BA pass over the whole map runs alongside it for direct comparison. Measuring wall-clock solve time confirms both halves of this section's "Scaling" row in code: the local window's cost stays roughly flat as the map grows, while the Global BA pass's cost grows with it. It also demonstrates *why* an occasional Global BA pass helps - accumulated front-end drift - and, just as informatively, that its benefit is modest without an actual loop closure to supply a genuinely new constraint (see the script's own module docstring for that finding).
 
 ---
 

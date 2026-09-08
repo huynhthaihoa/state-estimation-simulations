@@ -76,7 +76,7 @@ $${J =\begin{bmatrix}\frac{\partial y_1}{\partial x_1} & \frac{\partial y_1}{\pa
 \end{bmatrix} = \begin{bmatrix}1 & 2x_2 \\
 x_2 & x_1\end{bmatrix}}$$
 
-That's the **Jacobian**. Notice the convention: each **row** is one output ($y_i$), each **column** is one input ($x_j$) — $J_{ij} = \partial y_i/\partial x_j$.
+That's the **Jacobian**. Notice the convention: each **row** is one output ($y_i$), each **column** is one input ($x_j$) - $J_{ij} = \partial y_i/\partial x_j$.
 
 ---
 
@@ -117,13 +117,13 @@ This tells you:
 
 So you can think of the Jacobian as a **sensitivity table**.
 
-> This $H$ is schematic — its exact entries depend on the camera model, which isn't specified here. Section 4 below works out a concrete projection Jacobian end-to-end — though there the input is the 3D point being observed rather than the robot pose, so it's a related but distinct sensitivity matrix (labeled $J$, not $H$, for that reason).
+> This $H$ is schematic - its exact entries depend on the camera model, which isn't specified here. Section 4 below works out a concrete projection Jacobian end-to-end - though there the input is the 3D point being observed rather than the robot pose, so it's a related but distinct sensitivity matrix (labeled $J$, not $H$, for that reason).
 
 ---
 
 ## 4. A very intuitive example: camera projection
 
-This works out a concrete instance of "camera measurement Jacobian" — but note it's differentiating with respect to the observed 3D point, not the robot pose from Section 3's $H$, which is why it gets its own symbol, $J$.
+This works out a concrete instance of "camera measurement Jacobian" - but note it's differentiating with respect to the observed 3D point, not the robot pose from Section 3's $H$, which is why it gets its own symbol, $J$.
 
 Suppose a 3D point is:
 
@@ -247,7 +247,7 @@ That's essentially what EKF does.
 
 ## 7. Jacobian ≈ "local translator"
 
-Here's another mental model I really like for robotics — the same idea as the mountain in Section 6, just written as an equation instead of a picture.
+Here's another mental model I really like for robotics - the same idea as the mountain in Section 6, just written as an equation instead of a picture.
 
 Suppose you have:
 
@@ -394,28 +394,28 @@ Section 9 mentioned that IEKF perturbs the state "according to the geometry of t
 
 Everywhere above, perturbing an input meant simple addition: $x \to x + \delta x$. That works because $x$ lives in a vector space.
 
-A rotation $R \in SO(3)$ does not. There is no such thing as $R + \delta R$ — the result generally isn't even a valid rotation. Instead, a small perturbation $\delta\varphi \in \mathbb{R}^3$ is turned into a rotation via the exponential map, $\text{Exp}(\delta\varphi)$, and then **composed** (matrix-multiplied) with $R$:
+A rotation $R \in SO(3)$ does not. There is no such thing as $R + \delta R$ - the result generally isn't even a valid rotation. Instead, a small perturbation $\delta\varphi \in \mathbb{R}^3$ is turned into a rotation via the exponential map, $\text{Exp}(\delta\varphi)$, and then **composed** (matrix-multiplied) with $R$:
 
 $$R' = \text{Exp}(\delta\varphi)\,R \qquad \text{or} \qquad R' = R\,\text{Exp}(\delta\varphi)$$
 
-Both are valid ways to perturb $R$ — but they are *not* the same $R'$ in general, because matrix multiplication doesn't commute. That single fact — no commutativity — is the entire reason left and right Jacobians exist. On a vector space this distinction never comes up, because addition always commutes.
+Both are valid ways to perturb $R$ - but they are *not* the same $R'$ in general, because matrix multiplication doesn't commute. That single fact - no commutativity - is the entire reason left and right Jacobians exist. On a vector space this distinction never comes up, because addition always commutes.
 
 ### 11.2 The actual question being asked
 
-Suppose you already have a rotation built from $\varphi$, i.e. $\text{Exp}(\varphi)$, and you want to nudge the *argument*: $\text{Exp}(\varphi + \delta\varphi)$. Because $\text{Exp}$ is a curved, nonlinear map (just like $u = fX/Z$ was curved in Section 4), you cannot simply distribute the addition. What you *can* do is ask the same sensitivity question as always — "how does the output change?" — and express the answer as a small rotation composed onto $\text{Exp}(\varphi)$, either on the left or on the right:
+Suppose you already have a rotation built from $\varphi$, i.e. $\text{Exp}(\varphi)$, and you want to nudge the *argument*: $\text{Exp}(\varphi + \delta\varphi)$. Because $\text{Exp}$ is a curved, nonlinear map (just like $u = fX/Z$ was curved in Section 4), you cannot simply distribute the addition. What you *can* do is ask the same sensitivity question as always - "how does the output change?" - and express the answer as a small rotation composed onto $\text{Exp}(\varphi)$, either on the left or on the right:
 
 $$\text{Exp}(\varphi+\delta\varphi)\;\approx\;\text{Exp}\big(J_l(\varphi)\,\delta\varphi\big)\cdot\text{Exp}(\varphi) \qquad\text{(left)}$$
 
 $$\text{Exp}(\varphi+\delta\varphi)\;\approx\;\text{Exp}(\varphi)\cdot\text{Exp}\big(J_r(\varphi)\,\delta\varphi\big) \qquad\text{(right)}$$
 
-So $J_l$ and $J_r$ are still exactly what Section 10 says a Jacobian always is — a local sensitivity map, "small change in input → small change in output" — just applied to the exponential map instead of to a vector-valued function, and reported as *which side* the resulting perturbation attaches to.
+So $J_l$ and $J_r$ are still exactly what Section 10 says a Jacobian always is - a local sensitivity map, "small change in input → small change in output" - just applied to the exponential map instead of to a vector-valued function, and reported as *which side* the resulting perturbation attaches to.
 
 ### 11.3 The intuition: compass vs. steering wheel
 
-- **Right Jacobian** $J_r(\varphi)$: the extra rotation is applied *after* $\text{Exp}(\varphi)$, i.e. it's expressed in the object's **own current (body) frame**. Like turning a car's steering wheel a bit more — "a bit more" is always relative to however the car is already pointed.
+- **Right Jacobian** $J_r(\varphi)$: the extra rotation is applied *after* $\text{Exp}(\varphi)$, i.e. it's expressed in the object's **own current (body) frame**. Like turning a car's steering wheel a bit more - "a bit more" is always relative to however the car is already pointed.
 - **Left Jacobian** $J_l(\varphi)$: the extra rotation is applied *before*, i.e. it's expressed in the **fixed world/global frame**. Like someone nudging your heading by a fixed compass bearing, regardless of which way you're currently facing.
 
-Near the identity ($\varphi \to 0$) there's no rotation yet to disagree about "whose frame," so the two notions collapse: $J_l(0) = J_r(0) = I$. This is exactly the flat-tangent-plane picture from Section 6 — right at the point of linearization, the manifold looks flat and left/right don't matter yet. The distinction only shows up once you're linearizing *away* from the identity, i.e. around some existing rotation.
+Near the identity ($\varphi \to 0$) there's no rotation yet to disagree about "whose frame," so the two notions collapse: $J_l(0) = J_r(0) = I$. This is exactly the flat-tangent-plane picture from Section 6 - right at the point of linearization, the manifold looks flat and left/right don't matter yet. The distinction only shows up once you're linearizing *away* from the identity, i.e. around some existing rotation.
 
 ### 11.4 Closed form for $SO(3)$
 
@@ -429,7 +429,7 @@ Useful identities (all follow from $[\varphi]_\times^2$ being symmetric and $[\v
 
 $$J_r(\varphi) = J_l(-\varphi) \qquad J_r(\varphi) = J_l(\varphi)^\top \qquad J_l(\varphi) = R(\varphi)\,J_r(\varphi)$$
 
-The last one is the frame-conversion identity: $R(\varphi)$ is exactly what turns a body-frame perturbation into a world-frame one, so it's the bridge between $J_r$ and $J_l$ — consistent with the compass/steering-wheel picture above.
+The last one is the frame-conversion identity: $R(\varphi)$ is exactly what turns a body-frame perturbation into a world-frame one, so it's the bridge between $J_r$ and $J_l$ - consistent with the compass/steering-wheel picture above.
 
 ### 11.5 A worked example: 90° yaw
 
@@ -441,10 +441,10 @@ Notice $J_r = J_l^\top$, exactly as the identity predicts. If you instead plug i
 
 ### 11.6 Where this actually matters
 
-* **IMU preintegration**: the effect of a small change in gyroscope bias is naturally expressed in the sensor's own (body) frame, so bias-correction Jacobians in preintegration use $J_r$ — worked out end-to-end in [imu_preintegration.md](../optimization/imu_preintegration.md).
-* **Covariance/uncertainty propagation on the manifold**: a rotation's uncertainty is stored as a covariance on the tangent vector $\delta\varphi$, but whether that $\delta\varphi$ is defined via $R\,\text{Exp}(\delta\varphi)$ (right) or $\text{Exp}(\delta\varphi)\,R$ (left) changes what the covariance numerically means. Converting between the two conventions is exactly a multiplication by $J_l$ or $J_r$ — a change of frame, not a change of the underlying uncertainty.
+* **IMU preintegration**: the effect of a small change in gyroscope bias is naturally expressed in the sensor's own (body) frame, so bias-correction Jacobians in preintegration use $J_r$ - worked out end-to-end in [imu_preintegration.md](../optimization/imu_preintegration.md).
+* **Covariance/uncertainty propagation on the manifold**: a rotation's uncertainty is stored as a covariance on the tangent vector $\delta\varphi$, but whether that $\delta\varphi$ is defined via $R\,\text{Exp}(\delta\varphi)$ (right) or $\text{Exp}(\delta\varphi)\,R$ (left) changes what the covariance numerically means. Converting between the two conventions is exactly a multiplication by $J_l$ or $J_r$ - a change of frame, not a change of the underlying uncertainty.
 * **Factor graphs / bundle adjustment on $SE(3)$**: residual Jacobians w.r.t. a pose depend on which perturbation convention (left vs. right) the library uses; using the wrong one silently biases the optimization even though the code runs without error.
 
 ### 11.7 One-sentence intuition
 
-> **$J_l$ and $J_r$ are the same "local sensitivity map" as every other Jacobian in this document — they just answer the question for the exponential map on a Lie group, where a small change to the input can be reported either in the world frame (left) or in the object's own frame (right), and those two answers only agree exactly at the identity.**
+> **$J_l$ and $J_r$ are the same "local sensitivity map" as every other Jacobian in this document - they just answer the question for the exponential map on a Lie group, where a small change to the input can be reported either in the world frame (left) or in the object's own frame (right), and those two answers only agree exactly at the identity.**

@@ -371,7 +371,7 @@ $${q_{\text{true}} = \delta q\otimes q_{\text{estimate}}}$$
 
 where $\delta q$ represents a **small 3D rotational error**.
 
-This idea leads directly into **SO(3), Lie groups, Lie algebra, and the Invariant EKF** you were asking about earlier. In the terminology of [left_right_invariant.md](../filtering/left_right_invariant.md), this particular $\delta q$ is a *right*-invariant error (the mismatch viewed from a fixed point in the world frame) — see that doc for when you’d instead want the left-invariant, body-frame version.
+This idea leads directly into **SO(3), Lie groups, Lie algebra, and the Invariant EKF** you were asking about earlier. In the terminology of [left_right_invariant.md](../filtering/left_right_invariant.md), this particular $\delta q$ is a *right*-invariant error (the mismatch viewed from a fixed point in the world frame) - see that doc for when you’d instead want the left-invariant, body-frame version.
 
 ---
 

@@ -281,13 +281,13 @@ Each particle is propagated through the (possibly highly nonlinear) motion model
      •    •                    •   •                       •
 ```
 
-This lets a PF represent **multimodal** beliefs — "the robot is either in room A or room B, I genuinely don't know which" — something a single Gaussian, which every KF-family filter assumes, simply cannot express.
+This lets a PF represent **multimodal** beliefs - "the robot is either in room A or room B, I genuinely don't know which" - something a single Gaussian, which every KF-family filter assumes, simply cannot express.
 
 **Why care?**
 
-* No linearity or Gaussian-noise assumption at all — works for arbitrarily nonlinear, non-Gaussian problems.
+* No linearity or Gaussian-noise assumption at all - works for arbitrarily nonlinear, non-Gaussian problems.
 * Naturally represents multimodal beliefs (ambiguous data association, the kidnapped-robot problem, global localization).
-* Classic robotics use case: **Monte Carlo Localization (MCL)** — localizing a robot on a known map from range/bearing measurements.
+* Classic robotics use case: **Monte Carlo Localization (MCL)** - localizing a robot on a known map from range/bearing measurements.
 
 **The catch**: accuracy scales with particle count, and in high-dimensional state spaces (like a full SLAM state vector) you need an impractically large number of particles to cover the space adequately. That's why particle filters are common for low-dimensional localization but rare for full SLAM state estimation, where EKF/UKF/factor-graph approaches dominate instead.
 
@@ -436,7 +436,7 @@ Given your background in **computer vision, SLAM, embedded systems, and your upc
 
 I'd prioritize them roughly like this:
 
-### Tier 1 — Must understand
+### Tier 1 - Must understand
 
 #### 1. Standard KF
 
@@ -481,7 +481,7 @@ Understand:
 * left/right invariant errors
 * system symmetries
 
-### Tier 2 — Very useful
+### Tier 2 - Very useful
 
 #### 5. UKF
 
@@ -499,7 +499,7 @@ Very useful for offline trajectory estimation and SLAM.
 
 Important for numerical stability and large-scale estimation.
 
-### Tier 3 — Know the idea
+### Tier 3 - Know the idea
 
 #### 8. Adaptive KF
 

@@ -254,7 +254,7 @@ You compute:
 
 $$\delta\theta^\wedge = \log(R_1^{-1}R_2)$$
 
-This converts a group element back into a Lie-algebra element — undoing the exponential map:
+This converts a group element back into a Lie-algebra element - undoing the exponential map:
 
 $$\log(\exp(\delta\theta^\wedge)) = \delta\theta^\wedge$$
 
@@ -276,9 +276,9 @@ So:
 
 > **Logarithm map = turn an actual transformation back into a local motion.**
 
-(To pull the plain vector $\delta\theta \in \mathbb{R}^3$ out of the skew-symmetric matrix $\delta\theta^\wedge$, apply the inverse of the hat operator — usually called the **vee operator** $(\cdot)^\vee$ — so $\delta\theta = (\log(R))^\vee$.)
+(To pull the plain vector $\delta\theta \in \mathbb{R}^3$ out of the skew-symmetric matrix $\delta\theta^\wedge$, apply the inverse of the hat operator - usually called the **vee operator** $(\cdot)^\vee$ - so $\delta\theta = (\log(R))^\vee$.)
 
-This is exactly how you turn "the difference between two poses" into a plain vector you can measure, weight, and feed into a least-squares solver — which is precisely what pose-graph optimization does with every edge residual.
+This is exactly how you turn "the difference between two poses" into a plain vector you can measure, weight, and feed into a least-squares solver - which is precisely what pose-graph optimization does with every edge residual.
 
 The same idea applies to $SE(3)$:
 
@@ -365,12 +365,12 @@ $$\xi^\wedge = \begin{bmatrix} \phi^\wedge & \rho\\
 
 where $\phi^\wedge$ is that same $3\times3$ skew-symmetric block from before.
 
-Here's the part that's easy to get wrong: **$\exp(\xi^\wedge)$ is *not* "exponentiate the rotation part and copy the translation part over unchanged."** Rotation and translation are coupled — sweeping a small rotation while translating traces a curve, not a straight line. The closed form is:
+Here's the part that's easy to get wrong: **$\exp(\xi^\wedge)$ is *not* "exponentiate the rotation part and copy the translation part over unchanged."** Rotation and translation are coupled - sweeping a small rotation while translating traces a curve, not a straight line. The closed form is:
 
 $$\exp(\xi^\wedge) = \begin{bmatrix} \exp(\phi^\wedge) & V\rho\\ 
 0 & 1 \end{bmatrix}$$
 
-where $V$ is a $3\times3$ matrix (built purely from $\phi$) that "bends" the raw translation $\rho$ to account for that coupling. The exact formula for $V$ isn't the point here — what matters is: **you can't just glue the $SO(3)$ exponential and the raw translation together; $SE(3)$'s exponential map genuinely mixes rotation and translation.** (The log map has the mirror-image subtlety: recovering $\rho$ from a pose requires $V^{-1}$, not just reading the translation column off directly.)
+where $V$ is a $3\times3$ matrix (built purely from $\phi$) that "bends" the raw translation $\rho$ to account for that coupling. The exact formula for $V$ isn't the point here - what matters is: **you can't just glue the $SO(3)$ exponential and the raw translation together; $SE(3)$'s exponential map genuinely mixes rotation and translation.** (The log map has the mirror-image subtlety: recovering $\rho$ from a pose requires $V^{-1}$, not just reading the translation column off directly.)
 
 Then:
 
@@ -401,7 +401,7 @@ $$\xi = \begin{bmatrix} 2\,\text{cm}\\
 0\\
 0.2^\circ \end{bmatrix}$$
 
-It describes a **small motion**, not a complete pose. (In cm/degrees purely for intuition — plugging into the actual $\exp(\xi^\wedge)$ formula requires consistent units, i.e. meters and radians.)
+It describes a **small motion**, not a complete pose. (In cm/degrees purely for intuition - plugging into the actual $\exp(\xi^\wedge)$ formula requires consistent units, i.e. meters and radians.)
 
 You then apply that motion to the drone's current pose.
 

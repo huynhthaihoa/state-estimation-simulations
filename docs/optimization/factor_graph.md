@@ -23,7 +23,7 @@ For SLAM:
 
 ![A four-layer factor graph for 2D robot localization: landmarks L0-L2 at top connected via bearing factors to poses P0-P2, which are in turn chained together by odometry factors](../images/factor_graph_5.jpg)
 
-*These diagrams are illustrative sketches pulled from different tutorials/papers — see [Image sources](#image-sources) below for exactly which claim is confirmed vs. still unverified.*
+*These diagrams are illustrative sketches pulled from different tutorials/papers - see [Image sources](#image-sources) below for exactly which claim is confirmed vs. still unverified.*
 
 For example:
 
@@ -510,49 +510,49 @@ That is the conceptual bridge connecting essentially all the SLAM topics you've 
 
 1. Kschischang, F. R., Frey, B. J., & Loeliger, H.-A. (2001). *Factor Graphs and the Sum-Product
    Algorithm*. IEEE Transactions on Information Theory, 47(2), 498–519.
-   https://doi.org/10.1109/18.910572 — the original, general (non-robotics) definition of a
+   https://doi.org/10.1109/18.910572 - the original, general (non-robotics) definition of a
    factor graph as a bipartite graph of variable nodes and factor nodes, behind §1 and §6's
    variable/factor terminology. This paper does **not** contain the diagram in
-   `images/factor_graph_1.jpg`; see Image sources below — that image's originally-recorded
+   `images/factor_graph_1.jpg`; see Image sources below - that image's originally-recorded
    citation was checked against the paper's actual figures and found to be wrong.
 2. Dellaert, F., & Kaess, M. (2017). *Factor Graphs for Robot Perception*. Foundations and
-   Trends in Robotics, 6(1–2), 1–139. https://doi.org/10.1561/2300000043 — the standard
+   Trends in Robotics, 6(1–2), 1–139. https://doi.org/10.1561/2300000043 - the standard
    robotics-focused reference for factor graphs in SLAM (poses, landmarks, IMU/camera/loop-
    closure factors), behind §1, §5, §6, and §7's pose-graph-vs-factor-graph distinction.
 3. Racinskis, P., Arents, J., & Greitans, M. (2023). *Constructing Maps for Autonomous Robotics:
    An Introductory Conceptual Overview*. Electronics, 12(13), 2925.
-   https://doi.org/10.3390/electronics12132925 — Figure 1 of this paper is the confirmed source
+   https://doi.org/10.3390/electronics12132925 - Figure 1 of this paper is the confirmed source
    of the diagram in `images/factor_graph_3.jpg` (see Image sources below).
 
 ### Image sources
 
-<!-- 1. `images/factor_graph_1.jpg` — originally cited as https://ieeexplore.ieee.org/document/910572
+<!-- 1. `images/factor_graph_1.jpg` - originally cited as https://ieeexplore.ieee.org/document/910572
    (IEEE document 910572, i.e., Reference 1 above). **This citation is incorrect.** The paper was
    downloaded in full and every figure inspected; none of them show robot poses, landmarks,
    "Odometry measurement"/"Landmark measurement" labels, or the "Bipartite graph with variable
-   nodes and factor nodes" legend seen in this image — the paper's figures are all abstract
+   nodes and factor nodes" legend seen in this image - the paper's figures are all abstract
    coding-theory examples ($x_1,\dots,x_5$ with generic factors $f_A,\dots,f_E$), Tanner graphs,
    trellises, and a scalar Kalman-filter derivation. A plausible alternative family of sources
    (Dellaert & Kaess's SLAM tutorials, which use this exact "Odometry measurement" / "Landmark
-   measurement" phrasing with toy robot/furniture photos) was checked and did not match either —
+   measurement" phrasing with toy robot/furniture photos) was checked and did not match either -
    their version uses photographs, not the abstract $x_0,\dots,x_n$ / $l_1, l_2$ circles seen
    here. The true source of this image is **unidentified**; do not cite IEEE document 910572 for
    it. -->
-2. `images/factor_graph_2.jpg` — originally cited as
+2. `images/factor_graph_2.jpg` - originally cited as
    https://engcang.github.io/gtsam_tutorial.html. **Confirmed**: this is a pixel-for-pixel match
    for the second pose-graph figure on that page (image file
    `/assets/img/posts/230715_gtsam/graph2.png`), a Korean-language GTSAM tutorial blog post by
    Eungchang Mason Lee (page title "GTSAM 튜토리얼 | Eungchang Mason Lee").
-3. `images/factor_graph_3.jpg` — originally cited as https://www.mdpi.com/2079-9292/12/13/2925.
+3. `images/factor_graph_3.jpg` - originally cited as https://www.mdpi.com/2079-9292/12/13/2925.
    **Confirmed**: pixel-for-pixel match for Figure 1 of Reference 3 above (downloaded directly
    from MDPI's own PDF host, since the MDPI article page itself returns HTTP 403 to automated
    fetches).
-4. `images/factor_graph_4.jpg` — originally cited as https://cmsc426.github.io/gtsam/.
+4. `images/factor_graph_4.jpg` - originally cited as https://cmsc426.github.io/gtsam/.
    **Confirmed**: pixel-for-pixel match for the image `/assets/sfm/gtsam9.png` embedded on that
    page, part of the University of Maryland CMSC426 (Computer Vision) course's "Structure from
    Motion" lecture notes.
-5. `images/factor_graph_5.jpg` — originally cited as https://symforce.org/. **Confirmed**:
+5. `images/factor_graph_5.jpg` - originally cited as https://symforce.org/. **Confirmed**:
    pixel-for-pixel match for the image `docs/static/images/robot_2d_localization/factor_graph.png`
-   embedded on that page — the diagram from SymForce's (Skydio's symbolic-computation library for
+   embedded on that page - the diagram from SymForce's (Skydio's symbolic-computation library for
    robotics) "Robot 2D Localization" example/tutorial,
    https://symforce.org/examples/robot_2d_localization/README.html.
