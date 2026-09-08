@@ -16,7 +16,7 @@ Each `use_manif/<name>.py` is the manifpy counterpart of `use_numpy/<name>.py` o
 ## Documentation
 
 [docs/](docs/) has the conceptual write-ups behind these simulations:
-- Math foundations: Jacobian, Lie algebra, quaternions
+- **Math foundations**: Jacobian, Lie algebra, quaternions
 - The **Kalman-filter** family: KF/EKF/IEKF and variants
 - The **factor-graph/smoothing** family: NLS, Gauss-Newton, Levenberg-Marquardt, factor graphs,
 pose-graph optimization, bundle adjustment, iSAM 
