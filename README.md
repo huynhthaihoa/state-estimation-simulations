@@ -2,8 +2,8 @@
 
 ## Introduction
 
-A collection of from-scratch simulations exploring pose/state estimation on manifolds: 
- - How orientation and pose should be integrated and corrected on $SO(3)$ / $SE(3)$ rather than treated as flat vectors
+A collection of from-scratch simulations exploring **pose/state estimation on manifolds**: 
+ - How **orientation** and **pose** should be integrated and corrected on $SO(3)$ / $SE(3)$ rather than treated as flat vectors
  - How a **prior** (a motion model driven by noisy control/odometry inputs) can be fused with **measurements** either **recursively** (Kalman filtering) or in **batch** (Gauss-Newton optimization).
 
 Two implementation styles run side by side for the core comparison scripts,
@@ -25,7 +25,7 @@ Start at [docs/README.md](docs/README.md) for the full index, or [docs/frontend_
 
 ## Library structure
 
-### [use_numpy/](use_numpy/) — plain numpy, hand-rolled Lie-group math
+### [use_numpy/](use_numpy/) - Plain numpy, hand-rolled Lie-group math
 
 - [lie_utils.py](use_numpy/lie_utils.py): shared module of the hand-rolled
   Lie-group helpers (`skew`, `rotation_geodesic_error`, `so3_exp`,
@@ -87,7 +87,7 @@ Start at [docs/README.md](docs/README.md) for the full index, or [docs/frontend_
   can hit but `bundle_adjustment.py`'s densely-observed toy scene never
   does.
 
-### [use_manif/](use_manif/) — same simulations, on `manifpy`
+### [use_manif/](use_manif/) - Same simulations, on `manifpy`
 
 - [imu_integration_comparison.py](use_manif/imu_integration_comparison.py)
 - [robot_imu_simulation.py](use_manif/robot_imu_simulation.py)
