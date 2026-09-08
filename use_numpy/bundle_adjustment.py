@@ -45,29 +45,15 @@ lie_utils.py, shared with pointcloud_pose_tracking.py and pose_graph.py.
 '''
 
 import argparse
+import os
+import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lie_utils import skew, se3_exp, se3_log, se3_inv, compute_se3_inv_right_jacobian, rotation_geodesic_error
-
-
-def look_at_rotation(cam_pos, target, up_hint=np.array([0.0, 0.0, 1.0])):
-    """Builds a camera-to-world rotation whose local +z axis points from
-    cam_pos toward target.
-    Arguments:
-        cam_pos: camera position in world frame (3,)
-        target: point the camera should look at, world frame (3,)
-        up_hint: approximate "up" direction in world frame (3,)
-    Returns:
-        R: (3,3) camera-to-world rotation (columns = camera x,y,z axes in world coords)
-    """
-    forward = target - cam_pos
-    forward = forward / np.linalg.norm(forward)
-    right = np.cross(forward, up_hint)
-    right = right / np.linalg.norm(right)
-    cam_up = np.cross(forward, right)
-    return np.column_stack([right, cam_up, forward])
+from utils import look_at_rotation, umeyama_alignment, landmark_errors
 
 
 def generate_ground_truth_scene(n_cameras, n_landmarks, camera_radius, arc_span_deg, landmark_spread, rng):
@@ -392,32 +378,6 @@ def run_bundle_adjustment(T_init, P_init, observations, K, pose_noise_std, pixel
     return T_est, P_est
 
 
-def umeyama_alignment(P_est, P_true):
-    """Least-squares similarity (scale, rotation, translation) that best
-    maps P_est onto P_true (Umeyama, 1991): P_true ~= s * (R @ P_est.T).T + t.
-    Arguments:
-        P_est: (N,3) estimated points
-        P_true: (N,3) corresponding true points
-    Returns:
-        s: scale
-        R: (3,3) rotation
-        t: (3,) translation
-    """
-    mu_est, mu_true = P_est.mean(axis=0), P_true.mean(axis=0)
-    X, Y = P_est - mu_est, P_true - mu_true
-    n = P_est.shape[0]
-    cov = (Y.T @ X) / n
-    U, D, Vt = np.linalg.svd(cov)
-    S = np.eye(3)
-    if np.linalg.det(U) * np.linalg.det(Vt) < 0.0:
-        S[2, 2] = -1.0
-    R = U @ S @ Vt
-    var_est = (X ** 2).sum() / n
-    s = np.trace(np.diag(D) @ S) / var_est
-    t = mu_true - s * (R @ mu_est)
-    return s, R, t
-
-
 def align_reconstruction_to_ground_truth(T_true, T_est, P_est):
     """Aligns a bundle-adjustment result to ground truth via the best-fit
     similarity (scale + rotation + translation) between estimated and true
@@ -467,17 +427,6 @@ def pose_errors(T_true_list, T_est_list):
         rot_err[k] = np.degrees(rotation_geodesic_error(T_true_list[k][0:3, 0:3], T_est_list[k][0:3, 0:3]))
         pos_err[k] = np.linalg.norm(T_true_list[k][0:3, 3] - T_est_list[k][0:3, 3])
     return rot_err, pos_err
-
-
-def landmark_errors(P_true, P_est):
-    """Per-landmark position error (m).
-    Arguments:
-        P_true: (n_landmarks, 3) ground-truth landmark positions
-        P_est: (n_landmarks, 3) estimated landmark positions
-    Returns:
-        err: (n_landmarks,) array of per-landmark position errors (m)
-    """
-    return np.linalg.norm(P_true - P_est, axis=1)
 
 
 def reprojection_rms(T_list, P_list, observations, K):

@@ -43,57 +43,15 @@ this codebase.
 '''
 
 import argparse
-import time
-import tracemalloc
+import os
+import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lie_utils import skew, se3_exp, se3_log, se3_inv, se3_adjoint, compute_se3_inv_right_jacobian, se3_right_jacobian, rotation_geodesic_error
-
-def measure_performance(fn, *args, n_steps, **kwargs):
-    """Runs `fn` once, measuring wall-clock time and peak memory allocated
-    during the call (via tracemalloc), and reports both as per-step averages
-    so the three approaches (different amounts of work per step) are
-    comparable on the same footing.
-    Arguments:
-        fn: callable to run and measure
-        *args, **kwargs: forwarded to fn
-        n_steps: number of trajectory steps, used to normalize both metrics
-    Returns:
-        result: fn(*args, **kwargs)'s return value
-        avg_time_per_step: wall-clock time / n_steps (s)
-        avg_mem_per_step: peak traced memory / n_steps (bytes)
-    """
-    tracemalloc.start()
-    t_start = time.perf_counter()
-    result = fn(*args, **kwargs)
-    elapsed = time.perf_counter() - t_start
-    _, peak_mem = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
-    return result, elapsed / n_steps, peak_mem / n_steps
-
-
-def true_body_rates(t):
-    """Smooth, persistently-exciting angular & linear body-frame rate profile
-    Arguments:
-        t: time (s)
-    Returns:
-        omega: body-frame angular velocity (rad/s)
-        v: body-frame linear velocity (m/s)
-    """
-    omega = np.array([
-        0.6 * np.sin(0.7 * t),
-        0.5 * np.cos(0.4 * t + 0.3),
-        0.8 * np.sin(0.25 * t + 1.0),
-    ])
-    v = np.array([
-        1.0 * np.cos(0.3 * t),
-        0.5 * np.sin(0.2 * t),
-        0.2 * np.sin(0.5 * t),
-    ])
-    return omega, v
-
+from utils import measure_performance, true_body_rates
 
 def make_body_point_cloud(n_points, rng, half_extent=0.5):
     """A fixed, non-degenerate set of body-frame landmark points (the object's

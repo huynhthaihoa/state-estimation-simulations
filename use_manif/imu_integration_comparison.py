@@ -52,10 +52,15 @@ Appendix:
 '''
 
 import argparse
+import os
+import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 import manifpy as manif
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils import true_body_rates
 
 
 def euler_to_quat_xyzw(rpy):
@@ -76,21 +81,6 @@ def euler_to_quat_xyzw(rpy):
         cr * cp * sy - sr * sp * cy,
         cr * cp * cy + sr * sp * sy,
     ])
-
-
-def true_body_rates(t):
-    """Smooth, persistently-exciting angular & linear body-frame rate profile."""
-    omega = np.array([
-        0.6 * np.sin(0.7 * t),
-        0.5 * np.cos(0.4 * t + 0.3),
-        0.8 * np.sin(0.25 * t + 1.0),
-    ])
-    v = np.array([
-        1.0 * np.cos(0.3 * t),
-        0.5 * np.sin(0.2 * t),
-        0.2 * np.sin(0.5 * t),
-    ])
-    return omega, v
 
 
 def run_simulation(duration, dt, gyro_noise_std, vel_noise_std, seed):

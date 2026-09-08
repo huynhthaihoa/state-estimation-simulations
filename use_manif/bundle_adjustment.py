@@ -43,67 +43,15 @@ imu_preintegration.py's `euler_to_quat_xyzw` helper.
 '''
 
 import argparse
+import os
+import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 import manifpy as manif
 
-
-def rotation_matrix_to_quaternion_xyzw(R):
-    """Converts a (3,3) rotation matrix to a manifpy-convention [x,y,z,w]
-    quaternion (Shepperd's method) -- used only to build ground-truth/
-    aligned manif.SE3 poses from a plain rotation matrix; not a Lie-group
-    operation itself.
-    Arguments:
-        R: (3,3) rotation matrix
-    Returns:
-        quat_xyzw: (4,) array [x, y, z, w]
-    """
-    tr = np.trace(R)
-    if tr > 0:
-        S = np.sqrt(tr + 1.0) * 2.0
-        w = 0.25 * S
-        x = (R[2, 1] - R[1, 2]) / S
-        y = (R[0, 2] - R[2, 0]) / S
-        z = (R[1, 0] - R[0, 1]) / S
-    elif R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
-        S = np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2]) * 2.0
-        w = (R[2, 1] - R[1, 2]) / S
-        x = 0.25 * S
-        y = (R[0, 1] + R[1, 0]) / S
-        z = (R[0, 2] + R[2, 0]) / S
-    elif R[1, 1] > R[2, 2]:
-        S = np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2]) * 2.0
-        w = (R[0, 2] - R[2, 0]) / S
-        x = (R[0, 1] + R[1, 0]) / S
-        y = 0.25 * S
-        z = (R[1, 2] + R[2, 1]) / S
-    else:
-        S = np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1]) * 2.0
-        w = (R[1, 0] - R[0, 1]) / S
-        x = (R[0, 2] + R[2, 0]) / S
-        y = (R[1, 2] + R[2, 1]) / S
-        z = 0.25 * S
-    quat = np.array([x, y, z, w])
-    return quat / np.linalg.norm(quat)
-
-
-def look_at_rotation(cam_pos, target, up_hint=np.array([0.0, 0.0, 1.0])):
-    """Builds a camera-to-world rotation whose local +z axis points from
-    cam_pos toward target.
-    Arguments:
-        cam_pos: camera position in world frame (3,)
-        target: point the camera should look at, world frame (3,)
-        up_hint: approximate "up" direction in world frame (3,)
-    Returns:
-        R: (3,3) camera-to-world rotation (columns = camera x,y,z axes in world coords)
-    """
-    forward = target - cam_pos
-    forward = forward / np.linalg.norm(forward)
-    right = np.cross(forward, up_hint)
-    right = right / np.linalg.norm(right)
-    cam_up = np.cross(forward, right)
-    return np.column_stack([right, cam_up, forward])
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils import look_at_rotation, umeyama_alignment, landmark_errors, rotation_matrix_to_quaternion_xyzw
 
 
 def generate_ground_truth_scene(n_cameras, n_landmarks, camera_radius, arc_span_deg, landmark_spread, rng):
@@ -451,17 +399,6 @@ def pose_errors(T_true_list, T_est_list):
     return rot_err, pos_err
 
 
-def landmark_errors(P_true, P_est):
-    """Per-landmark position error (m).
-    Arguments:
-        P_true: (n_landmarks, 3) ground-truth landmark positions
-        P_est: (n_landmarks, 3) estimated landmark positions
-    Returns:
-        err: (n_landmarks,) array of per-landmark position errors (m)
-    """
-    return np.linalg.norm(P_true - P_est, axis=1)
-
-
 def reprojection_rms(T_list, P_list, observations, K):
     """RMS pixel reprojection error over every observed (camera, landmark)
     pair -- directly implements docs/bundle_adjustment.md's own
@@ -479,32 +416,6 @@ def reprojection_rms(T_list, P_list, observations, K):
         pred, _, _ = camera_project(T_list[i], P_list[j], K)
         sq_errors.append(np.sum((z_ij - pred) ** 2))
     return float(np.sqrt(np.mean(sq_errors)))
-
-
-def umeyama_alignment(P_est, P_true):
-    """Least-squares similarity (scale, rotation, translation) that best
-    maps P_est onto P_true (Umeyama, 1991): P_true ~= s * (R @ P_est.T).T + t.
-    Arguments:
-        P_est: (N,3) estimated points
-        P_true: (N,3) corresponding true points
-    Returns:
-        s: scale
-        R: (3,3) rotation
-        t: (3,) translation
-    """
-    mu_est, mu_true = P_est.mean(axis=0), P_true.mean(axis=0)
-    X, Y = P_est - mu_est, P_true - mu_true
-    n = P_est.shape[0]
-    cov = (Y.T @ X) / n
-    U, D, Vt = np.linalg.svd(cov)
-    S = np.eye(3)
-    if np.linalg.det(U) * np.linalg.det(Vt) < 0.0:
-        S[2, 2] = -1.0
-    R = U @ S @ Vt
-    var_est = (X ** 2).sum() / n
-    s = np.trace(np.diag(D) @ S) / var_est
-    t = mu_true - s * (R @ mu_est)
-    return s, R, t
 
 
 def align_reconstruction_to_ground_truth(T_true, T_est, P_est):

@@ -25,6 +25,8 @@ already set by use_manif/bundle_adjustment.py.
 '''
 
 import argparse
+import os
+import sys
 import time
 from collections import defaultdict
 
@@ -32,62 +34,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import manifpy as manif
 
-
-def rotation_matrix_to_quaternion_xyzw(R):
-    """Converts a (3,3) rotation matrix to a manifpy-convention [x,y,z,w]
-    quaternion (Shepperd's method) -- used only to build ground-truth
-    manif.SE3 poses from a plain rotation matrix; not a Lie-group operation
-    itself. Identical to bundle_adjustment.py's helper of the same name.
-    Arguments:
-        R: (3,3) rotation matrix
-    Returns:
-        quat_xyzw: (4,) array [x, y, z, w]
-    """
-    tr = np.trace(R)
-    if tr > 0:
-        S = np.sqrt(tr + 1.0) * 2.0
-        w = 0.25 * S
-        x = (R[2, 1] - R[1, 2]) / S
-        y = (R[0, 2] - R[2, 0]) / S
-        z = (R[1, 0] - R[0, 1]) / S
-    elif R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
-        S = np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2]) * 2.0
-        w = (R[2, 1] - R[1, 2]) / S
-        x = 0.25 * S
-        y = (R[0, 1] + R[1, 0]) / S
-        z = (R[0, 2] + R[2, 0]) / S
-    elif R[1, 1] > R[2, 2]:
-        S = np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2]) * 2.0
-        w = (R[0, 2] - R[2, 0]) / S
-        x = (R[0, 1] + R[1, 0]) / S
-        y = 0.25 * S
-        z = (R[1, 2] + R[2, 1]) / S
-    else:
-        S = np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1]) * 2.0
-        w = (R[1, 0] - R[0, 1]) / S
-        x = (R[0, 2] + R[2, 0]) / S
-        y = (R[1, 2] + R[2, 1]) / S
-        z = 0.25 * S
-    quat = np.array([x, y, z, w])
-    return quat / np.linalg.norm(quat)
-
-
-def forward_facing_rotation(forward, up_hint=np.array([0.0, 0.0, 1.0])):
-    """Builds a camera-to-world rotation whose local +z axis is `forward`
-    (e.g. a path's tangent direction) -- analogous to bundle_adjustment.py's
-    look_at_rotation, but taking the forward direction directly instead of
-    deriving it from a target point.
-    Arguments:
-        forward: forward direction in world frame (3,)
-        up_hint: approximate "up" direction in world frame (3,)
-    Returns:
-        R: (3,3) camera-to-world rotation (columns = camera x,y,z axes in world coords)
-    """
-    forward = forward / np.linalg.norm(forward)
-    right = np.cross(forward, up_hint)
-    right = right / np.linalg.norm(right)
-    cam_up = np.cross(forward, right)
-    return np.column_stack([right, cam_up, forward])
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils import pair_key, forward_facing_rotation, rotation_matrix_to_quaternion_xyzw
 
 
 def generate_ground_truth_trajectory(n_keyframes, path_radius, arc_span_deg):
@@ -303,11 +251,6 @@ def simulate_frontend_trajectory(T_true, relative_pose_noise_std, rng):
         T_rel_noisy = T_rel_true + manif.SE3Tangent(rng.normal(0.0, relative_pose_noise_std, 6))
         T_init.append(T_init[-1] * T_rel_noisy)
     return T_init
-
-
-def pair_key(i, j):
-    """Canonical (order-independent) key for an unordered keyframe pair."""
-    return (i, j) if i < j else (j, i)
 
 
 def triangulate_landmark(T_obs_list, z_list, K):

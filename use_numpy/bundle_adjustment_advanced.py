@@ -85,31 +85,17 @@ with bundle_adjustment.py, pointcloud_pose_tracking.py and pose_graph.py.
 '''
 
 import argparse
+import os
+import sys
 import time
 from collections import defaultdict
 
 import numpy as np
 import matplotlib.pyplot as plt
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lie_utils import skew, se3_exp, se3_inv, rotation_geodesic_error
-
-
-def forward_facing_rotation(forward, up_hint=np.array([0.0, 0.0, 1.0])):
-    """Builds a camera-to-world rotation whose local +z axis is `forward`
-    (e.g. a path's tangent direction) -- analogous to bundle_adjustment.py's
-    look_at_rotation, but taking the forward direction directly instead of
-    deriving it from a target point.
-    Arguments:
-        forward: forward direction in world frame (3,)
-        up_hint: approximate "up" direction in world frame (3,)
-    Returns:
-        R: (3,3) camera-to-world rotation (columns = camera x,y,z axes in world coords)
-    """
-    forward = forward / np.linalg.norm(forward)
-    right = np.cross(forward, up_hint)
-    right = right / np.linalg.norm(right)
-    cam_up = np.cross(forward, right)
-    return np.column_stack([right, cam_up, forward])
+from utils import pair_key, forward_facing_rotation
 
 
 def generate_ground_truth_trajectory(n_keyframes, path_radius, arc_span_deg):
@@ -320,11 +306,6 @@ def simulate_frontend_trajectory(T_true, relative_pose_noise_std, rng):
         T_rel_noisy = T_rel_true @ se3_exp(rng.normal(0.0, relative_pose_noise_std, 6))
         T_init.append(T_init[-1] @ T_rel_noisy)
     return T_init
-
-
-def pair_key(i, j):
-    """Canonical (order-independent) key for an unordered keyframe pair."""
-    return (i, j) if i < j else (j, i)
 
 
 def triangulate_landmark(T_obs_list, z_list, K):
