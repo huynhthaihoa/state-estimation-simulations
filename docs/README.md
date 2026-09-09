@@ -4,7 +4,7 @@ Conceptual/pedagogical notes on the state-estimation and SLAM ideas behind the c
 
 ## Start here
 
-- [frontend_backend.md](frontend_backend.md): the **front-end**/**back-end** split in SLAM;the widest-angle overview, and a map of how everything else here fits together.
+- [frontend_backend.md](frontend_backend.md): the **front-end**/**back-end** split in SLAM; the widest-angle overview, and a map of how everything else here fits together.
 - [filtering_smoothing.md](filtering_smoothing.md): **filtering** (EKF-style) vs. **optimization/smoothing** (factor-graph-style) as the two general strategies for state estimation; the other natural entry point, and the one that motivates why both the `filtering/` and `optimization/` groups below exist.
 
 ## [`foundations/`](foundations/) - Reusable math, not SLAM-specific
