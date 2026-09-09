@@ -210,8 +210,7 @@ dt=0.80  n_steps=  6  max pos diff=1.204e-02 m  max rot diff=7.072e-02 deg
 
 The **position** gap grows cleanly and monotonically with `dt`, exactly as
 predicted. The **rotation** gap moves in the same broad direction but not
-monotonically - it's a max-over-the-whole-trajectory statistic, and larger
-`dt` also means fewer, coarser-discretized steps sampling a different subset
+monotonically - it's a max-over-the-whole-trajectory statistic, and larger `dt` also means fewer, coarser-discretized steps sampling a different subset
 of the `true_body_rates` profile each time, so which single step happens to
 realize the worst-case disagreement varies. Worth reporting honestly rather
 than smoothing over: the *mechanism* (§3.2) and the *position* evidence both
@@ -271,9 +270,8 @@ per se. Two ways it can break:
    for one shared rigid `T`) has failed. That needs a richer state (pose
    plus some deformation/shape parameters), not a filter swap.
 
-**Rule of thumb (EKF vs. IEKF):** it's not rigid vs. non-rigid that decides
-this - it's whether the uncertainty is isotropic or
-anisotropic-and-tied-to-the-object's-frame. Non-rigid objects are simply a
+**Rule of thumb (EKF vs. IEKF):** it's not **rigid** vs. **non-rigid** that decides
+this - it's **whether the uncertainty is isotropic or anisotropic-and-tied-to-the-object's-frame**. Non-rigid objects are simply a
 natural, common source of the latter. None of this affects UKF's already-
 approximate agreement with either filter one way or the other, since §3's
 gap comes from linearization/noise-injection mechanics, not from the
