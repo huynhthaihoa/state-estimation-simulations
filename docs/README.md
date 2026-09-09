@@ -26,9 +26,10 @@ Conceptual/pedagogical notes on the state-estimation and SLAM ideas behind the c
   why each exists.
 - [left_right_invariant.md](filtering/left_right_invariant.md): left- vs. right-invariant error
   formulations in the IEKF (builds on `extra_kf_variants.md`).
-- [ekf_iekf_equivalence.md](filtering/ekf_iekf_equivalence.md): an empirical note (not a concept
+- [ekf_iekf_ukf_empirical_note.md](filtering/ekf_iekf_ukf_empirical_note.md): an empirical note (not a concept
   explainer) on why `run_ekf`/`run_iekf` produce bit-identical output in
-  `pointcloud_pose_tracking.py`.
+  `pointcloud_pose_tracking.py`, and why `run_ukf` only comes close but doesn't match either
+  one exactly.
 
 ## [`optimization/`](optimization/) - The factor-graph / smoothing lineage
 
