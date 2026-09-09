@@ -255,14 +255,14 @@ per se. Two ways it can break:
    *structured*: a flag flexing along its pole, a limb bending more along
    its length than sideways - an ellipsoid of uncertainty aligned with the
    object's own axes (its long axis, a hinge axis), not the world's.
-   - EKF (world frame) sees that ellipsoid rotate with the object every
+   - **EKF (world frame)** sees that ellipsoid rotate with the object every
      step; if it doesn't re-derive its noise model to track that rotation,
      it's silently using the wrong noise shape.
-   - IEKF (body frame) sees the same ellipsoid sitting still, since it's
+   - **IEKF (body frame)** sees the same ellipsoid sitting still, since it's
      fixed relative to the object's own axes - it can use a fixed,
      correctly-shaped anisotropic covariance with no per-step rotation.
-   - Here the two filters genuinely diverge, and IEKF is arguably the more
-     natural model, not just the faster one.
+   - Here the two filters genuinely diverge, and **IEKF is arguably the more
+     natural model**, not just the faster one.
 
 3. **Genuinely non-rigid motion (not just noisy-around-a-rigid-mean).** If
    no single rigid transform `T` reasonably explains the point cloud's
