@@ -83,6 +83,8 @@ UKF can be attractive when:
 
 But it can be computationally more expensive than EKF, especially for high-dimensional states.
 
+See `run_ukf` in [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/pointcloud_pose_tracking.py) / [`use_manif/pointcloud_pose_tracking.py`](../../use_manif/pointcloud_pose_tracking.py) for a runnable manifold-UKF implementation of this idea.
+
 ---
 
 ## 2. Error-State Kalman Filter (ESKF) ⭐⭐⭐

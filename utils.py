@@ -141,6 +141,46 @@ def landmark_errors(P_true, P_est):
     return np.linalg.norm(P_true - P_est, axis=1)
 
 
+def unscented_weights(n, alpha, beta, kappa):
+    """Van der Merwe scaled unscented-transform weights for an n-dimensional
+    tangent state.
+    Arguments:
+        n: state (tangent-space) dimension
+        alpha: spread of the sigma points around the mean
+        beta: prior-distribution knowledge (2 is optimal for Gaussian priors)
+        kappa: secondary scaling parameter
+    Returns:
+        lambda_: scaling parameter used to build the sigma-point offsets
+        w_m: (2n+1,) mean weights
+        w_c: (2n+1,) covariance weights
+    """
+    lambda_ = alpha ** 2 * (n + kappa) - n
+    w_m = np.full(2 * n + 1, 1.0 / (2.0 * (n + lambda_)))
+    w_c = w_m.copy()
+    w_m[0] = lambda_ / (n + lambda_)
+    w_c[0] = lambda_ / (n + lambda_) + (1.0 - alpha ** 2 + beta)
+    return lambda_, w_m, w_c
+
+
+def unscented_sigma_offsets(P, lambda_):
+    """Tangent-space sigma-point offsets around a zero mean with covariance P,
+    for the scaled unscented transform. Row 0 is the zero (central) offset;
+    rows 1..n and n+1..2n are the +/- columns of the scaled Cholesky factor.
+    Arguments:
+        P: (n,n) covariance (numpy array)
+        lambda_: scaling parameter from unscented_weights
+    Returns:
+        offsets: (2n+1, n) array of tangent-space offset rows
+    """
+    n = P.shape[0]
+    P_sym = 0.5 * (P + P.T) + 1e-9 * np.eye(n)
+    L = np.linalg.cholesky((n + lambda_) * P_sym)
+    offsets = np.zeros((2 * n + 1, n))
+    offsets[1:n + 1] = L.T
+    offsets[n + 1:2 * n + 1] = -L.T
+    return offsets
+
+
 def measure_performance(fn, *args, n_steps, **kwargs):
     """Runs `fn` once, measuring wall-clock time and peak memory allocated
     during the call (via tracemalloc), and reports both as per-step averages

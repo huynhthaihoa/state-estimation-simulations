@@ -9,7 +9,7 @@ Tracks the pose of a rigid object over time from a combination of:
      point cloud is observed transformed into the world frame (noisy 3D
      point-to-point correspondences), i.e. z_i = T.act(p_i) + noise.
 
-Three ways to fuse the two into a pose estimate are implemented, all built on
+Four ways to fuse the two into a pose estimate are implemented, all built on
 the exact same `motion_model`/`observation_model` functions and hand-rolled
 analytical SE(3) Jacobians (closed-form skew/exp/log/adjoint math, no
 external Lie-theory library):
@@ -33,6 +33,13 @@ external Lie-theory library):
     trajectory (not just causal history), so it can do at least as well as
     the EKF.
 
+  - UKF (recursive): same predict/update structure as the EKF, but with no
+    Jacobians at all -- sigma points sampled around the current estimate are
+    retracted onto SE(3), pushed through the exact (not linearized)
+    motion_model/observation_model, and recombined into a new mean/
+    covariance. Genuinely different in character from the other three
+    methods here, which all rely on an analytical Jacobian somewhere.
+
 A pure dead-reckoning trajectory (motion model only, no point-cloud
 correction at all) is carried along as the "uncorrected" baseline, and also
 doubles as the batch solver's initial guess.
@@ -51,7 +58,7 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from lie_utils import skew, se3_exp, se3_log, se3_inv, se3_adjoint, compute_se3_inv_right_jacobian, se3_right_jacobian, rotation_geodesic_error
-from utils import measure_performance, true_body_rates
+from utils import measure_performance, true_body_rates, unscented_weights, unscented_sigma_offsets
 
 def make_body_point_cloud(n_points, rng, half_extent=0.5):
     """A fixed, non-degenerate set of body-frame landmark points (the object's
@@ -280,6 +287,92 @@ def run_iekf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_
     return T_list
 
 
+def run_ukf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_std,
+            ukf_alpha, ukf_beta, ukf_kappa):
+    """Recursive UKF: a manifold unscented transform via right-perturbation
+    retraction, alternating a predict step and an update step exactly like
+    run_ekf/run_iekf, but with no Jacobians at all -- sigma points are
+    retracted through the *exact* nonlinear motion_model/observation_model
+    instead of a linearization of them.
+
+    Note: on a Lie group there is no linear average of poses, so the
+    predicted mean is taken to be the central sigma point's own propagation
+    (T_pred_mean = motion_model(T_est, u, dt)) -- this is exact, not an
+    approximation, since that call *is* sigma point 0's propagation; the
+    approximation is in measuring every other sigma point's spread relative
+    to this reference via Log() rather than an iterative Frechet mean, the
+    standard simplification used by practical UKF-on-manifolds
+    implementations. Sigma points are also *redrawn* at the update step from
+    (T_pred_mean, P_pred) rather than reusing the predict-step sigma points,
+    because Q_tangent is injected additively into P_pred after recombination
+    (no augmented-noise sigma dimensions) -- reusing the predict sigma points
+    would understate the true post-predict spread and bias the filter
+    overconfident.
+    Arguments:
+        T_init: initial pose (4,4)
+        P_init: initial 6x6 tangent covariance (numpy array)
+        u_meas: (N,6) array of noisy body-frame twists
+        z: list of noisy point-cloud measurements (M,3)
+        body_points: (M,3) array of points in the object's body frame
+        dt: time step (s)
+        Q_tangent: 6x6 tangent covariance of the motion-model twist increment (numpy array)
+        point_noise_std: std-dev of Gaussian noise added to the predicted world-frame point-cloud measurements (m)
+        ukf_alpha: unscented-transform spread parameter
+        ukf_beta: unscented-transform prior-knowledge parameter (2 is optimal for Gaussian priors)
+        ukf_kappa: unscented-transform secondary scaling parameter
+    Returns:
+        T_list: list of estimated poses (4,4)
+    """
+    n = 6
+    n_points = len(body_points)
+    R_diag = point_noise_std ** 2 * np.eye(3 * n_points)
+    lambda_, w_m, w_c = unscented_weights(n, ukf_alpha, ukf_beta, ukf_kappa)
+
+    T_est, P = T_init, P_init.copy()
+    T_list = [T_est]
+    for k in range(len(u_meas)):
+        # --- Predict ---
+        offsets = unscented_sigma_offsets(P, lambda_)
+        T_pred_mean = motion_model(T_est, u_meas[k], dt)
+
+        xi_pred = np.zeros((2 * n + 1, n))
+        for i in range(1, 2 * n + 1):
+            T_sigma = T_est @ se3_exp(offsets[i])
+            T_pred_sigma = motion_model(T_sigma, u_meas[k], dt)
+            xi_pred[i] = se3_log(se3_inv(T_pred_mean) @ T_pred_sigma)
+
+        P_pred = Q_tangent.copy()
+        for i in range(2 * n + 1):
+            P_pred += w_c[i] * np.outer(xi_pred[i], xi_pred[i])
+
+        # --- Update (fresh sigma points around the predicted mean) ---
+        offsets_upd = unscented_sigma_offsets(P_pred, lambda_)
+        z_sigma = np.zeros((2 * n + 1, 3 * n_points))
+        for i in range(2 * n + 1):
+            T_upd_sigma = T_pred_mean @ se3_exp(offsets_upd[i])
+            pred_i, _ = observation_model(T_upd_sigma, body_points)
+            z_sigma[i] = pred_i.reshape(-1)
+
+        z_hat = w_m @ z_sigma
+        P_zz = R_diag.copy()
+        P_xz = np.zeros((n, 3 * n_points))
+        for i in range(2 * n + 1):
+            dz = z_sigma[i] - z_hat
+            P_zz += w_c[i] * np.outer(dz, dz)
+            P_xz += w_c[i] * np.outer(offsets_upd[i], dz)
+
+        r = z[k + 1].reshape(-1) - z_hat
+        K = P_xz @ np.linalg.inv(P_zz)
+        delta = K @ r
+
+        T_est = T_pred_mean @ se3_exp(delta)
+        P = P_pred - K @ P_zz @ K.T
+
+        T_list.append(T_est)
+
+    return T_list
+
+
 def run_batch_gn(T_init_list, T_prior0, P_init, u_meas, z, body_points, dt, Q_tangent,
                   point_noise_std, gn_tol, gn_max_iters):
     """Batch Gauss-Newton smoother: jointly optimizes the whole trajectory
@@ -395,6 +488,10 @@ def main():
     parser.add_argument("--gn-tol", type=float, default=1e-6, help="Batch Gauss-Newton convergence tolerance")
     parser.add_argument("--gn-max-iters", type=int, default=20, help="Maximum batch Gauss-Newton iterations")
 
+    parser.add_argument("--ukf-alpha", type=float, default=1.0, help="UKF unscented-transform spread parameter")
+    parser.add_argument("--ukf-beta", type=float, default=2.0, help="UKF unscented-transform prior-knowledge parameter (2 is optimal for Gaussian priors)")
+    parser.add_argument("--ukf-kappa", type=float, default=-3.0, help="UKF unscented-transform secondary scaling parameter (default gives n+kappa=3 for this script's 6-dim tangent state)")
+
     parser.add_argument("--seed", type=int, default=0, help="RNG seed")
 
     parser.add_argument("--out", type=str, default=None, help="Save the figure to this path instead of showing it")
@@ -442,10 +539,16 @@ def main():
         run_batch_gn, T_dr, T_init, P_init, u_meas, z, body_points, args.dt, Q_tangent,
         args.point_noise_std, args.gn_tol, args.gn_max_iters, n_steps=n_steps)
 
+    print("Running UKF (manifold unscented transform via right-perturbation retraction)...")
+    T_ukf, time_ukf, mem_ukf = measure_performance(
+        run_ukf, T_init, P_init, u_meas, z, body_points, args.dt, Q_tangent, args.point_noise_std,
+        args.ukf_alpha, args.ukf_beta, args.ukf_kappa, n_steps=n_steps)
+
     rot_err_dr, pos_err_dr = pose_errors(T_true, T_dr)
     rot_err_ekf, pos_err_ekf = pose_errors(T_true, T_ekf)
     rot_err_iekf, pos_err_iekf = pose_errors(T_true, T_iekf)
     rot_err_gn, pos_err_gn = pose_errors(T_true, T_gn)
+    rot_err_ukf, pos_err_ukf = pose_errors(T_true, T_ukf)
 
     print("\nFinal / RMS errors:")
     for name, rot_err, pos_err in [
@@ -453,6 +556,7 @@ def main():
         ("EKF (recursive)", rot_err_ekf, pos_err_ekf),
         ("IEKF (invariant)", rot_err_iekf, pos_err_iekf),
         ("Batch GN", rot_err_gn, pos_err_gn),
+        ("UKF (unscented)", rot_err_ukf, pos_err_ukf),
     ]:
         print(f"  {name:<18s} final rot={rot_err[-1]:7.3f} deg, pos={pos_err[-1]:7.4f} m | "
               f"RMS rot={np.sqrt(np.mean(rot_err**2)):7.3f} deg, pos={np.sqrt(np.mean(pos_err**2)):7.4f} m")
@@ -463,24 +567,26 @@ def main():
         ("EKF (recursive)", time_ekf, mem_ekf),
         ("IEKF (invariant)", time_iekf, mem_iekf),
         ("Batch GN", time_gn, mem_gn),
+        ("UKF (unscented)", time_ukf, mem_ukf),
     ]:
         print(f"  {name:<18s} avg time={avg_time * 1e6:9.2f} µs/step | avg peak mem={avg_mem / 1024.0:9.3f} KB/step")
 
     t_hist = np.arange(len(T_true)) * args.dt
     fig, (ax_rot, ax_pos, ax_traj) = plt.subplots(3, 1, figsize=(9, 11))
 
-    for ax, err_dr, err_ekf, err_iekf, err_gn, ylabel in [
-        (ax_rot, rot_err_dr, rot_err_ekf, rot_err_iekf, rot_err_gn, "Rotation error (deg)"),
-        (ax_pos, pos_err_dr, pos_err_ekf, pos_err_iekf, pos_err_gn, "Position error (m)"),
+    for ax, err_dr, err_ekf, err_iekf, err_gn, err_ukf, ylabel in [
+        (ax_rot, rot_err_dr, rot_err_ekf, rot_err_iekf, rot_err_gn, rot_err_ukf, "Rotation error (deg)"),
+        (ax_pos, pos_err_dr, pos_err_ekf, pos_err_iekf, pos_err_gn, pos_err_ukf, "Position error (m)"),
     ]:
         ax.plot(t_hist, err_dr, label="Dead-reckoning (prior only)", color="tab:gray")
         ax.plot(t_hist, err_ekf, label="EKF (recursive)", color="tab:red")
         ax.plot(t_hist, err_iekf, label="IEKF (invariant)", color="tab:green")
         ax.plot(t_hist, err_gn, label="Batch Gauss-Newton", color="tab:blue")
+        ax.plot(t_hist, err_ukf, label="UKF (unscented)", color="tab:purple")
         ax.set_ylabel(ylabel)
         ax.set_yscale("log")
         ax.legend()
-    ax_rot.set_title("Point-cloud pose tracking: prior-only vs. EKF vs. invariant EKF vs. batch Gauss-Newton")
+    ax_rot.set_title("Point-cloud pose tracking: prior-only vs. EKF vs. invariant EKF vs. batch Gauss-Newton vs. UKF")
     ax_pos.set_xlabel("Time (s)")
 
     def xy(T_list):
@@ -492,6 +598,7 @@ def main():
     ax_traj.plot(*xy(T_ekf), label="EKF (recursive)", color="tab:red", linestyle="--")
     ax_traj.plot(*xy(T_iekf), label="IEKF (invariant)", color="tab:green", linestyle="--")
     ax_traj.plot(*xy(T_gn), label="Batch Gauss-Newton", color="tab:blue", linestyle="--")
+    ax_traj.plot(*xy(T_ukf), label="UKF (unscented)", color="tab:purple", linestyle="--")
     ax_traj.set_xlabel("x (m)")
     ax_traj.set_ylabel("y (m)")
     ax_traj.axis("equal")
