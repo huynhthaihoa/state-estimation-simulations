@@ -53,17 +53,36 @@ def euler_to_R(rpy):
 
 
 def run_simulation(duration, dt, gyro_noise_std, vel_noise_std, seed):
+    """Simulation of naive vs. exp-map integration of noisy IMU measurements.
+
+    Args:
+        duration: Simulation length in seconds
+        dt: IMU sample interval in seconds
+        gyro_noise_std: Standard deviation of gyroscope noise
+        vel_noise_std: Standard deviation of velocity noise
+        seed: Random seed
+
+    Returns:
+        t_hist: Simulation history (time steps)
+        rot_err_naive: Rotation error for naive estimator
+        rot_err_exp: Rotation error for exp-map estimator
+        pos_err_naive: Position error for naive estimator
+        pos_err_exp: Position error for exp-map estimator
+    """
+    
     rng = np.random.default_rng(seed)
     n_steps = int(duration / dt)
 
-    R_true, p_true = np.eye(3), np.zeros(3)
+    # ground truth attitude state (rotation matrix) and position state (3D vector)
+    R_gt_naive, p_gt_naive = np.eye(3), np.zeros(3)
+    R_gt_exp, p_gt_exp = np.eye(3), np.zeros(3)
     
     # naive estimator's own attitude state (roll,pitch,yaw)
-    R_naive_euler = np.zeros(3)   
-    R_naive, p_naive = np.eye(3), np.zeros(3)
+    R_est_naive_euler = np.zeros(3)   
+    R_est_naive, p_est_naive = np.eye(3), np.zeros(3)
     
     # exp-map estimator's own attitude state (rotation matrix)
-    R_exp, p_exp = np.eye(3), np.zeros(3)
+    R_est_exp, p_est_exp = np.eye(3), np.zeros(3)
 
     t_hist = np.zeros(n_steps)
     
@@ -79,36 +98,41 @@ def run_simulation(duration, dt, gyro_noise_std, vel_noise_std, seed):
         
         t = k * dt
         
-        omega_true, v_true = true_body_rates(t)
+        # Ground truth: get the true body rates (angular velocity and linear velocity) at time t
+        omega_gt, v_gt = true_body_rates(t)
+
+        # Ground truth: naive integration of the noise-free rates using Euler angles (roll, pitch, yaw)
+        R_gt_naive = R_gt_naive @ euler_to_R(omega_gt * dt)
+        p_gt_naive = p_gt_naive + R_gt_naive @ v_gt * dt
 
         # Ground truth: exact SO(3) integration of the noise-free rates.
-        R_true = R_true @ so3_exp(omega_true * dt)
-        p_true = p_true + R_true @ v_true * dt
+        R_gt_exp = R_gt_exp @ so3_exp(omega_gt * dt)
+        p_gt_exp = p_gt_exp + R_gt_exp @ v_gt * dt
 
         # Shared noisy IMU measurement.
         
         # Gyroscope noise: Gaussian noise added to the true angular velocity.
         # This simulates the effect of sensor noise on the angular velocity measurements from gyroscope.
-        omega_meas = omega_true + rng.normal(0.0, gyro_noise_std, 3)
+        omega_meas = omega_gt + rng.normal(0.0, gyro_noise_std, 3)
         
         # Body-velocity noise: Gaussian noise added to the true body-frame velocity.
         # This simulates the effect of sensor noise on the linear velocity measurements from accelerometer.
-        v_meas = v_true + rng.normal(0.0, vel_noise_std, 3)
+        v_meas = v_gt + rng.normal(0.0, vel_noise_std, 3)
 
         # Naive: Euler angles treated as a flat vector space.
-        R_naive_euler = R_naive_euler + omega_meas * dt
-        R_naive = euler_to_R(R_naive_euler)
-        p_naive = p_naive + R_naive @ v_meas * dt
+        R_est_naive_euler = R_est_naive_euler + omega_meas * dt
+        R_est_naive = euler_to_R(R_est_naive_euler)
+        p_est_naive = p_est_naive + R_est_naive @ v_meas * dt
 
         # Exp-map: proper SO(3) manifold update.
-        R_exp = R_exp @ so3_exp(omega_meas * dt)
-        p_exp = p_exp + R_exp @ v_meas * dt
+        R_est_exp = R_est_exp @ so3_exp(omega_meas * dt)
+        p_est_exp = p_est_exp + R_est_exp @ v_meas * dt
 
         t_hist[k] = t
-        rot_err_naive[k] = np.degrees(rotation_geodesic_error(R_true, R_naive))
-        rot_err_exp[k] = np.degrees(rotation_geodesic_error(R_true, R_exp))
-        pos_err_naive[k] = np.linalg.norm(p_true - p_naive)
-        pos_err_exp[k] = np.linalg.norm(p_true - p_exp)
+        rot_err_naive[k] = np.degrees(rotation_geodesic_error(R_gt_naive, R_est_naive))
+        rot_err_exp[k] = np.degrees(rotation_geodesic_error(R_gt_exp, R_est_exp))
+        pos_err_naive[k] = np.linalg.norm(p_gt_naive - p_est_naive)
+        pos_err_exp[k] = np.linalg.norm(p_gt_exp - p_est_exp)
 
     return t_hist, rot_err_naive, rot_err_exp, pos_err_naive, pos_err_exp
 

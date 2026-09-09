@@ -84,10 +84,27 @@ def euler_to_quat_xyzw(rpy):
 
 
 def run_simulation(duration, dt, gyro_noise_std, vel_noise_std, seed):
+    """Simulation of naive vs. exp-map integration of noisy IMU measurements.
+
+    Args:
+        duration: Simulation length in seconds
+        dt: IMU sample interval in seconds
+        gyro_noise_std: Standard deviation of gyroscope noise
+        vel_noise_std: Standard deviation of velocity noise
+        seed: Random seed
+
+    Returns:
+        t_hist: Simulation history (time steps)
+        rot_err_naive: Rotation error for naive estimator
+        rot_err_exp: Rotation error for exp-map estimator
+        pos_err_naive: Position error for naive estimator
+        pos_err_exp: Position error for exp-map estimator
+    """
+    
     rng = np.random.default_rng(seed)
     n_steps = int(duration / dt)
 
-    T_true = manif.SE3.Identity()  # Ground truth pose, exact SE(3) exp-map integration
+    T_gt = manif.SE3.Identity()  # Ground truth pose, exact SE(3) exp-map integration
 
     # naive estimator's own attitude state (roll,pitch,yaw) and position
     naive_euler = np.zeros(3) #rotation angles (roll, pitch, yaw)
@@ -110,20 +127,21 @@ def run_simulation(duration, dt, gyro_noise_std, vel_noise_std, seed):
 
         t = k * dt
 
-        omega_true, v_true = true_body_rates(t)
+        # Ground truth: get the true body rates (angular velocity and linear velocity) at time t
+        omega_gt, v_gt = true_body_rates(t)
 
         # Ground truth: exact SE(3) exp-map integration of the noise-free body twist.
-        T_true = T_true.rplus(manif.SE3Tangent(np.concatenate([v_true, omega_true]) * dt))
+        T_gt = T_gt.rplus(manif.SE3Tangent(np.concatenate([v_gt, omega_gt]) * dt))
 
         # Shared noisy IMU measurement.
 
         # Gyroscope noise: Gaussian noise added to the true angular velocity.
         # This simulates the effect of sensor noise on the angular velocity measurements from gyroscope.
-        omega_meas = omega_true + rng.normal(0.0, gyro_noise_std, 3)
+        omega_meas = omega_gt + rng.normal(0.0, gyro_noise_std, 3)
 
         # Body-velocity noise: Gaussian noise added to the true body-frame velocity.
         # This simulates the effect of sensor noise on the linear velocity measurements from accelerometer.
-        v_meas = v_true + rng.normal(0.0, vel_noise_std, 3)
+        v_meas = v_gt + rng.normal(0.0, vel_noise_std, 3)
 
         # Naive: Euler angles treated as a flat vector space.
         naive_euler = naive_euler + omega_meas * dt
@@ -135,14 +153,14 @@ def run_simulation(duration, dt, gyro_noise_std, vel_noise_std, seed):
 
         t_hist[k] = t
         
-        R_true = manif.SO3(T_true.coeffs()[3:7])
+        R_gt = manif.SO3(T_gt.coeffs()[3:7])
         R_exp = manif.SO3(T_exp.coeffs()[3:7])
         
-        rot_err_naive[k] = np.degrees(np.linalg.norm(R_naive.rminus(R_true).coeffs()))
-        rot_err_exp[k] = np.degrees(np.linalg.norm(R_exp.rminus(R_true).coeffs()))
+        rot_err_naive[k] = np.degrees(np.linalg.norm(R_naive.rminus(R_gt).coeffs()))
+        rot_err_exp[k] = np.degrees(np.linalg.norm(R_exp.rminus(R_gt).coeffs()))
         
-        pos_err_naive[k] = np.linalg.norm(T_true.translation() - p_naive)
-        pos_err_exp[k] = np.linalg.norm(T_true.translation() - T_exp.translation())
+        pos_err_naive[k] = np.linalg.norm(T_gt.translation() - p_naive)
+        pos_err_exp[k] = np.linalg.norm(T_gt.translation() - T_exp.translation())
 
     return t_hist, rot_err_naive, rot_err_exp, pos_err_naive, pos_err_exp
 
