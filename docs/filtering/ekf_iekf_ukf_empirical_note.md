@@ -1,7 +1,7 @@
 # Empirical note of EKF vs. IEKF vs. UKF in `pointcloud_pose_tracking.py`: what's actually identical, and what isn't
 
-Applies to both `use_numpy/pointcloud_pose_tracking.py` and
-`use_manif/pointcloud_pose_tracking.py`, which implement three ways to turn
+Applies to both [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/pointcloud_pose_tracking.py) and
+[`use_manif/pointcloud_pose_tracking.py`](../../use_manif/pointcloud_pose_tracking.py), which implement three ways to turn
 the same predicted point-cloud measurements into a pose correction: `run_ekf`,
 `run_iekf`, `run_ukf`. It's tempting to lump "they all give similar numbers"
 into one claim, but on this benchmark two very different things are actually
