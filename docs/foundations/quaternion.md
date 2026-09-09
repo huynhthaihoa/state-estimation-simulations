@@ -342,14 +342,11 @@ This is actually where quaternions become especially relevant.
 
 In an EKF, you might have a state like
 
-$${\mathbf{x}=
-\begin{bmatrix}
-p\\
-v\\
-q\\
-b_g\\
-b_a
-\end{bmatrix}}$$
+$${\mathbf{x}= \begin{bmatrix} p\\ 
+v\\ 
+q\\ 
+b_g\\ 
+b_a \end{bmatrix}}$$
 
 where:
 
@@ -383,19 +380,7 @@ If you remember only one thing:
 
 And for your robotics work, I’d mentally organize it as:
 
-$${
-\boxed{
-\text{Euler angles}
-\rightarrow
-\text{Quaternion}
-\rightarrow
-SO(3)
-\rightarrow
-\mathfrak{so}(3)
-\rightarrow
-\text{Lie-group state estimation}
-}
-}
+$${ \boxed{ \text{Euler angles} \rightarrow \text{Quaternion} \rightarrow SO(3) \rightarrow \mathfrak{so}(3) \rightarrow \text{Lie-group state estimation} } }
 $$
 
 The really interesting next step is **why quaternion multiplication actually performs rotation**, because that is the part that makes quaternions initially feel like magic.

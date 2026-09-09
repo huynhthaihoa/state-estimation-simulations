@@ -161,7 +161,7 @@ larger, faster steps
 
 Therefore:
 
-$$\boxed{\text{LM} \approx \begin{cases} \text{Gradient Descent}, & \lambda\text{ large}\\
+$$\boxed{\text{LM} \approx \begin{cases} \text{Gradient Descent}, & \lambda\text{ large}\\ 
 \text{Gauss–Newton}, & \lambda\text{ small}\end{cases}}$$
 
 That's the most important intuition.
@@ -508,17 +508,7 @@ That's why **GN, LM, factor graphs, and iSAM** fit together so naturally in mode
 
 ## 15. References
 
-1. Levenberg, K. (1944). *A Method for the Solution of Certain Non-Linear Problems in Least
-   Squares*. Quarterly of Applied Mathematics, 2(2), 164–168. https://doi.org/10.1090/qam/10666
-   - the original damped least-squares method behind §4's $(J^TJ+\lambda I)\Delta x=-J^Te$.
-2. Marquardt, D. W. (1963). *An Algorithm for Least-Squares Estimation of Nonlinear Parameters*.
-   Journal of the Society for Industrial and Applied Mathematics, 11(2), 431–441.
-   https://doi.org/10.1137/0111030 - the scale-invariant diagonal-damping variant
-   $D=\text{diag}(J^TJ)$ behind §12.
-3. Triggs, B., McLauchlan, P. F., Hartley, R. I., & Fitzgibbon, A. W. (2000). *Bundle Adjustment
-   - A Modern Synthesis*. In Vision Algorithms: Theory and Practice (LNCS vol. 1883, pp.
-   298–372). Springer. https://doi.org/10.1007/3-540-44480-7_21 - the reprojection-error /
-   bundle-adjustment application of LM behind §9.
-4. Dellaert, F., & Kaess, M. (2017). *Factor Graphs for Robot Perception*. Foundations and Trends
-   in Robotics, 6(1–2), 1–139. https://doi.org/10.1561/2300000043 - general reference for the
-   factor-graph formulation behind §1 and §10.
+1. Levenberg, K. (1944). *A Method for the Solution of Certain Non-Linear Problems in Least Squares*. Quarterly of Applied Mathematics, 2(2), 164–168. https://doi.org/10.1090/qam/10666 - the original damped least-squares method behind §4's $(J^TJ+\lambda I)\Delta x=-J^Te$.
+2. Marquardt, D. W. (1963). *An Algorithm for Least-Squares Estimation of Nonlinear Parameters*. Journal of the Society for Industrial and Applied Mathematics, 11(2), 431–441. https://doi.org/10.1137/0111030 - the scale-invariant diagonal-damping variant $D=\text{diag}(J^TJ)$ behind §12.
+3. Triggs, B., McLauchlan, P. F., Hartley, R. I., & Fitzgibbon, A. W. (2000). *Bundle Adjustment - A Modern Synthesis*. In Vision Algorithms: Theory and Practice (LNCS vol. 1883, pp. 298–372). Springer. https://doi.org/10.1007/3-540-44480-7_21 - the reprojection-error / bundle-adjustment application of LM behind §9.
+4. Dellaert, F., & Kaess, M. (2017). *Factor Graphs for Robot Perception*. Foundations and Trends in Robotics, 6(1–2), 1–139. https://doi.org/10.1561/2300000043 - general reference for the factor-graph formulation behind §1 and §10.

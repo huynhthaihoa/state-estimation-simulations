@@ -25,7 +25,8 @@ $$y = ax+b$$
 
 The unknowns are:
 
-$$x=\begin{bmatrix}a \\ b\end{bmatrix}$$
+$$x=\begin{bmatrix}a \\ 
+b\end{bmatrix}$$
 
 For each measurement, there is an error:
 
@@ -125,9 +126,9 @@ $$\boxed{\min_x \frac12\|e(x)\|^2}$$
 
 where:
 
-$$x =\begin{bmatrix}x_1\\
-x_2\\
-\vdots\\
+$$x =\begin{bmatrix}x_1\\ 
+x_2\\ 
+\vdots\\ 
 x_n\end{bmatrix}$$
 
 contains the unknowns.
@@ -583,20 +584,9 @@ That distinction—**problem formulation vs optimization algorithm**—is one of
 
 ## 17. References
 
-1. Nocedal, J., & Wright, S. J. (2006). *Numerical Optimization* (2nd ed.). Springer Series in
-   Operations Research and Financial Engineering. Springer. ISBN 978-0-387-30303-1 - the general
-   nonlinear-least-squares / Gauss–Newton treatment behind §4 and §7–9.
-2. Hartley, R., & Zisserman, A. (2004). *Multiple View Geometry in Computer Vision* (2nd ed.).
-   Cambridge University Press. ISBN 978-0-521-54051-3 - the camera-projection / reprojection-error
-   formalism ($z - \pi(TX)$) behind §5.
-3. Triggs, B., McLauchlan, P. F., Hartley, R. I., & Fitzgibbon, A. W. (2000). *Bundle Adjustment
-   - A Modern Synthesis*. In Vision Algorithms: Theory and Practice (LNCS vol. 1883, pp.
-   298–372). Springer. https://doi.org/10.1007/3-540-44480-7_21 - the bundle-adjustment
-   application referenced in §5.
-4. Dellaert, F., & Kaess, M. (2017). *Factor Graphs for Robot Perception*. Foundations and Trends
-   in Robotics, 6(1–2), 1–139. https://doi.org/10.1561/2300000043 - the factor-graph formulation
-   of the NLS problem behind §11 and §14.
+1. Nocedal, J., & Wright, S. J. (2006). *Numerical Optimization* (2nd ed.). Springer Series in Operations Research and Financial Engineering. Springer. ISBN 978-0-387-30303-1 - the general nonlinear-least-squares / Gauss–Newton treatment behind §4 and §7–9.
+2. Hartley, R., & Zisserman, A. (2004). *Multiple View Geometry in Computer Vision* (2nd ed.). Cambridge University Press. ISBN 978-0-521-54051-3 - the camera-projection / reprojection-error formalism ($z - \pi(TX)$) behind §5.
+3. Triggs, B., McLauchlan, P. F., Hartley, R. I., & Fitzgibbon, A. W. (2000). *Bundle Adjustment - A Modern Synthesis*. In Vision Algorithms: Theory and Practice (LNCS vol. 1883, pp. 298–372). Springer. https://doi.org/10.1007/3-540-44480-7_21 - the bundle-adjustment application referenced in §5.
+4. Dellaert, F., & Kaess, M. (2017). *Factor Graphs for Robot Perception*. Foundations and Trends in Robotics, 6(1–2), 1–139. https://doi.org/10.1561/2300000043 - the factor-graph formulation of the NLS problem behind §11 and §14.
 
-All four were verified against live search results before being added here (title, authors,
-venue/publisher, edition/volume/pages, and ISBN/DOI cross-checked), rather than cited from memory
-alone.
+All four were verified against live search results before being added here (title, authors, venue/publisher, edition/volume/pages, and ISBN/DOI cross-checked), rather than cited from memory alone.

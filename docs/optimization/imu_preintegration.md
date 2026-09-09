@@ -2,10 +2,10 @@
 
 > **IMU preintegration compresses thousands of raw, sensor-rate IMU samples between two keyframes into one relative-motion factor - and lets that factor be instantly recomputed when the bias estimate changes, without re-touching a single raw sample.**
 
-This builds directly on two things you've already seen: 
+This builds directly on two things you've already seen:
 - The **node/edge language** from [pose_graph_optimization.md](pose_graph_optimization.md#2-where-do-the-edges-come-from) ("an edge is a relative-motion constraint between two nodes")
 
-- The **right Jacobian** from [jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space) (" $J_r$ converts a tangent-space nudge into a body-frame-composed rotation"). 
+- The **right Jacobian** from [jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space) (" $J_r$ converts a tangent-space nudge into a body-frame-composed rotation").
 
 IMU preintegration is where both ideas get used together for a real sensor.
 
@@ -19,9 +19,9 @@ An IMU reports raw angular rate and acceleration at 100-1000 Hz. Camera keyframe
 
 - **Problem B - bias re-linearization**: IMUs have slowly-drifting gyro/accel biases ($b_g$, $b_a$) that the optimizer refines as part of the state. Every raw sample was integrated using *some* bias estimate. When the optimizer updates that estimate - which happens on essentially every iteration - the integration technically has to be redone with the new bias, because the raw samples were corrected using the old one. Redoing a 100+-sample integration loop every time the bias nudges, for every IMU segment in the graph, every optimizer iteration, is not something you can afford.
 
-Preintegration solves both: 
+Preintegration solves both:
 
-- It folds every raw sample between two keyframes into a single **relative-motion bundle** ($\Delta R$, $\Delta v$, $\Delta p$) - solving **Problem A**. 
+- It folds every raw sample between two keyframes into a single **relative-motion bundle** ($\Delta R$, $\Delta v$, $\Delta p$) - solving **Problem A**.
 
 - It tracks, *as it integrates*, a set of **bias-sensitivity Jacobians** that let that bundle be corrected for a bias change with one matrix-vector multiply instead of a full re-integration - solving **Problem B**.
 

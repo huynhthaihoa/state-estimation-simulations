@@ -540,7 +540,7 @@ Offline SfM pipelines sacrifice real-time speed for maximum accuracy: as COLMAP 
 
 ### Choosing between them
 
-Use **Local BA** for real-time robotics/AR/VR where sub-30ms latency matters more than perfect global consistency (loop closure repairs that later). 
+Use **Local BA** for real-time robotics/AR/VR where sub-30ms latency matters more than perfect global consistency (loop closure repairs that later).
 
 Use **Global BA** for offline reconstruction - meshes, NeRF/Gaussian-Splatting input scenes, photogrammetric surveys - where total geometric fidelity matters more than runtime.
 

@@ -198,55 +198,27 @@ A useful mental model is:
 
 ## 6. References
 
-1. Cadena, C., Carlone, L., Carrillo, H., Latif, Y., Scaramuzza, D., Neira, J., Reid, I., &
-   Leonard, J. J. (2016). *Past, Present, and Future of Simultaneous Localization and Mapping:
-   Toward the Robust-Perception Age*. IEEE Transactions on Robotics, 32(6), 1309–1332.
-   https://doi.org/10.1109/TRO.2016.2624754 - the standard survey that frames the front-end/
-   back-end split used throughout this doc (§1, §2, §4).
-2. Grisetti, G., Kümmerle, R., Stachniss, C., & Burgard, W. (2010). *A Tutorial on Graph-Based
-   SLAM*. IEEE Intelligent Transportation Systems Magazine, 2(4), 31–43.
-   https://doi.org/10.1109/MITS.2010.939925 - the back-end / pose-graph optimization tutorial
-   behind §2 and §4.
-3. Mur-Artal, R., Montiel, J. M. M., & Tardós, J. D. (2015). *ORB-SLAM: A Versatile and Accurate
-   Monocular SLAM System*. IEEE Transactions on Robotics, 31(5), 1147–1163.
-   https://doi.org/10.1109/TRO.2015.2463671 - a concrete worked system pairing an ORB-feature
-   front-end with a local-BA + pose-graph back-end, behind §1's ORB mention and §3's loop-closure
-   walkthrough.
-4. Gálvez-López, D., & Tardós, J. D. (2012). *Bags of Binary Words for Fast Place Recognition in
-   Image Sequences*. IEEE Transactions on Robotics, 28(5), 1188–1197.
-   https://doi.org/10.1109/TRO.2012.2197158 - the DBoW2 place-recognition method behind §3's
-   claim that loop-closure *detection* is a front-end (place-recognition) task.
-5. Chen, W., Shang, G., Ji, A., Zhou, C., Wang, X., Xu, C., Li, Z., & Hu, K. (2022). *An Overview
-   on Visual SLAM: From Tradition to Semantic*. Remote Sensing, 14(13), 3010.
-   https://doi.org/10.3390/rs14133010 - the original source of the diagram in
-   `images/frontend_backend_1.jpg` (see Image sources below).
-6. Chen, W., Zhou, C., Shang, G., Wang, X., Li, Z., Xu, C., & Hu, K. (2022). *SLAM Overview:
-   From Single Sensor to Heterogeneous Fusion*. Remote Sensing, 14(23), 6033.
-   https://doi.org/10.3390/rs14236033 - the original source of the diagram in
-   `images/frontend_backend_2.jpg` (see Image sources below).
-7. Duan, R., Feng, Y., & Wen, C.-Y. (2022). *Deep Pose Graph-Matching-Based Loop Closure
-   Detection for Semantic Visual SLAM*. Sustainability, 14(19), 11864.
-   https://doi.org/10.3390/su141911864 - Figure 1 of this paper is the original source of the
-   diagram in `images/frontend_backend_4.jpg` (see Image sources below).
+1. Cadena, C., Carlone, L., Carrillo, H., Latif, Y., Scaramuzza, D., Neira, J., Reid, I., & Leonard, J. J. (2016). *Past, Present, and Future of Simultaneous Localization and Mapping: Toward the Robust-Perception Age*. IEEE Transactions on Robotics, 32(6), 1309–1332. https://doi.org/10.1109/TRO.2016.2624754 - the standard survey that frames the front-end/ back-end split used throughout this doc (§1, §2, §4).
+2. Grisetti, G., Kümmerle, R., Stachniss, C., & Burgard, W. (2010). *A Tutorial on Graph-Based SLAM*. IEEE Intelligent Transportation Systems Magazine, 2(4), 31–43. https://doi.org/10.1109/MITS.2010.939925 - the back-end / pose-graph optimization tutorial behind §2 and §4.
+3. Mur-Artal, R., Montiel, J. M. M., & Tardós, J. D. (2015). *ORB-SLAM: A Versatile and Accurate Monocular SLAM System*. IEEE Transactions on Robotics, 31(5), 1147–1163. https://doi.org/10.1109/TRO.2015.2463671 - a concrete worked system pairing an ORB-feature front-end with a local-BA + pose-graph back-end, behind §1's ORB mention and §3's loop-closure walkthrough.
+4. Gálvez-López, D., & Tardós, J. D. (2012). *Bags of Binary Words for Fast Place Recognition in Image Sequences*. IEEE Transactions on Robotics, 28(5), 1188–1197. https://doi.org/10.1109/TRO.2012.2197158 - the DBoW2 place-recognition method behind §3's claim that loop-closure *detection* is a front-end (place-recognition) task.
+5. Chen, W., Shang, G., Ji, A., Zhou, C., Wang, X., Xu, C., Li, Z., & Hu, K. (2022). *An Overview on Visual SLAM: From Tradition to Semantic*. Remote Sensing, 14(13), 3010. https://doi.org/10.3390/rs14133010 - the original source of the diagram in `images/frontend_backend_1.jpg` (see Image sources below).
+6. Chen, W., Zhou, C., Shang, G., Wang, X., Li, Z., Xu, C., & Hu, K. (2022). *SLAM Overview: From Single Sensor to Heterogeneous Fusion*. Remote Sensing, 14(23), 6033. https://doi.org/10.3390/rs14236033 - the original source of the diagram in `images/frontend_backend_2.jpg` (see Image sources below).
+7. Duan, R., Feng, Y., & Wen, C.-Y. (2022). *Deep Pose Graph-Matching-Based Loop Closure Detection for Semantic Visual SLAM*. Sustainability, 14(19), 11864. https://doi.org/10.3390/su141911864 - Figure 1 of this paper is the original source of the diagram in `images/frontend_backend_4.jpg` (see Image sources below).
 
 ### Image sources
 
-The 4 diagrams above were originally embedded as hotlinks to an OpenAI-hosted CDN
-(`images.openai.com`) and have since been downloaded into [`images/`](images/) for durability.
+The 4 diagrams above were originally embedded as hotlinks to an OpenAI-hosted CDN (`images.openai.com`) and have since been downloaded into [`images/`](images/) for durability.
 
 1. `images/frontend_backend_1.jpg`
    - Original CDN URL: https://images.openai.com/static-rsc-4/ohut01r4hXxy0FBo1CUweMJvMR0DsWr7j5TugX3IqHY3ySm7JWT-MdDMc2CRdBXXvXt09Nx7tRO552QRLOCFQVlHDCt1ECQBAvWQ3EM4vtQVfcF4qvfLvULQutQRozc5gRTmOfctTMUsz0aIsbjamEKvI7-cPBEbDYm31qYmsS9bfmdHnOGJdUH9Z1ke9Gg4?purpose=fullsize
-   - Confirmed source: Reference 5 above (Chen et al., 2022, *An Overview on Visual SLAM: From
-     Tradition to Semantic*).
+   - Confirmed source: Reference 5 above (Chen et al., 2022, *An Overview on Visual SLAM: From Tradition to Semantic*).
 2. `images/frontend_backend_2.jpg`
    - Original CDN URL: https://images.openai.com/static-rsc-4/fRJK_NxCUU5MX0xfOKYi4rlB7jQ2LD2ipmlYDd1XKT9PVkvHJ59nZQLTRowQ7zaPmc1Tzewjuf_rumoJ-G38d3DTs4WPCbo0OZ9-qlf_3j4KZgVNfSF75TNlFbV_dW2iWXO4jkKbovsJViao1gfCoFPnqfyO3C6b0bOfIQjQ2wl8FJoT509kwELbxeXlDrRy?purpose=fullsize
-   - Confirmed source: Reference 6 above (Chen et al., 2022, *SLAM Overview: From Single Sensor
-     to Heterogeneous Fusion*).
+   - Confirmed source: Reference 6 above (Chen et al., 2022, *SLAM Overview: From Single Sensor to Heterogeneous Fusion*).
 3. `images/frontend_backend_3.jpg`
    - Original CDN URL: https://images.openai.com/static-rsc-4/wSKnA5y3wi9kOy12TexCHpO7AOzmAIMkZP2Lubf4gLoaeo0jwVd2DipIoWO0Wl3INhlXLgBCQdyTZDQDPTZ_RdR9zltV7hoG-H7wiRY1Ja5iCt4PRRL85wEpuQhuOsc_bFhxps25YgL-sEyUaeU8fOFDOwQkEP_pkcA_9pUoqBfG5E6skjfrZ_g_hbGjQ_X6?purpose=fullsize
-   - Source: not yet identified - no candidate has been found or confirmed. Do not assume it
-     shares a source with the other three.
+   - Source: not yet identified - no candidate has been found or confirmed. Do not assume it shares a source with the other three.
 4. `images/frontend_backend_4.jpg`
    - Original CDN URL: https://images.openai.com/static-rsc-4/1oH3r36n4WxtILN9nlK9PXhy52VKoblXYiuWIZXpb-0MKArZ9UwGQ2MPtIRdMgIlUwEwt2pvxyX0Ri8_bukIvSur2fgcoVvciiGxRn3Dqtd1GXQ63CWXEJIAwd1Ua9qad043n0DNKLTnphMUzjYDmzneWRPZPEI_hn9jf-ij253TMJJs6oZh9k7FQ7KgA59-?purpose=fullsize
-   - Confirmed source: Reference 7 above (Duan, Feng, & Wen, 2022, *Deep Pose Graph-Matching-
-     Based Loop Closure Detection for Semantic Visual SLAM*), Figure 1.
+   - Confirmed source: Reference 7 above (Duan, Feng, & Wen, 2022, *Deep Pose Graph-Matching- Based Loop Closure Detection for Semantic Visual SLAM*), Figure 1.

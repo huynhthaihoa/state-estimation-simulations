@@ -483,12 +483,7 @@ $${\min_X \sum_{(i,j) \in \mathcal{E}} e_{ij}^T \Omega_{ij} e_{ij}}$$
 
 where $\Omega_{ij}$ is related to the **information/covariance** of the measurement.
 
-This is why sensor uncertainty matters - though it's worth noting that `pose_graph.py` (both the
-`use_numpy/` and `use_manif/` versions), the toy implementations accompanying this doc, keep things
-simple: they share one identity `info_matrix` across every edge (odometry and loop-closure alike),
-so they don't actually exploit per-edge weighting the way $\Omega_{ij}$ above suggests - even
-though the loop-closure edge is generated with a different noise level than the odometry edges.
-Per-edge weighting like this is a natural extension, not something the default scripts do.
+This is why sensor uncertainty matters - though it's worth noting that `pose_graph.py` (both the `use_numpy/` and `use_manif/` versions), the toy implementations accompanying this doc, keep things simple: they share one identity `info_matrix` across every edge (odometry and loop-closure alike), so they don't actually exploit per-edge weighting the way $\Omega_{ij}$ above suggests - even though the loop-closure edge is generated with a different noise level than the odometry edges. Per-edge weighting like this is a natural extension, not something the default scripts do.
 
 ---
 
@@ -551,13 +546,14 @@ Pose-Graph Optimization (PGO) formulates loop closure and drift correction as a 
 
 A 3D pose consists of a rotation $R \in \mathrm{SO}(3)$ and a translation $p \in \mathbb{R}^3$, represented as a $4 \times 4$ matrix $T_i \in \mathrm{SE}(3)$:
 
-$$T_i = \begin{bmatrix} R_i & p_i \\ \mathbf{0}^\top & 1 \end{bmatrix} \in \mathrm{SE}(3)$$
+$$T_i = \begin{bmatrix} R_i & p_i \\ 
+\mathbf{0}^\top & 1 \end{bmatrix} \in \mathrm{SE}(3)$$
 
 The full state vector containing all $N$ pose keyframes is $X = \{T_1, T_2, \dots, T_N\}$.
 
 #### Relative Edge Measurements
 
-An edge $e_{ij}$ between nodes $i$ and $j$ represents a relative transformation measurement 
+An edge $e_{ij}$ between nodes $i$ and $j$ represents a relative transformation measurement
 
 $${z_{ij} = {\tilde{T}_{ij} \in \mathrm{SE}(3)}}$$ 
 
@@ -583,11 +579,11 @@ The residual vector:
 
 $${r_{ij} = \left[ \boldsymbol{\rho}_{ij}^\top \theta_{ij}^\top \right]^\top}$$
 
-captures 3D translational error: 
+captures 3D translational error:
 
 $${\boldsymbol{\rho}_{ij}}$$
 
-and rotational error: 
+and rotational error:
 
 $${\theta_{ij}}$$
 
@@ -609,7 +605,10 @@ $${T_i \oplus \boldsymbol{\xi}_i = T_i \cdot \mathrm{Exp}(\boldsymbol{\xi}_i)}$$
 
 where ${\mathrm{Exp}(\boldsymbol{\xi}) = \exp(\boldsymbol{\xi}^\wedge) \in \mathrm{SE}(3)}$, and ${(\cdot)^\wedge}$ maps a 6D vector to a ${4 \times 4}$ Lie algebra element ${\mathfrak{se}(3)}$:
 
-$${\boldsymbol{\xi}^\wedge = \begin{bmatrix} \boldsymbol{\phi}^\wedge & \boldsymbol{\rho} \\ \mathbf{0}^\top & 0 \end{bmatrix}, \quad \text{with } \boldsymbol{\phi}^\wedge = \begin{bmatrix} 0 & -\phi_z & \phi_y \\ \phi_z & 0 & -\phi_x \\ -\phi_y & \phi_x & 0 \end{bmatrix} \in \mathfrak{so}(3)}$$
+$${\boldsymbol{\xi}^\wedge = \begin{bmatrix} \boldsymbol{\phi}^\wedge & \boldsymbol{\rho} \\ 
+\mathbf{0}^\top & 0 \end{bmatrix}, \quad \text{with } \boldsymbol{\phi}^\wedge = \begin{bmatrix} 0 & -\phi_z & \phi_y \\ 
+\phi_z & 0 & -\phi_x \\ 
+-\phi_y & \phi_x & 0 \end{bmatrix} \in \mathfrak{so}(3)}$$
 
 #### First-Order Taylor Expansion
 
@@ -631,7 +630,9 @@ $${J_i = - J_r^{-1}(r_{ij}) \, \mathrm{Ad}\left( T_j^{-1} T_i \right)}$$
 
 Here, ${\mathrm{Ad}(T) \in \mathbb{R}^{6 \times 6}}$ is the **Adjoint transformation matrix** of ${\mathrm{SE}(3)}$, which transforms velocity/tangent vectors between frame coordinate systems:
 
-$${\mathrm{Ad}\left(\begin{bmatrix} R & p \\ \mathbf{0}^\top & 1 \end{bmatrix}\right) = \begin{bmatrix} R & p^\wedge R \\ \mathbf{0} & R \end{bmatrix}}$$
+$${\mathrm{Ad}\left(\begin{bmatrix} R & p \\ 
+\mathbf{0}^\top & 1 \end{bmatrix}\right) = \begin{bmatrix} R & p^\wedge R \\ 
+\mathbf{0} & R \end{bmatrix}}$$
 
 and ${J_r^{-1}(\cdot)}$ is the inverse right Jacobian of ${\mathrm{SE}(3)}$.
 
@@ -685,7 +686,9 @@ $$w(e) = \frac{1}{e} \frac{\partial \rho(e)}{\partial e}$$
 
 Huber acts as quadratic ($L_2$) for small residuals (inliers) and linear ($L_1$) for residuals exceeding a threshold $\delta$:
 
-$$\rho(e) = \begin{cases} \frac{1}{2} e^2 & \text{if } \vert{}e\vert{} \le \delta \\ \delta \left( \vert{}e\vert{} - \frac{1}{2} \delta \right) & \text{if } \vert{}e\vert{} > \delta \end{cases}, \quad w(e) = \begin{cases} 1 & \text{if } \vert{}e\vert{} \le \delta \\ \frac{\delta}{\vert{}e\vert{}} & \text{if } \vert{}e\vert{} > \delta \end{cases}$$
+$$\rho(e) = \begin{cases} \frac{1}{2} e^2 & \text{if } \vert{}e\vert{} \le \delta \\ 
+\delta \left( \vert{}e\vert{} - \frac{1}{2} \delta \right) & \text{if } \vert{}e\vert{} > \delta \end{cases}, \quad w(e) = \begin{cases} 1 & \text{if } \vert{}e\vert{} \le \delta \\ 
+\frac{\delta}{\vert{}e\vert{}} & \text{if } \vert{}e\vert{} > \delta \end{cases}$$
 
 * **Behavior:** Because $w(e) \propto \frac{1}{\vert{}e\vert{}}$, the gradient magnitude becomes constant ($\delta$) for outliers rather than growing infinitely.
 * **Limitation in SLAM:** A linear error cost still grows indefinitely as $e \to \infty$. If a false loop closure has a massive initial error, Huber will still pull the graph significantly toward the false measurement.

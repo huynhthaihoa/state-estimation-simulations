@@ -38,8 +38,8 @@ For a function with **one input and one output**, we call this a derivative.
 
 Suppose:
 
-$${\begin{bmatrix}y_1 \\
-y_2 \end{bmatrix}=f\left(\begin{bmatrix}x_1 \\
+$${\begin{bmatrix}y_1 \\ 
+y_2 \end{bmatrix}=f\left(\begin{bmatrix}x_1 \\ 
 x_2\end{bmatrix}\right)}$$
 
 Now we have:
@@ -72,8 +72,8 @@ $${\frac{\partial y_1}{\partial x_1} = 1 \qquad \frac{\partial y_1}{\partial x_2
 So we put all those derivatives into a matrix:
 
 $${J =\begin{bmatrix}\frac{\partial y_1}{\partial x_1} & \frac{\partial y_1}{\partial x_2} \\ 
-\frac{\partial y_2}{\partial x_1} & \frac{\partial y_2}{\partial x_2} \\
-\end{bmatrix} = \begin{bmatrix}1 & 2x_2 \\
+\frac{\partial y_2}{\partial x_1} & \frac{\partial y_2}{\partial x_2} \\ 
+\end{bmatrix} = \begin{bmatrix}1 & 2x_2 \\ 
 x_2 & x_1\end{bmatrix}}$$
 
 That's the **Jacobian**. Notice the convention: each **row** is one output ($y_i$), each **column** is one input ($x_j$) - $J_{ij} = \partial y_i/\partial x_j$.
@@ -86,20 +86,14 @@ This is probably the most useful intuition.
 
 Suppose your robot's state is:
 
-$${p =
-\begin{bmatrix}
-x \\
-y \\
-\theta
-\end{bmatrix}}$$
+$${p = \begin{bmatrix} x \\ 
+y \\ 
+\theta \end{bmatrix}}$$
 
 and your camera produces some measurement:
 
-$${z =
-\begin{bmatrix}
-u \\
-v
-\end{bmatrix}}$$
+$${z = \begin{bmatrix} u \\ 
+v \end{bmatrix}}$$
 
 The Jacobian might look like:
 
@@ -161,15 +155,9 @@ Meaning:
 
 Putting every partial derivative together gives the full Jacobian:
 
-$${J =
-\begin{bmatrix}
-\frac{\partial u}{\partial X} & \frac{\partial u}{\partial Y} & \frac{\partial u}{\partial Z} \\
-\frac{\partial v}{\partial X} & \frac{\partial v}{\partial Y} & \frac{\partial v}{\partial Z}
-\end{bmatrix}
-=\begin{bmatrix}
-f/Z & 0 & -fX/Z^2 \\
-0 & f/Z & -fY/Z^2
-\end{bmatrix}}$$
+$${J = \begin{bmatrix} \frac{\partial u}{\partial X} & \frac{\partial u}{\partial Y} & \frac{\partial u}{\partial Z} \\ 
+\frac{\partial v}{\partial X} & \frac{\partial v}{\partial Y} & \frac{\partial v}{\partial Z} \end{bmatrix} =\begin{bmatrix} f/Z & 0 & -fX/Z^2 \\ 
+0 & f/Z & -fY/Z^2 \end{bmatrix}}$$
 
 Notice the zeros: $\partial u/\partial Y = 0$ and $\partial v/\partial X = 0$, because horizontal image position ($u$) doesn't depend on vertical 3D position ($Y$) at all, and vice versa for $v$ and $X$. This is the actual Jacobian a visual-SLAM or bundle-adjustment system would compute at every reprojected point.
 
@@ -435,7 +423,11 @@ The last one is the frame-conversion identity: $R(\varphi)$ is exactly what turn
 
 Take $\varphi = (0, 0, \theta)$, a pure rotation about $z$, with $\theta = \pi/2$. For a single-axis rotation, $[\varphi]_\times^2 = \theta^2(kk^\top - I) = \text{diag}(-\theta^2, -\theta^2, 0)$ with $k=(0,0,1)$, which keeps the algebra clean. Plugging $\theta=\pi/2$ ($\cos\theta=0$, $\sin\theta=1$) into the formulas above gives:
 
-$$J_l \approx \begin{bmatrix}0.637 & -0.637 & 0\\ 0.637 & 0.637 & 0\\ 0 & 0 & 1\end{bmatrix} \qquad J_r \approx \begin{bmatrix}0.637 & 0.637 & 0\\ -0.637 & 0.637 & 0\\ 0 & 0 & 1\end{bmatrix}$$
+$$J_l \approx \begin{bmatrix}0.637 & -0.637 & 0\\ 
+0.637 & 0.637 & 0\\ 
+0 & 0 & 1\end{bmatrix} \qquad J_r \approx \begin{bmatrix}0.637 & 0.637 & 0\\ 
+-0.637 & 0.637 & 0\\ 
+0 & 0 & 1\end{bmatrix}$$
 
 Notice $J_r = J_l^\top$, exactly as the identity predicts. If you instead plug in $\theta \to 0$ in the same formulas, both matrices collapse to $I$, confirming Section 11.3's claim about the identity.
 

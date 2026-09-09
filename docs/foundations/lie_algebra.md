@@ -55,8 +55,8 @@ Simply adding numbers to a rotation matrix will generally destroy these properti
 
 For example, you could accidentally obtain something like:
 
-$$\begin{bmatrix}1.01 & 0 & 0\\
-0 & 1.02 & 0\\
+$$\begin{bmatrix}1.01 & 0 & 0\\ 
+0 & 1.02 & 0\\ 
 0 & 0 & 1\end{bmatrix}$$
 
 which isn't a valid rotation.
@@ -69,14 +69,14 @@ which isn't a valid rotation.
 
 Suppose your robot position is
 
-$$p =\begin{bmatrix}x\\
-y\\
+$$p =\begin{bmatrix}x\\ 
+y\\ 
 z\end{bmatrix}$$
 
 A small movement is simply:
 
 $$\delta p = \begin{bmatrix}\delta x\\ 
-\delta y\\
+\delta y\\ 
 \delta z\end{bmatrix}$$
 
 and we can update:
@@ -162,8 +162,8 @@ Instead of thinking about **all possible rotations**, zoom in around $R$.
 
 Locally, small rotations behave approximately like ordinary vectors:
 
-$$\delta\theta =\begin{bmatrix}\delta\theta_x\\
-\delta\theta_y\\
+$$\delta\theta =\begin{bmatrix}\delta\theta_x\\ 
+\delta\theta_y\\ 
 \delta\theta_z \end{bmatrix}$$
 
 This is the Lie algebra:
@@ -185,7 +185,7 @@ That's probably the single most useful intuition.
 You might encounter:
 
 $$\delta\theta^\wedge = \begin{bmatrix} 0 & -\delta\theta_z & \delta\theta_y\\
-\delta\theta_z & 0 & -\delta\theta_x\\
+\delta\theta_z & 0 & -\delta\theta_x\\ 
 -\delta\theta_y & \delta\theta_x & 0 \end{bmatrix}$$
 
 This is called the **hat operator**:
@@ -325,7 +325,7 @@ A robot pose consists of:
 
 We represent it as:
 
-$$T = \begin{bmatrix}R & t\\
+$$T = \begin{bmatrix}R & t\\ 
 0 & 1 \end{bmatrix}$$
 
 where:
@@ -340,7 +340,7 @@ $$\mathfrak{se}(3)$$
 
 and a small pose perturbation can be represented as:
 
-$$\xi = \begin{bmatrix} \rho\\
+$$\xi = \begin{bmatrix} \rho\\ 
 \phi \end{bmatrix} \in \mathbb{R}^6$$
 
 where:
@@ -394,11 +394,11 @@ Now someone tells you:
 
 That's essentially a **Lie algebra vector**:
 
-$$\xi = \begin{bmatrix} 2\,\text{cm}\\
--1\,\text{cm}\\
-0\\
-0.5^\circ\\
-0\\
+$$\xi = \begin{bmatrix} 2\,\text{cm}\\ 
+-1\,\text{cm}\\ 
+0\\ 
+0.5^\circ\\ 
+0\\ 
 0.2^\circ \end{bmatrix}$$
 
 It describes a **small motion**, not a complete pose. (In cm/degrees purely for intuition - plugging into the actual $\exp(\xi^\wedge)$ formula requires consistent units, i.e. meters and radians.)

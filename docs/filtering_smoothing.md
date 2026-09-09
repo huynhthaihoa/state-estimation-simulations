@@ -115,8 +115,7 @@ But later, at `E`, it recognizes:
 
 That's a **loop closure**.
 
-Now the robot realizes that its previous trajectory was wrong: the new information tells us it
-should have ended up back near its starting position, not off at a separate point `E`.
+Now the robot realizes that its previous trajectory was wrong: the new information tells us it should have ended up back near its starting position, not off at a separate point `E`.
 
 Therefore, **all those previous poses may need to move**:
 
@@ -341,14 +340,7 @@ This gives us a useful trade-off:
 | Global consistency | Harder                         | Stronger                                   |
 | Typical idea       | EKF-SLAM                       | Pose graph / factor graph / BA             |
 
-**A caveat worth remembering**: "filtering is cheaper, optimization is more expensive" is the
-right intuition for small, fixed-size problems, but it inverts at scale. EKF-style filtering
-maintains a *dense* joint covariance over the state, so each update costs roughly $O(n^2)$ in the
-number of landmarks/poses (Dissanayake et al., 2001). Sparse factor-graph smoothing exploits the
-sparsity of the underlying graph, so incremental solvers like iSAM2 update in close to $O(1)$ – ${O(\log n)}$
-amortized time even as the map grows (Kaess et al., 2012). That gap - not accuracy - is the actual
-reason large-scale SLAM systems moved from EKF-SLAM toward factor-graph smoothing: dense filtering
-simply doesn't scale to large maps the way sparse smoothing does.
+**A caveat worth remembering**: "filtering is cheaper, optimization is more expensive" is the right intuition for small, fixed-size problems, but it inverts at scale. EKF-style filtering maintains a *dense* joint covariance over the state, so each update costs roughly $O(n^2)$ in the number of landmarks/poses (Dissanayake et al., 2001). Sparse factor-graph smoothing exploits the sparsity of the underlying graph, so incremental solvers like iSAM2 update in close to $O(1)$ – ${O(\log n)}$ amortized time even as the map grows (Kaess et al., 2012). That gap - not accuracy - is the actual reason large-scale SLAM systems moved from EKF-SLAM toward factor-graph smoothing: dense filtering simply doesn't scale to large maps the way sparse smoothing does.
 
 ---
 
@@ -474,8 +466,7 @@ A rough map is:
                          Factor graphs / Optimization
 ```
 
-(KF and EKF stay in the dense, recursive filtering loop; fixed-lag and full smoothing are the
-methods usually solved via sparse factor-graph optimization.)
+(KF and EKF stay in the dense, recursive filtering loop; fixed-lag and full smoothing are the methods usually solved via sparse factor-graph optimization.)
 
 Examples you'll encounter:
 
@@ -528,29 +519,11 @@ And that distinction is one of the most useful conceptual foundations for unders
 
 ## 12. References
 
-1. Thrun, S., Burgard, W., & Fox, D. (2005). *Probabilistic Robotics*. MIT Press. - the
-   online-SLAM-vs-full-SLAM framing behind §1's and §6's filtering/smoothing distinction.
-2. Dissanayake, M. W. M. G., Newman, P., Clark, S., Durrant-Whyte, H. F., & Csorba, M. (2001). *A
-   Solution to the Simultaneous Localization and Map Building (SLAM) Problem*. IEEE Transactions on
-   Robotics and Automation, 17(3), 229–241. https://doi.org/10.1109/70.938381 - the $O(n^2)$
-   dense-covariance growth of EKF-SLAM referenced in §8's caveat.
-3. Dellaert, F., & Kaess, M. (2006). *Square Root SAM: Simultaneous Localization and Mapping via
-   Square Root Information Smoothing*. International Journal of Robotics Research, 25(12),
-   1181–1203. https://doi.org/10.1177/0278364906072768 - the sparse smoothing/factor-graph approach
-   behind §4, §9, and §8's caveat.
-4. Kaess, M., Johannsson, H., Roberts, R., Ila, V., Leonard, J. J., & Dellaert, F. (2012). *iSAM2:
-   Incremental Smoothing and Mapping Using the Bayes Tree*. International Journal of Robotics
-   Research, 31(2), 216–235. https://doi.org/10.1177/0278364911430419 - the incremental sparse
-   solver behind §8's caveat and §12's iSAM/iSAM2 entry.
-5. Dellaert, F., & Kaess, M. (2017). *Factor Graphs for Robot Perception*. Foundations and Trends
-   in Robotics, 6(1–2), 1–139. https://doi.org/10.1561/2300000043 - general reference for the
-   factor-graph formulation used throughout §9.
-6. Mourikis, A. I., & Roumeliotis, S. I. (2007). *A Multi-State Constraint Kalman Filter for
-   Vision-Aided Inertial Navigation*. ICRA 2007, 3565–3572. https://doi.org/10.1109/ROBOT.2007.364024
-   - the MSCKF reference in §12.
-7. Qin, T., Li, P., & Shen, S. (2018). *VINS-Mono: A Robust and Versatile Monocular Visual-Inertial
-   State Estimator*. IEEE Transactions on Robotics, 34(4), 1004–1020.
-   https://doi.org/10.1109/TRO.2018.2853729 - the VINS-Mono/VINS-Fusion reference in §12.
-8. Mur-Artal, R., Montiel, J. M. M., & Tardós, J. D. (2015). *ORB-SLAM: A Versatile and Accurate
-   Monocular SLAM System*. IEEE Transactions on Robotics, 31(5), 1147–1163.
-   https://doi.org/10.1109/TRO.2015.2463671 - the ORB-SLAM reference in §12.
+1. Thrun, S., Burgard, W., & Fox, D. (2005). *Probabilistic Robotics*. MIT Press. - the online-SLAM-vs-full-SLAM framing behind §1's and §6's filtering/smoothing distinction.
+2. Dissanayake, M. W. M. G., Newman, P., Clark, S., Durrant-Whyte, H. F., & Csorba, M. (2001). *A Solution to the Simultaneous Localization and Map Building (SLAM) Problem*. IEEE Transactions on Robotics and Automation, 17(3), 229–241. https://doi.org/10.1109/70.938381 - the $O(n^2)$ dense-covariance growth of EKF-SLAM referenced in §8's caveat.
+3. Dellaert, F., & Kaess, M. (2006). *Square Root SAM: Simultaneous Localization and Mapping via Square Root Information Smoothing*. International Journal of Robotics Research, 25(12), 1181–1203. https://doi.org/10.1177/0278364906072768 - the sparse smoothing/factor-graph approach behind §4, §9, and §8's caveat.
+4. Kaess, M., Johannsson, H., Roberts, R., Ila, V., Leonard, J. J., & Dellaert, F. (2012). *iSAM2: Incremental Smoothing and Mapping Using the Bayes Tree*. International Journal of Robotics Research, 31(2), 216–235. https://doi.org/10.1177/0278364911430419 - the incremental sparse solver behind §8's caveat and §12's iSAM/iSAM2 entry.
+5. Dellaert, F., & Kaess, M. (2017). *Factor Graphs for Robot Perception*. Foundations and Trends in Robotics, 6(1–2), 1–139. https://doi.org/10.1561/2300000043 - general reference for the factor-graph formulation used throughout §9.
+6. Mourikis, A. I., & Roumeliotis, S. I. (2007). *A Multi-State Constraint Kalman Filter for Vision-Aided Inertial Navigation*. ICRA 2007, 3565–3572. https://doi.org/10.1109/ROBOT.2007.364024 - the MSCKF reference in §12.
+7. Qin, T., Li, P., & Shen, S. (2018). *VINS-Mono: A Robust and Versatile Monocular Visual-Inertial State Estimator*. IEEE Transactions on Robotics, 34(4), 1004–1020. https://doi.org/10.1109/TRO.2018.2853729 - the VINS-Mono/VINS-Fusion reference in §12.
+8. Mur-Artal, R., Montiel, J. M. M., & Tardós, J. D. (2015). *ORB-SLAM: A Versatile and Accurate Monocular SLAM System*. IEEE Transactions on Robotics, 31(5), 1147–1163. https://doi.org/10.1109/TRO.2015.2463671 - the ORB-SLAM reference in §12.
