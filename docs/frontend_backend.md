@@ -218,7 +218,7 @@ The 4 diagrams above were originally embedded as hotlinks to an OpenAI-hosted CD
    - Confirmed source: Reference 6 above (Chen et al., 2022, *SLAM Overview: From Single Sensor to Heterogeneous Fusion*).
 3. `images/frontend_backend_3.jpg`
    - Original CDN URL: https://images.openai.com/static-rsc-4/wSKnA5y3wi9kOy12TexCHpO7AOzmAIMkZP2Lubf4gLoaeo0jwVd2DipIoWO0Wl3INhlXLgBCQdyTZDQDPTZ_RdR9zltV7hoG-H7wiRY1Ja5iCt4PRRL85wEpuQhuOsc_bFhxps25YgL-sEyUaeU8fOFDOwQkEP_pkcA_9pUoqBfG5E6skjfrZ_g_hbGjQ_X6?purpose=fullsize
-   - Source: not yet identified - no candidate has been found or confirmed. Do not assume it shares a source with the other three.
+   <!-- - Source: not yet identified - no candidate has been found or confirmed. Do not assume it shares a source with the other three. -->
 4. `images/frontend_backend_4.jpg`
    - Original CDN URL: https://images.openai.com/static-rsc-4/1oH3r36n4WxtILN9nlK9PXhy52VKoblXYiuWIZXpb-0MKArZ9UwGQ2MPtIRdMgIlUwEwt2pvxyX0Ri8_bukIvSur2fgcoVvciiGxRn3Dqtd1GXQ63CWXEJIAwd1Ua9qad043n0DNKLTnphMUzjYDmzneWRPZPEI_hn9jf-ij253TMJJs6oZh9k7FQ7KgA59-?purpose=fullsize
    - Confirmed source: Reference 7 above (Duan, Feng, & Wen, 2022, *Deep Pose Graph-Matching- Based Loop Closure Detection for Semantic Visual SLAM*), Figure 1.
