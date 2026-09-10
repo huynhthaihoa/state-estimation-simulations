@@ -648,6 +648,14 @@ $${H \, \boldsymbol{\delta}^* = -b}$$
 
 Because edges only connect adjacent or loop-closing keyframes, $H$ is extremely **sparse** and block-structured. It is typically solved using Sparse Cholesky Factorization (${\mathrm{LL}^\top}$ or ${\mathrm{LDL}^\top}$) or Conjugate Gradients in solvers like GTSAM or g2o.
 
+**What that factorization is doing:** $H$ is symmetric positive-definite, and Cholesky factorization writes it as $H = LL^\top$ with $L$ lower-triangular. Solving $H\boldsymbol{\delta}^* = -b$ then becomes two cheap triangular solves instead of one general one:
+
+$$Ly = -b \quad\text{(forward substitution)}, \qquad L^\top \boldsymbol{\delta}^* = y \quad\text{(back substitution)}$$
+
+Each pass is just row-by-row substitution — no matrix inversion needed.
+
+**Why "sparse" matters:** most pose pairs never share a constraint, so most of $H$'s off-diagonal blocks are exactly zero. Sparse Cholesky exploits that known zero pattern instead of doing dense arithmetic on entries it already knows are zero. One subtlety: eliminating a variable can turn some of those zeros into nonzeros — called **fill-in**. For example, eliminating $x_2$ out of a chain $x_1 - x_2 - x_3$ creates a new dependency between $x_1$ and $x_3$ even though they were never directly measured. Which order variables are eliminated in controls how much fill-in accumulates; see [`bayes_tree.md` §3](bayes_tree.md#3-elimination-is-the-key-idea) for a worked elimination example, and [`isam2_optimization.md` §7](isam2_optimization.md#7-bayes-tree--the-most-important-intuition) for why iSAM2 cares about this at all.
+
 In practice a pure Gauss-Newton step can overshoot or diverge far from the solution, so a **Levenberg-Marquardt** damping term $\lambda$ is added to the Hessian's diagonal before solving:
 
 $${(H + \lambda I) \, \boldsymbol{\delta}^* = -b}$$

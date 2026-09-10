@@ -62,15 +62,15 @@ $$X^*=\arg\min_X \sum_i \|r_i(X)\|^2$$
 For example:
 
 ```text
-                measurement
-x1 ───────────────────────── x2
-        "you moved 1 m"
-
-x2 ───────────────────────── x3
-        "you moved 1 m"
-
-x3 ───────────────────────── x4
-        "you moved 1 m"
+        measurement
+x1 ───────────────────── x2
+      "you moved 1 m"
+                                 measurement
+                         x2 ───────────────────── x3
+                               "you moved 1 m"
+                                                          measurement
+                                                  x3 ───────────────────── x4
+                                                        "you moved 1 m"
 ```
 
 But measurements contain noise.
@@ -79,8 +79,8 @@ So maybe the robot actually estimates:
 
 ```text
 x1 ---- 1.02m ---- x2
-x2 ---- 0.97m ---- x3
-x3 ---- 1.05m ---- x4
+                   x2 ---- 0.97m ---- x3
+                                      x3 ---- 1.05m ---- x4
 ```
 
 Optimization finds the set of poses that makes **all measurements reasonably happy at the same time**.
@@ -222,17 +222,9 @@ These three ideas are the heart of iSAM2.
 
 ## 7. Bayes tree — the most important intuition
 
-You already learned about **Sparse Cholesky factorization**.
+Quick recap first: **Sparse Cholesky factorization** splits $H$ into $H = LL^T$ ($L$ lower-triangular), so solving $H\Delta x=-g$ becomes two cheap triangular solves instead of one matrix inversion. "Sparse" means most of $H$ is already zero — two poses only interact if a factor directly connects them — so the factorization skips arithmetic on entries it already knows are zero. The one catch: eliminating a variable can turn some of those zeros into nonzeros ("fill-in"), which is why elimination/variable order matters (§12). Full derivation in [`pose_graph_optimization.md` §5](pose_graph_optimization.md#5-solving-the-linear-system-gauss-newton-step); a worked elimination example in [`bayes_tree.md` §3](bayes_tree.md#3-elimination-is-the-key-idea).
 
-This is closely connected.
-
-After linearization, SLAM gives you something like:
-
-$$H\Delta x=-g$$
-
-Because SLAM is sparse, we don't want to treat $H$ as a giant dense matrix.
-
-We factorize it efficiently, and conceptually:
+So after linearization, SLAM hands you exactly the $H\Delta x=-g$ system above, and that sparse-elimination process is run for real. Conceptually:
 
 ```text
 Factor graph
@@ -244,14 +236,9 @@ Cholesky / QR
 Bayes tree
 ```
 
-The **Bayes tree** is a tree representation of that factorization — built by eliminating
-variables one at a time and recording which remaining variables each elimination step's
-result depends on — that makes incremental updates easier: given a new factor, iSAM2 can walk
-straight to the affected part of the tree instead of recomputing everything.
+The **Bayes tree** is a tree representation of that factorization — built by eliminating variables one at a time and recording which remaining variables each elimination step's result depends on — that makes incremental updates easier: given a new factor, iSAM2 can walk straight to the affected part of the tree instead of recomputing everything.
 
-This doc only needs that one-sentence version. For the full mechanism — how elimination
-produces the tree, cliques, the probabilistic interpretation, and a worked loop-closure
-example on a correctly-drawn tree — see [`bayes_tree.md`](bayes_tree.md).
+This doc only needs that one-sentence version. For the full mechanism — how elimination produces the tree, cliques, the probabilistic interpretation, and a worked loop-closure example on a correctly-drawn tree — see [`bayes_tree.md`](bayes_tree.md).
 
 ---
 
@@ -302,8 +289,8 @@ Suppose your robot drives around:
 
 ```text
         x1 ─ x2 ─ x3
-        |           |
-        |           |
+        |          |
+        |          |
         x6 ─ x5 ─ x4
 ```
 
@@ -315,7 +302,7 @@ So you add a loop-closure factor:
 
 ```text
 x1 ─ x2 ─ x3
-│           │
+│          │
 x6 ─ x5 ─ x4
 ```
 
@@ -401,21 +388,9 @@ This is called **selective relinearization**.
 
 ## 11. Why is that powerful?
 
-Imagine a SLAM graph containing:
+Imagine a SLAM graph containing $10,000$ poses.
 
-$$
-10,000
-$$
-
-poses.
-
-After a new measurement, maybe only:
-
-$$
-50
-$$
-
-variables have changed significantly.
+After a new measurement, maybe only $50$ variables have changed significantly.
 
 A batch optimizer might effectively reconsider all 10,000.
 
@@ -646,8 +621,8 @@ then the correction can propagate backward through the trajectory:
 
 ```text
 x1 ← x2 ← x3 ← ... ← x100
-↑                         ↑
-└──── loop closure ───────┘
+↑                      ↑
+└──── loop closure ────┘
 ```
 
 So old poses can change.
@@ -670,30 +645,11 @@ And the three keywords to remember are:
 
 ## 19. Where this is implemented in this repo
 
-Partially — and it's worth being precise about which part rather than leaving it as one bare
-claim. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds this
-doc's §7 Bayes tree for real (symbolic elimination over this repo's pose-graph topology, via
-`symbolic_eliminate`/`bayes_tree_affected_path` in `utils.py`) and quantifies §9's "small vs.
-large affected region" claim with a computed example instead of only prose — see
-[`bayes_tree.md` §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo) for the details,
-including a genuinely useful finding: with a *fixed* elimination order (oldest node first, since
-§12's variable reordering is explicitly not implemented), this repo's loop-closure edge produces
-the worst possible case — the entire tree, not just a subtree, gets invalidated.
+Partially — and it's worth being precise about which part rather than leaving it as one bare claim. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds this doc's §7 Bayes tree for real (symbolic elimination over this repo's pose-graph topology, via `symbolic_eliminate`/`bayes_tree_affected_path` in `utils.py`) and quantifies §9's "small vs. large affected region" claim with a computed example instead of only prose — see [`bayes_tree.md` §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo) for the details, including a genuinely useful finding: with a *fixed* elimination order (oldest node first, since §12's variable reordering is explicitly not implemented), this repo's loop-closure edge produces the worst possible case — the entire tree, not just a subtree, gets invalidated.
 
-**§10 selective relinearization and §12 variable reordering (COLAMD) remain unimplemented** — no
-numeric solve is integrated with the tree above. That's still
-[`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and
-`use_manif/`)'s job, and it implements the original **iSAM v1** mechanism described in
-[`isam_optimization.md`](isam_optimization.md) instead — incremental Givens-rotation QR row
-insertion into a running square-root-information matrix, plus periodic/loop-closure-triggered
-full relinearization, with no Bayes tree involved at all. Its own module docstring explicitly
-calls out the Bayes tree and COLAMD as out of scope; see
-[`isam_optimization.md` §14](isam_optimization.md#14-where-this-is-implemented-in-this-repo) for
-exactly where that line is drawn.
+**§10 selective relinearization and §12 variable reordering (COLAMD) remain unimplemented** — no numeric solve is integrated with the tree above. That's still [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`)'s job, and it implements the original **iSAM v1** mechanism described in [`isam_optimization.md`](isam_optimization.md) instead — incremental Givens-rotation QR row insertion into a running square-root-information matrix, plus periodic/loop-closure-triggered full relinearization, with no Bayes tree involved at all. Its own module docstring explicitly calls out the Bayes tree and COLAMD as out of scope; see [`isam_optimization.md` §14 (isam_optimization.md#14-where-this-is-implemented-in-this-repo) for exactly where that line is drawn.
 
-So this page's Bayes tree now has a real, runnable counterpart, but iSAM2 as a whole — the tree,
-selective relinearization, and dynamic reordering working together against an actual numeric
-solve — is still the conceptual target no single script in `use_numpy/`/`use_manif/` reaches.
+So this page's Bayes tree now has a real, runnable counterpart, but iSAM2 as a whole — the tree, selective relinearization, and dynamic reordering working together against an actual numeric solve — is still the conceptual target no single script in `use_numpy/`/`use_manif/` reaches.
 
 ---
 
@@ -702,6 +658,4 @@ solve — is still the conceptual target no single script in `use_numpy/`/`use_m
 1. Kaess, M., Johannsson, H., Roberts, R., Ila, V., Leonard, J. J., & Dellaert, F. (2012). *iSAM2: Incremental Smoothing and Mapping Using the Bayes Tree*. International Journal of Robotics Research, 31(2), 216–235. https://doi.org/10.1177/0278364911430419 - the Bayes tree, fluid/selective relinearization, and dynamic variable reordering this whole doc walks through.
 2. Kaess, M., Ranganathan, A., & Dellaert, F. (2008). *iSAM: Incremental Smoothing and Mapping*. IEEE Transactions on Robotics, 24(6), 1365–1378. https://doi.org/10.1109/TRO.2008.2006706 - the predecessor algorithm (incremental QR updates, no Bayes tree) that [`isam_optimization.md`](isam_optimization.md) covers and that `pose_graph_incremental.py` actually implements.
 
-See also [`bayes_tree.md`](bayes_tree.md) for the full elimination-to-tree mechanism behind
-§7, and [`isam_optimization.md`](isam_optimization.md) for the non-Bayes-tree predecessor
-algorithm this doc builds on.
+See also [`bayes_tree.md`](bayes_tree.md) for the full elimination-to-tree mechanism behind §7, and [`isam_optimization.md`](isam_optimization.md) for the non-Bayes-tree predecessor algorithm this doc builds on.

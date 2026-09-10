@@ -8,7 +8,7 @@ Suppose your robot has four poses:
 
 ```text
 x1 ───── x2 ───── x3 ───── x4
-       odom12    odom23    odom34
+   odom12   odom23   odom34
 ```
 
 And suppose it observes a landmark:
@@ -46,7 +46,7 @@ $$A\Delta x=b$$
 
 Now we need to solve this large sparse system.
 
-This is where your previous topic, **Sparse Cholesky Factorization**, becomes important.
+This is where **Sparse Cholesky Factorization** becomes important — see [`pose_graph_optimization.md` §5](pose_graph_optimization.md#5-solving-the-linear-system-gauss-newton-step) if you want the recap: $H = LL^T$, solved via two triangular substitutions instead of a full inversion, exploiting the fact that $H$ is mostly zero.
 
 We want to factorize the system efficiently.
 
@@ -259,7 +259,7 @@ That's much smarter than rebuilding the entire factorization blindly.
 
 ## 9. Bayes tree + sparse Cholesky
 
-This connects directly to what you learned recently.
+This connects directly to [`pose_graph_optimization.md`'s sparse Cholesky factorization](pose_graph_optimization.md#5-solving-the-linear-system-gauss-newton-step) and to iSAM2's use of it in [`isam2_optimization.md` §7](isam2_optimization.md#7-bayes-tree--the-most-important-intuition).
 
 You can think of the pipeline as:
 
@@ -303,9 +303,7 @@ Re-eliminate
 Updated Bayes Tree
 ```
 
-This is the core mechanism behind **[iSAM2](isam2_optimization.md)'s incremental efficiency** -
-the older [iSAM](isam_optimization.md) algorithm gets its own incremental updates from QR row
-insertion alone, without a Bayes tree at all.
+This is the core mechanism behind **[iSAM2](isam2_optimization.md)'s incremental efficiency** - the older [iSAM](isam_optimization.md) algorithm gets its own incremental updates from QR row insertion alone, without a Bayes tree at all.
 
 ---
 
@@ -430,26 +428,9 @@ So:
 
 ## 15. Where this is implemented in this repo
 
-Partially. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds an
-actual Bayes tree from this repo's pose-graph topology - `symbolic_eliminate`/
-`bayes_tree_affected_path` in `utils.py` run the elimination-game construction from §3-§4 and the
-root-ward affected-path query from §7-§9 - and plots the "small vs. large affected region"
-contrast this doc argues for in prose (§7 vs. §8) using a real, computed example instead of an
-ASCII sketch. It fixes the elimination order (oldest node first) rather than choosing one
-dynamically, so **COLAMD-style variable reordering is still not implemented** - worth noting
-since, under that fixed order, this repo's loop-closure edge happens to produce the worst
-possible case (it invalidates the *entire* tree, not just a subtree), which is exactly the
-scenario dynamic reordering exists to avoid. There is also still no numeric fluid-relinearization
-solve integrated with this tree - [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and
-`use_manif/`) separately implements the older [iSAM v1](isam_optimization.md) algorithm
-(incremental QR row insertion, no Bayes tree at all); see
-[`isam_optimization.md` §14](isam_optimization.md#14-where-this-is-implemented-in-this-repo)
-and [`isam2_optimization.md` §19](isam2_optimization.md#19-where-this-is-implemented-in-this-repo)
-for exactly where that numeric-solve line is drawn.
+Partially. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds an actual Bayes tree from this repo's pose-graph topology - `symbolic_eliminate`/`bayes_tree_affected_path` in `utils.py` run the elimination-game construction from §3-§4 and the root-ward affected-path query from §7-§9 - and plots the "small vs. large affected region" contrast this doc argues for in prose (§7 vs. §8) using a real, computed example instead of an ASCII sketch. It fixes the elimination order (oldest node first) rather than choosing one dynamically, so **COLAMD-style variable reordering is still not implemented** - worth noting since, under that fixed order, this repo's loop-closure edge happens to produce the worst possible case (it invalidates the *entire* tree, not just a subtree), which is exactly the scenario dynamic reordering exists to avoid. There is also still no numeric fluid-relinearization solve integrated with this tree - [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`) separately implements the older [iSAM v1](isam_optimization.md) algorithm (incremental QR row insertion, no Bayes tree at all); see [`isam_optimization.md` §14](isam_optimization.md#14-where-this-is-implemented-in-this-repo) and [`isam2_optimization.md` §19(isam2_optimization.md#19-where-this-is-implemented-in-this-repo) for exactly where that numeric-solve line is drawn.
 
-So this page's data structure now has a real, runnable counterpart - but the rest of
-[iSAM2](isam2_optimization.md) (dynamic reordering, fluid relinearization integrated with an
-actual solve) still exists only conceptually here.
+So this page's data structure now has a real, runnable counterpart - but the rest of [iSAM2](isam2_optimization.md) (dynamic reordering, fluid relinearization integrated with an actual solve) still exists only conceptually here.
 
 ---
 
@@ -458,6 +439,4 @@ actual solve) still exists only conceptually here.
 1. Kaess, M., Johannsson, H., Roberts, R., Ila, V., Leonard, J. J., & Dellaert, F. (2012). *iSAM2: Incremental Smoothing and Mapping Using the Bayes Tree*. International Journal of Robotics Research, 31(2), 216–235. https://doi.org/10.1177/0278364911430419 - the Bayes tree itself: its construction via variable elimination (§3-§4), the clique structure (§13), and how it localizes incremental updates (§7-§9).
 2. Kaess, M., Ranganathan, A., & Dellaert, F. (2008). *iSAM: Incremental Smoothing and Mapping*. IEEE Transactions on Robotics, 24(6), 1365–1378. https://doi.org/10.1109/TRO.2008.2006706 - the predecessor algorithm that reaches incremental updates without a Bayes tree, contrasted in §7 and implemented by `pose_graph_incremental.py`.
 
-See also [`isam2_optimization.md`](isam2_optimization.md) for how the Bayes tree fits into the
-full iSAM2 algorithm, and [`isam_optimization.md`](isam_optimization.md) for the non-Bayes-tree
-predecessor this repo actually implements.
+See also [`isam2_optimization.md`](isam2_optimization.md) for how the Bayes tree fits into the full iSAM2 algorithm, and [`isam_optimization.md`](isam_optimization.md) for the non-Bayes-tree predecessor this repo actually implements.
