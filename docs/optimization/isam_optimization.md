@@ -154,10 +154,10 @@ Then you get a new camera observation at X4.
 Maybe it observes landmark L0:
 
 ```text
-                L0
-                ●
+                 L0
+                 ●
+                /
                /
-              /
 X0 ●──X1──X2──X3──X4
                   ↑
              new camera
