@@ -65,7 +65,7 @@ Conceptually:
 Before:
 
 X0 ─── X1 ─── X2 ─── X3
-             ↑
+              ↑
         already solved
 
 
@@ -93,8 +93,8 @@ Suppose we have a [factor graph](factor_graph.md):
 
 ```text
 X0 ─── X1 ─── X2 ─── X3
-             │
-             L1
+              │
+              L1
 ```
 
 After linearization, the nonlinear optimization becomes approximately:

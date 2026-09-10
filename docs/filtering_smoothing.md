@@ -123,15 +123,15 @@ Therefore, **all those previous poses may need to move**:
 Before:
 
 A ---- B ---- C ---- D
-                    \
-                     E
+                      \
+                       E
 
 
 After:
 
        B --- C --- D
       /             \
-A ------------------- E
+     A ------------- E
 ```
 
 A pure filtering mindset is uncomfortable with this because it has already compressed the past.
@@ -196,8 +196,8 @@ But then we detect a loop:
 
 ```text
 x₀ ── x₁ ── x₂ ── x₃ ── x₄
-│                         │
-└─────────────────────────┘
+│                        │
+└────────────────────────┘
           loop closure
 ```
 
@@ -218,7 +218,7 @@ After optimization:
 
       x₁ --- x₂ --- x₃
      /               \
-x₀ --------------------- x₄
+    x₀ -------------- x₄
 ```
 
 The important point is:
@@ -355,7 +355,7 @@ A factor graph has two kinds of factors. A **landmark factor** ties a pose to a 
          ●
         / \
        /   \
- x₀ ●       ● x₂
+ x₀   ●     ● x₂
 ```
 
 A **pose-to-pose factor** ties two consecutive (or, for a loop closure, non-consecutive) poses together via a relative measurement:

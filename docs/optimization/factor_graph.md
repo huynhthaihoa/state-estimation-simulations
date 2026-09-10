@@ -425,11 +425,11 @@ Suppose:
 
 ```text
 Odometry says:
-X1 should be here ────────┐
-                          │
+X1 should be here ─────────┐
+                           │
 Camera says:
-X1 should be there ──────┤ → compromise
-                          │
+X1 should be there ────────┤ → compromise
+                           │
 IMU says:
 X1 should be somewhere else┘
 ```

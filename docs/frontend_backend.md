@@ -35,7 +35,7 @@ Motion estimation
      ↓
 Measurements / constraints
      ↓
-       Backend
+   Backend
 ```
 
 Typical front-end tasks:

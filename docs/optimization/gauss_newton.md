@@ -322,8 +322,8 @@ After moving:
             /
            /
 ----------●----------
-              ↓
-          new position
+          ↓
+     new position
 ```
 
 Then it builds **another local approximation**.

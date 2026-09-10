@@ -120,8 +120,8 @@ We obtain a loop-closure constraint:
 
 ```text
 x₀ ───── x₁ ───── x₂ ───── x₃ ───── x₄
-│                                     │
-└──────────── loop closure ───────────┘
+│                                   │
+└──────────── loop closure ─────────┘
 ```
 
 This is extremely valuable.
@@ -294,7 +294,7 @@ Conceptually:
         📷 T₀
        /  \
       /    \
-    P₁     P₂
+    P₁      P₂
      \      /
       \    /
        📷 T₁
@@ -716,8 +716,8 @@ $$s_{ij} = \min\left(1, \; \frac{2 \Phi}{\Phi + e_{ij}^2}\right)$$
 ```
                        DCS Scaling Factor (s_ij)
           1.0 |────────────┐
-              |              \
-              |               \___   (s_ij decreases once e_ij^2 > Phi)
+              |             \
+              |              \___   (s_ij decreases once e_ij^2 > Phi)
           0.0 +--------------------> e_ij^2 (Error)
               0            Phi
 

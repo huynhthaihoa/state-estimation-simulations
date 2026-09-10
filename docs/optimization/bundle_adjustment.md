@@ -26,7 +26,7 @@ The 3D point `P` gets projected onto the camera image:
 ```text
 3D world                 Image
 
-    P ●                    • p
+   P ●                      • p
       \                    /
        \                  /
         \                /
@@ -214,19 +214,19 @@ t₀       t₁       t₂       t₃
  \        \        \        \
   \        \        \        \
    ● A      ● B      ● C      ● D
-    \       |        / 
-     \      |       /
+    \       |       / 
+     \      |      /
         landmarks
 ```
 
 The camera observes many landmarks:
 
 ```text
-        ● L1
-
-📷₀             ● L2
-    \          /
-     \        /
+      ● L1
+     /
+📷₀ /— — — — — ● L2
+    \          
+     \        
       ● L3
 ```
 
@@ -381,8 +381,8 @@ $${\boxed{\text{camera poses + 3D landmarks}}}$$
 
 ```text
         T₀       T₁       T₂
-         \        |        /
-          \       |       /
+         \        |       /
+          \       |      /
            P₁    P₂    P₃
 ```
 
@@ -436,7 +436,7 @@ You initially make a rough reconstruction:
         \           /
          \         /
           ●       ●
-             landmarks
+          landmarks
 ```
 
 Then you ask:
@@ -522,10 +522,10 @@ Re-optimizing the entire map on every camera move is impossible in real time, so
 
 ```text
   [Fixed Keyframe]  sees -> (Fixed Map Point)
-         |                                    |
-  (Covisible Link)                      (Observed by)
-         |                                    v
- [Active Keyframe]  < optimizes > [Active Map Point]
+         |                             |
+  (Covisible Link)               (Observed by)
+         |                             v
+ [Active Keyframe] < optimizes > [Active Map Point]
 ```
 
 * **Active keyframes**: the new keyframe plus its neighbors in the **covisibility graph** (keyframes sharing many observed points).

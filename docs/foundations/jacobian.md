@@ -219,8 +219,8 @@ At your current position, the complicated mountain can be approximated by a **fl
 
 ```text
              actual mountain
-                  /
                 /
+               /
               /
              /________
             /

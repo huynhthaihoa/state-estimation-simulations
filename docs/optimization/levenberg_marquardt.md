@@ -197,7 +197,7 @@ CAUTIOUS
    ↓
 Gradient Descent
    ↓
-LM
+  LM
    ↓
 Gauss–Newton
    ↓
@@ -360,7 +360,7 @@ Remember our factor graph:
        ●
       / \
      /   \
-X0 ●─────● X1
+X0  ●─────● X1
      \   /
       \ /
        X2

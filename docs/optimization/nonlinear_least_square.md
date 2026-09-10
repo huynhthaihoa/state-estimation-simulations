@@ -167,7 +167,7 @@ We have:
             /
            /
           /
-Camera ●
+  Camera ●
    T
 ```
 

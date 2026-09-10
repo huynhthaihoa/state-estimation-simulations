@@ -86,8 +86,8 @@ Imagine a curved road:
 
 ```text
                  actual nonlinear function
-                       /
                      /
+                    /
                    /
                 __/
              __/

@@ -226,7 +226,7 @@ Conceptually:
 Lie algebra                     Lie group
 
 small rotation                  actual rotation
-δθ                              R
+δθ                               R
  │                               │
  │       exponential             │
  └──────────────────────────────►│
@@ -266,7 +266,7 @@ Conceptually:
 Lie group                       Lie algebra
 
 actual rotation                 small rotation
-R                                δθ
+ R                               δθ
  │                               │
  │       logarithm               │
  └──────────────────────────────►│
