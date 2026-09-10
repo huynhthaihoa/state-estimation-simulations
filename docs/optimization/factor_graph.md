@@ -476,7 +476,7 @@ If you remember only one picture, remember this:
         ↓      ↓      ↓
 
 X0 ●──────●──────●──────● X3
-    X1     X2
+          X1     X2
 
  ↑                         ↑
  └────── loop closure ─────┘
