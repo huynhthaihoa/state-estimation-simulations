@@ -47,7 +47,7 @@ This repo's implementation, [`umeyama_alignment`](../../utils.py) in `utils.py`,
    Plain $UV^\top$ is the best-fit *orthogonal* matrix, but "orthogonal" includes reflections ($\det = -1$) as well as rotations ($\det = +1$). Since $R$ must be an actual rotation, $S$ flips the sign of the smallest-variance axis whenever the unconstrained best fit would have been a reflection - see the worked example in §4 for why this matters and what it costs.
 
 4. **Scale and translation:**
-   $$s = \frac{\operatorname{tr}(DS)}{\operatorname{var}(X)}, \qquad \operatorname{var}(X) = \frac{1}{n}\sum \|X_i\|^2, \qquad t = \mu_{\text{true}} - s R \mu_{\text{est}}$$
+   $$s = \frac{\text{tr}(DS)}{\text{var}(X)}, \qquad \text{var}(X) = \frac{1}{n}\sum \|X_i\|^2, \qquad t = \mu_{\text{true}} - s R \mu_{\text{est}}$$
 
 That's exactly the four steps `umeyama_alignment` runs, in order.
 
