@@ -388,8 +388,8 @@ There's not much opportunity to correct accumulated drift.
 With loop closure:
 
 ```text
-        ┌────────────────────┐
-        ↓                    │
+┌────────────────────────┐
+↓                        │
 x₀ ─ x₁ ─ x₂ ─ x₃ ─ x₄ ─ x₅
 ```
 
