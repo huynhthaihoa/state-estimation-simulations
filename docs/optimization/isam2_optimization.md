@@ -52,7 +52,7 @@ Your factor graph looks like:
 
 ```text
 x1 ─── x2 ─── x3 ─── x4
-      z12     z23    z34
+   z12    z23    z34
 ```
 
 You want to find the poses that best explain all measurements:
