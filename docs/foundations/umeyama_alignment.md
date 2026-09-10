@@ -15,9 +15,9 @@ A monocular camera looking at a static scene can recover the *shape* of the scen
 - **absolute position/orientation**: the whole reconstruction could be picked up and rigidly moved anywhere, and every reprojection error would stay identical, and
 - **absolute scale**: shrinking the entire scene and every camera-to-point distance by the same factor, while doubling nothing else, leaves every projected pixel exactly where it was.
 
-Together that's a **7-parameter similarity ambiguity**: 3 translation + 3 rotation + 1 scale. This is the same **gauge freedom** idea as in [pose_graph_optimization.md](../optimization/pose_graph_optimization.md)'s "one subtlety this formula hides" note - a direction the optimizer's cost function is completely blind to - except pose graphs only have the 6-DoF rigid version (their edges are *relative rigid* constraints, so scale is never in question), while monocular bundle adjustment's edges are *projective*, so scale is unobservable too.
+Together, that's a **7-parameter similarity ambiguity**: 3 translation + 3 rotation + 1 scale. This is the same **gauge freedom** idea as in [pose_graph_optimization.md](../optimization/pose_graph_optimization.md)'s "one subtlety this formula hides" note - a direction the optimizer's cost function is completely blind to - except pose graphs only have the 6-DoF rigid version (their edges are *relative rigid* constraints, so scale is never in question), while monocular bundle adjustment's edges are *projective*, so scale is unobservable too.
 
-You can't compute a meaningful "position error in meters" against ground truth while this ambiguity is still there - the reconstruction and the ground truth are simply expressed in two different (and differently-scaled) coordinate systems. Umeyama alignment is how you solve for the one similarity transform that brings them into the same frame before measuring error.
+You can't compute a meaningful "position error in meters" against ground truth while this ambiguity is still there - the reconstruction and the ground truth are simply expressed in two different (and differently scaled) coordinate systems. Umeyama alignment is how you solve for the one similarity transform that brings them into the same frame before measuring error.
 
 ---
 
@@ -27,26 +27,35 @@ Given $n$ corresponding point pairs $\{(x_i, y_i)\}$ - here, $x_i$ from the esti
 
 $$\boxed{\min_{s,R,t} \sum_{i=1}^{n} \left\| s R x_i + t - y_i \right\|^2}$$
 
-i.e. the least-squares best-fit similarity transform mapping the estimated points onto the ground-truth points. Unlike a generic nonlinear least-squares problem, this one has a **closed-form solution** via SVD - no Gauss-Newton iteration needed.
+i.e., the least-squares best-fit similarity transform mapping the estimated points onto the ground-truth points. Unlike a generic nonlinear least-squares problem, this one has a **closed-form solution** via SVD - no Gauss-Newton iteration needed.
 
 ---
 
 ## 3. The closed-form solution
 
-This repo's implementation, [`umeyama_alignment`](../../utils.py) in `utils.py`, is the textbook closed-form solution end to end:
+This repo's implementation, [`umeyama_alignment`](../../utils.py) in `utils.py`, is the textbook closed-form solution end-to-end:
 
 1. **Center both point sets** on their own centroids:
    $$\mu_{\text{est}} = \frac{1}{n}\sum x_i \qquad \mu_{\text{true}} = \frac{1}{n}\sum y_i \qquad X = x_i - \mu_{\text{est}} \qquad Y = y_i - \mu_{\text{true}}$$
-   Centering removes translation from the problem - it's handled separately, in step 4.
+   Centering removes translation from the problem; it's handled separately in step 4.
 
 2. **Cross-covariance and its SVD:**
    $$\Sigma = \frac{1}{n} Y^\top X = U D V^\top$$
 
 3. **Rotation, with a reflection guard:**
-   $$R = U S V^\top, \qquad S = \begin{cases}I & \det(U)\det(V^\top) \ge 0\\ \text{diag}(1,1,-1) & \det(U)\det(V^\top) < 0\end{cases}$$
-   Plain $UV^\top$ is the best-fit *orthogonal* matrix, but "orthogonal" includes reflections ($\det = -1$) as well as rotations ($\det = +1$). Since $R$ must be an actual rotation, $S$ flips the sign of the smallest-variance axis whenever the unconstrained best fit would have been a reflection - see the worked example in §4 for why this matters and what it costs.
+ 
+$${R = U S V^\top}$$
+   
+$$
+S = \begin{cases} 
+I & \text{if } \det(U)\det(V^\top) \ge 0 \\ 
+\text{diag}(1,1,-1) & \text{if } \det(U)\det(V^\top) < 0 
+\end{cases}
+$$
+   
+Plain $UV^\top$ is the best-fit *orthogonal* matrix, but "orthogonal" includes reflections ($\det = -1$) as well as rotations ($\det = +1$). Since $R$ must be an actual rotation, $S$ flips the sign of the smallest-variance axis whenever the unconstrained best fit would have been a reflection - see the worked example in §4 for why this matters and what it costs.
 
-4. **Scale and translation:**
+5. **Scale and translation:**
    $$s = \frac{\text{tr}(DS)}{\text{var}(X)}, \qquad \text{var}(X) = \frac{1}{n}\sum \|X_i\|^2, \qquad t = \mu_{\text{true}} - s R \mu_{\text{est}}$$
 
 That's exactly the four steps `umeyama_alignment` runs, in order.
@@ -68,7 +77,16 @@ So the guard is a deliberate trade: it always returns a physically valid rotatio
 
 Take four non-coplanar points and a known similarity transform - scale $s=2$, a $90°$ yaw about $z$, translation $t=(1,2,3)$:
 
-$$X = \begin{bmatrix}0&0&0\\1&0&0\\0&1&0\\0&0&1\end{bmatrix}, \qquad R_{\text{true}} = \begin{bmatrix}0&-1&0\\1&0&0\\0&0&1\end{bmatrix}, \qquad Y = s\,(R_{\text{true}} X^\top)^\top + t$$
+$$X = \begin{bmatrix}0&0&0\\
+1&0&0\\
+0&1&0\\
+0&0&1\end{bmatrix}$$
+
+$$\qquad R_{\text{true}} = \begin{bmatrix}0&-1&0\\
+1&0&0\\
+0&0&1\end{bmatrix}$$
+
+$$\qquad Y = s\,(R_{\text{true}} X^\top)^\top + t$$
 
 Running `umeyama_alignment(X, Y)` recovers $\hat{s} = 2.0$, $\hat{R} = R_{\text{true}}$, and $\hat{t} = (1, 2, 3)$ back out - to floating-point precision ($< 10^{-15}$ max error), since 4 well-spread non-coplanar points exactly determine a similarity transform with no noise to average out. With real (noisy) data from more than 4 points, the same four steps instead return the *least-squares best* $s, R, t$, exactly like fitting a line through noisy points.
 
