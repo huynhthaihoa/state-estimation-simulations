@@ -219,20 +219,28 @@ from lie_utils import se3_exp, se3_log, se3_inv, se3_adjoint, compute_se3_inv_ri
 #     return np.arccos(np.clip(c, -1.0, 1.0))
 
 
-def generate_ground_truth_trajectory(side_length):
-    """A closed 4-node square loop in the XY plane (start -> +X -> +Y -> -X),
-    with an implicit loop-closure edge back from the last node to the first.
+def generate_ground_truth_trajectory(side_length, nodes_per_side=1):
+    """A closed square loop in the XY plane (start -> +X -> +Y -> -X), with an
+    implicit loop-closure edge back from the last node to the first.
     Arguments:
         side_length: length of each side of the square (m)
+        nodes_per_side: number of edge-segments per side (1 = corners only,
+                        the original 4-node loop; >1 subdivides each side
+                        with evenly-spaced intermediate nodes, for a longer
+                        streaming trajectory)
     Returns:
-        gt_poses: list of 4 ground-truth poses (4,4)
+        gt_poses: list of 4*nodes_per_side ground-truth poses (4,4)
     """
     corners = [(0.0, 0.0), (side_length, 0.0), (side_length, side_length), (0.0, side_length)]
     gt_poses = []
-    for x, y in corners:
-        T = np.eye(4)
-        T[0:3, 3] = [x, y, 0.0]
-        gt_poses.append(T)
+    for k in range(len(corners)):
+        x0, y0 = corners[k]
+        x1, y1 = corners[(k + 1) % len(corners)]
+        for step in range(nodes_per_side):
+            frac = step / nodes_per_side
+            T = np.eye(4)
+            T[0:3, 3] = [x0 + frac * (x1 - x0), y0 + frac * (y1 - y0), 0.0]
+            gt_poses.append(T)
     return gt_poses
 
 

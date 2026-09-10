@@ -26,16 +26,28 @@ import matplotlib.pyplot as plt
 import manifpy as manif
 
 
-def generate_ground_truth_trajectory(side_length):
-    """A closed 4-node square loop in the XY plane (start -> +X -> +Y -> -X),
-    with an implicit loop-closure edge back from the last node to the first.
+def generate_ground_truth_trajectory(side_length, nodes_per_side=1):
+    """A closed square loop in the XY plane (start -> +X -> +Y -> -X), with an
+    implicit loop-closure edge back from the last node to the first.
     Arguments:
         side_length: length of each side of the square (m)
+        nodes_per_side: number of edge-segments per side (1 = corners only,
+                        the original 4-node loop; >1 subdivides each side
+                        with evenly-spaced intermediate nodes, for a longer
+                        streaming trajectory)
     Returns:
-        gt_poses: list of 4 ground-truth poses (manif.SE3)
+        gt_poses: list of 4*nodes_per_side ground-truth poses (manif.SE3)
     """
     corners = [(0.0, 0.0), (side_length, 0.0), (side_length, side_length), (0.0, side_length)]
-    return [manif.SE3(np.array([x, y, 0.0, 0.0, 0.0, 0.0, 1.0])) for x, y in corners]
+    gt_poses = []
+    for k in range(len(corners)):
+        x0, y0 = corners[k]
+        x1, y1 = corners[(k + 1) % len(corners)]
+        for step in range(nodes_per_side):
+            frac = step / nodes_per_side
+            x, y = x0 + frac * (x1 - x0), y0 + frac * (y1 - y0)
+            gt_poses.append(manif.SE3(np.array([x, y, 0.0, 0.0, 0.0, 0.0, 1.0])))
+    return gt_poses
 
 
 def simulate_noisy_edges(gt_poses, pos_noise_std, rot_noise_std, loop_noise_scale, rng):

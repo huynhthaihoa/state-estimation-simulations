@@ -460,7 +460,13 @@ And **iSAM2** takes this further by using a **Bayes tree** to efficiently identi
 
 ---
 
-## 14. References
+## 14. Where this is implemented in this repo
+
+[`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`) implements exactly §3's mechanism: new odometry edges are absorbed into a running square-root-information matrix via Givens-rotation row insertion (`qr_insert_row` in `utils.py`) instead of rebuilding the linear system from scratch, contrasted directly against a batch baseline that re-solves everything at every new node - reproducing §1/§8's batch-vs-incremental comparison and §6/§9's "loop closure needs a wide update" point empirically (the script always triggers a full relinearization on the loop-closure edge, plus periodically otherwise). **It does not implement §7's Bayes tree or variable reordering** - that's iSAM2-specific machinery genuinely out of scope here; this is iSAM's original QR/square-root-information mechanism (Kaess et al. 2008), not iSAM2.
+
+---
+
+## 15. References
 
 1. Dellaert, F., & Kaess, M. (2006). *Square Root SAM: Simultaneous Localization and Mapping via Square Root Information Smoothing*. International Journal of Robotics Research, 25(12), 1181–1203. https://doi.org/10.1177/0278364906072768 - the sparse QR/square-root-information factorization behind §3's $A \approx QR$ and the claim that most of the previous factorization stays reusable.
 2. Kaess, M., Ranganathan, A., & Dellaert, F. (2008). *iSAM: Incremental Smoothing and Mapping*. IEEE Transactions on Robotics, 24(6), 1365–1378. https://doi.org/10.1109/TRO.2008.2006706 - the original iSAM algorithm (incremental QR updates via Givens rotations, with periodic variable reordering) behind §1, §2, §4–§6, and §9.
