@@ -32,6 +32,8 @@ Start at [docs/README.md](docs/README.md) for the full index, or [docs/frontend_
 - [imu_preintegration.py](use_numpy/imu_preintegration.py): IMU pre-integration - compresses a burst of high-frequency IMU samples into one relative measurement plus first-order bias Jacobians, then shows an instant Taylor-expansion correction when the bias estimate changes, without re-integrating.
 - [pointcloud_pose_tracking.py](use_numpy/pointcloud_pose_tracking.py): tracks a rigid object's pose from a motion-model prior (noisy control inputs) fused with noisy point-cloud measurements of its known geometry, comparing a recursive **EKF**, a recursive **invariant EKF** (body-frame residual, state-independent measurement Jacobian), a **batch Gauss-Newton** smoother over the whole trajectory, and a recursive **UKF** (sigma-point unscented transform via right-perturbation retraction, no Jacobians at all), reusing `lie_utils.py`'s $SE(3)$ $Exp$ / $Log$ /inverse-right-Jacobian math plus a hand-rolled adjoint/right-Jacobian for the motion-model Jacobians. Also reports empirical per-step time and peak memory for each of the five approaches.
 - [pose_graph.py](use_numpy/pose_graph.py): a small closed-loop 3D pose-graph relaxation (odometry drift + one loop closure), jointly optimized via Levenberg-Marquardt, reusing the same `lie_utils.py` $SE(3)$ $Exp$ / $Log$ / inverse-right-Jacobian/adjoint math as `pointcloud_pose_tracking.py`.
+- [pose_graph_incremental.py](use_numpy/pose_graph_incremental.py): the [iSAM](docs/optimization/isam_optimization.md) counterpart to `pose_graph.py`'s batch solver - a longer loop streams in one node at a time, and an incremental square-root-SAM solver (Givens-rotation QR row insertion via `qr_insert_row` in `utils.py`, plus periodic/loop-closure-triggered full relinearization) is timed against a from-scratch batch re-solve at every step.
+- [bayes_tree_construction.py](use_numpy/bayes_tree_construction.py): builds the actual [Bayes tree](docs/optimization/bayes_tree.md) `iSAM2` relies on - symbolic variable elimination (`symbolic_eliminate` in `utils.py`) over the same square-loop pose-graph topology, then a root-ward affected-path query (`bayes_tree_affected_path`) contrasting a local odometry edge against the loop-closure edge. Pure index/graph bookkeeping, no pose math at all, so there's no `use_manif/` counterpart - the result would be structurally identical either way.
 - [bundle_adjustment.py](use_numpy/bundle_adjustment.py): jointly refines camera poses **and** 3D landmarks against pinhole reprojection error - cameras on an arc around a landmark cluster, with a field-of-view cutoff so not every camera observes every landmark. Compares three solvers: **landmarks-only refinement** and **poses-only refinement** (independent 3x3/6x6 GN solves, each a "fix one side" strawman) against **full joint bundle adjustment** (coupled dense GN over poses + landmarks, gauge-fixed with a prior factor on the first two camera poses, then [Umeyama-aligned](docs/foundations/umeyama_alignment.md) to ground truth before reporting absolute error, since monocular BA only recovers the scene up to an unknown similarity transform).
 - [bundle_adjustment_advanced.py](use_numpy/bundle_adjustment_advanced.py): Local **and** Global bundle adjustment, run back to back for direct comparison - the real-time-system-behavior counterpart to `bundle_adjustment.py`'s single-batch scene. A camera moves keyframe-by-keyframe along a forward-facing arc through a landmark corridor instead of sitting on a static ring; a covisibility graph builds incrementally, and every new keyframe triggers a bounded local Gauss-Newton/Levenberg-Marquardt solve over an active window (new keyframe + covisible neighbors, with every other observing keyframe held fixed as a rigid anchor), while a periodic Global BA pass jointly re-solves the whole map so far for contrast. Keyframes 0/1 are hard-fixed forever as the gauge anchor - no prior factor needed, unlike `bundle_adjustment.py`, since a hard anchor already pins the gauge with no residual freedom left to constrain. Guards against Gauss-Newton divergence (Levenberg-Marquardt damping) and the classic point-behind-camera reflection ambiguity (`passes_cheirality`/ `cull_invalid_points`) that a weakly-constrained, forward-motion scene can hit but `bundle_adjustment.py`'s densely-observed toy scene never does.
 
@@ -42,6 +44,7 @@ Start at [docs/README.md](docs/README.md) for the full index, or [docs/frontend_
 - [imu_preintegration.py](use_manif/imu_preintegration.py): same bias-Jacobian preintegration bundle, with the $SO(3)$ $Exp$ map / right Jacobian / skew(hat) math delegated to manif's `rplus` Jacobian out-parameters and `SO3Tangent.hat()` instead of hand-rolled formulas.
 - [pointcloud_pose_tracking.py](use_manif/pointcloud_pose_tracking.py): same five solvers (dead-reckoning, EKF, invariant EKF, batch Gauss-Newton, UKF) as the `use_numpy` version, with `motion_model`/`observation_model` built on `manifpy`'s `rplus`/`rminus`/`act` Jacobian out-parameters instead of `lie_utils.py` (the UKF itself uses only the bare `rplus`/`rminus` group operations, no Jacobian out-parameters).
 - [pose_graph.py](use_manif/pose_graph.py)
+- [pose_graph_incremental.py](use_manif/pose_graph_incremental.py): same incremental-vs-batch comparison as the `use_numpy` version, with edge Jacobians obtained by chaining `manifpy`'s own `compose`/`rminus` Jacobian out-parameters instead of `lie_utils.py`.
 - [bundle_adjustment.py](use_manif/bundle_adjustment.py): same three solvers as the `use_numpy` version, with camera-pose Jacobians obtained by chaining `manifpy`'s own `inverse`/`act` Jacobian out-parameters instead of a hand-rolled closed form; landmarks stay plain numpy R^3 vectors (manif has no notion of those), same as `pointcloud_pose_tracking.py`.
 - [bundle_adjustment_advanced.py](use_manif/bundle_adjustment_advanced.py): same Local + Global BA comparison as the `use_numpy` version, with camera-pose Jacobians obtained by chaining `manifpy`'s own `inverse`/ `act` Jacobian out-parameters, matching `bundle_adjustment.py`'s own manif version.
 
@@ -57,6 +60,14 @@ Start at [docs/README.md](docs/README.md) for the full index, or [docs/frontend_
 - Then sync dependencies: `uv sync`
 - Run any script with `uv run` from this repository's root directory, e.g.:
   `uv run python use_numpy/imu_integration_comparison.py`
+
+### Running the tests
+
+`tests/` has a pytest suite covering `utils.py`, `use_numpy/lie_utils.py`'s Lie-group math (round-trip and Jacobian-identity checks), and the testable functions in every `use_numpy/`/`use_manif/` simulation script (deterministic, fixed-seed regression checks - e.g. optimized error beats an uncorrected baseline, two solvers agree on the same input, a filter matches its own documented exact-agreement claim). `use_manif/` tests skip cleanly (not fail) in an environment without `manifpy` built.
+
+```
+uv run pytest tests/ -v
+```
 
 ## E. Library guideline
 
@@ -253,7 +264,7 @@ The incremental loop (`run_incremental_local_ba`) runs keyframe-by-keyframe:
 - **Bounded local BA window** (`build_active_window` + `run_local_ba_step`): the new keyframe plus its strongest covisible neighbors (up to `--max-window-keyframes`) are optimized together; every other keyframe that also observes one of the window's landmarks is held fixed as a rigid anchor. Keyframes 0/1 are hard-fixed forever as the gauge anchor - no prior factor needed, since a hard anchor already pins the gauge.
 - **Periodic Global BA** (`run_global_ba`): every `--global-ba-interval` keyframes (plus once at the end), every keyframe and landmark seen so far is jointly re-solved in one system, for direct comparison against the bounded local window.
 
-Both solvers share one Levenberg-Marquardt core (`run_windowed_gn_lm`): a step is only accepted if it actually reduces total reprojection error, otherwise the damping grows and the step is retried - plain fixed-damping Gauss-Newton (as `bundle_adjustment.py` uses for its densely-observed, prior-anchored toy scene) was found to diverge explosively on this script's weakly-constrained early windows. The incremental loop runs twice off the same scene - once with Global BA disabled, once with it enabled - and prints/plots wall-clock solve time (should stay flat for the local window, grow for Global BA as the map grows) and a trailing-window RMS trajectory error (drift accumulating vs. periodically corrected). One finding worth being upfront about: this path never revisits a place, so Global BA has no *new* geometric constraint to exploit beyond what the overlapping local windows already used - it still helps on most noise draws, just not as dramatically as an actual loop closure would (see `docs/optimization/pose_graph_optimization.md`).
+Both solvers share one Levenberg-Marquardt core (`run_windowed_gn_lm`): a step is only accepted if it actually reduces total reprojection error, otherwise the damping grows and the step is retried - plain fixed-damping Gauss-Newton (as `bundle_adjustment.py` uses for its densely-observed, prior-anchored toy scene) was found to diverge explosively on this script's weakly-constrained early windows. The incremental loop runs twice off the same scene - once with Global BA disabled, once with it enabled - and prints/plots wall-clock solve time (should stay flat for the local window, grow for Global BA as the map grows) and a trailing-window RMS trajectory error (drift accumulating vs. periodically corrected). One finding worth being upfront about: on the default open path, Global BA has no *new* geometric constraint to exploit beyond what the overlapping local windows already used - it still helps on most noise draws, just not as dramatically as an actual loop closure would (see `docs/optimization/pose_graph_optimization.md`). The covisibility/window/Global-BA machinery itself is already loop-closure-agnostic, though - see "Loop closure example" below for a path that actually has one.
 
 #### Scripts
 
@@ -280,9 +291,78 @@ uv run python use_numpy/bundle_adjustment_advanced.py --n-keyframes 50 --path-ra
 - `--min-shared-for-covisibility`: minimum shared-landmark count for a covisibility edge between two keyframes (default `2`)
 - `--max-window-keyframes`: maximum active keyframes per local BA window, including the new one (default `6`)
 - `--global-ba-interval`: run a full Global BA pass every this many keyframes, plus once at the end (default `8`)
+- `--loop-closure-min-gap`: minimum keyframe-index gap for a covisibility edge to count as a loop closure rather than ordinary local covisibility (default `20`)
 - `--relative-pose-noise-std`: std-dev of the se3 twist noise added to each frame-to-frame front-end pose estimate, mixed m/rad - compounds into drift (default `0.02`)
 - `--pixel-noise-std`: std-dev of Gaussian pixel measurement noise, px (default `1.0`)
 - `--gn-tol`: Levenberg-Marquardt convergence tolerance (default `1e-6`)
 - `--gn-max-iters`: maximum accepted GN/LM steps per solve (default `15`)
 - `--seed`: RNG seed (default `0`)
+
+#### Loop closure example
+
+The default `--arc-span-deg 90` path never revisits a place, so Global BA never gets a genuinely new constraint. Pushing the span close to 360 degrees (at the *same* `--n-keyframes 50` - no other change needed) swings the path's end back within view range of its own start, so a late keyframe re-observes an early landmark - a real loop closure, picked up automatically by the same covisibility/window/Global-BA code with zero logic changes:
+
+```
+uv run python use_numpy/bundle_adjustment_advanced.py --arc-span-deg 350 --seed 0 --out loop_closure.png
+```
+
+This prints an extra line (in place of the "never revisits" caveat) identifying exactly which keyframe closed the loop and against which earlier one, plus the measured trajectory-RMS improvement once the next Global BA pass exploits it, and adds a labeled green "Loop closure" marker to the drift plot at that keyframe.
+
+### 8. Incremental (square-root SAM) vs. batch pose-graph solving
+
+#### Purpose
+
+`docs/optimization/isam_optimization.md` describes iSAM's core mechanism - absorbing a new measurement into an existing square-root-information factorization instead of rebuilding the whole linear system from scratch - but `pose_graph.py`'s batch solver always rebuilds from scratch. This script fills that gap on a longer version of the same square loop (`--nodes-per-side` nodes per side instead of `pose_graph.py`'s fixed 4 corners), streamed in one node/odometry-edge at a time, and runs two solvers over the identical stream:
+
+- **Batch streaming** (`run_batch_streaming`): the expensive baseline - every new node triggers a full re-solve of the entire graph so far, from a fresh dead-reckoning guess, by calling `pose_graph.py`'s own `run_pose_graph_optimization` unmodified.
+- **Incremental square-root SAM** (`run_incremental_pose_graph`): absorbs each new odometry edge into a running upper-triangular square-root-information matrix via Givens-rotation row insertion (`qr_insert_row` in `utils.py`), touching only the new node's columns - no other row is re-evaluated. Every `--relinearize-every` nodes, and unconditionally on the loop-closure edge (which, unlike a sequential odometry edge, connects the newest node all the way back to the first one), it instead relinearizes fully: adopts the current estimate as a new linearization point and rebuilds the whole system from one `np.linalg.qr` call, iterating to Gauss-Newton convergence exactly like the batch solver does.
+
+This deliberately does **not** implement iSAM2's Bayes tree (selective relinearization of only the affected subtree) or variable reordering - see the module docstring and `docs/optimization/isam_optimization.md` §14 for exactly what is/isn't in scope. Both solvers are timed via `utils.py`'s `measure_performance` and converge to matching final/RMS pose error; the printed relinearization counts and per-node wall-clock time are the actual point of the comparison.
+
+#### Scripts
+
+- [use_numpy/pose_graph_incremental.py](use_numpy/pose_graph_incremental.py)
+
+- [use_manif/pose_graph_incremental.py](use_manif/pose_graph_incremental.py)
+
+#### Usage
+
+```
+uv run python use_numpy/pose_graph_incremental.py --side-length 2.0 --nodes-per-side 16 --pos-noise-std 0.05 --rot-noise-std 0.01 --loop-noise-scale 0.5 --damping 0.01 --gn-tol 1e-6 --gn-max-iters 10 --anchor-weight 1e6 --relinearize-every 8 --seed 0 --out out.png
+```
+
+- `--side-length`: side length of the square ground-truth loop, m (default `2.0`)
+- `--nodes-per-side`: nodes per side of the loop, streamed in one at a time (default `16`)
+- `--pos-noise-std`: odometry-edge translation noise std-dev, m (default `0.05`)
+- `--rot-noise-std`: odometry-edge rotation noise std-dev, rad (default `0.01`)
+- `--loop-noise-scale`: noise std-dev multiplier for the loop-closure edge (default `0.5`)
+- `--damping`: Levenberg-Marquardt damping for the batch-streaming baseline only (default `0.01`)
+- `--gn-tol`: Gauss-Newton convergence tolerance (default `1e-6`)
+- `--gn-max-iters`: maximum Gauss-Newton iterations per solve/relinearization (default `10`)
+- `--anchor-weight`: information weight of the node-0 gauge-fixing prior (default `1e6`)
+- `--relinearize-every`: force a full relinearization every this many new nodes (default `8`)
+- `--seed`: RNG seed (default `0`)
+- `--out`: save the figure to this path instead of showing it (default: show)
+
+### 9. Bayes tree construction and affected-region query
+
+#### Purpose
+
+`docs/optimization/bayes_tree.md` and `docs/optimization/isam2_optimization.md` describe the Bayes tree iSAM2 builds from a factor graph's elimination order, and the key claim that makes it useful: a new factor only invalidates the affected part of the tree, not the whole thing. This script makes that concrete instead of leaving it to ASCII diagrams - it builds an actual Bayes tree over `pose_graph.py`'s square-loop topology via symbolic variable elimination (`symbolic_eliminate` in `utils.py`: eliminating a node connects its still-uneliminated neighbors, and the resulting clique's parent is whichever neighbor is eliminated next), fixing the elimination order as oldest-node-first (not COLAMD - that dynamic reordering is explicitly out of scope, see `docs/optimization/isam2_optimization.md` §12).
+
+It then answers `bayes_tree_affected_path`'s (`utils.py`) "what's affected" query for two scenarios: an ordinary new odometry edge, and the loop-closure edge. Worked out by hand before writing the script and confirmed by its own printed output: under oldest-first elimination the tree is always a straight chain here, and because the loop-closure edge connects the *first*-eliminated node (the deepest leaf) to the root, it invalidates the *entire* chain - the worst case a fill-reducing reordering like COLAMD exists specifically to avoid, versus an ordinary odometry edge near the root which only invalidates 2 nodes regardless of graph size.
+
+This is pure index/graph bookkeeping - no pose math, `SE(3)`, or Lie algebra anywhere - so unlike every other script in this repo there is no `use_manif/` counterpart; the result would be structurally identical either way, since the tree only depends on which node indices a factor connects, never the noisy relative-pose values themselves. It implements the Bayes tree's *construction* and *affected-region query* only, not the numeric fluid-relinearization solve (`pose_graph_incremental.py`'s iSAM v1 square-root-SAM update handles that, without ever building a Bayes tree) or dynamic reordering.
+
+#### Scripts
+
+- [use_numpy/bayes_tree_construction.py](use_numpy/bayes_tree_construction.py)
+
+#### Usage
+
+```
+uv run python use_numpy/bayes_tree_construction.py --nodes-per-side 4 --out out.png
+```
+
+- `--nodes-per-side`: nodes per side of the ring pose graph, same topology as `pose_graph_incremental.py` (default `4`; kept small since this plots an inspectable diagram, not a timing benchmark)
 - `--out`: save the figure to this path instead of showing it (default: show)
