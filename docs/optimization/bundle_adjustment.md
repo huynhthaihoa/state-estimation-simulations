@@ -550,7 +550,15 @@ Use **Global BA** for offline reconstruction - meshes, NeRF/Gaussian-Splatting i
 
 ---
 
-## 14. One sentence to remember
+## 14. Evaluating the result: gauge freedom and Umeyama alignment
+
+Monocular BA recovers the scene only up to an unknown similarity transform (rigid + scale) - shifting, rotating, or uniformly rescaling the whole reconstructed scene and every camera pose together leaves reprojection error completely unchanged. `bundle_adjustment.py`'s `run_bundle_adjustment` pins that freedom down to *some* solution with a soft gauge-prior factor on the first two camera poses, but the resulting frame still won't match ground truth's frame or scale exactly. So before computing pose/landmark error, the script Umeyama-aligns the solved cameras and landmarks onto ground truth with one shared scale+rotation+translation - see [umeyama_alignment.md](../foundations/umeyama_alignment.md) for how that alignment is computed and why it's needed. Reprojection error itself is reported *before* this alignment step and is unaffected by it.
+
+`bundle_adjustment_advanced.py` sidesteps this entirely: hard-fixing two anchor keyframes (rather than a soft prior) removes all residual gauge freedom up front, so there's nothing left to align away before reporting its error.
+
+---
+
+## 15. One sentence to remember
 
 > **Bundle Adjustment is the process of jointly refining camera poses and 3D landmarks so that their projections agree as closely as possible with the observed image features.**
 

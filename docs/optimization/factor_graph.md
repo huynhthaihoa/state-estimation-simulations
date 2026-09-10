@@ -82,11 +82,11 @@ Now imagine that at X3 the camera recognizes a place it saw at X0.
 That's a **loop closure**:
 
 ```text
-X0 ●────────────────● X3
-    \              /
-     \            /
-      ●────●────●
-      X1   X2
+X0 ●──────────────● X3
+    \            /
+     \          /
+      ●────────●
+      X1      X2
 ```
 
 The loop-closure measurement says:

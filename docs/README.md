@@ -12,6 +12,7 @@ Conceptual/pedagogical notes on the state-estimation and SLAM ideas behind the c
 - [jacobian.md](foundations/jacobian.md): what a Jacobian means and why linearization needs one.
 - [lie_algebra.md](foundations/lie_algebra.md): Lie groups/algebras for optimizing on $SE(3)$ without singularities.
 - [quaternion.md](foundations/quaternion.md): quaternions as a 3D-orientation representation.
+- [umeyama_alignment.md](foundations/umeyama_alignment.md): the closed-form best-fit scale+rotation+translation between two point sets, used to align a reconstruction onto ground truth before measuring error.
 
 ## [`filtering/`](filtering/) - The Kalman-filter lineage
 
