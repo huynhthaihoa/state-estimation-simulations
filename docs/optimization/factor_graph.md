@@ -65,8 +65,8 @@ But every measurement has error.
 Maybe the real motion was:
 
 ```text
-X0 → X1 → X2 → X3
-      1.02   0.97   1.05 m
+X0  →  X1  →  X2  →  X3
+  1.02   0.97    1.05 m
 ```
 
 If you simply integrate these measurements:
