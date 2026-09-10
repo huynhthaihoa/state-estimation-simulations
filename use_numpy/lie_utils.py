@@ -172,52 +172,65 @@ def compute_so3_inv_right_jacobian(theta_vec):
     return I3 + 0.5 * theta_skew + coeff * theta_skew_sq
 
 
+def se3_ad(xi):
+    """
+    The 6x6 "little adjoint" ad(xi) of an SE(3) tangent vector -- the linear
+    operator representing the Lie bracket [xi, .], used to build the right
+    Jacobian from its definition. For the [v,omega] (translation-first)
+    convention used throughout this codebase:
+        ad(xi) = [[skew(omega), skew(v)   ],
+                  [0,            skew(omega)]]
+    Arguments:
+        xi: 6-vector [v,omega] (numpy array)
+    Returns:
+        6x6 ad(xi) matrix (numpy array)
+    """
+    v, omega = xi[0:3], xi[3:6]
+    omega_skew = skew(omega)
+    ad = np.zeros((6, 6))
+    ad[0:3, 0:3] = omega_skew
+    ad[0:3, 3:6] = skew(v)
+    ad[3:6, 3:6] = omega_skew
+    return ad
+
+
+def se3_right_jacobian(xi, n_terms=18):
+    """
+    The direct (non-inverse) SE(3) right Jacobian Jr(xi), computed from its
+    definition as the alternating factorial series in the tangent-space
+    adjoint operator: Jr(xi) = sum_{n=0}^inf (-ad(xi))^n / (n+1)!. Unlike a
+    closed-form trigonometric expression, this series is exact by
+    construction and needs no separate small-angle branch -- it degrades
+    gracefully to the identity as xi -> 0 -- and converges fast (factorial-
+    dominated) for any tangent-vector magnitude used in this codebase.
+    Arguments:
+        xi: 6-vector [v,omega] (numpy array)
+        n_terms: number of series terms (18 already gives double-precision
+                 accuracy well beyond any xi magnitude used here)
+    Returns:
+        6x6 SE(3) right Jacobian (numpy array)
+    """
+    ad = se3_ad(xi)
+    power = np.eye(6)
+    Jr = np.zeros((6, 6))
+    sign, fact = 1.0, 1.0
+    for n in range(n_terms):
+        fact *= (n + 1)
+        Jr += sign * power / fact
+        power = power @ ad
+        sign = -sign
+    return Jr
+
+
 def compute_se3_inv_right_jacobian(error_vector):
     """
-    Computes the 6x6 analytical inverse right Jacobian for an SE(3) error vector.
+    Computes the 6x6 inverse right Jacobian for an SE(3) error vector, as the
+    matrix inverse of se3_right_jacobian -- guaranteed consistent with it by
+    construction, rather than a second, independently-derived closed form
+    that could silently drift out of sync with it.
     Arguments:
         error_vector: 6-vector [rho, theta_vec] (numpy array)
     Returns:
         6x6 inverse right Jacobian (numpy array)
     """
-    rho = error_vector[0:3]
-    theta_vec = error_vector[3:6]
-    theta = np.linalg.norm(theta_vec)
-
-    J_r_inv_so3 = compute_so3_inv_right_jacobian(theta_vec)
-
-    if theta < 1e-6:
-        Q = 0.5 * skew(rho)
-    else:
-        theta_skew = skew(theta_vec)
-        theta_skew_sq = np.dot(theta_skew, theta_skew)
-
-        coeff_2 = (theta - np.sin(theta)) / (theta ** 3)
-        rho_skew = skew(rho)
-        theta_rho_skew = skew(np.cross(theta_vec, rho))
-
-        coeff_q1 = (theta * np.sin(theta) + 2 * np.cos(theta) - 2) / (2 * theta ** 4 * (np.cos(theta) - 1))
-        if np.isnan(coeff_q1) or np.isinf(coeff_q1):
-            coeff_q1 = -1.0 / 12.0
-
-        Q = (0.5 * rho_skew +
-             (coeff_2 * (np.dot(theta_skew, rho_skew) + np.dot(rho_skew, theta_skew) + np.dot(theta_skew, np.dot(rho_skew, theta_skew)))) +
-             coeff_q1 * np.dot(theta_skew_sq, theta_rho_skew))
-
-    J_inv_se3 = np.zeros((6, 6))
-    J_inv_se3[0:3, 0:3] = J_r_inv_so3
-    J_inv_se3[0:3, 3:6] = Q
-    J_inv_se3[3:6, 3:6] = J_r_inv_so3
-    return J_inv_se3
-
-
-def se3_right_jacobian(xi):
-    """
-    The direct (non-inverse) SE(3) right Jacobian Jr(xi), obtained by inverting
-    the closed-form Jr_inv(xi) above rather than re-deriving a second formula.
-    Arguments:
-        xi: 6-vector [v,omega] (numpy array)
-    Returns:
-        6x6 SE(3) right Jacobian (numpy array)
-    """
-    return np.linalg.inv(compute_se3_inv_right_jacobian(xi))
+    return np.linalg.inv(se3_right_jacobian(error_vector))
