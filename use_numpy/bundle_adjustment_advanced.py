@@ -69,14 +69,24 @@ occasionally shift a borderline triangulation's cheirality outcome
 (passes_cheirality) between the two runs -- a small, expected divergence,
 not a bug.
 
-On an open (non-looping) path like this one, a periodic Global BA pass has
-no genuinely *new* geometric constraint to exploit beyond what the
-overlapping local windows already used -- that only comes from revisiting
-a place (loop closure) or an absolute measurement. Comparing the two runs
-here still shows Global BA helping on most noise realizations (a global
-joint solve is less path-dependent than a bounded sequential one), but not
-as dramatically or as reliably as it would with an actual loop closure --
-see docs/bundle_adjustment.md Section 13's own pointer to "loop closure +
+On an open (non-looping) path -- the default --arc-span-deg 90 -- a
+periodic Global BA pass has no genuinely *new* geometric constraint to
+exploit beyond what the overlapping local windows already used -- that
+only comes from revisiting a place (loop closure) or an absolute
+measurement. Comparing the two runs here still shows Global BA helping on
+most noise realizations (a global joint solve is less path-dependent than
+a bounded sequential one), but not as dramatically or as reliably as it
+would with an actual loop closure.
+
+A genuine loop closure doesn't need any different machinery -- the
+covisibility bookkeeping below, build_active_window, and run_global_ba are
+already general (none of them assume temporal locality). It only needs the
+*geometry* to revisit a place: passing --arc-span-deg close to 360 (e.g.
+350) makes the path's end swing back within view range of its own start,
+so a late keyframe re-observes a landmark last seen by an early one. This
+is detected automatically (loop_closure_min_gap below) and reported/plotted
+when it happens -- see run_incremental_local_ba's loop_closure_keyframe.
+See also docs/bundle_adjustment.md Section 13's pointer to "loop closure +
 pose-graph optimization" as Local BA's other, complementary correction
 mechanism (pose_graph_optimization.md).
 
@@ -654,13 +664,21 @@ def pose_errors_dict(T_true, T_est, keyframe_ids):
 
 def run_incremental_local_ba(T_true, observations_by_keyframe, K, relative_pose_noise_std,
                               min_observations, min_shared_for_covisibility, max_window_keyframes,
-                              global_ba_interval, use_global_ba, gn_tol, gn_max_iters, rng):
+                              global_ba_interval, use_global_ba, gn_tol, gn_max_iters, rng,
+                              loop_closure_min_gap=20):
     """Processes keyframes k = 0..n-1 in time order: reveals k's
     observations, triangulates any landmark that just became triangulable,
     builds k's active BA window (build_active_window) and solves it
     (run_local_ba_step), and -- if use_global_ba -- runs a full Global BA
     pass (run_global_ba) every global_ba_interval keyframes plus once at the
     end. Keyframes 0 and 1 are hard-fixed forever as the gauge anchor.
+
+    Also detects a loop closure -- a keyframe re-observing a landmark last
+    seen loop_closure_min_gap-or-more keyframes ago -- purely from the
+    covisibility bookkeeping already being done here; on the default open
+    arc this never triggers (ordinary local covisibility gaps stay well
+    below the threshold), but a looping path (--arc-span-deg close to 360)
+    does trigger it, with zero other changes to this function.
     Arguments:
         T_true: list of ground-truth camera poses (4,4), in time order
         observations_by_keyframe: list, observations_by_keyframe[k] = list of (k, landmark_idx, z_ij)
@@ -674,10 +692,13 @@ def run_incremental_local_ba(T_true, observations_by_keyframe, K, relative_pose_
         gn_tol: convergence tolerance on the correction step norm
         gn_max_iters: maximum number of Gauss-Newton iterations per solve
         rng: numpy random number generator (used only to build the front-end trajectory)
+        loop_closure_min_gap: minimum keyframe-index gap for a covisibility edge to be classified
+                               as a loop closure rather than ordinary local covisibility
     Returns:
         T_est: dict {keyframe_idx: (4,4)} final pose estimates
         P_est: dict {landmark_idx: (3,)} final landmark position estimates
-        history: dict of per-event metrics recorded during the run
+        history: dict of per-event metrics recorded during the run, including
+                  loop_closure_keyframe/loop_closure_partner (both None if never detected)
     """
     n_keyframes = len(T_true)
     anchor_keyframes = {0, 1}
@@ -688,18 +709,22 @@ def run_incremental_local_ba(T_true, observations_by_keyframe, K, relative_pose_
     observers_by_landmark = defaultdict(list)
     landmarks_by_keyframe = defaultdict(set)
     shared_count = defaultdict(int)
+    loop_closure_keyframe, loop_closure_partner = None, None
 
     history = {
         "local_step": [], "local_solve_time": [], "n_active_kf": [], "n_fixed_kf": [],
         "n_active_points": [], "reproj_rms_after": [],
         "global_step": [], "global_solve_time": [],
         "traj_step": [], "traj_rms_pos_err": [],
+        "loop_closure_keyframe": None, "loop_closure_partner": None,
     }
 
     for k in range(n_keyframes):
         for (i, j, z) in observations_by_keyframe[k]:
             for (i_prev, _) in observers_by_landmark[j]:
                 shared_count[pair_key(i_prev, k)] += 1
+                if loop_closure_keyframe is None and k - i_prev >= loop_closure_min_gap:
+                    loop_closure_keyframe, loop_closure_partner = k, i_prev
             observers_by_landmark[j].append((k, z))
             landmarks_by_keyframe[k].add(j)
 
@@ -755,6 +780,8 @@ def run_incremental_local_ba(T_true, observations_by_keyframe, K, relative_pose_
         history["traj_step"].append(k)
         history["traj_rms_pos_err"].append(float(np.sqrt(np.mean(pos_err ** 2))))
 
+    history["loop_closure_keyframe"] = loop_closure_keyframe
+    history["loop_closure_partner"] = loop_closure_partner
     return T_est, P_est, history
 
 
@@ -778,6 +805,7 @@ def main():
     parser.add_argument("--min-shared-for-covisibility", type=int, default=2, help="Minimum shared-landmark count for a covisibility edge between two keyframes")
     parser.add_argument("--max-window-keyframes", type=int, default=6, help="Maximum number of active keyframes per local BA window (including the new one)")
     parser.add_argument("--global-ba-interval", type=int, default=8, help="Run a full Global BA pass every this many keyframes (plus once at the end)")
+    parser.add_argument("--loop-closure-min-gap", type=int, default=20, help="Minimum keyframe-index gap for a covisibility edge to count as a loop closure rather than ordinary local covisibility (only triggers on a looping path, e.g. --arc-span-deg close to 360)")
 
     parser.add_argument("--relative-pose-noise-std", type=float, default=0.02, help="Std-dev of the se3 twist noise added to each frame-to-frame front-end pose estimate (mixed m/rad) -- compounds into drift over the trajectory")
     parser.add_argument("--pixel-noise-std", type=float, default=1.0, help="Std-dev of Gaussian pixel measurement noise (px)")
@@ -807,13 +835,13 @@ def main():
     T_local, P_local, hist_local = run_incremental_local_ba(
         T_true, observations_by_keyframe, K, args.relative_pose_noise_std, args.min_observations,
         args.min_shared_for_covisibility, args.max_window_keyframes, args.global_ba_interval,
-        False, args.gn_tol, args.gn_max_iters, np.random.default_rng(args.seed))
+        False, args.gn_tol, args.gn_max_iters, np.random.default_rng(args.seed), args.loop_closure_min_gap)
 
     print("Running incremental Local BA + periodic Global BA...")
     T_hybrid, P_hybrid, hist_hybrid = run_incremental_local_ba(
         T_true, observations_by_keyframe, K, args.relative_pose_noise_std, args.min_observations,
         args.min_shared_for_covisibility, args.max_window_keyframes, args.global_ba_interval,
-        True, args.gn_tol, args.gn_max_iters, np.random.default_rng(args.seed))
+        True, args.gn_tol, args.gn_max_iters, np.random.default_rng(args.seed), args.loop_closure_min_gap)
 
     avg_local_time = np.mean(hist_hybrid["local_solve_time"])
     print(f"\nLocal BA:  {len(hist_hybrid['local_solve_time'])} calls, "
@@ -826,9 +854,30 @@ def main():
           f"{np.mean(hist_hybrid['reproj_rms_after'][-5:]):.3f} px (pixel noise std = {args.pixel_noise_std:.3f} px)")
     print(f"Final RMS trajectory position error: Local-only = {hist_local['traj_rms_pos_err'][-1]:.4f} m, "
           f"Local + Global BA = {hist_hybrid['traj_rms_pos_err'][-1]:.4f} m")
-    print("(This path never revisits a place -- no loop closure -- so periodic Global BA has no "
-          "genuinely new constraint to exploit, only a joint re-solve of the same information; "
-          "it still helps on most noise draws, just not as dramatically as it would with a loop.)")
+    lc_keyframe = hist_hybrid["loop_closure_keyframe"]
+    if lc_keyframe is None:
+        print("(This path never revisits a place -- no loop closure -- so periodic Global BA has no "
+              "genuinely new constraint to exploit, only a joint re-solve of the same information; "
+              "it still helps on most noise draws, just not as dramatically as it would with a loop. "
+              "Pass --arc-span-deg close to 360 to make the path loop back and trigger one.)")
+    else:
+        lc_partner = hist_hybrid["loop_closure_partner"]
+        idx_at_lc = hist_hybrid["traj_step"].index(lc_keyframe)
+        rms_before = hist_hybrid["traj_rms_pos_err"][max(0, idx_at_lc - 1)]
+        later_global_steps = [s for s in hist_hybrid["global_step"] if s >= lc_keyframe]
+        print(f"Loop closure detected at keyframe {lc_keyframe} (re-observed a landmark last seen "
+              f"at keyframe {lc_partner}, gap {lc_keyframe - lc_partner} >= "
+              f"--loop-closure-min-gap {args.loop_closure_min_gap}).")
+        if later_global_steps:
+            step_after = later_global_steps[0]
+            rms_after = hist_hybrid["traj_rms_pos_err"][hist_hybrid["traj_step"].index(step_after)]
+            pct = 100.0 * (rms_before - rms_after) / rms_before if rms_before > 0 else 0.0
+            print(f"Trajectory RMS error (Local + Global BA): {rms_before:.4f} m just before closure -> "
+                  f"{rms_after:.4f} m after the next Global BA pass (keyframe {step_after}), "
+                  f"a {pct:.1f}% reduction.")
+        else:
+            print("No Global BA pass ran after the closure to exploit it -- try a smaller "
+                  "--global-ba-interval.")
 
     fig, axes = plt.subplots(2, 2, figsize=(13, 10))
     ax_scene, ax_time, ax_window, ax_drift = axes[0, 0], axes[0, 1], axes[1, 0], axes[1, 1]
@@ -874,6 +923,8 @@ def main():
     ax_drift.plot(hist_hybrid["traj_step"], hist_hybrid["traj_rms_pos_err"], color="tab:blue", label="Local + periodic Global BA")
     for step in hist_hybrid["global_step"]:
         ax_drift.axvline(step, color="gray", linestyle=":", linewidth=0.7)
+    if lc_keyframe is not None:
+        ax_drift.axvline(lc_keyframe, color="tab:green", linestyle="-", linewidth=1.5, label="Loop closure")
     ax_drift.set_xlabel("Keyframe index")
     ax_drift.set_ylabel("RMS trajectory position error (m)")
     ax_drift.set_title("Drift vs. periodic Global BA correction")

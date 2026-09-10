@@ -30,7 +30,9 @@ Conceptual/pedagogical notes on the state-estimation and SLAM ideas behind the c
 - [pose_graph_optimization.md](optimization/pose_graph_optimization.md): factor graphs specialized to poses-only, relative-constraint problems.
 - [bundle_adjustment.md](optimization/bundle_adjustment.md): factor graphs specialized to joint camera-pose + 3D-landmark refinement.
 - [imu_preintegration.md](optimization/imu_preintegration.md): compressing raw high-rate IMU samples into one relative-motion edge, with a right-Jacobian trick to correct it for bias changes without re-integrating.
-- [isam_optimization.md](optimization/isam_optimization.md): incrementally updating the solution to a growing factor graph(iSAM/iSAM2) instead of re-solving it from scratch every step.
+- [isam_optimization.md](optimization/isam_optimization.md): incrementally updating the solution to a growing factor graph (iSAM) instead of re-solving it from scratch every step.
+- [isam2_optimization.md](optimization/isam2_optimization.md): iSAM's successor - adds a Bayes-tree factorization, selective relinearization, and dynamic variable reordering; the tree itself is built in this repo, the rest is conceptual only.
+- [bayes_tree.md](optimization/bayes_tree.md): the tree representation of variable-elimination order that iSAM2 relies on to know which part of the solution a new factor actually affects, built for real from this repo's pose graph in `bayes_tree_construction.py`.
 
 ## [`images/`](images/)
 
