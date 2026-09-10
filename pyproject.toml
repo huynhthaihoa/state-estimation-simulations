@@ -13,5 +13,11 @@ dependencies = [
     "manifpy",
 ]
 
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.uv.sources]
 manifpy = { path = "../manif" }

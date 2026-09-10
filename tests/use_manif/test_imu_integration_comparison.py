@@ -1,0 +1,98 @@
+import numpy as np
+import pytest
+manif = pytest.importorskip("manifpy")
+
+from scipy.spatial.transform import Rotation
+
+
+@pytest.fixture
+def imu_integration_comparison(import_module, use_manif_dir):
+    return import_module(use_manif_dir, "imu_integration_comparison")
+
+
+@pytest.mark.parametrize("rpy", [
+    (0.0, 0.0, 0.0),
+    (np.pi / 2, 0.0, 0.0),
+    (0.0, np.pi / 2, 0.0),
+    (0.0, 0.0, np.pi / 2),
+    (0.3, -0.5, 1.2),
+])
+def test_euler_to_quat_xyzw_matches_scipy_zyx_convention(imu_integration_comparison, rpy):
+    # euler_to_quat_xyzw is the naive estimator's own ZYX (roll-pitch-yaw)
+    # Euler -> quaternion conversion -- confirm it agrees with scipy's "xyz"
+    # (extrinsic) convention, which is the same composition order (Rz @ Ry @ Rx
+    # applied to a vector) as the manual half-angle formula in the source.
+    quat = imu_integration_comparison.euler_to_quat_xyzw(rpy)
+    assert np.isclose(np.linalg.norm(quat), 1.0, atol=1e-10)
+    expected = Rotation.from_euler("xyz", rpy).as_quat()  # scipy is already [x,y,z,w]
+    # quaternions represent the same rotation up to an overall sign
+    assert np.allclose(quat, expected, atol=1e-8) or np.allclose(quat, -expected, atol=1e-8)
+
+
+def test_euler_to_quat_xyzw_single_axis_roll_matches_known_quaternion(imu_integration_comparison):
+    quat = imu_integration_comparison.euler_to_quat_xyzw((np.pi / 2, 0.0, 0.0))
+    expected = np.array([np.sin(np.pi / 4), 0.0, 0.0, np.cos(np.pi / 4)])
+    assert np.allclose(quat, expected, atol=1e-10)
+
+
+def test_run_simulation_with_zero_noise_exp_map_error_is_near_exact(imu_integration_comparison):
+    # With zero noise, omega_meas == omega_gt and v_meas == v_gt exactly, so the
+    # exp-map estimator's own state recursion (T_exp = T_exp (+) Exp([v,omega]*dt))
+    # is *identical* to the exp-map ground-truth recursion -- their errors should
+    # be ~0 (float precision), not merely "small". The naive estimator, however,
+    # composes Euler angles by flat-vector-space addition while its own ground
+    # truth composes SE(3) properly -- these two formulas differ even with zero
+    # noise, so rot_err_naive is NOT expected to vanish; it reflects the
+    # approximation error the whole script exists to demonstrate.
+    t, rot_err_naive, rot_err_exp, pos_err_naive, pos_err_exp = \
+        imu_integration_comparison.run_simulation(
+            duration=5.0, dt=0.01, gyro_noise_std=0.0, vel_noise_std=0.0, seed=0)
+
+    assert np.max(rot_err_exp) < 1e-3   # degrees
+    assert np.max(pos_err_exp) < 1e-6   # meters, exactly 0 up to float noise
+    # The naive vector-space approximation error should dominate/exceed the
+    # near-zero exp-map error by a wide margin, even without any noise driving it.
+    assert rot_err_naive[-1] > rot_err_exp[-1] * 100
+
+
+def test_run_simulation_with_realistic_noise_exp_map_beats_naive(imu_integration_comparison):
+    t, rot_err_naive, rot_err_exp, pos_err_naive, pos_err_exp = \
+        imu_integration_comparison.run_simulation(
+            duration=5.0, dt=0.01, gyro_noise_std=0.02, vel_noise_std=0.05, seed=0)
+
+    rms_rot_naive = np.sqrt(np.mean(rot_err_naive ** 2))
+    rms_rot_exp = np.sqrt(np.mean(rot_err_exp ** 2))
+    rms_pos_naive = np.sqrt(np.mean(pos_err_naive ** 2))
+    rms_pos_exp = np.sqrt(np.mean(pos_err_exp ** 2))
+
+    # The whole point of the comparison: proper SE(3)-manifold integration
+    # should track substantially better than naive Euler-angle vector addition.
+    assert rot_err_exp[-1] <= rot_err_naive[-1]
+    assert rms_rot_exp <= rms_rot_naive
+    assert pos_err_exp[-1] <= pos_err_naive[-1]
+    assert rms_pos_exp <= rms_pos_naive
+
+
+def test_run_simulation_output_shapes_and_monotonic_time(imu_integration_comparison):
+    duration, dt = 2.0, 0.01
+    t, rot_err_naive, rot_err_exp, pos_err_naive, pos_err_exp = \
+        imu_integration_comparison.run_simulation(
+            duration=duration, dt=dt, gyro_noise_std=0.01, vel_noise_std=0.02, seed=3)
+
+    n_steps = int(duration / dt)
+    for arr in (t, rot_err_naive, rot_err_exp, pos_err_naive, pos_err_exp):
+        assert arr.shape == (n_steps,)
+    assert np.allclose(t, np.arange(n_steps) * dt, atol=1e-12)
+    assert np.all(rot_err_naive >= 0.0)
+    assert np.all(rot_err_exp >= 0.0)
+    assert np.all(pos_err_naive >= 0.0)
+    assert np.all(pos_err_exp >= 0.0)
+
+
+def test_run_simulation_is_deterministic_given_seed(imu_integration_comparison):
+    result_a = imu_integration_comparison.run_simulation(
+        duration=1.0, dt=0.01, gyro_noise_std=0.02, vel_noise_std=0.05, seed=42)
+    result_b = imu_integration_comparison.run_simulation(
+        duration=1.0, dt=0.01, gyro_noise_std=0.02, vel_noise_std=0.05, seed=42)
+    for arr_a, arr_b in zip(result_a, result_b):
+        assert np.array_equal(arr_a, arr_b)

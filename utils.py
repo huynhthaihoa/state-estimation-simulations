@@ -181,6 +181,89 @@ def unscented_sigma_offsets(P, lambda_):
     return offsets
 
 
+def qr_insert_row(R, d, a_row, b_val):
+    """Givens-rotation insertion of one new whitened measurement row into an
+    existing upper-triangular square-root-information system, in place --
+    the core "reuse the previous factorization" step behind incremental
+    (iSAM-style) smoothing: absorbing one new row costs O(m) work touching
+    only the columns from its first nonzero onward, not an O(m^3)
+    refactorization of the whole system.
+    Arguments:
+        R: (m,m) upper-triangular sqrt-information matrix (modified in place)
+        d: (m,) transformed right-hand side (modified in place)
+        a_row: (m,) new row's coefficients (not modified; consumed via a local copy)
+        b_val: scalar, the new row's right-hand side
+    Returns:
+        R, d: the same arrays passed in, returned for convenience/chaining
+    """
+    m = R.shape[0]
+    a, b = a_row.copy(), b_val
+    for c in range(m):
+        if abs(a[c]) < 1e-14:
+            continue
+        r = np.hypot(R[c, c], a[c])
+        cos_, sin_ = R[c, c] / r, a[c] / r
+        R[c, c:], a[c:] = cos_ * R[c, c:] + sin_ * a[c:], -sin_ * R[c, c:] + cos_ * a[c:]
+        d[c], b = cos_ * d[c] + sin_ * b, -sin_ * d[c] + cos_ * b
+    return R, d
+
+
+def symbolic_eliminate(n_vars, edges, order):
+    """Symbolic variable elimination (the "elimination game"): the structural
+    half of building a Bayes tree from a factor graph's sparsity pattern --
+    which variables end up depending on which others after elimination,
+    without touching any numeric factor values. Eliminating a variable
+    connects all of its still-uneliminated neighbors to each other (fill-in),
+    then removes it from the graph; the clique this produces is
+    {variable} union {its neighbors at elimination time} (the separator). A
+    clique's parent is whichever separator member is eliminated next -- the
+    clique that will absorb this one's separator into its own.
+    Arguments:
+        n_vars: number of variables (0..n_vars-1)
+        edges: iterable of (i, j) pairs, the factor graph's sparsity pattern
+        order: sequence of all n_vars variable indices, the elimination order
+               (order[0] eliminated first; order[-1] becomes the tree's root)
+    Returns:
+        separator: dict {variable: sorted list of separator variables}
+        parent: dict {variable: parent variable index, or None for the root}
+    """
+    adjacency = {v: set() for v in range(n_vars)}
+    for i, j in edges:
+        adjacency[i].add(j)
+        adjacency[j].add(i)
+
+    position = {v: k for k, v in enumerate(order)}
+    separator, parent = {}, {}
+    for v in order:
+        neighbors = adjacency[v]
+        separator[v] = sorted(neighbors)
+        for a in neighbors:
+            adjacency[a].update(neighbors - {a})
+            adjacency[a].discard(v)
+        parent[v] = min(neighbors, key=lambda u: position[u]) if neighbors else None
+    return separator, parent
+
+
+def bayes_tree_affected_path(parent, touched_vars):
+    """Which cliques a set of newly touched variables invalidates: every
+    clique on the root-ward path from each touched variable, via `parent`
+    pointers from `symbolic_eliminate` -- Bayes-tree information only ever
+    flows toward the root, so a change at a leaf can only affect its
+    ancestors, never a sibling subtree.
+    Arguments:
+        parent: {variable: parent variable index or None}, from symbolic_eliminate
+        touched_vars: iterable of variable indices a new factor touches
+    Returns:
+        affected: set of variable indices on the union of root-ward paths
+    """
+    affected = set()
+    for v in touched_vars:
+        while v is not None and v not in affected:
+            affected.add(v)
+            v = parent[v]
+    return affected
+
+
 def measure_performance(fn, *args, n_steps, **kwargs):
     """Runs `fn` once, measuring wall-clock time and peak memory allocated
     during the call (via tracemalloc), and reports both as per-step averages
