@@ -198,6 +198,8 @@ They don't intersect perfectly.
 
 You can think of BA as adjusting the **bundle of rays** and camera poses so that everything fits together better.
 
+(Recovering a single point from a bundle of already-known-pose rays - rather than jointly adjusting everything - is triangulation on its own; see [frontend/triangulation_pnp.md](../frontend/triangulation_pnp.md) for the closed-form math this repo actually implements, plus its exact inverse problem, PnP.)
+
 Hence:
 
 > **Bundle Adjustment.**

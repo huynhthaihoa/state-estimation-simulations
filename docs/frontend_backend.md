@@ -44,7 +44,7 @@ Typical front-end tasks:
 * **Feature tracking / matching**
 * **Data association** - determining that a feature in frame $k$ is the same physical point seen in frame $k+1$
 * **Visual odometry**
-* **Depth estimation / triangulation**
+* **Depth estimation / triangulation** - see [frontend/triangulation_pnp.md](frontend/triangulation_pnp.md) for the actual math, plus its inverse problem (PnP)
 * **Keyframe selection**
 * **Loop-closure detection**
 

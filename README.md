@@ -36,6 +36,7 @@ Start at [docs/README.md](docs/README.md) for the full index, or [docs/frontend_
 - [bayes_tree_construction.py](use_numpy/bayes_tree_construction.py): builds the actual [Bayes tree](docs/optimization/bayes_tree.md) `iSAM2` relies on - symbolic variable elimination (`symbolic_eliminate` in `utils.py`) over the same square-loop pose-graph topology, then a root-ward affected-path query (`bayes_tree_affected_path`) contrasting a local odometry edge against the loop-closure edge. Pure index/graph bookkeeping, no pose math at all, so there's no `use_manif/` counterpart - the result would be structurally identical either way.
 - [bundle_adjustment.py](use_numpy/bundle_adjustment.py): jointly refines camera poses **and** 3D landmarks against pinhole reprojection error - cameras on an arc around a landmark cluster, with a field-of-view cutoff so not every camera observes every landmark. Compares three solvers: **landmarks-only refinement** and **poses-only refinement** (independent 3x3/6x6 GN solves, each a "fix one side" strawman) against **full joint bundle adjustment** (coupled dense GN over poses + landmarks, gauge-fixed with a prior factor on the first two camera poses, then [Umeyama-aligned](docs/foundations/umeyama_alignment.md) to ground truth before reporting absolute error, since monocular BA only recovers the scene up to an unknown similarity transform).
 - [bundle_adjustment_advanced.py](use_numpy/bundle_adjustment_advanced.py): Local **and** Global bundle adjustment, run back to back for direct comparison - the real-time-system-behavior counterpart to `bundle_adjustment.py`'s single-batch scene. A camera moves keyframe-by-keyframe along a forward-facing arc through a landmark corridor instead of sitting on a static ring; a covisibility graph builds incrementally, and every new keyframe triggers a bounded local Gauss-Newton/Levenberg-Marquardt solve over an active window (new keyframe + covisible neighbors, with every other observing keyframe held fixed as a rigid anchor), while a periodic Global BA pass jointly re-solves the whole map so far for contrast. Keyframes 0/1 are hard-fixed forever as the gauge anchor - no prior factor needed, unlike `bundle_adjustment.py`, since a hard anchor already pins the gauge with no residual freedom left to constrain. Guards against Gauss-Newton divergence (Levenberg-Marquardt damping) and the classic point-behind-camera reflection ambiguity (`passes_cheirality`/ `cull_invalid_points`) that a weakly-constrained, forward-motion scene can hit but `bundle_adjustment.py`'s densely-observed toy scene never does.
+- [pnp_estimation.py](use_numpy/pnp_estimation.py): Perspective-n-Point (PnP) - triangulation's exact inverse ([docs/frontend/triangulation_pnp.md](docs/frontend/triangulation_pnp.md)): given known 3D points and their observed pixels, recovers the unknown camera pose via a closed-form linear DLT initial guess (specialized to known intrinsics), then a few Gauss-Newton iterations against the true reprojection error. No `use_manif/` counterpart (single-implementation, like `bayes_tree_construction.py`).
 
 ### [use_manif/](use_manif/) - Same simulations, on `manifpy`
 
@@ -365,4 +366,29 @@ uv run python use_numpy/bayes_tree_construction.py --nodes-per-side 4 --out out.
 ```
 
 - `--nodes-per-side`: nodes per side of the ring pose graph, same topology as `pose_graph_incremental.py` (default `4`; kept small since this plots an inspectable diagram, not a timing benchmark)
+- `--out`: save the figure to this path instead of showing it (default: show)
+
+### 10. Perspective-n-Point (PnP): recovering a camera pose from known 3D-2D correspondences
+
+#### Purpose
+
+`docs/frontend/triangulation_pnp.md` frames triangulation and PnP as the same reprojection problem run in opposite directions: triangulation (`bundle_adjustment_advanced.py`'s `triangulate_landmark`/`refine_landmark_gn`) holds camera poses fixed to solve for an unknown 3D point; PnP holds a set of known 3D points fixed and solves for the unknown camera pose that observed them. This script implements PnP with the same two-step recipe used throughout this codebase: a closed-form linear initial guess, then a few Gauss-Newton iterations against the true nonlinear reprojection error.
+
+`linear_pnp_dlt` solves the classic Direct Linear Transform (DLT) camera-resectioning problem specialized to known intrinsics - each calibrated ray is parallel to its camera-frame point, giving a linear homogeneous constraint on the flattened world-to-camera `[R|t]`, solved via the smallest right-singular vector and then projected onto the nearest proper rotation (SVD orthogonalization), with scale and sign fixed from that same decomposition and a positive-depth check (this repo's PnP analogue of `passes_cheirality`). `refine_pose_gn` then runs ordinary Gauss-Newton on the true reprojection residual, updating the pose via a right-multiplicative SE(3) correction, mirroring `refine_landmark_gn`'s loop.
+
+#### Scripts
+
+- [use_numpy/pnp_estimation.py](use_numpy/pnp_estimation.py)
+
+#### Usage
+
+```
+uv run python use_numpy/pnp_estimation.py --n-points 20 --pixel-noise-std 1.0 --seed 0 --out out.png
+```
+
+- `--n-points`: number of 3D-2D correspondences (default `20`)
+- `--image-width`/`--image-height`/`--focal-length`: pinhole intrinsics (defaults `640`/`480`/`800.0`)
+- `--pixel-noise-std`: std-dev of Gaussian pixel noise added to each observation (px, default `1.0`)
+- `--gn-tol`/`--gn-max-iters`: Gauss-Newton convergence tolerance and iteration cap (defaults `1e-8`/`20`)
+- `--seed`: RNG seed
 - `--out`: save the figure to this path instead of showing it (default: show)

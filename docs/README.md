@@ -14,6 +14,11 @@ Conceptual/pedagogical notes on the state-estimation and SLAM ideas behind the c
 - [quaternion.md](foundations/quaternion.md): quaternions as a 3D-orientation representation.
 - [umeyama_alignment.md](foundations/umeyama_alignment.md): the closed-form best-fit scale+rotation+translation between two point sets, used to align a reconstruction onto ground truth before measuring error.
 
+## [`frontend/`](frontend/) - Turning raw sensor data into constraints for the back-end
+
+- [triangulation_pnp.md](frontend/triangulation_pnp.md): recovering a 3D point from known camera poses (triangulation, implemented for real in `bundle_adjustment_advanced.py`) and its exact inverse - recovering a camera pose from known 3D points (PnP, implemented in `pnp_estimation.py`).
+- [vi_initialization.md](frontend/vi_initialization.md): bootstrapping scale, gravity direction, and initial velocity/bias before IMU preintegration and factor-graph optimization can run at all; conceptual only, no accompanying script.
+
 ## [`filtering/`](filtering/) - The Kalman-filter lineage
 
 - [kf_ekf_iekf.md](filtering/kf_ekf_iekf.md): KF → EKF → Invariant EKF, in one progression.
