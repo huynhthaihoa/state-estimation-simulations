@@ -93,6 +93,8 @@ Eliminate x1:
 
 This is the fundamental idea behind elimination.
 
+(Here `x1` is eliminated as part of building a solve order - it's still implicitly part of the problem and gets re-eliminated on the next update. [marginalization.md](marginalization.md) reuses this exact step for a different purpose: permanently discarding an old state to bound a sliding-window estimator's size.)
+
 ---
 
 ## 4. Why elimination creates a tree

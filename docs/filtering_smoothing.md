@@ -477,6 +477,8 @@ Examples you'll encounter:
 * **GTSAM-based systems** → factor-graph optimization
 * **iSAM / iSAM2** → incremental smoothing/optimization
 
+(See [optimization/marginalization.md](optimization/marginalization.md) for the actual mechanics of how a state gets marginalized out and why that's what makes a bounded sliding window possible.)
+
 ---
 
 ## 11. And this matters a lot for your PhD topic
