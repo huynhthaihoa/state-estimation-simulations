@@ -222,7 +222,7 @@ These three ideas are the heart of iSAM2.
 
 ## 7. Bayes tree — the most important intuition
 
-Quick recap first: **Sparse Cholesky factorization** splits $H$ into $H = LL^T$ ($L$ lower-triangular), so solving $H\Delta x=-g$ becomes two cheap triangular solves instead of one matrix inversion. "Sparse" means most of $H$ is already zero — two poses only interact if a factor directly connects them — so the factorization skips arithmetic on entries it already knows are zero. The one catch: eliminating a variable can turn some of those zeros into nonzeros ("fill-in"), which is why elimination/variable order matters (§12). Full derivation in [`pose_graph_optimization.md` §5](pose_graph_optimization.md#5-solving-the-linear-system-gauss-newton-step); a worked elimination example in [`bayes_tree.md` §3](bayes_tree.md#3-elimination-is-the-key-idea).
+Quick recap first: **Sparse Cholesky factorization** splits $H$ into $H = LL^T$ ($L$ lower-triangular), so solving $H\Delta x=-g$ becomes two cheap triangular solves instead of one matrix inversion. "Sparse" means most of $H$ is already zero — two poses only interact if a factor directly connects them — so the factorization skips arithmetic on entries it already knows are zero. The one catch: eliminating a variable can turn some of those zeros into nonzeros ("fill-in"), which is why elimination/variable order matters (§12). Full derivation in [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md); a worked elimination example in [`elimination_tree.md`](elimination_tree.md).
 
 So after linearization, SLAM hands you exactly the $H\Delta x=-g$ system above, and that sparse-elimination process is run for real. Conceptually:
 

@@ -46,7 +46,7 @@ $$A\Delta x=b$$
 
 Now we need to solve this large sparse system.
 
-This is where **Sparse Cholesky Factorization** becomes important — see [`pose_graph_optimization.md` §5](pose_graph_optimization.md#5-solving-the-linear-system-gauss-newton-step) if you want the recap: $H = LL^T$, solved via two triangular substitutions instead of a full inversion, exploiting the fact that $H$ is mostly zero.
+This is where **Sparse Cholesky Factorization** becomes important — see [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) if you want the full explainer: $H = LL^T$, solved via two triangular substitutions instead of a full inversion, exploiting the fact that $H$ is mostly zero.
 
 We want to factorize the system efficiently.
 
@@ -91,7 +91,7 @@ Eliminate x1:
     from x1
 ```
 
-This is the fundamental idea behind elimination.
+This is the fundamental idea behind elimination. See [`elimination_tree.md`](elimination_tree.md) for the full explainer of the dependency structure this produces.
 
 (Here `x1` is eliminated as part of building a solve order - it's still implicitly part of the problem and gets re-eliminated on the next update. [marginalization.md](marginalization.md) reuses this exact step for a different purpose: permanently discarding an old state to bound a sliding-window estimator's size.)
 
@@ -261,7 +261,7 @@ That's much smarter than rebuilding the entire factorization blindly.
 
 ## 9. Bayes tree + sparse Cholesky
 
-This connects directly to [`pose_graph_optimization.md`'s sparse Cholesky factorization](pose_graph_optimization.md#5-solving-the-linear-system-gauss-newton-step) and to iSAM2's use of it in [`isam2_optimization.md` §7](isam2_optimization.md#7-bayes-tree--the-most-important-intuition).
+This connects directly to [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) and to iSAM2's use of it in [`isam2_optimization.md` §7](isam2_optimization.md#7-bayes-tree--the-most-important-intuition).
 
 You can think of the pipeline as:
 

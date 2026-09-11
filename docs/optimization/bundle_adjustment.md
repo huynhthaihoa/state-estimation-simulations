@@ -499,7 +499,7 @@ Pts   │ coupling │     block-     │
       └──────────┴────────────────┘
 ```
 
-Since real scenes usually have far more points than cameras, solvers exploit this with the **Schur complement trick**: marginalize out the point block first (cheap, since it's block-diagonal - each point's own small block inverts independently), solve the much smaller reduced camera-only system, then cheaply back-substitute to recover the points. It's the same style of sparsity exploitation that makes [pose_graph_optimization.md](pose_graph_optimization.md#5-solving-the-linear-system-gauss-newton-step)'s sparse Cholesky factorization tractable at scale.
+Since real scenes usually have far more points than cameras, solvers exploit this with the **Schur complement trick**: marginalize out the point block first (cheap, since it's block-diagonal - each point's own small block inverts independently), solve the much smaller reduced camera-only system, then cheaply back-substitute to recover the points. It's the same style of sparsity exploitation that makes [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md)'s approach tractable at scale.
 
 `bundle_adjustment.py` doesn't need this trick - its toy scenes are small enough (a handful of cameras and landmarks) that `run_bundle_adjustment` just solves the full dense joint system directly every iteration. Schur-complement marginalization is what a production solver (COLMAP, g2o, GTSAM, Ceres) does under the hood at real scene sizes, not something this demo implements.
 

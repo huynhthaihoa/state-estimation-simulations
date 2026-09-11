@@ -34,9 +34,11 @@ Conceptual/pedagogical notes on the state-estimation and SLAM ideas behind the c
 - [factor_graph.md](optimization/factor_graph.md): the graphical structure (variables + factors) that SLAM's NLS problems are usually organized as.
 - [pose_graph_optimization.md](optimization/pose_graph_optimization.md): factor graphs specialized to poses-only, relative-constraint problems.
 - [bundle_adjustment.md](optimization/bundle_adjustment.md): factor graphs specialized to joint camera-pose + 3D-landmark refinement.
+- [sparse_cholesky_factorization.md](optimization/sparse_cholesky_factorization.md): why the linear solve inside a Gauss-Newton/LM step exploits $H$'s sparsity instead of a dense $LL^T$, and the fill-in problem that variable-elimination order controls.
 - [imu_preintegration.md](optimization/imu_preintegration.md): compressing raw high-rate IMU samples into one relative-motion edge, with a right-Jacobian trick to correct it for bias changes without re-integrating.
 - [isam_optimization.md](optimization/isam_optimization.md): incrementally updating the solution to a growing factor graph (iSAM) instead of re-solving it from scratch every step.
 - [isam2_optimization.md](optimization/isam2_optimization.md): iSAM's successor - adds a Bayes-tree factorization, selective relinearization, and dynamic variable reordering; the tree itself is built in this repo, the rest is conceptual only.
+- [elimination_tree.md](optimization/elimination_tree.md): the dependency structure ("what must be computed before what") that variable elimination produces, distinct from the factor graph itself ("who talks to whom") - the setup for the Bayes tree below.
 - [bayes_tree.md](optimization/bayes_tree.md): the tree representation of variable-elimination order that iSAM2 relies on to know which part of the solution a new factor actually affects, built for real from this repo's pose graph in `bayes_tree_construction.py`.
 - [marginalization.md](optimization/marginalization.md): the same variable-elimination step, aimed at permanently discarding an old state instead of reordering a solve - the mechanism behind sliding-window/fixed-lag smoothing (MSCKF, VINS-Mono); conceptual only, no accompanying script.
 
