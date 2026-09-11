@@ -6,7 +6,11 @@ For a symmetric positive-definite matrix $A$, ordinary Cholesky decomposes:
 
 $$A = LL^T$$
 
-where $L$ is lower triangular.
+where $L$ is lower triangular. Column by column, its entries are:
+
+$$L_{jj} = \sqrt{A_{jj} - \sum_{k=1}^{j-1} L_{jk}^2}, \qquad L_{ij} = \frac{1}{L_{jj}}\left(A_{ij} - \sum_{k=1}^{j-1} L_{ik}L_{jk}\right)\ \ (i>j)$$
+
+That sum over earlier columns $k$ is the whole story behind fill-in (Section 3): even when $A_{ij}=0$, $L_{ij}$ can come out nonzero if $i$ and $j$ share an already-eliminated neighbor $k$ with $L_{ik}, L_{jk} \neq 0$.
 
 For example:
 
