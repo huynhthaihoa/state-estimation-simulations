@@ -120,9 +120,7 @@ Even if $H$ is sparse, $L$ is **not necessarily equally sparse**.
 
 Consider:
 
-$$H = \begin{bmatrix} \boxed{*} & * & *\\
-* & \boxed{*} & 0\\
-* & 0 & \boxed{*} \end{bmatrix}$$
+$$H = \begin{bmatrix} \boxed{*} & * & * \\ * & \boxed{*} & 0 \\ * & 0 & \boxed{*} \end{bmatrix}$$
 
 There is no connection between variable 2 and variable 3.
 
@@ -132,9 +130,7 @@ $$L_{32}\neq0$$
 
 so the factor becomes:
 
-$$L=\begin{bmatrix}* & 0 & 0\\
-* & * & 0\\
-* & \boxed{*} & *\end{bmatrix}$$
+$$L = \begin{bmatrix} * & 0 & 0 \\ * & * & 0 \\ * & \boxed{*} & * \end{bmatrix}$$
 
 That newly created nonzero is called **fill-in**.
 
