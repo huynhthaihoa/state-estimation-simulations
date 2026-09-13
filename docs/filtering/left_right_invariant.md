@@ -32,7 +32,7 @@ Each error is unaffected by one specific kind of frame change, and the name tell
 - $\eta_L$ is unchanged if you left-multiply both $X$ and $\hat X$ by the same fixed transform $g$ (i.e. you redefine the *world/global* frame - rotate your map, shift your origin). That cancels out: $(g\hat X)^{-1}(gX) = \hat X^{-1}X$. So it's invariant to **global frame redefinition** - which makes sense, since a body-frame quantity shouldn't care how you labeled the world frame.
 - $\eta_R$ is unchanged if you right-multiply both by $g$ (i.e. you redefine the *body* frame convention - recalibrate where "robot frame origin" sits, e.g. sensor extrinsics). That cancels out too: $(Xg)(\hat Xg)^{-1} = X\hat X^{-1}$. So it's invariant to **body-frame redefinition**.
 
-### 3.1 Same story, one level down: angular velocity on SO(3)
+### 3.1 Same story, one level down: angular velocity on $SO(3)$
 
 The pattern above is easiest to see on the rotation part alone, without the estimate/truth pair. For $R(t) \in SO(3)$, define body-frame and spatial (world-frame) angular velocity by
 
