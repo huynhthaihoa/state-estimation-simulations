@@ -101,10 +101,16 @@ A full VIO/VI-SLAM back-end (GTSAM's `CombinedImuFactor`, ORB-SLAM3, VINS-Mono, 
 
 - **`imu_preintegration.py`** (both [`use_numpy/`](../../use_numpy/imu_preintegration.py) and [`use_manif/`](../../use_manif/imu_preintegration.py)) implements exactly §3-§5 above: compress raw samples into a bundle, track the bias Jacobians, then apply the $O(1)$ correction. The two versions are line-for-line equivalent - `use_manif`'s docstring spells out the exact correspondence (its `rplus()` call returns the same `dR`/right-Jacobian pair the numpy version computes by hand). **Neither script builds the graph residual described in §6** - both stop at demonstrating the compression + correction, which is the specific mechanism this doc covers.
 - **`robot_imu_simulation.py`** is a related but different script: it dead-reckons raw IMU readings directly on $SE(3)$ every micro-step (chaining `se3_exp`, no bundle, no bias Jacobians at all), then periodically runs a small Gauss-Newton correction against a separate GPS-like sensor. It's about *strapdown integration + periodic on-manifold correction*, not preintegration.
-- **`imu_integration_comparison.py`** is also related but different: like [ekf_iekf_equivalence.md](../filtering/ekf_iekf_equivalence.md), it's an empirical comparison note rather than a concept explainer - it plots naive Euler-angle (vector-space) integration against proper $SO(3)$ Exp-map integration to show why the latter doesn't drift the way the former does. No bias correction involved.
+- **`imu_integration_comparison.py`** is also related but different: like [ekf_iekf_ukf_empirical_note.md](../filtering/ekf_iekf_ukf_empirical_note.md), it's an empirical comparison note rather than a concept explainer - it plots naive Euler-angle (vector-space) integration against proper $SO(3)$ Exp-map integration to show why the latter doesn't drift the way the former does. No bias correction involved.
 
 ---
 
 ## 8. One-sentence summary
 
 > **Preintegration turns "re-run 100+ raw IMU samples every time the bias estimate changes" into "one matrix-vector multiply," by tracking - while integrating - exactly how sensitive the compressed relative-motion bundle is to the bias, using the same right-Jacobian machinery that converts a tangent-space nudge into a body-frame rotation anywhere else in this codebase.**
+
+---
+
+## 9. References
+
+1. Forster, C., Carlone, L., Dellaert, F., & Scaramuzza, D. (2017). *On-Manifold Preintegration for Real-Time Visual-Inertial Odometry*. IEEE Transactions on Robotics, 33(1), 1-21. https://doi.org/10.1109/TRO.2016.2597321 - the on-manifold, right-Jacobian bias-correction preintegration formulation this whole doc walks through (§3-§5).
