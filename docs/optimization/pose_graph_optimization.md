@@ -540,7 +540,7 @@ And there's a particularly important connection to your SLAM research: **PGO is 
 
 Pose-Graph Optimization (PGO) formulates loop closure and drift correction as a non-linear least squares problem on the Special Euclidean Group $\mathrm{SE}(3)$ (or $\mathrm{SE}(2)$ for 2D). Because $\mathrm{SE}(3)$ is a non-Euclidean Lie group rather than a vector space, standard calculus operations like addition and subtraction do not apply directly. Instead, optimization is performed locally on its Lie algebra $\mathfrak{se}(3)$ using tangent spaces.
 
-### 1. State Representation and Constraints
+### 15.1 State Representation and Constraints
 
 #### Poses as Lie Group Elements
 
@@ -559,7 +559,7 @@ $${z_{ij} = {\tilde{T}_{ij} \in \mathrm{SE}(3)}}$$
 
 (e.g., from ICP scan matching or visual odometry), accompanied by an information matrix ${\Omega_{ij} = {\Sigma_{ij}^{-1} \in \mathbb{R}^{6 \times 6}}}$ representing measurement confidence.
 
-### 2. Residual Vector Formulation on $\mathrm{SE}(3)$
+### 15.2 Residual Vector Formulation on $\mathrm{SE}(3)$
 
 The expected relative transformation between pose $T_i$ and pose $T_j$ according to the current state estimate is:
 
@@ -587,13 +587,13 @@ and rotational error:
 
 $${\theta_{ij}}$$
 
-### 3. Objective Function
+### 15.3 Objective Function
 
 The global optimization minimizes the sum of squared Mahalanobis distances over all edges ${\mathcal{E}}$ in the graph:
 
 $${F(X) = \sum_{(i,j) \in \mathcal{E}} r_{ij}(X)^\top \Omega_{ij} \, r_{ij}(X)}$$
 
-### 4. Manifold Optimization and Linearization
+### 15.4 Manifold Optimization and Linearization
 
 Standard vector updates ${T_i \leftarrow T_i + \Delta x_i}$ break the matrix constraints of ${\mathrm{SE}(3)}$ (e.g., $R_i$ will cease to be orthogonal). Updates are applied using the exponential map ${\mathrm{Exp}: \mathbb{R}^6 \to \mathrm{SE}(3)}$ via local perturbations ${\boldsymbol{\xi}_i \in \mathbb{R}^6}$ acting on the tangent space.
 
@@ -636,7 +636,7 @@ $${\mathrm{Ad}\left(\begin{bmatrix} R & p \\
 
 and ${J_r^{-1}(\cdot)}$ is the inverse right Jacobian of ${\mathrm{SE}(3)}$.
 
-### 5. Solving the Linear System (Gauss-Newton Step)
+### 15.5 Solving the Linear System (Gauss-Newton Step)
 
 Stacking all residuals into a global residual vector $R(X)$ and Jacobians into a sparse Jacobian matrix $J$, the linearization takes the standard form:
 
@@ -662,7 +662,7 @@ $${(H + \lambda I) \, \boldsymbol{\delta}^* = -b}$$
 
 Larger $\lambda$ shrinks the step toward gradient descent (safer, slower) while ${\lambda \to 0}$ recovers pure Gauss-Newton (faster near convergence). Both `pose_graph.py` implementations (`use_numpy/` and `use_manif/`) use this damped form with a fixed `damping` coefficient (`H += np.eye(dof) * damping`) rather than pure, undamped Gauss-Newton.
 
-### 6. Retraction / State Update
+### 15.6 Retraction / State Update
 
 Once the increment vector ${\boldsymbol{\delta}^*}$ is computed, the system updates the trajectory states on the ${\mathrm{SE}(3)}$ manifold:
 
@@ -678,7 +678,7 @@ In Pose-Graph Optimization (PGO), standard non-linear least squares relies on an
 
 Robust cost functions replace or reweight the standard $L_2$ norm to cap or reduce the influence of large residuals.
 
-### The M-Estimator Framework (Iteratively Reweighted Least Squares)
+### 16.1 The M-Estimator Framework (Iteratively Reweighted Least Squares)
 
 Instead of minimizing $\frac{1}{2} e^2$ (where $e = \sqrt{r^\top \Omega r}$ is the normalized residual scalar), M-estimators minimize a robust kernel $\rho(e)$:
 
@@ -688,7 +688,7 @@ To integrate this into standard Gauss-Newton or Levenberg-Marquardt solvers with
 
 $$w(e) = \frac{1}{e} \frac{\partial \rho(e)}{\partial e}$$
 
-### 1. Classical M-Estimators
+### 16.2 Classical M-Estimators
 
 #### Huber Loss
 
@@ -709,7 +709,7 @@ $$\rho(e) = \frac{k^2}{2} \ln\left(1 + \frac{e^2}{k^2}\right), \quad w(e) = \fra
 
 * **Behavior:** The weight falls off quadratically ($w(e) \propto \frac{1}{e^2}$), heavily suppressing high-residual edges.
 
-### 2. Dynamic Covariance Scaling (DCS)
+### 16.3 Dynamic Covariance Scaling (DCS)
 
 Dynamic Covariance Scaling (Agarwal et al., 2013) is specifically designed for pose-graph optimization. Instead of reweighting during every residual evaluation, DCS dynamically scales the information matrix based on an analytical closed-form solution derived from Switchable Constraints.
 
@@ -737,7 +737,7 @@ $$s_{ij} = \min\left(1, \; \frac{2 \Phi}{\Phi + e_{ij}^2}\right)$$
 2. **Outliers ($e_{ij}^2 > \Phi$):** $s_{ij} = \frac{2 \Phi}{\Phi + e_{ij}^2} < 1$. As error $e_{ij}^2$ grows, $s_{ij}^2 \propto \frac{1}{e^4}$, causing the effective weight of the edge to drop rapidly to zero.
 3. **No Extra State Variables:** Unlike original Switchable Constraints, DCS does not add auxiliary optimization variables to the Hessian matrix $H$, preserving graph sparsity without increasing matrix inversion costs.
 
-### Comparison of Robust Loss Functions
+### 16.4 Comparison of Robust Loss Functions
 
 | Loss Function | Residual Cost Tail $\rho(e)$ | Weight Degeneration $w(e)$ | SLAM False Loop Rejection Power |
 | ------------- | ------------- | ------------- | ------------- |
@@ -749,9 +749,18 @@ $$s_{ij} = \min\left(1, \; \frac{2 \Phi}{\Phi + e_{ij}^2}\right)$$
 
 Note the distinction in the first column: Geman-McClure's cost $\rho(e)=e^2/(1+e^2)$ genuinely **saturates**, monotonically approaching a constant ($1$) as $e\to\infty$. DCS's effective cost $s_{ij}^2 e_{ij}^2 = \frac{4\Phi^2 e^2}{(\Phi+e^2)^2}$ is stronger than that - for $e^2>\Phi$ it is *decreasing* in $e$ and decays all the way back to $0$ as $e\to\infty$ (differentiate w.r.t. $x=e^2$: $\frac{d}{dx}\frac{4\Phi^2 x}{(\Phi+x)^2} = \frac{4\Phi^2(\Phi-x)}{(\Phi+x)^3} < 0$ for $x>\Phi$). This **redescending** behavior is why DCS suppresses extreme outliers even more aggressively than Geman-McClure, and also why it's every bit as non-convex - the "Graduated Non-Convexity" caveat below applies to it for exactly this reason.
 
-### Practical Considerations in Implementation
+### 16.5 Practical Considerations in Implementation
 
 1. **Threshold Tuning ($\delta, k, \Phi$):** The parameters set the boundary between inliers and outliers. In $\mathrm{SE}(3)$ PGO, error $e^2$ follows a Chi-Square distribution ($\chi^2$) with 6 degrees of freedom. Setting $\Phi$ or $k^2$ corresponding to the 95% or 99% quantile of $\chi^2(6)$ (e.g., $\Phi \approx 12.59$) provides a sound baseline.
 2. **Graduated Non-Convexity (GNC):** Highly non-convex robust functions (like DCS or Geman-McClure) can introduce local minima if applied from a poor initial guess. Modern solvers use GNC to start with a convex $L_2$ loss and gradually harden the robust kernel as iterations progress.
 
 This section is theory only: neither `use_numpy/pose_graph.py` nor `use_manif/pose_graph.py` implements Huber, Cauchy, or DCS reweighting - both scripts still use a single, unweighted `info_matrix = np.eye(6)` shared by every edge, odometry and loop-closure alike (the same gap already noted for per-edge $\Omega_{ij}$ weighting earlier in this doc). Robust loss reweighting is a natural extension a reader could add, not something the accompanying scripts exercise.
+
+---
+
+## 17. References
+
+1. Grisetti, G., Kümmerle, R., Stachniss, C., & Burgard, W. (2010). *A Tutorial on Graph-Based SLAM*. IEEE Intelligent Transportation Systems Magazine, 2(4), 31-43. https://doi.org/10.1109/MITS.2010.939925 - already cited in [frontend_backend.md §6](../frontend_backend.md#6-references); the general graph/error-formulation/optimization reference behind §1-§14 here.
+2. Huber, P. J. (1964). *Robust Estimation of a Location Parameter*. Annals of Mathematical Statistics, 35(1), 73-101. https://doi.org/10.1214/aoms/1177703732 - the Huber loss in §16.2.
+3. Geman, S., & McClure, D. E. (1985). *Bayesian Image Analysis: An Application to Single Photon Emission Tomography*. Proceedings of the American Statistical Association, Statistical Computing Section, 12-18. - the Geman-McClure loss named in §16.4's comparison table.
+4. Agarwal, P., Tipaldi, G. D., Spinello, L., Stachniss, C., & Burgard, W. (2013). *Robust Map Optimization Using Dynamic Covariance Scaling*. ICRA 2013, 62-69. https://doi.org/10.1109/ICRA.2013.6630557 - Dynamic Covariance Scaling in §16.3, already named inline there as "Agarwal et al., 2013".
