@@ -4,7 +4,7 @@
 
 Think of a **factor graph** as a way to represent:
 
-> **“What unknowns do I have, and what pieces of evidence tell me about those unknowns?”**
+> **"What unknowns do I have, and what pieces of evidence tell me about those unknowns?"**
 
 For SLAM:
 

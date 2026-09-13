@@ -62,13 +62,13 @@ Conceptual only - there is no accompanying script for this doc. Unlike `triangul
 
 ---
 
-## 6. References
+## 6. One-sentence summary
 
-1. Qin, T., & Shen, S. (2017). *Robust Initialization of Monocular Visual-Inertial Estimation on Aerial Robots*. IROS 2017, 4225-4232. https://doi.org/10.1109/IROS.2017.8206284 - the source of the linear gyro-bias / gravity-scale-velocity alignment pipeline in §2.
-2. Qin, T., Li, P., & Shen, S. (2018). *VINS-Mono: A Robust and Versatile Monocular Visual-Inertial State Estimator*. IEEE Transactions on Robotics, 34(4), 1004-1020. https://doi.org/10.1109/TRO.2018.2853729 - the full system this initialization pipeline bootstraps; already cited in [filtering_smoothing.md §12](../filtering_smoothing.md#12-references) and [marginalization.md §9](../optimization/marginalization.md#9-references).
+> **Visual-inertial initialization solves, once and in closed form, the one problem every other doc in this repo assumes is already solved - a trustworthy starting guess - by linearly aligning a short vision-only window against preintegrated IMU bundles to recover scale, gravity direction, and initial velocity/bias, before handing off to the ordinary preintegration + factor-graph machinery for good.**
 
 ---
 
-## 7. One-sentence summary
+## 7. References
 
-> **Visual-inertial initialization solves, once and in closed form, the one problem every other doc in this repo assumes is already solved - a trustworthy starting guess - by linearly aligning a short vision-only window against preintegrated IMU bundles to recover scale, gravity direction, and initial velocity/bias, before handing off to the ordinary preintegration + factor-graph machinery for good.**
+1. Qin, T., & Shen, S. (2017). *Robust Initialization of Monocular Visual-Inertial Estimation on Aerial Robots*. IROS 2017, 4225-4232. https://doi.org/10.1109/IROS.2017.8206284 - the source of the linear gyro-bias / gravity-scale-velocity alignment pipeline in §2.
+2. Qin, T., Li, P., & Shen, S. (2018). *VINS-Mono: A Robust and Versatile Monocular Visual-Inertial State Estimator*. IEEE Transactions on Robotics, 34(4), 1004-1020. https://doi.org/10.1109/TRO.2018.2853729 - the full system this initialization pipeline bootstraps; already cited in [filtering_smoothing.md §12](../filtering_smoothing.md#12-references) and [marginalization.md §10](../optimization/marginalization.md#10-references).

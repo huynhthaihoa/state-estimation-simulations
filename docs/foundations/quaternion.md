@@ -1,6 +1,6 @@
 # Quaternion intuitive explanation
 
-Since you’re working with **SLAM, state estimation, and robotics**, the most useful way to understand a quaternion is as a clever mathematical way to represent **3D orientation** without some of the problems of Euler angles.
+Since you're working with **SLAM, state estimation, and robotics**, the most useful way to understand a quaternion is as a clever mathematical way to represent **3D orientation** without some of the problems of Euler angles.
 
 ## 1. First: what problem is a quaternion solving?
 
@@ -14,7 +14,7 @@ So we need to describe its orientation in 3D.
 
 The obvious approach is Euler angles:
 
-> “Rotate 30° around X, then 20° around Y, then 10° around Z.”
+> "Rotate 30° around X, then 20° around Y, then 10° around Z."
 
 But there is a problem: **the rotations interact with each other**.
 
@@ -26,13 +26,13 @@ A quaternion gives us another representation.
 
 ---
 
-## 2. The intuitive idea: a quaternion is an “axis + angle” in disguise
+## 2. The intuitive idea: a quaternion is an "axis + angle" in disguise
 
 Suppose I tell you:
 
-> “Rotate the robot by **90° around the Z-axis**.”
+> "Rotate the robot by **90° around the Z-axis**."
 
-That’s actually enough information to define an orientation change.
+That's actually enough information to define an orientation change.
 
 We have:
 
@@ -85,7 +85,7 @@ $$
 
 You can think of it as:
 
-> **“Rotate around this axis by this amount.”**
+> **"Rotate around this axis by this amount."**
 
 The four numbers are just a convenient mathematical encoding of that idea.
 
@@ -111,13 +111,13 @@ Effectively:
 
 > 4 numbers + 1 constraint → 3 degrees of freedom.
 
-That’s why a quaternion can represent a 3D orientation even though it has four components.
+That's why a quaternion can represent a 3D orientation even though it has four components.
 
 ---
 
-## 4. The most important intuition: don’t think of it as a mysterious 4D object
+## 4. The most important intuition: don't think of it as a mysterious 4D object
 
-When you’re learning robotics, I’d recommend **not initially thinking of a quaternion as “a point in 4D space.”**
+When you're learning robotics, I'd recommend **not initially thinking of a quaternion as "a point in 4D space."**
 
 Instead think:
 
@@ -187,7 +187,7 @@ This is where they become really interesting for your SLAM/state-estimation work
 
 Suppose your IMU tells you:
 
-> “The robot rotated slightly during this 10 ms interval.”
+> "The robot rotated slightly during this 10 ms interval."
 
 You want to update:
 
@@ -195,9 +195,9 @@ $$
 R_{k+1}=R_k\Delta R
 $$
 
-where $R$ is the robot’s orientation.
+where $R$ is the robot's orientation.
 
-You can represent $R$ as a rotation matrix (${R \in SO(3)}$), but that’s **9 numbers**.
+You can represent $R$ as a rotation matrix (${R \in SO(3)}$), but that's **9 numbers**.
 
 A quaternion only needs $q = (w,x,y,z)$ with the unit constraint.
 
@@ -209,9 +209,9 @@ $${q_{\text{new}}=q_{\text{old}}\otimes\Delta q}$$
 
 Conceptually:
 
-> **Quaternion multiplication = “apply one rotation after another.”**
+> **Quaternion multiplication = "apply one rotation after another."**
 
-That’s incredibly useful for IMU integration.
+That's incredibly useful for IMU integration.
 
 ---
 
@@ -240,7 +240,7 @@ Now rotate it 90° around the Z-axis:
 
 Instead of storing:
 
-> “The phone has roll = ?, pitch = ?, yaw = 90°”
+> "The phone has roll = ?, pitch = ?, yaw = 90°"
 
 you can simply describe the transformation as:
 
@@ -254,7 +254,7 @@ The quaternion stores exactly that information in a form that is mathematically 
 
 You might reasonably ask:
 
-> “If rotation matrices work, why bother with quaternions?”
+> "If rotation matrices work, why bother with quaternions?"
 
 Good question.
 
@@ -275,7 +275,7 @@ And those 9 numbers must satisfy several constraints: $R^TR = I$ and $\det(R) = 
 
 Quaternions have only four numbers and one simple normalization constraint: $\|q\| = 1$.
 
-So they’re generally:
+So they're generally:
 
 * more compact
 * numerically convenient
@@ -362,13 +362,13 @@ The tricky part is:
 
 It lives on the **unit quaternion manifold**, which represents rotations.
 
-That’s why modern VIO/SLAM systems often use a **small 3D orientation error** rather than directly adding a 4D quaternion error:
+That's why modern VIO/SLAM systems often use a **small 3D orientation error** rather than directly adding a 4D quaternion error:
 
 $${q_{\text{true}} = \delta q\otimes q_{\text{estimate}}}$$
 
 where $\delta q$ represents a **small 3D rotational error**.
 
-This idea leads directly into **SO(3), Lie groups, Lie algebra, and the Invariant EKF** you were asking about earlier. In the terminology of [left_right_invariant.md](../filtering/left_right_invariant.md), this particular $\delta q$ is a *right*-invariant error (the mismatch viewed from a fixed point in the world frame) - see that doc for when you’d instead want the left-invariant, body-frame version.
+This idea leads directly into **SO(3), Lie groups, Lie algebra, and the Invariant EKF** you were asking about earlier. In the terminology of [left_right_invariant.md](../filtering/left_right_invariant.md), this particular $\delta q$ is a *right*-invariant error (the mismatch viewed from a fixed point in the world frame) - see that doc for when you'd instead want the left-invariant, body-frame version.
 
 ---
 
@@ -376,9 +376,9 @@ This idea leads directly into **SO(3), Lie groups, Lie algebra, and the Invarian
 
 If you remember only one thing:
 
-> **A quaternion is a clever four-number representation of a 3D rotation, essentially encoding “rotate by this angle around this axis,” in a form that makes chaining and estimating rotations much easier.**
+> **A quaternion is a clever four-number representation of a 3D rotation, essentially encoding "rotate by this angle around this axis," in a form that makes chaining and estimating rotations much easier.**
 
-And for your robotics work, I’d mentally organize it as:
+And for your robotics work, I'd mentally organize it as:
 
 $${ \boxed{ \text{Euler angles} \rightarrow \text{Quaternion} \rightarrow SO(3) \rightarrow \mathfrak{so}(3) \rightarrow \text{Lie-group state estimation} } }
 $$

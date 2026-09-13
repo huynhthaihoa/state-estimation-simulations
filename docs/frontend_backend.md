@@ -4,9 +4,9 @@ In **SLAM**, the terms **front-end** and **back-end** describe two major parts o
 
 A simple way to think about them is:
 
-> **Front-end: “What happened between these observations?”**
+> **Front-end: "What happened between these observations?"**
 
-> **Back-end: “Given all observations, what is the most consistent trajectory and map?”**
+> **Back-end: "Given all observations, what is the most consistent trajectory and map?"**
 
 ![Front-end (visual odometry: feature extraction, data association) feeding a back-end optimization stage that produces a mapped point-cloud trajectory, with loop closure looping back into the front-end](images/frontend_backend_1.jpg)
 

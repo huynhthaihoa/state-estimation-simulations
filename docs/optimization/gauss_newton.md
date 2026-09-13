@@ -1,6 +1,6 @@
 # Gauss-Newton Optimization
 
-Since you’re working with **SLAM, [bundle adjustment](bundle_adjustment.md), and [pose-graph optimization](pose_graph_optimization.md)**, Gauss-Newton is one of the most important optimization ideas to understand intuitively.
+Since you're working with **SLAM, [bundle adjustment](bundle_adjustment.md), and [pose-graph optimization](pose_graph_optimization.md)**, Gauss-Newton is one of the most important optimization ideas to understand intuitively.
 
 ---
 
@@ -10,7 +10,7 @@ Suppose you want to find parameters $x$ that make some measurements fit as well 
 
 For example, in SLAM:
 
-> “What robot pose $x$ best explains these sensor measurements?”
+> "What robot pose $x$ best explains these sensor measurements?"
 
 You define a **residual**:
 
@@ -24,7 +24,7 @@ The problem is that $r(x)$ is usually **nonlinear**.
 
 Gauss-Newton says:
 
-> **“I can't solve this nonlinear problem directly, so around my current guess, I'll pretend it is linear, solve that easier problem, move there, and repeat.”**
+> **"I can't solve this nonlinear problem directly, so around my current guess, I'll pretend it is linear, solve that easier problem, move there, and repeat."**
 
 That's essentially the whole algorithm.
 
@@ -44,7 +44,7 @@ But you can look at the terrain immediately around you.
 
 If the terrain looks approximately like a **tilted bowl**, you can estimate:
 
-> “If I move this direction, I'll go downhill.”
+> "If I move this direction, I'll go downhill."
 
 So you:
 

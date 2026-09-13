@@ -83,14 +83,14 @@ The exact same problem - known 3D points, known intrinsics, unknown pose - is so
 
 ---
 
-## 7. References
+## 7. One-sentence summary
+
+> **Triangulation and PnP are the same reprojection problem run in opposite directions - one holds poses fixed to solve for a point, the other holds a point fixed to solve for a pose - and this repo solves both the same way: a closed-form linear guess (ray intersection / DLT) followed by a few Gauss-Newton iterations, guarded against the same sign/reflection ambiguity in both directions.**
+
+---
+
+## 8. References
 
 1. Hartley, R., & Zisserman, A. (2004). *Multiple View Geometry in Computer Vision* (2nd ed.). Cambridge University Press. - the standard reference for DLT camera resectioning behind §3's derivation.
 2. Lepetit, V., Moreno-Noguer, F., & Fua, P. (2009). *EPnP: An Accurate O(n) Solution to the PnP Problem*. International Journal of Computer Vision, 81(2), 155-166. https://doi.org/10.1007/s11263-008-0152-6 - the production-grade PnP algorithm named as a contrast in §6.
 3. Triggs, B., McLauchlan, P. F., Hartley, R. I., & Fitzgibbon, A. W. (2000). *Bundle Adjustment - A Modern Synthesis*. In Vision Algorithms: Theory and Practice (pp. 298-372). Springer. - already cited in [bundle_adjustment.md](../optimization/bundle_adjustment.md), covering the triangulation-within-BA context behind §2.
-
----
-
-## 8. One-sentence summary
-
-> **Triangulation and PnP are the same reprojection problem run in opposite directions - one holds poses fixed to solve for a point, the other holds a point fixed to solve for a pose - and this repo solves both the same way: a closed-form linear guess (ray intersection / DLT) followed by a few Gauss-Newton iterations, guarded against the same sign/reflection ambiguity in both directions.**

@@ -146,15 +146,15 @@ This doc is conceptual only - unlike most docs in `optimization/`, there is no a
 
 ---
 
-## 9. References
+## 9. One-sentence summary
+
+> **Marginalization is the same variable-elimination step `bayes_tree.md` uses to build a solve order, aimed instead at permanently discarding an old state - turning it into a dense prior factor over whatever it was still connected to, which is exactly the trick that lets sliding-window/fixed-lag smoothers (MSCKF, VINS-Mono) run in bounded memory and time forever, at the cost of a fill-in penalty and a consistency subtlety (FEJ) that full-batch and iSAM2 never have to deal with.**
+
+---
+
+## 10. References
 
 1. Sibley, G., Matthies, L., & Sukhatme, G. (2010). *Sliding Window Filter with Application to Planetary Landing*. Journal of Field Robotics, 27(5), 587-608. https://doi.org/10.1002/rob.20360 - the sliding-window/delayed-state-marginalization formulation behind §4 and §7.
 2. Huang, G. P., Mourikis, A. I., & Roumeliotis, S. I. (2009). *A First-Estimates Jacobian EKF for Improving SLAM Consistency*. In Experimental Robotics: The Eleventh International Symposium (pp. 373-382). Springer. https://doi.org/10.1007/978-3-642-00196-3_43 - the FEJ fix behind §6.
 3. Mourikis, A. I., & Roumeliotis, S. I. (2007). *A Multi-State Constraint Kalman Filter for Vision-Aided Inertial Navigation*. ICRA 2007, 3565-3572. https://doi.org/10.1109/ROBOT.2007.364024 - the MSCKF reference in §7, already cited in [filtering_smoothing.md §12](../filtering_smoothing.md#12-references).
 4. Qin, T., Li, P., & Shen, S. (2018). *VINS-Mono: A Robust and Versatile Monocular Visual-Inertial State Estimator*. IEEE Transactions on Robotics, 34(4), 1004-1020. https://doi.org/10.1109/TRO.2018.2853729 - the VINS-Mono reference in §7, already cited in [filtering_smoothing.md §12](../filtering_smoothing.md#12-references).
-
----
-
-## 10. One-sentence summary
-
-> **Marginalization is the same variable-elimination step `bayes_tree.md` uses to build a solve order, aimed instead at permanently discarding an old state - turning it into a dense prior factor over whatever it was still connected to, which is exactly the trick that lets sliding-window/fixed-lag smoothers (MSCKF, VINS-Mono) run in bounded memory and time forever, at the cost of a fill-in penalty and a consistency subtlety (FEJ) that full-batch and iSAM2 never have to deal with.**
