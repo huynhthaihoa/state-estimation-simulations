@@ -244,7 +244,7 @@ For example:
 
 $$R = \hat R \exp(\delta\theta^\wedge)$$
 
-where $\delta\theta$ is a small rotation error.
+where $\delta\theta$ is a **small rotation error**.
 
 This is much more natural geometrically.
 
