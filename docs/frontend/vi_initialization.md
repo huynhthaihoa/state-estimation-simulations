@@ -1,6 +1,8 @@
 # Visual-inertial initialization
 
-> **Before a visual-inertial estimator can run its normal loop (preintegrate IMU, optimize against camera constraints), it has to solve a chicken-and-egg bootstrapping problem: figure out metric scale, gravity direction, initial velocity, and IMU bias, none of which a monocular camera or a bias-corrupted IMU can tell you on its own.**
+> **Note**: A visual-inertial state estimator combines data from cameras and inertial measurement units (IMUs) to track the position, velocity, and orientation of a moving robot or device.
+
+Before a visual-inertial state estimator can run its normal loop (preintegrate IMU, optimize against camera constraints), it has to solve a chicken-and-egg bootstrapping problem: figure out metric scale, gravity direction, initial velocity, and IMU bias, none of which a monocular camera or a bias-corrupted IMU can tell you on its own.
 
 This builds directly on:
 - **IMU preintegration** ($\Delta R, \Delta v, \Delta p$ and their bias Jacobians) from [imu_preintegration.md](../optimization/imu_preintegration.md) - this doc explains what has to happen *before* that machinery can be trusted.
