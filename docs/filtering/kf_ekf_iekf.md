@@ -208,7 +208,7 @@ Here's perhaps the most useful mental model:
 | **EKF**  | "The world is nonlinear, so I'll linearize it."                                                |
 | **IEKF** | "The world is nonlinear, so I'll linearize it in a way that respects its geometry/symmetries." |
 
-The IEKF is therefore **not simply "EKF but more accurate."** It's a different way of constructing the error and performing the linearization.
+The IEKF is therefore **not simply "EKF but more accurate"**. Instead, it's a different way of constructing the error and performing the linearization.
 
 ---
 
