@@ -80,20 +80,26 @@ def run_simulation(dt_imu, total_seconds, snapshots_per_second, gn_tol, gn_max_i
         # Run local optimization cycles using the manifold formulas, iterating
         # until the correction step shrinks below gn_tol (or gn_max_iters is hit)
         for opt_iter in range(gn_max_iters):
-            # Compute tracking residual matrix in the local tangent workspace
-            T_error = np.dot(np.linalg.inv(T_true), T_est)
+            # T_error = T_true⁻¹ · T_est: compute tracking residual matrix in the local tangent workspace
+            # The error is defined with the perturbation on the right.
+            T_error = np.dot(np.linalg.inv(T_true), T_est) # 
+            
+            # T_est = T_true · Exp(e): the tangent vector e is a local/body-frame perturbation living on the right side of T_true.
             e_vector = se3_log(T_error)
 
             # Evaluate analytical Jacobian mapping
+            # The choice isn't arbitrary — it has to match whichever side you compose the correction onto, 
+            # and this codebase standardizes on right (body-frame) updates throughout
             J = compute_se3_inv_right_jacobian(e_vector)
 
             # Solve normal system with our confidence profile
+            # H is the Gauss-Newton approximate Hessian
             H = np.dot(J.T, np.dot(omega_info, J)) + np.eye(6) * 1e-4
             g = -np.dot(J.T, np.dot(omega_info, e_vector))
             delta_xi = np.linalg.solve(H, g)
 
-            # Correct the estimate matrix
-            T_est = np.dot(T_est, se3_exp(delta_xi))
+            # T_est ← T_est · Exp(δξ): correct the estimate matrix
+            T_est = np.dot(T_est, se3_exp(delta_xi)) 
 
             step_norm = np.linalg.norm(delta_xi)
             print(f"    ├─ GN iter {opt_iter + 1}: |delta_xi| = {step_norm:.8f}")
