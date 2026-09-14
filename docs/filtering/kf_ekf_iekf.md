@@ -246,9 +246,7 @@ $$R = \hat R \exp(\delta\theta^\wedge)$$
 
 where $\delta\theta$ is a **small rotation error**.
 
-This is much more natural geometrically.
-
-You are essentially saying:
+This is much more natural geometrically, as you are essentially saying:
 
 > "My estimate is here. What small motion on the rotation manifold would take me to the truth?"
 
@@ -274,15 +272,7 @@ where:
 * $b_g$: gyroscope bias
 * $b_a$: accelerometer bias
 
-An ordinary EKF has to repeatedly calculate Jacobians around the current estimate.
-
-But the system has important geometric symmetries.
-
-For example, changing the global reference frame shouldn't fundamentally change the robot's physical behavior.
-
-The IEKF tries to construct the estimation error so that these symmetries are handled naturally.
-
-That can give you much better behavior when the system is highly nonlinear.
+An ordinary EKF has to repeatedly calculate Jacobians around the current estimate. But the system has important **geometric symmetries**. For example, changing the **global reference frame** shouldn't fundamentally change the **robot's physical behavior**. The IEKF tries to construct the **estimation error** so that these symmetries are handled naturally. That can give you much better behavior when the system is highly nonlinear.
 
 ---
 
