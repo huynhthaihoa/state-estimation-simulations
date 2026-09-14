@@ -194,11 +194,7 @@ Before                         After changing frame
 
 the physical situation hasn't changed.
 
-The robot doesn't suddenly behave differently just because **you changed your coordinate system**.
-
-A good estimator should therefore behave consistently under these transformations.
-
-This property is related to **invariance**.
+The robot doesn't suddenly behave differently just because **you changed your coordinate system**. A good estimator should therefore behave consistently under these transformations. This property is related to **invariance**.
 
 ---
 
