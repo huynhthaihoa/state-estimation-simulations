@@ -50,8 +50,22 @@ where:
 * $z$: measurement
 * $F$: linear motion model
 * $H$: linear measurement model
-* $w$: process noise (everything motion model $F$ doesn't capture like unmodeled dynamics, wind gusts, wheel slip, IMU bias drift, etc.)
-* $v$: measurement noise (sensor imperfection like GPS jitter, camera pixel noise, IMU noise, etc.)
+* $w$: process noise (everything motion model $F$ doesn't capture like unmodeled dynamics, wind gusts, wheel slip, IMU bias drift, etc.), with covariance $Q = \mathrm{Cov}(w)$
+* $v$: measurement noise (sensor imperfection like GPS jitter, camera pixel noise, IMU noise, etc.), with covariance $R = \mathrm{Cov}(v)$
+
+$Q$ and $R$ - not $w$ and $v$ themselves - are what the filter actually needs as inputs: since the individual noise values are unknown at each step, the filter works with their statistics (how large and correlated the noise typically is) instead. This is the same $Q$/$R$ notation [extra_kf_variants.md §8](extra_kf_variants.md#8-adaptive-kalman-filter) (Adaptive KF) and [§12](extra_kf_variants.md#12-which-ones-should-you-prioritize-learning)'s checklist refer to.
+
+Every KF cycle alternates two steps, each carrying its own uncertainty as a **covariance matrix** $P$ (how spread-out/correlated the filter's belief about $x$ currently is):
+
+**Prediction step** - push the last estimate through the motion model, and grow $P$ by however uncertain that model is ($Q$):
+
+$$\hat x_{k}^- = F\hat x_{k-1} \qquad P_k^- = FP_{k-1}F^\top + Q$$
+
+**Measurement update step** - compare the predicted measurement $H\hat x_k^-$ against what actually arrived ($z_k$), and blend the two using the **Kalman gain** $K_k$:
+
+$$K_k = P_k^- H^\top(HP_k^-H^\top + R)^{-1} \qquad \hat x_k = \hat x_k^- + K_k(z_k - H\hat x_k^-) \qquad P_k = (I-K_kH)P_k^-$$
+
+$K_k$ is exactly the "how much should I trust my prediction versus my measurement" weighting from the intuition above: it's large (trusts the measurement more) when $P_k^-$ is large relative to $R$, and small (trusts the prediction more) when $R$ is large relative to $P_k^-$ - the 70%/30% split earlier is $K$ in disguise.
 
 ### Intuition
 

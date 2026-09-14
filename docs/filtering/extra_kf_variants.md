@@ -182,7 +182,7 @@ There are particularly interesting formulations involving:
 * left-invariant error
 * right-invariant error
 
-which can give the estimation error dynamics properties that are independent of the current state in ways that ordinary EKF linearizations aren't.
+which can give the estimation error dynamics properties that are independent of the current state in ways that ordinary EKF linearizations aren't. See [left_right_invariant.md](left_right_invariant.md) for exactly what distinguishes the two and when to reach for each.
 
 This is particularly relevant to:
 
