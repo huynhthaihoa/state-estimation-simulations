@@ -57,13 +57,13 @@ $Q$ and $R$ - not $w$ and $v$ themselves - are what the filter actually needs as
 
 Every KF cycle alternates two steps, each carrying its own uncertainty as a **covariance matrix** $P$ (how spread-out/correlated the filter's belief about $x$ currently is):
 
-**Prediction step** - push the last estimate through the motion model, and grow $P$ by however uncertain that model is ($Q$):
+- **Prediction step**: push the last estimate through the motion model, and grow $P$ by however uncertain that model is ($Q$):
 
-$$\hat x_{k}^- = F\hat x_{k-1} \qquad P_k^- = FP_{k-1}F^\top + Q$$
+     $$\hat x_{k}^- = F\hat x_{k-1} \qquad P_k^- = FP_{k-1}F^\top + Q$$
 
-**Measurement update step** - compare the predicted measurement $H\hat x_k^-$ against what actually arrived ($z_k$), and blend the two using the **Kalman gain** $K_k$:
+- **Measurement update step**: compare the predicted measurement $H\hat x_k^-$ against what actually arrived ($z_k$), and blend the two using the **Kalman gain** $K_k$:
 
-$$K_k = P_k^- H^\top(HP_k^-H^\top + R)^{-1} \qquad \hat x_k = \hat x_k^- + K_k(z_k - H\hat x_k^-) \qquad P_k = (I-K_kH)P_k^-$$
+     $$K_k = P_k^- H^\top(HP_k^-H^\top + R)^{-1} \qquad \hat x_k = \hat x_k^- + K_k(z_k - H\hat x_k^-) \qquad P_k = (I-K_kH)P_k^-$$
 
 $K_k$ is exactly the "how much should I trust my prediction versus my measurement" weighting from the intuition above: it's large (trusts the measurement more) when $P_k^-$ is large relative to $R$, and small (trusts the prediction more) when $R$ is large relative to $P_k^-$ - the 70%/30% split earlier is $K$ in disguise.
 
