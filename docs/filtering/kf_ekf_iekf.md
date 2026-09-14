@@ -405,7 +405,7 @@ And for your SLAM research, the last distinction is particularly important: **ro
 
 KF, EKF, and IEKF aren't the whole landscape. A few others come up constantly in robotics/SLAM/VIO work, so it's worth knowing what each one buys you.
 
-### UKF - "Don't linearize the function, sample around it instead"
+### UKF (Unscented Kalman Filter) - "Don't linearize the function, sample around it instead"
 
 Instead of a Jacobian, the UKF pushes a small, deterministic set of "sigma points" through the *exact* nonlinear function and reconstructs the mean/covariance from the results. No derivatives needed, and it captures curvature a first-order Jacobian misses - often more accurate than EKF at similar cost.
 
