@@ -500,7 +500,7 @@ Now put everything together:
 
 ## 14. iSAM2 vs EKF
 
-This distinction is particularly useful for your SLAM learning.
+This distinction is particularly useful for understanding modern SLAM systems.
 
 ### EKF-SLAM
 
@@ -574,8 +574,6 @@ Imagine you're solving a giant jigsaw puzzle.
 Every time someone gives you a new puzzle piece:
 
 > "Let's throw away our current arrangement and solve the entire puzzle again."
-
-😅
 
 ### iSAM2
 

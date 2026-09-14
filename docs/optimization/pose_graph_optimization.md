@@ -532,7 +532,7 @@ If you remember only one thing:
 
 > **Pose-graph optimization is like taking a trajectory made of slightly inaccurate pieces, connecting those pieces with constraints—including loop closures—and then moving the poses around until the entire graph becomes as geometrically consistent as possible.**
 
-And there's a particularly important connection to your SLAM research: **PGO is essentially a sparse nonlinear least-squares problem over poses on $SE(2)$ or $SE(3)$**. Once you understand that, the next natural step is understanding **why we need Lie groups / Lie algebra and how Gauss–Newton or Levenberg–Marquardt actually moves the poses during optimization**.
+There's also a particularly important connection worth making explicit: **PGO is essentially a sparse nonlinear least-squares problem over poses on $SE(2)$ or $SE(3)$**. Once you understand that, the next natural step is understanding **why we need Lie groups / Lie algebra and how Gauss–Newton or Levenberg–Marquardt actually moves the poses during optimization**.
 
 ---
 

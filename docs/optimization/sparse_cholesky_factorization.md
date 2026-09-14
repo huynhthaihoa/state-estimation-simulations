@@ -233,7 +233,7 @@ This is why SLAM systems use algorithms such as:
 
 ## 6. Connection to SLAM
 
-This is especially important for your SLAM/optimization work.
+This is especially important for SLAM/optimization work.
 
 Suppose your state is:
 

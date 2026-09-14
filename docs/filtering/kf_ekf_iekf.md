@@ -1,11 +1,14 @@
-
-# What are the difference between the standard Kalman Filter, Extended Kalman Filter, and Invariant Extended Kalman Filter? 
+# What are the differences between the standard Kalman Filter, Extended Kalman Filter, and Invariant Extended Kalman Filter?
 
 The most intuitive way to understand them is to start with one idea:
 
 > **A Kalman Filter is basically a smart way of combining "what I predicted" with "what I measured."**
 
 The three filters differ mainly in **what kind of system they assume** and **how they deal with nonlinear motion**.
+
+This builds directly on:
+- **Lie groups and $SO(3)$/$SE(3)$** from [lie_algebra.md](../foundations/lie_algebra.md) - the geometric structure §4-§6's IEKF discussion is built around.
+- The **right Jacobian / exp map** from [jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space) - the $\exp(\delta\theta^\wedge)$ notation used in §6.
 
 ---
 
@@ -272,7 +275,7 @@ An ordinary EKF has to repeatedly calculate Jacobians around the current estimat
 
 ## 8. A nice analogy
 
-Imagine you're navigating Prague with a map. 🙂
+Imagine you're navigating an unfamiliar city with a map.
 
 ### KF
 
@@ -363,7 +366,7 @@ In fact, an IEKF can sometimes have **better convergence and consistency propert
 
 ## 11. If you remember only three sentences
 
-I'd remember these:
+The three that matter most:
 
 ### KF
 
@@ -377,7 +380,7 @@ I'd remember these:
 
 > **"My system is nonlinear and has geometric structure, so I'll define my errors and linearization in a way that respects that structure."**
 
-And for your SLAM research, the last distinction is particularly important: **robot pose is not just a vector; it has geometry.** That's one of the main reasons IEKF is so attractive for inertial navigation, visual-inertial estimation, and SLAM.
+The last distinction is the one worth internalizing: **robot pose is not just a vector; it has geometry.** That's one of the main reasons IEKF is so attractive for inertial navigation, visual-inertial estimation, and SLAM.
 
 ---
 
@@ -409,7 +412,13 @@ The Invariant EKF (§4-§6) exploits the geometry of matrix Lie groups like SO(3
 
 ---
 
-## 13. References
+## 13. One-sentence summary
+
+> **KF, EKF, and IEKF are three answers to the same question - how do I combine a prediction with a measurement - that differ only in what they assume about the system: linear (KF), nonlinear but locally linearizable (EKF), or nonlinear with geometric structure worth respecting in how the error itself is defined (IEKF).**
+
+---
+
+## 14. References
 
 1. Kalman, R. E. (1960). *A New Approach to Linear Filtering and Prediction Problems*. Journal of Basic Engineering, 82(1), 35–45. https://doi.org/10.1115/1.3662552 - the original formulation behind §1's standard KF.
 2. Huang, G. P., Mourikis, A. I., & Roumeliotis, S. I. (2010). *Observability-based Rules for Designing Consistent EKF SLAM Estimators*. International Journal of Robotics Research, 29(5), 502–528. https://journals.sagepub.com/doi/10.1177/0278364909353640 - the consistency analysis behind §3's "spurious information into unobservable directions" argument.

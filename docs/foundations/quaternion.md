@@ -183,7 +183,7 @@ As the rotation increases, the vector part grows.
 
 ## 6. Why are quaternions so useful in robotics?
 
-This is where they become really interesting for your SLAM/state-estimation work.
+This is where they become really interesting for SLAM/state-estimation work.
 
 Suppose your IMU tells you:
 
