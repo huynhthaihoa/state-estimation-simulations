@@ -16,7 +16,9 @@ from lie_utils import so3_exp, so3_right_jacobian, skew
 class PreintegratedIMUBundle:
     """
     Manages the compression of thousands of high-frequency IMU tracking steps 
-    into a single relative localized measurement factor independent of global pose.
+    into a single relative localized measurement factor independent of global pose:
+        delta_*: summary
+        J_*: sensitivity    
     """
     def __init__(self, initial_bias_gyro, initial_bias_accel):
         # Initial bias estimates at the time the bundle started
