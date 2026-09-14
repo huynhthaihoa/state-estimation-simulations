@@ -593,6 +593,8 @@ The global optimization minimizes the sum of squared Mahalanobis distances over 
 
 $${F(X) = \sum_{(i,j) \in \mathcal{E}} r_{ij}(X)^\top \Omega_{ij} \, r_{ij}(X)}$$
 
+> **Note**: Mahalanobis distance measures how far a point is from the center (mean) of a distribution, accounting for the correlations and variances between variables. Here the "point" is the residual ${r_{ij}(X)}$, the "distribution" is the measurement noise model (mean $\mathbf{0}$, covariance ${\Sigma_{ij} = \Omega_{ij}^{-1}}$), and ${\Omega_{ij}}$ is exactly the inverse-covariance weighting that turns a plain squared-error sum into a squared Mahalanobis-distance sum. See the tilestats.com video and amit's Medium explainer cited in [§17](#17-references).
+
 ### 15.4 Manifold Optimization and Linearization
 
 Standard vector updates ${T_i \leftarrow T_i + \Delta x_i}$ break the matrix constraints of ${\mathrm{SE}(3)}$ (e.g., $R_i$ will cease to be orthogonal). Updates are applied using the exponential map ${\mathrm{Exp}: \mathbb{R}^6 \to \mathrm{SE}(3)}$ via local perturbations ${\boldsymbol{\xi}_i \in \mathbb{R}^6}$ acting on the tangent space.
@@ -761,6 +763,8 @@ This section is theory only: neither `use_numpy/pose_graph.py` nor `use_manif/po
 ## 17. References
 
 1. Grisetti, G., Kümmerle, R., Stachniss, C., & Burgard, W. (2010). *A Tutorial on Graph-Based SLAM*. IEEE Intelligent Transportation Systems Magazine, 2(4), 31-43. https://doi.org/10.1109/MITS.2010.939925 - already cited in [frontend_backend.md §6](../frontend_backend.md#6-references); the general graph/error-formulation/optimization reference behind §1-§14 here.
-2. Huber, P. J. (1964). *Robust Estimation of a Location Parameter*. Annals of Mathematical Statistics, 35(1), 73-101. https://doi.org/10.1214/aoms/1177703732 - the Huber loss in §16.2.
-3. Geman, S., & McClure, D. E. (1985). *Bayesian Image Analysis: An Application to Single Photon Emission Tomography*. Proceedings of the American Statistical Association, Statistical Computing Section, 12-18. - the Geman-McClure loss named in §16.4's comparison table.
-4. Agarwal, P., Tipaldi, G. D., Spinello, L., Stachniss, C., & Burgard, W. (2013). *Robust Map Optimization Using Dynamic Covariance Scaling*. ICRA 2013, 62-69. https://doi.org/10.1109/ICRA.2013.6630557 - Dynamic Covariance Scaling in §16.3, already named inline there as "Agarwal et al., 2013".
+2. tilestats.com (2021, February 3). *Euclidean Distance and the Mahalanobis Distance (and the Error Ellipse)* [Video]. YouTube. https://www.youtube.com/watch?v=xXhLvheEF7o - the Mahalanobis-distance intuition in §15.3.
+3. amit (2024, October 30). *Understanding Mahalanobis Distance*. Medium. https://medium.com/@pamit2235/understanding-mahalanobis-distance-081bd765fcdb - the Mahalanobis-distance intuition in §15.3.
+4. Huber, P. J. (1964). *Robust Estimation of a Location Parameter*. Annals of Mathematical Statistics, 35(1), 73-101. https://doi.org/10.1214/aoms/1177703732 - the Huber loss in §16.2.
+5. Geman, S., & McClure, D. E. (1985). *Bayesian Image Analysis: An Application to Single Photon Emission Tomography*. Proceedings of the American Statistical Association, Statistical Computing Section, 12-18. - the Geman-McClure loss named in §16.4's comparison table.
+6. Agarwal, P., Tipaldi, G. D., Spinello, L., Stachniss, C., & Burgard, W. (2013). *Robust Map Optimization Using Dynamic Covariance Scaling*. ICRA 2013, 62-69. https://doi.org/10.1109/ICRA.2013.6630557 - Dynamic Covariance Scaling in §16.3, already named inline there as "Agarwal et al., 2013".
