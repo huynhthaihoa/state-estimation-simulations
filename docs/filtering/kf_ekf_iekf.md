@@ -53,7 +53,7 @@ where:
 * $w$: process noise (everything the motion model $F$ doesn't capture, like unmodeled dynamics, wind gusts, wheel slip, IMU bias drift, etc.), with covariance $Q = \mathrm{Cov}(w)$
 * $v$: measurement noise (sensor imperfections like GPS jitter, camera pixel noise, IMU noise, etc.), with covariance $R = \mathrm{Cov}(v)$
 
-$Q$ and $R$ - not $w$ and $v$ themselves - are what the filter actually needs as inputs: since the individual noise values are unknown at each step, the filter works with their statistics (how large and correlated the noise typically is) instead. This is the same $Q$/ $R$ notation [extra_kf_variants.md §8](extra_kf_variants.md#8-adaptive-kalman-filter) (Adaptive KF) and [§12](extra_kf_variants.md#12-which-ones-should-you-prioritize-learning)'s checklist refer to.
+$Q$ and $R$ - not $w$ and $v$ themselves - are what the filter actually needs as inputs: since the individual noise values are unknown at each step, the filter works with their statistics (how large and correlated the noise typically is) instead. This is the same $Q$ / $R$ notation [extra_kf_variants.md §8](extra_kf_variants.md#8-adaptive-kalman-filter) (Adaptive KF) and [§12](extra_kf_variants.md#12-which-ones-should-you-prioritize-learning)'s checklist refer to.
 
 Every KF cycle alternates two steps, each carrying its own uncertainty as a **covariance matrix** $P$ (how spread-out/correlated the filter's belief about $x$ currently is):
 
