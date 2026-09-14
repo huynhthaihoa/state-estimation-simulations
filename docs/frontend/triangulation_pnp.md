@@ -48,6 +48,8 @@ $$d_i \times (R_{cw}P_i + t_{cw}) = 0$$
 
 This is **linear and homogeneous** in the 12 flattened entries of $[R_{cw} \mid t_{cw}]$ - exactly the classical **Direct Linear Transform (DLT)** camera-resectioning setup, specialized to *known* intrinsics. Stacking two independent rows of this constraint per correspondence gives an over-determined homogeneous system $Ax=0$, solved via `linear_pnp_dlt` as the smallest right-singular vector of $A$ (`np.linalg.svd`).
 
+> **Note**: SVD (Singular Value Decomposition) factors any matrix as $A=U\Sigma V^\top$, with $U,V$ orthogonal and $\Sigma$ diagonal (the singular values, ranking how much each orthogonal direction contributes to $A$). Taking the smallest right-singular vector of $A$ - the column of $V$ paired with the smallest singular value - gives the least-squares null-space solution `linear_pnp_dlt` uses above; taking $UV^\top$ from a matrix's own SVD gives the nearest true rotation, which is exactly what the orthogonalization step below does.
+
 The recovered $3\times3$ block is only a *scaled, possibly reflected* rotation - not yet a valid element of $SO(3)$ - so `linear_pnp_dlt` projects it onto the nearest true rotation via SVD orthogonalization ($R_{cw} = UV^\top$ from $R_{raw}=U\Sigma V^\top$), recovers scale from the singular values, and fixes the sign using a positive-depth check (§4). `refine_pose_gn` then runs Gauss-Newton on the true reprojection error, updating the pose via a right-multiplicative correction $T \leftarrow T\cdot\mathrm{Exp}(\delta)$ - mirroring `refine_landmark_gn`'s loop exactly, just solving a $6\times6$ system for the pose instead of a $3\times3$ system for the point.
 
 ```text

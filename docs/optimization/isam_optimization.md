@@ -105,6 +105,8 @@ Instead of directly solving this system every time, we can factorize it:
 
 $$A \approx QR$$
 
+> **Note**: QR decomposition factors a matrix as $A=QR$, with $Q$ orthogonal and $R$ upper-triangular. Because $Q$ is orthogonal it doesn't change the least-squares solution, so solving $A\Delta x=b$ reduces to the cheap triangular solve $R\Delta x = Q^\top b$ - and, critically for iSAM, $R$ can be updated incrementally via Givens rotations when a new row (factor) arrives, instead of refactorizing $A$ from scratch. That incremental-update property is exactly what the next paragraph relies on.
+
 or equivalently work with a related factorization of the information/Hessian system.
 
 The important point is:

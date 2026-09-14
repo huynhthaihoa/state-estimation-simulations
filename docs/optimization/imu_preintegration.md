@@ -9,6 +9,8 @@ This builds directly on two things you've already seen:
 
 IMU preintegration is where both ideas get used together for a real sensor.
 
+> **Note**: An IMU (Inertial Measurement Unit) is the physical sensor this doc is about - a gyroscope (angular rate) and accelerometer (linear acceleration) packaged together, sampled at the 100-1000 Hz rate described in §1 below.
+
 ---
 
 ## 1. The problem
@@ -93,7 +95,7 @@ A preintegrated bundle becomes one **edge** in the same sense as [pose_graph_opt
                       IMU factor
 ```
 
-A full VIO/VI-SLAM back-end (GTSAM's `CombinedImuFactor`, ORB-SLAM3, VINS-Mono, etc.) then builds a residual comparing this corrected bundle against what the two connected nodes' current estimates imply - the same "measured vs. predicted, then `Log`" pattern as [pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive). Because the bundle can be bias-corrected in $O(1)$, this residual and its Jacobian can be cheaply re-evaluated at every optimizer iteration without ever revisiting the raw 100+ Hz stream - which is the entire reason preintegration exists.
+A full VIO (Visual-Inertial Odometry)/VI-SLAM back-end (GTSAM's `CombinedImuFactor`, ORB-SLAM3, VINS-Mono, etc.) then builds a residual comparing this corrected bundle against what the two connected nodes' current estimates imply - the same "measured vs. predicted, then `Log`" pattern as [pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive). Because the bundle can be bias-corrected in $O(1)$, this residual and its Jacobian can be cheaply re-evaluated at every optimizer iteration without ever revisiting the raw 100+ Hz stream - which is the entire reason preintegration exists.
 
 ---
 
