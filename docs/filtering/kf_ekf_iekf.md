@@ -7,7 +7,7 @@ The most intuitive way to understand them is to start with one idea:
 The three filters differ mainly in **what kind of system they assume** and **how they deal with nonlinear motion**.
 
 This builds directly on:
-- **Lie groups and $SO(3)$/$SE(3)$** from [lie_algebra.md](../foundations/lie_algebra.md) - the geometric structure §4-§6's IEKF discussion is built around.
+- **Lie groups and $SO(3)$ / $SE(3)$** from [lie_algebra.md](../foundations/lie_algebra.md) - the geometric structure §4-§6's IEKF discussion is built around.
 - The **right Jacobian / exp map** from [jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space) - the $\exp(\delta\theta^\wedge)$ notation used in §6.
 
 ---
