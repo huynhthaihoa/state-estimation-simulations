@@ -11,7 +11,7 @@ Once you've been through all eight phases, [`docs/README.md`](docs/README.md) is
 ## Phase 0 — Orient yourself (read only)
 
 - [`docs/frontend_backend.md`](docs/frontend_backend.md) and [`docs/filtering_smoothing.md`](docs/filtering_smoothing.md) — the two "big picture" docs. The second matters most: it names the repo's central fork — **filtering** (recursive, Kalman-style) vs. **optimization/smoothing** (batch, factor-graph-style) — which is exactly how the rest of this repo is organized.
-- [`docs/foundations/lie_algebra.md`](docs/foundations/lie_algebra.md) — the single most load-bearing prerequisite in the whole repo: why orientation/pose live on $SO(3)$/$SE(3)$ and get updated via $\text{Exp}$/${\text{Log}}$ instead of flat-vector addition. Every script depends on this.
+- [`docs/foundations/lie_algebra.md`](docs/foundations/lie_algebra.md) — the single most load-bearing prerequisite in the whole repo: why orientation/pose live on $SO(3)$/$SE(3)$ and get updated via $\text{Exp}$/ $\text{Log}$ instead of flat-vector addition. Every script depends on this.
 - [`docs/foundations/jacobian.md`](docs/foundations/jacobian.md) — what a Jacobian is, and its §11 (left/right Jacobians) for later.
 
 ## Phase 1 — Prove the manifold matters
