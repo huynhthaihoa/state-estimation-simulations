@@ -1,6 +1,6 @@
 # IMU preintegration
 
-> **IMU preintegration compresses thousands of raw, sensor-rate IMU samples between two keyframes into one relative-motion factor - and lets that factor be instantly recomputed when the bias estimate changes, without re-touching a single raw sample.**
+IMU preintegration compresses thousands of raw, sensor-rate IMU samples between two keyframes into one relative-motion factor - and lets that factor be instantly recomputed when the bias estimate changes, without re-touching a single raw sample.
 
 This builds directly on two things you've already seen:
 - The **node/edge language** from [pose_graph_optimization.md](pose_graph_optimization.md#2-where-do-the-edges-come-from) ("an edge is a relative-motion constraint between two nodes")

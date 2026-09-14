@@ -1,6 +1,6 @@
 # Marginalization and sliding-window smoothing
 
-> **Marginalizing a variable means permanently removing it from the optimization while keeping everything it taught you about its neighbors, packaged as one new prior factor - so a real-time estimator can bound its problem size without lying to itself about what it used to know.**
+Marginalizing a variable means permanently removing it from the optimization while keeping everything it taught you about its neighbors, packaged as one new prior factor - so a real-time estimator can bound its problem size without lying to itself about what it used to know.
 
 This builds directly on two things you've already seen:
 - **Variable elimination** from [`elimination_tree.md`](elimination_tree.md) ("eliminate x1 → its info gets summarized into a new constraint on x2") - this doc reuses that exact mechanic for a different purpose.
