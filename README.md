@@ -1,5 +1,7 @@
 # State Estimation Simulations
 
+> New here? [GETTING_STARTED.md](GETTING_STARTED.md) is a suggested reading-and-running order through every doc and script in this repo, phase by phase.
+
 ## A. Introduction
 
 A collection of from-scratch simulations exploring **pose/state estimation on manifolds**: 
