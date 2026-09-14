@@ -186,7 +186,7 @@ Sensors ──→ Tracking ──→ Constraints
                   Updated SLAM state
 ```
 
-For your research topic, this distinction becomes particularly important because **front-end errors become constraints for the back-end**. If data association or motion estimation is wrong, even a very good optimizer can converge to the wrong solution.
+This distinction is particularly important because **front-end errors become constraints for the back-end**. If data association or motion estimation is wrong, even a very good optimizer can converge to the wrong solution.
 
 A useful mental model is:
 

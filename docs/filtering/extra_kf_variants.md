@@ -1,6 +1,11 @@
 # An overview of other prominent Kalman Filter variants
 
-If you're learning Kalman filtering specifically for **robotics, SLAM, visual-inertial estimation, and embedded systems**, there are several variants worth knowing. You don't need to master all of them, but it's useful to know **why each one exists**.
+For **robotics, SLAM, visual-inertial estimation, and embedded systems**, there are several Kalman filter variants worth knowing. You don't need to master all of them, but it's useful to know **why each one exists**.
+
+This builds directly on:
+- The **standard KF, EKF, and IEKF** foundations from [kf_ekf_iekf.md](kf_ekf_iekf.md) - this doc surveys the wider family those three sit inside.
+- **Lie groups and $SO(3)$/$SE(3)$** from [lie_algebra.md §5, §11](../foundations/lie_algebra.md#5-lie-group-the-space-of-valid-transformations) - the structure §2's ESKF and §4's IEKF sections both lean on.
+- **Robust loss functions (Huber, etc.)** from [pose_graph_optimization.md §16](../optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures) - referenced directly in §9's Robust KF discussion.
 
 A good mental map is:
 
@@ -25,7 +30,7 @@ And then there are variants dealing with **noise, time, robustness, and computat
 
 ---
 
-## 1. Unscented Kalman Filter (UKF) ⭐
+## 1. Unscented Kalman Filter (UKF)
 
 This is probably the **most important variant to learn after EKF**.
 
@@ -87,9 +92,9 @@ See `run_ukf` in [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/point
 
 ---
 
-## 2. Error-State Kalman Filter (ESKF) ⭐⭐⭐
+## 2. Error-State Kalman Filter (ESKF)
 
-For **your SLAM/VIO direction**, I'd put this very high on the list.
+This is one of the most important variants to know for SLAM/VIO work.
 
 An ESKF doesn't estimate the entire state error directly.
 
@@ -146,7 +151,7 @@ IEKF is essentially taking the idea of defining the estimation error carefully a
 | Easy for complicated models | Sometimes difficult | Often easier                |
 | Common in robotics          | Very common         | Less dominant than EKF/ESKF |
 
-For robotics, I'd learn:
+For robotics, the typical learning order is:
 
 **KF → EKF → ESKF → IEKF**
 
@@ -154,7 +159,7 @@ before spending too much time on UKF.
 
 ---
 
-## 4. Invariant EKF (IEKF) ⭐⭐⭐
+## 4. Invariant EKF (IEKF)
 
 We already discussed this one, but it's worth putting it into the broader family.
 
@@ -432,11 +437,11 @@ This is one of the fundamental patterns behind real-time sensor fusion.
 
 ---
 
-## 12. So which ones should YOU learn?
+## 12. Which ones should you prioritize learning?
 
-Given your background in **computer vision, SLAM, embedded systems, and your upcoming research on resource-constrained robots**, I wouldn't try to learn every Kalman variant equally.
+For robotics work spanning **computer vision, SLAM, embedded systems, and resource-constrained platforms**, it's not necessary to learn every Kalman variant equally.
 
-I'd prioritize them roughly like this:
+A reasonable prioritization:
 
 ### Tier 1 - Must understand
 
@@ -559,10 +564,31 @@ Examples include:
 * GTSAM-style smoothing
 * pose-graph optimization
 
-And **this distinction is probably more important for your PhD than memorizing every KF variant**.
+<!-- And **this distinction is probably more important for your PhD than memorizing every KF variant**. -->
 
-A particularly useful learning progression for you would therefore be:
+A particularly useful learning progression is:
 
 $$\boxed{KF \rightarrow EKF \rightarrow ESKF \rightarrow Lie\ Groups \rightarrow IEKF \rightarrow Factor\ Graphs/Smoothing}$$
 
 Once you understand that sequence, you'll have a pretty solid conceptual foundation for modern **VIO/SLAM and state estimation**.
+
+---
+
+## 14. One-sentence summary
+
+> **Every variant in this list exists to relax one assumption of the standard KF - linearity (EKF/UKF), Euclidean state (ESKF/IEKF), Gaussian/unimodal belief (PF/EnKF), known noise (Adaptive KF), clean measurements (Robust KF), numerical precision (SR-KF), or causal-only information (RTS smoother) - and knowing which assumption a given problem violates is what tells you which variant to reach for.**
+
+---
+
+## 15. References
+
+1. Julier, S. J., & Uhlmann, J. K. (1997). *New extension of the Kalman filter to nonlinear systems*. Proc. SPIE 3068, Signal Processing, Sensor Fusion, and Target Recognition VI, 182-193. https://doi.org/10.1117/12.280797 - the original UKF paper behind §1; already cited in [kf_ekf_iekf.md §13](kf_ekf_iekf.md#13-references).
+2. Solà, J. (2017). *Quaternion kinematics for the error-state Kalman filter*. arXiv:1711.02508. https://arxiv.org/abs/1711.02508 - the standard ESKF reference behind §2; already cited in [kf_ekf_iekf.md §13](kf_ekf_iekf.md#13-references).
+3. Barrau, A., & Bonnabel, S. (2017). *The Invariant Extended Kalman Filter as a Stable Observer*. IEEE Transactions on Automatic Control, 62(4), 1797-1812. https://arxiv.org/abs/1410.1465 - the IEKF paper behind §4; already cited in [kf_ekf_iekf.md §13](kf_ekf_iekf.md#13-references).
+4. Bierman, G. J. (1977). *Factorization Methods for Discrete Sequential Estimation*. Academic Press. - the standard square-root/Cholesky-factor filtering reference behind §5.
+5. Evensen, G. (1994). *Sequential data assimilation with a nonlinear quasi-geostrophic model using Monte Carlo methods to forecast error statistics*. Journal of Geophysical Research, 99(C5), 10143-10162. https://doi.org/10.1029/94JC00572 - the original Ensemble Kalman Filter paper behind §6.
+6. Thrun, S., Burgard, W., & Fox, D. (2005). *Probabilistic Robotics*. MIT Press. - covers both the particle filter and Monte Carlo Localization behind §7; already cited in [filtering_smoothing.md §12](../filtering_smoothing.md#12-references).
+7. Mehra, R. K. (1970). *On the identification of variances and adaptive Kalman filtering*. IEEE Transactions on Automatic Control, 15(2), 175-184. https://doi.org/10.1109/TAC.1970.1099422 - the adaptive-noise-estimation reference behind §8.
+8. Huber, P. J. (1964). *Robust Estimation of a Location Parameter*. Annals of Mathematical Statistics, 35(1), 73-101. https://doi.org/10.1214/aoms/1177703732 - the robust-loss reference behind §9; already cited in [pose_graph_optimization.md §17](../optimization/pose_graph_optimization.md#17-references).
+9. Rauch, H. E., Tung, F., & Striebel, C. T. (1965). *Maximum likelihood estimates of linear dynamic systems*. AIAA Journal, 3(8), 1445-1450. https://doi.org/10.2514/3.3166 - the original RTS smoother paper behind §10.
+10. Mourikis, A. I., & Roumeliotis, S. I. (2007). *A Multi-State Constraint Kalman Filter for Vision-aided Inertial Navigation*. ICRA 2007, 3565-3572. https://doi.org/10.1109/ROBOT.2007.364024 - a concrete filtering-family system combining several of §2/§4's ideas (ESKF-style error state) for VIO; already cited in [kf_ekf_iekf.md §13](kf_ekf_iekf.md#13-references).

@@ -222,15 +222,13 @@ It's a different way of constructing the error and performing the linearization.
 
 This is probably the most important concept for understanding IEKF.
 
-Suppose your estimated robot orientation is: $\hat R$ and the true orientation is: $R$
+Suppose:
+- Your **estimated orientation** is $\hat R$ 
+- The **true orientation** is $R$
 
 ### Ordinary EKF thinking
 
-You might think: $R-\hat R$
-
-But subtraction doesn't naturally make sense for rotations.
-
-So EKF implementations often represent the rotation using something like Euler angles or a local perturbation and then linearize.
+You might think **the error** is defined as ${R-\hat R}$, but subtraction doesn't naturally make sense for rotations. So EKF implementations often represent the rotation using something like Euler angles or a local perturbation and then linearize.
 
 ### IEKF thinking
 
@@ -246,9 +244,7 @@ For example:
 
 $$R = \hat R \exp(\delta\theta^\wedge)$$
 
-where:
-
-$\delta\theta$ is a small rotation error.
+where $\delta\theta$ is a small rotation error.
 
 This is much more natural geometrically.
 
@@ -264,7 +260,7 @@ That's a much more natural representation for robot motion.
 
 ## 7. Why is this useful for SLAM?
 
-This becomes especially relevant to your PhD topic because you're dealing with **SLAM and state estimation for robots with unusual motion**.
+<!-- This becomes especially relevant to your PhD topic because you're dealing with **SLAM and state estimation for robots with unusual motion**. -->
 
 Consider a robot state:
 

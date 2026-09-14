@@ -481,9 +481,9 @@ Examples you'll encounter:
 
 ---
 
-## 11. And this matters a lot for your PhD topic
+## 11. And this matters a lot for SLAM + state estimation for resource-constrained robots with discontinuous/hybrid motion
 
-For your planned work on **SLAM + state estimation for resource-constrained robots with discontinuous/hybrid motion**, this distinction is particularly important.
+<!-- For your planned work on **SLAM + state estimation for resource-constrained robots with discontinuous/hybrid motion**, this distinction is particularly important. -->
 
 Your robot might experience:
 
