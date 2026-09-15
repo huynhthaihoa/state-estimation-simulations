@@ -66,8 +66,8 @@ Every KF cycle alternates two steps, each carrying its own uncertainty as a **co
      $$K_k = P_k^- H^\top(HP_k^-H^\top + R)^{-1} \qquad \hat x_k = \hat x_k^- + K_k(z_k - H\hat x_k^-) \qquad P_k = (I-K_kH)P_k^-$$
 
 $K_k$ is exactly the "how much should I trust my prediction versus my measurement" weighting from the intuition above: 
-- it's large (trusts the measurement more) when $P_k^-$ is large relative to $R$
-- it's small (trusts the prediction more) when $R$ is large relative to $P_k^-$ - the 70%/30% split earlier is $K$ in disguise
+- It's large (trusts the measurement more) when $P_k^-$ is large relative to $R$
+- It's small (trusts the prediction more) when $R$ is large relative to $P_k^-$ - the 70%/30% split earlier is $K$ in disguise
 
 ### Intuition
 
