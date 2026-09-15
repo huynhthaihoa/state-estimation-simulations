@@ -135,3 +135,25 @@ The EKF/IEKF equivalence (§2) rests on **isotropic noise**, not on rigidity per
 **Rule of thumb (EKF vs. IEKF):** it's not **rigid** vs. **non-rigid** that decides this - it's **whether the uncertainty is isotropic or anisotropic-and-tied-to-the-object's-frame**. Non-rigid objects are simply a natural, common source of the latter. None of this affects UKF's already- approximate agreement with either filter one way or the other, since §3's gap comes from linearization/noise-injection mechanics, not from the isotropy argument in §2.
 
 **Rule of thumb (UKF vs. EKF/IEKF):** per §3.4, the gap widens with stronger per-step nonlinearity (bigger `dt`, faster rotation, larger corrections) and narrows toward the EKF/IEKF floor as the per-step motion shrinks - it does not have an isotropy precondition the way the EKF/IEKF equivalence does, and it never becomes bit-identical the way EKF/IEKF are, no matter how small the step gets (there's always a residual first-vs-second-order gap, it just shrinks toward zero).
+
+---
+
+## Appendix: Related terms
+
+Short definitions of a few terms this doc leans on, gathered in one place rather than left implicit in §2/§4.
+
+### A.1 Isotropic and anisotropic noise
+
+**Isotropic** noise/uncertainty is the same in every direction: a covariance of the form `Sigma = sigma^2 * I` (equal variance on every axis, zero cross-correlation), which geometrically is a perfect sphere. **Anisotropic** noise is direction-dependent - unequal diagonal entries and/or nonzero off-diagonal terms, an ellipsoid rather than a sphere. This is what §2 and §4 above lean on: a sphere looks identical after any rotation (`R @ (sigma^2 I) @ R.T = sigma^2 I`), which is the exact algebraic step that makes EKF's world-frame and IEKF's body-frame corrections agree.
+
+### A.2 Invariance and equivariance
+
+An error (or a system) is **invariant** to a transformation if it doesn't change when that transformation is applied. `run_iekf`'s body-frame residual `T_pred^-1.act(z_i) - p_i` is **left-invariant** in exactly this sense - it's unaffected by redefining the world frame (left-multiplying both the true and estimated pose by the same fixed transform). See [left_right_invariant.md](left_right_invariant.md) for the full left- vs. right-invariant treatment, including why body-frame point-cloud measurements (this script's case) naturally pair with the left-invariant choice.
+
+### A.3 Mahalanobis distance and the information matrix
+
+The **Mahalanobis distance** of a residual is its Euclidean distance rescaled by the inverse covariance (the **information matrix** `Omega = Sigma^-1`): `d^2 = r.T @ Omega @ r` - "how many standard deviations away, accounting for the noise model's shape." Isotropic noise is the special case where that rescaling doesn't distort anything: `Omega = I / sigma^2` is just a uniform scale factor, so Mahalanobis distance reduces to plain Euclidean distance divided by `sigma`. See [pose_graph_optimization.md §15.3](../optimization/pose_graph_optimization.md#153-objective-function) for the general definition and its use as a pose-graph objective function.
+
+### A.4 Scalar, diagonal, and full covariance matrices
+
+Covariance matrices used in this repo fall into three shapes, in increasing generality: **scalar** (`sigma^2 * I`, e.g. this script's own `R_diag` - isotropic, the A.1 case), **diagonal** (a different variance per axis but no cross-correlation - anisotropic but still axis-aligned), and **full** (an arbitrary positive-definite matrix, with nonzero off-diagonal terms encoding correlation between axes - anisotropic and not necessarily aligned with any coordinate axis). Only the scalar case is guaranteed to commute with an arbitrary rotation, which is why §2's EKF/IEKF equivalence needs isotropic (scalar) noise specifically, not merely "diagonal."
