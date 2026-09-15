@@ -131,7 +131,7 @@ def observation_model(T, body_points, with_jacobian=False):
 
 
 def generate_ground_truth_and_data(duration, dt, n_points, vel_noise_std, gyro_noise_std,
-                                    point_noise_std, rng):
+                                    point_noise_std, rng, half_extent=0.5):
     """Builds the true trajectory (exp-map integration of noise-free inputs)
     and the noisy inputs/point-cloud measurements a tracker would actually
     receive.
@@ -143,6 +143,7 @@ def generate_ground_truth_and_data(duration, dt, n_points, vel_noise_std, gyro_n
         gyro_noise_std: std-dev of Gaussian noise added to the true body-frame angular velocity (rad/s)
         point_noise_std: std-dev of Gaussian noise added to the predicted world-frame point-cloud measurements (m)
         rng: numpy random number generator
+        half_extent: half the side length of the cube in which to sample body-frame points
     Returns:
         body_points: (M,3) array of points in the object's body frame
         T_true: list of true poses (manif.SE3)
@@ -150,7 +151,7 @@ def generate_ground_truth_and_data(duration, dt, n_points, vel_noise_std, gyro_n
         z: list of noisy point-cloud measurements (M,3)
     """
     n_steps = int(duration / dt)
-    body_points = make_body_point_cloud(n_points, rng)
+    body_points = make_body_point_cloud(n_points, rng, half_extent)
 
     T_true = [manif.SE3.Identity()]
     u_meas = np.zeros((n_steps, 6))
