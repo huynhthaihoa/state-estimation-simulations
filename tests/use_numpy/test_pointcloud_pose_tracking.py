@@ -48,10 +48,12 @@ def scenario(use_numpy_dir):
                        1.0, 2.0, -3.0)
     T_gn = m.run_batch_gn(T_dr, T_init, P_init, u_meas, z, body_points, dt, Q_tangent,
                            point_noise_std, 1e-6, 20)
+    T_vkf = m.run_vanilla_kf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_std)
 
     return {
         "m": m, "T_true": T_true,
         "T_dr": T_dr, "T_ekf": T_ekf, "T_iekf": T_iekf, "T_ukf": T_ukf, "T_gn": T_gn,
+        "T_vkf": T_vkf,
     }
 
 
@@ -152,6 +154,52 @@ def test_observation_model_without_jacobian_returns_none(pointcloud_pose_trackin
     assert np.allclose(pred, body_points, atol=1e-12)  # identity pose: pred == body_points
 
 
+# --- Vanilla KF helpers ---
+
+def test_se3_tangent_to_ambient_jacobian_matches_finite_difference(pointcloud_pose_tracking):
+    m = pointcloud_pose_tracking
+    rng = np.random.default_rng(10)
+    R = m.se3_exp(np.concatenate([np.zeros(3), rng.normal(size=3) * 0.4]))[0:3, 0:3]
+    J = m.se3_tangent_to_ambient_jacobian(R)
+    assert J.shape == (12, 6)
+
+    eps = 1e-6
+    for i in range(6):
+        d = np.zeros(6)
+        d[i] = eps
+        # A right SE(3) perturbation exp(d) at rotation R changes (R,t) by exactly the
+        # small-angle motion-model formula this Jacobian is meant to match: dR = R@skew(w),
+        # dt = R@v -- evaluated here via se3_exp's exact rotation block for the angular part
+        # (columns 3:6) and directly via R@v for the linear part (columns 0:3).
+        if i < 3:
+            v = np.zeros(3)
+            v[i] = eps
+            numeric_col = np.concatenate([np.zeros(9), R @ v]) / eps
+        else:
+            w = np.zeros(3)
+            w[i - 3] = eps
+            R_pert = R @ m.se3_exp(np.concatenate([np.zeros(3), w]))[0:3, 0:3]
+            numeric_col = np.concatenate([(R_pert - R).flatten(), np.zeros(3)]) / eps
+        assert np.allclose(numeric_col, J[:, i], atol=1e-4)
+
+
+def test_vanilla_kf_transition_matrix_matches_small_angle_motion_model(pointcloud_pose_tracking):
+    m = pointcloud_pose_tracking
+    rng = np.random.default_rng(11)
+    twist, dt = rng.normal(size=6) * 0.3, 0.1
+    R, t = rng.normal(size=(3, 3)), rng.normal(size=3)  # need not be a valid rotation -- A must be exact for ANY (R,t)
+
+    A = m.vanilla_kf_transition_matrix(twist, dt)
+    x = np.concatenate([R.flatten(), t])
+    x_pred = A @ x
+
+    w, v = twist[3:6] * dt, twist[0:3] * dt
+    R_pred_expected = R @ (np.eye(3) + m.skew(w))
+    t_pred_expected = t + R @ v
+    assert np.allclose(x_pred[0:9].reshape(3, 3), R_pred_expected, atol=1e-10)
+    assert np.allclose(x_pred[9:12], t_pred_expected, atol=1e-10)
+
+
 # --- End-to-end scenario checks ---
 
 def test_all_filters_beat_dead_reckoning_baseline(scenario):
@@ -159,7 +207,7 @@ def test_all_filters_beat_dead_reckoning_baseline(scenario):
     rot_err_dr, pos_err_dr = m.pose_errors(scenario["T_true"], scenario["T_dr"])
     rms_rot_dr, rms_pos_dr = _rms(rot_err_dr), _rms(pos_err_dr)
 
-    for key in ("T_ekf", "T_iekf", "T_ukf", "T_gn"):
+    for key in ("T_ekf", "T_iekf", "T_ukf", "T_gn", "T_vkf"):
         rot_err, pos_err = m.pose_errors(scenario["T_true"], scenario[key])
         assert _rms(rot_err) < rms_rot_dr
         assert _rms(pos_err) < rms_pos_dr
@@ -194,6 +242,16 @@ def test_batch_gn_rms_error_beats_ekf(scenario):
     rot_err_gn, pos_err_gn = m.pose_errors(scenario["T_true"], scenario["T_gn"])
     assert _rms(rot_err_gn) <= _rms(rot_err_ekf)
     assert _rms(pos_err_gn) <= _rms(pos_err_ekf)
+
+
+def test_vanilla_kf_rotation_blocks_stay_orthonormal(scenario):
+    # run_vanilla_kf's linear update has no notion of SO(3) at all -- this checks that
+    # its explicit post-update SVD re-projection actually keeps every returned R a valid
+    # rotation (R^T@R = I, det(R) = 1), not just approximately so.
+    for T in scenario["T_vkf"]:
+        R = T[0:3, 0:3]
+        assert np.allclose(R.T @ R, np.eye(3), atol=1e-9)
+        assert np.isclose(np.linalg.det(R), 1.0, atol=1e-9)
 
 
 def test_pose_errors_zero_for_identical_trajectories(pointcloud_pose_tracking):

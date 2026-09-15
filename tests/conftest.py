@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import scipy.spatial.transform  # noqa: F401 -- see warm-up note below
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 USE_NUMPY_DIR = REPO_ROOT / "use_numpy"
@@ -23,6 +24,16 @@ USE_MANIF_DIR = REPO_ROOT / "use_manif"
 # utils.py lives only at the repo root and never collides with anything else,
 # so it's safe to put on sys.path once for the whole test session.
 sys.path.insert(0, str(REPO_ROOT))
+
+# Warm up scipy (and the numpy FFT extension it pulls in transitively) here, before
+# `_import_from` below ever runs: its `modules_before`/`modules_after` diff deletes every
+# module gained during an isolated import, which works for pure-Python modules but not for
+# numpy's compiled `_pocketfft_umath` extension -- reloading it after deletion raises
+# "ImportError: cannot load module more than once per process". A script that imports scipy
+# (e.g. use_manif/pointcloud_pose_tracking.py's run_vanilla_kf, via
+# scipy.spatial.transform.Rotation) would otherwise trip this on its *second* isolated
+# import. Importing it once here, before any test runs, keeps it permanently outside every
+# `_import_from` call's delta so it's never a candidate for deletion.
 
 
 def _import_from(directory, module_name):

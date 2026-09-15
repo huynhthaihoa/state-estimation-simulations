@@ -9,10 +9,11 @@ Tracks the pose of a rigid object over time from a combination of:
      point cloud is observed transformed into the world frame (noisy 3D
      point-to-point correspondences), i.e. z_i = T.act(p_i) + noise.
 
-Four ways to fuse the two into a pose estimate are implemented, all built on
+Five ways to fuse the two into a pose estimate are implemented, all built on
 the exact same `motion_model`/`observation_model` functions and hand-rolled
 analytical SE(3) Jacobians (closed-form skew/exp/log/adjoint math, no
-external Lie-theory library):
+external Lie-theory library) -- except the vanilla KF, which deliberately
+avoids SE(3) altogether:
 
   - EKF (recursive): predict with the motion model + propagate a 6x6 tangent
     covariance, update with the point-cloud observation model + a Kalman
@@ -39,6 +40,17 @@ external Lie-theory library):
     motion_model/observation_model, and recombined into a new mean/
     covariance. Genuinely different in character from the other three
     methods here, which all rely on an analytical Jacobian somewhere.
+
+  - Vanilla KF (recursive): the odd one out -- reparameterizes the pose as a
+    redundant 12-dim ambient state [vec(R), t] instead of the minimal 6-dim
+    SE(3) tangent state, which makes the point-cloud observation model
+    exactly linear (fixed H, no Jacobian at all) but forces two compromises
+    the other methods avoid: the motion model needs a first-order
+    (small-angle) truncation of Exp(w), a real source of mean error the
+    EKF's exact group composition doesn't have; and nothing constrains R to
+    stay in SO(3), so it's explicitly re-projected back onto SO(3) via SVD
+    after every update. Included to make concrete what "just use a plain KF"
+    costs on a manifold-valued state, not because it's recommended.
 
 A pure dead-reckoning trajectory (motion model only, no point-cloud
 correction at all) is carried along as the "uncorrected" baseline, and also
@@ -374,6 +386,138 @@ def run_ukf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_s
     return T_list
 
 
+def se3_tangent_to_ambient_jacobian(R):
+    """(12,6) sensitivity of the ambient [vec(R) (9,), t (3,)] representation to a right SE(3)
+    tangent perturbation [v, w] applied at rotation R: dR = R @ skew(w), dt = R @ v. Used by
+    `run_vanilla_kf` both to lift the 6x6 tangent P_init into the 12-dim ambient covariance and
+    to build the per-step process-noise injection matrix -- unlike the transition matrix built by
+    `vanilla_kf_transition_matrix`, this one genuinely needs the current rotation estimate,
+    because the twist is defined in the body frame.
+    Arguments:
+        R: rotation (3,3)
+    Returns:
+        J: (12,6) Jacobian, columns 0:3 wrt the linear (v) part, 3:6 wrt the angular (w) part
+    """
+    J = np.zeros((12, 6))
+    for j in range(3):
+        e = np.zeros(3)
+        e[j] = 1.0
+        J[9:12, j] = R @ e
+        J[0:9, 3 + j] = (R @ skew(e)).flatten()
+    return J
+
+
+def vanilla_kf_transition_matrix(twist, dt):
+    """(12,12) state-transition matrix of the *first-order* (small-angle) approximation
+    Exp(w) ~= I + skew(w) of the motion model, applied to the ambient [vec(R) (9,), t (3,)]
+    state: R_pred = R_prev @ (I + skew(w)), t_pred = t_prev + R_prev @ v (w, v = angular/linear
+    parts of twist*dt). This map is exactly linear in the ambient state for a *known* twist
+    input, so -- unlike an EKF Jacobian, which linearizes a nonlinear map via finite/analytical
+    differentiation -- applying it to each of the 12 standard basis vectors recovers the exact
+    matrix, valid for any (R,t), not just the current estimate: A_k depends only on the known
+    input, never on the running state.
+
+    This first-order truncation of Exp is the real accuracy cost of using a vanilla (linear) KF
+    here at all: the EKF's predict step composes T_pred = T_prev @ Exp(w) exactly (only its
+    covariance propagation is linearized), while this mean itself is only approximate, with error
+    growing with the per-step rotation magnitude.
+    Arguments:
+        twist: body-frame twist (6-vector)
+        dt: time step (s)
+    Returns:
+        A: (12,12) state-transition matrix
+    """
+    w, v = twist[3:6] * dt, twist[0:3] * dt
+    M = np.eye(3) + skew(w)
+    A = np.zeros((12, 12))
+    for i in range(12):
+        x = np.zeros(12)
+        x[i] = 1.0
+        R, t = x[0:9].reshape(3, 3), x[9:12]
+        A[:, i] = np.concatenate([(R @ M).flatten(), t + R @ v])
+    return A
+
+
+def run_vanilla_kf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_std):
+    """Vanilla (linear) KF: reparameterizes the pose as a redundant 12-dim ambient state
+    x = [vec(R) (9,), t (3,)] instead of the minimal 6-dim SE(3) tangent state used by every
+    other method here, so that a textbook linear predict/update recursion can be applied without
+    any Jacobian re-linearization at every step.
+
+    This buys two genuine simplifications over the EKF: the point-cloud observation model
+    pred_i = R@p_i + t is *exactly* linear in x, so its (3M,12) matrix H is fixed and built once
+    (see `run_iekf`'s analogous state-independent-H trick); and the motion model's transition
+    matrix A_k (`vanilla_kf_transition_matrix`) depends only on the known twist input, never on
+    the running estimate.
+
+    But it also introduces two costs the other methods don't have, both bolted on rather than
+    part of "vanilla" KF theory proper:
+      1. A_k is only exact for the *first-order* (small-angle) truncation of Exp(w) -- unlike the
+         EKF's exact group-composition mean, this filter's point estimate itself accumulates a
+         real approximation error that grows with per-step rotation.
+      2. Nothing in a linear KF constrains R to stay in SO(3) (12 numbers estimating a 3-DoF
+         rotation manifold plus 3-DoF translation) -- R drifts off orthonormal every update and
+         is explicitly re-projected back onto SO(3) via SVD after each step, feeding the
+         corrected value back into the recursion. Skipping this quickly produces a matrix that no
+         longer represents any rotation at all.
+    Arguments:
+        T_init: initial pose (4,4)
+        P_init: initial 6x6 tangent covariance (numpy array)
+        u_meas: (N,6) array of noisy body-frame twists
+        z: list of noisy point-cloud measurements (M,3)
+        body_points: (M,3) array of points in the object's body frame
+        dt: time step (s)
+        Q_tangent: 6x6 tangent covariance of the motion-model twist increment (numpy array)
+        point_noise_std: std-dev of Gaussian noise added to the predicted world-frame point-cloud measurements (m)
+    Returns:
+        T_list: list of estimated poses (4,4)
+    """
+    n_points = len(body_points)
+    R_diag = point_noise_std ** 2 * np.eye(3 * n_points)
+
+    # Fixed, exact, state-independent measurement matrix: pred = H @ x, never rebuilt.
+    H = np.zeros((3 * n_points, 12))
+    for i, p in enumerate(body_points):
+        H[3 * i, 0:3], H[3 * i, 9] = p, 1.0
+        H[3 * i + 1, 3:6], H[3 * i + 1, 10] = p, 1.0
+        H[3 * i + 2, 6:9], H[3 * i + 2, 11] = p, 1.0
+
+    R0, t0 = T_init[0:3, 0:3], T_init[0:3, 3]
+    x_est = np.concatenate([R0.flatten(), t0])
+    J0 = se3_tangent_to_ambient_jacobian(R0)
+    P = J0 @ P_init @ J0.T
+
+    T_list = [T_init]
+    for k in range(len(u_meas)):
+        # --- Predict ---
+        R_prev = x_est[0:9].reshape(3, 3)
+        A = vanilla_kf_transition_matrix(u_meas[k], dt)
+        J = se3_tangent_to_ambient_jacobian(R_prev)
+        Q12 = J @ Q_tangent @ J.T
+
+        x_pred = A @ x_est
+        P_pred = A @ P @ A.T + Q12
+
+        # --- Update ---
+        r = z[k + 1].reshape(-1) - H @ x_pred
+        S = H @ P_pred @ H.T + R_diag
+        K = P_pred @ H.T @ np.linalg.inv(S)
+        x_upd = x_pred + K @ r
+        P = (np.eye(12) - K @ H) @ P_pred
+
+        # --- Re-orthogonalize R (SO(3) projection) ---
+        U, _, Vt = np.linalg.svd(x_upd[0:9].reshape(3, 3))
+        sign = 1.0 if np.linalg.det(U @ Vt) >= 0.0 else -1.0
+        R_fixed = U @ np.diag([1.0, 1.0, sign]) @ Vt
+        x_est = np.concatenate([R_fixed.flatten(), x_upd[9:12]])
+
+        T_est = np.eye(4)
+        T_est[0:3, 0:3], T_est[0:3, 3] = R_fixed, x_est[9:12]
+        T_list.append(T_est)
+
+    return T_list
+
+
 def run_batch_gn(T_init_list, T_prior0, P_init, u_meas, z, body_points, dt, Q_tangent,
                   point_noise_std, gn_tol, gn_max_iters):
     """Batch Gauss-Newton smoother: jointly optimizes the whole trajectory
@@ -545,11 +689,17 @@ def main():
         run_ukf, T_init, P_init, u_meas, z, body_points, args.dt, Q_tangent, args.point_noise_std,
         args.ukf_alpha, args.ukf_beta, args.ukf_kappa, n_steps=n_steps)
 
+    print("Running vanilla KF (linear predict/update over a redundant 12-dim [vec(R), t] ambient state)...")
+    T_vkf, time_vkf, mem_vkf = measure_performance(
+        run_vanilla_kf, T_init, P_init, u_meas, z, body_points, args.dt, Q_tangent, args.point_noise_std,
+        n_steps=n_steps)
+
     rot_err_dr, pos_err_dr = pose_errors(T_true, T_dr)
     rot_err_ekf, pos_err_ekf = pose_errors(T_true, T_ekf)
     rot_err_iekf, pos_err_iekf = pose_errors(T_true, T_iekf)
     rot_err_gn, pos_err_gn = pose_errors(T_true, T_gn)
     rot_err_ukf, pos_err_ukf = pose_errors(T_true, T_ukf)
+    rot_err_vkf, pos_err_vkf = pose_errors(T_true, T_vkf)
 
     print("\nFinal / RMS errors:")
     for name, rot_err, pos_err in [
@@ -558,6 +708,7 @@ def main():
         ("IEKF (invariant)", rot_err_iekf, pos_err_iekf),
         ("Batch GN", rot_err_gn, pos_err_gn),
         ("UKF (unscented)", rot_err_ukf, pos_err_ukf),
+        ("Vanilla KF", rot_err_vkf, pos_err_vkf),
     ]:
         print(f"  {name:<18s} final rot={rot_err[-1]:7.3f} deg, pos={pos_err[-1]:7.4f} m | "
               f"RMS rot={np.sqrt(np.mean(rot_err**2)):7.3f} deg, pos={np.sqrt(np.mean(pos_err**2)):7.4f} m")
@@ -569,25 +720,27 @@ def main():
         ("IEKF (invariant)", time_iekf, mem_iekf),
         ("Batch GN", time_gn, mem_gn),
         ("UKF (unscented)", time_ukf, mem_ukf),
+        ("Vanilla KF", time_vkf, mem_vkf),
     ]:
         print(f"  {name:<18s} avg time={avg_time * 1e6:9.2f} µs/step | avg peak mem={avg_mem / 1024.0:9.3f} KB/step")
 
     t_hist = np.arange(len(T_true)) * args.dt
     fig, (ax_rot, ax_pos, ax_traj) = plt.subplots(3, 1, figsize=(9, 11))
 
-    for ax, err_dr, err_ekf, err_iekf, err_gn, err_ukf, ylabel in [
-        (ax_rot, rot_err_dr, rot_err_ekf, rot_err_iekf, rot_err_gn, rot_err_ukf, "Rotation error (deg)"),
-        (ax_pos, pos_err_dr, pos_err_ekf, pos_err_iekf, pos_err_gn, pos_err_ukf, "Position error (m)"),
+    for ax, err_dr, err_ekf, err_iekf, err_gn, err_ukf, err_vkf, ylabel in [
+        (ax_rot, rot_err_dr, rot_err_ekf, rot_err_iekf, rot_err_gn, rot_err_ukf, rot_err_vkf, "Rotation error (deg)"),
+        (ax_pos, pos_err_dr, pos_err_ekf, pos_err_iekf, pos_err_gn, pos_err_ukf, pos_err_vkf, "Position error (m)"),
     ]:
         ax.plot(t_hist, err_dr, label="Dead-reckoning (prior only)", color="tab:gray")
         ax.plot(t_hist, err_ekf, label="EKF (recursive)", color="tab:red")
         ax.plot(t_hist, err_iekf, label="IEKF (invariant)", color="tab:green")
         ax.plot(t_hist, err_gn, label="Batch Gauss-Newton", color="tab:blue")
         ax.plot(t_hist, err_ukf, label="UKF (unscented)", color="tab:purple")
+        ax.plot(t_hist, err_vkf, label="Vanilla KF (linear, ambient state)", color="tab:orange")
         ax.set_ylabel(ylabel)
         ax.set_yscale("log")
         ax.legend()
-    ax_rot.set_title("Point-cloud pose tracking: prior-only vs. EKF vs. invariant EKF vs. batch Gauss-Newton vs. UKF")
+    ax_rot.set_title("Point-cloud pose tracking: prior-only vs. EKF vs. invariant EKF vs. batch Gauss-Newton vs. UKF vs. vanilla KF")
     ax_pos.set_xlabel("Time (s)")
 
     def xy(T_list):
@@ -600,6 +753,7 @@ def main():
     ax_traj.plot(*xy(T_iekf), label="IEKF (invariant)", color="tab:green", linestyle="--")
     ax_traj.plot(*xy(T_gn), label="Batch Gauss-Newton", color="tab:blue", linestyle="--")
     ax_traj.plot(*xy(T_ukf), label="UKF (unscented)", color="tab:purple", linestyle="--")
+    ax_traj.plot(*xy(T_vkf), label="Vanilla KF (linear, ambient state)", color="tab:orange", linestyle="--")
     ax_traj.set_xlabel("x (m)")
     ax_traj.set_ylabel("y (m)")
     ax_traj.axis("equal")
