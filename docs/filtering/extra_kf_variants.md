@@ -4,7 +4,7 @@ For **robotics, SLAM, visual-inertial estimation, and embedded systems**, there 
 
 This builds directly on:
 - The **standard KF, EKF, and IEKF** foundations from [kf_ekf_iekf.md](kf_ekf_iekf.md) - this doc surveys the wider family those three sit inside.
-- **Lie groups and $SO(3)$ / $SE(3)$ ** from [lie_algebra.md §5, §11](../foundations/lie_algebra.md#5-lie-group-the-space-of-valid-transformations) - the structure §2's ESKF and §4's IEKF sections both lean on.
+- **Lie groups and $SO(3)$ / $SE(3)$** from [lie_algebra.md §5, §11](../foundations/lie_algebra.md#5-lie-group-the-space-of-valid-transformations) - the structure §2's ESKF and §4's IEKF sections both lean on.
 - **Robust loss functions (Huber, etc.)** from [pose_graph_optimization.md §16](../optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures) - referenced directly in §9's Robust KF discussion.
 
 A good mental map is:
