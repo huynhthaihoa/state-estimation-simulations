@@ -77,6 +77,8 @@ estimated position ≈ 3.04 m
 
 you accumulate error.
 
+> **Note**: each of those per-step measurements (`X1 is 1m ahead of X0`, etc.) is what **odometry** actually provides - an estimate of the robot's *incremental* change in pose between two nearby moments, from onboard motion sensors (wheel encoders, IMU, visual odometry, ...). Chaining ("integrating") a sequence of these incremental measurements to track pose relative to a starting point, the way the `3.04 m` estimate above was computed, is called **dead reckoning**. Since every measurement carries a small error and dead reckoning sums them with no correction, the drift grows unboundedly the longer you integrate - exactly the problem the loop closure below fixes.
+
 Now imagine that at X3 the camera recognizes a place it saw at X0.
 
 That's a **loop closure**:

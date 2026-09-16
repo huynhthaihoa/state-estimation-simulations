@@ -49,7 +49,7 @@ That's the **pose graph**.
 
 Suppose the robot moves from `x₀` to `x₁`.
 
-From odometry or visual odometry, we estimate:
+From [odometry](factor_graph.md#2-why-do-we-need-it) or visual odometry, we estimate:
 
 > "The robot moved approximately 1 meter forward."
 
@@ -69,6 +69,8 @@ x₀ ──Δ₀₁── x₁ ──Δ₁₂── x₂ ──Δ₂₃── x�
 Each edge says:
 
 > **"The relative transformation between these two poses should approximately equal this measurement."**
+
+> **Note**: "odometry" and "visual odometry" aren't the same sensor, just the same *kind* of measurement from different sources - wheel odometry counts wheel rotations, while visual odometry (VO) tracks features across camera frames to estimate the same incremental relative pose. The distinction matters for this graph's edges specifically because a single (monocular) camera used this way can only recover relative motion up to an unknown **scale** factor - "the camera moved some distance" could mean 1 meter or 100 - see [vi_initialization.md §1](../frontend/vi_initialization.md#1-the-bootstrapping-problem) for why. This doc's $\Delta_{ij}$ edges are treated as already-metric (as from wheel odometry, stereo VO, or monocular VO with scale recovered via IMU fusion), which is exactly why - unlike monocular bundle adjustment's projective edges, whose unresolved scale is discussed in [umeyama_alignment.md](../foundations/umeyama_alignment.md) - a pose graph's only gauge freedom is the rigid 6-DoF one noted in [§7](#7-the-mathematics-is-actually-quite-intuitive), never a scale ambiguity.
 
 ---
 
