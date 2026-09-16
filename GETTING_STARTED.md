@@ -38,9 +38,9 @@ The biggest single payoff script in the repo lives here.
 
 **Read, in order:** [`docs/filtering/kf_ekf_iekf.md`](docs/filtering/kf_ekf_iekf.md) (KF → EKF → IEKF), [`docs/filtering/extra_kf_variants.md`](docs/filtering/extra_kf_variants.md) (UKF/ESKF/MSCKF), [`docs/filtering/left_right_invariant.md`](docs/filtering/left_right_invariant.md).
 
-**Run:** [README.md §4](README.md#4-point-cloud-pose-tracking-ekf-vs-invariant-ekf-vs-batch-gauss-newton-vs-ukf) — [`use_numpy/pointcloud_pose_tracking.py`](use_numpy/pointcloud_pose_tracking.py) — EKF vs. IEKF vs. batch-GN vs. UKF, head to head, with timing/memory numbers.
+**Run:** [README.md §4](README.md#4-point-cloud-pose-tracking-ekf-vs-invariant-ekf-vs-batch-gauss-newton-vs-ukf-vs-vanilla-kf) — [`use_numpy/pointcloud_pose_tracking.py`](use_numpy/pointcloud_pose_tracking.py) — EKF vs. IEKF vs. batch-GN vs. UKF vs. vanilla KF, head to head, with timing/memory numbers.
 
-**Then read:** [`docs/filtering/ekf_iekf_ukf_empirical_note.md`](docs/filtering/ekf_iekf_ukf_empirical_note.md) — deliberately *after* running the script, since it's written as a post-hoc explanation of exactly that script's output (why EKF/IEKF are bit-identical, why UKF is close-but-not-exact).
+**Then read:** [`docs/filtering/pointcloud_pose_tracking_empirical_note.md`](docs/filtering/pointcloud_pose_tracking_empirical_note.md) — deliberately *after* running the script, since it's written as a post-hoc explanation of exactly that script's output (why EKF/IEKF are bit-identical, why UKF is close-but-not-exact, and why vanilla KF diverges from all three unconditionally).
 
 ## Phase 5 — Graph-based batch smoothing
 

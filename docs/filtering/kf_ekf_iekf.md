@@ -77,6 +77,8 @@ Think of the standard KF as:
 
 It's elegant and mathematically clean, but it doesn't work directly for things like rotations, camera poses, or nonlinear robot dynamics.
 
+**A concrete data point**: this repo's own `run_vanilla_kf` (same point-cloud pose-tracking benchmark referenced in [§10](#10-the-subtle-but-important-point)) is exactly this - a standard linear KF applied directly to a pose, via a redundant ambient `[vec(R), t]` state rather than the minimal SE(3) tangent every other method there uses. It works, but only by bolting on a first-order truncation of the motion model and a post-hoc SVD re-projection to keep the rotation valid - see [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) for the measured cost of skipping the manifold structure altogether.
+
 ---
 
 ## 2. Extended Kalman Filter: "The world is nonlinear, so I'll approximate it locally"
@@ -376,7 +378,7 @@ It's better to think:
 
 In fact, an IEKF can sometimes have **better convergence and consistency properties** than a conventional EKF because the linearization is aligned with the system's inherent symmetries.
 
-**A concrete data point**: in this repo's own point-cloud pose-tracking benchmark ([use_numpy/pointcloud_pose_tracking.py](../../use_numpy/pointcloud_pose_tracking.py), [use_manif/pointcloud_pose_tracking.py](../../use_manif/pointcloud_pose_tracking.py), EKF and IEKF were verified to produce **exactly identical** corrections under [isotropic](ekf_iekf_ukf_empirical_note.md#a1-isotropic-and-anisotropic-noise) point-noise covariance - proven algebraically (the body-frame and world-frame residual/Jacobian pairs differ only by a per-point rotation that cancels exactly out of the Kalman gain) and confirmed numerically to ~1e-14 precision. IEKF's real, measured advantage there wasn't accuracy - both filters converged to the same estimate - it was **speed**: IEKF's fixed Jacobian made it ~35% faster per step than EKF, at identical memory. That's a good concrete reminder that "geometry-aware" doesn't always mean "more accurate" - sometimes it means "cheaper to compute the same answer," and the accuracy gap only opens up once the noise model or system structure breaks the symmetry that made them equivalent here.
+**A concrete data point**: in this repo's own point-cloud pose-tracking benchmark ([use_numpy/pointcloud_pose_tracking.py](../../use_numpy/pointcloud_pose_tracking.py), [use_manif/pointcloud_pose_tracking.py](../../use_manif/pointcloud_pose_tracking.py), EKF and IEKF were verified to produce **exactly identical** corrections under [isotropic](pointcloud_pose_tracking_empirical_note.md#a1-isotropic-and-anisotropic-noise) point-noise covariance - proven algebraically (the body-frame and world-frame residual/Jacobian pairs differ only by a per-point rotation that cancels exactly out of the Kalman gain) and confirmed numerically to ~1e-14 precision. IEKF's real, measured advantage there wasn't accuracy - both filters converged to the same estimate - it was **speed**: IEKF's fixed Jacobian made it ~35% faster per step than EKF, at identical memory. That's a good concrete reminder that "geometry-aware" doesn't always mean "more accurate" - sometimes it means "cheaper to compute the same answer," and the accuracy gap only opens up once the noise model or system structure breaks the symmetry that made them equivalent here.
 
 ---
 
