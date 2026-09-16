@@ -77,14 +77,14 @@ So the guard is a deliberate trade: it always returns a physically valid rotatio
 
 Take four non-coplanar points and a known similarity transform - scale $s=2$, a $90°$ yaw about $z$, translation $t=(1,2,3)$:
 
-$$X = \begin{bmatrix}0 & 0 & 0\\
+$$X = \begin{bmatrix} 0 & 0 & 0\\
 1 & 0 & 0\\
 0 & 1 & 0\\
-0 & 0 & 1\end{bmatrix}$$
+0 & 0 & 1 \end{bmatrix}$$
 
-$$\qquad R_{\text{true}} = \begin{bmatrix}0 & -1 & 0\\
+$$\qquad R_{\text{true}} = \begin{bmatrix} 0 & -1 & 0\\
 1 & 0 & 0\\
-0 & 0 & 1\end{bmatrix}$$
+0 & 0 & 1 \end{bmatrix}$$
 
 $$\qquad Y = s\,(R_{\text{true}} X^\top)^\top + t$$
 

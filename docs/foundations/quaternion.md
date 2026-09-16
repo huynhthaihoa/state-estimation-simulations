@@ -260,14 +260,9 @@ Good question.
 
 A rotation matrix:
 
-$$
-R=
-\begin{bmatrix}
-r_{11} & r_{12} & r_{13}\\
+$$R= \begin{bmatrix} r_{11} & r_{12} & r_{13}\\
 r_{21} & r_{22} & r_{23}\\
-r_{31} & r_{32} & r_{33}
-\end{bmatrix}
-$$
+r_{31} & r_{32} & r_{33} \end{bmatrix}$$
 
 has **9 elements**, even though a rotation has only 3 degrees of freedom.
 
@@ -309,14 +304,9 @@ $${(roll,pitch,yaw)=(0,0,90^\circ)}$$
 
 - **Rotation matrix**
 
-$$
-{R=
-\begin{bmatrix}
-0 & -1 & 0\\
+$$R= \begin{bmatrix} 0 & -1 & 0\\
 1 & 0 & 0\\
-0 & 0 & 1
-\end{bmatrix}}
-$$
+0 & 0 & 1 \end{bmatrix}$$
 
 - **Quaternion**
 

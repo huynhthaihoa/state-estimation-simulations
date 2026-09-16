@@ -14,15 +14,15 @@ That sum over earlier columns $k$ is the whole story behind fill-in (Section 3):
 
 For example:
 
-$$A =\begin{bmatrix}4 & 2 & 0\\
+$$A =\begin{bmatrix} 4 & 2 & 0\\
 2 & 5 & 3\\
-0 & 3 & 6\end{bmatrix}$$
+0 & 3 & 6 \end{bmatrix}$$
 
 becomes
 
-$$L = \begin{bmatrix}2 & 0 & 0\\
+$$L = \begin{bmatrix} 2 & 0 & 0\\
 1 & 2 & 0\\
-0 & 1.5 & \sqrt{3.75}\end{bmatrix}$$
+0 & 1.5 & \sqrt{3.75} \end{bmatrix}$$
 
 The key problem is that **large optimization problems often contain mostly zeros**.
 
@@ -124,9 +124,9 @@ Even if $H$ is sparse, $L$ is **not necessarily equally sparse**.
 
 Consider:
 
-$$H=\begin{bmatrix}[\*]&\*&\*\\
-\*&[\*]&0\\
-\*&0&[\*]\end{bmatrix}$$
+$$H=\begin{bmatrix} [\*] & \* & \* \\
+\* & [\*] & 0 \\
+\* & 0 &[\*] \end{bmatrix}$$
 
 There is no connection between variable 2 and variable 3.
 
@@ -136,7 +136,7 @@ $$L_{32}\neq0$$
 
 so the factor becomes:
 
-$${L = \begin{bmatrix}\* & 0 & 0 \\ 
+$${L = \begin{bmatrix} \* & 0 & 0 \\ 
 \* & \* & 0 \\ 
 \* & [\*] & \* \end{bmatrix}}$$
 
@@ -237,14 +237,14 @@ This is especially important for SLAM/optimization work.
 
 Suppose your state is:
 
-$$x =\begin{bmatrix}x_1\\
+$$x =\begin{bmatrix} x_1\\
 x_2\\
 x_3\\
 \vdots\\
 x_N\\
 l_1\\
 l_2\\
-\vdots\end{bmatrix}$$
+\vdots \end{bmatrix}$$
 
 and your nonlinear least-squares problem is:
 

@@ -25,8 +25,8 @@ $$y = ax+b$$
 
 The unknowns are:
 
-$$x=\begin{bmatrix}a \\ 
-b\end{bmatrix}$$
+$$x=\begin{bmatrix} a \\ 
+b \end{bmatrix}$$
 
 For each measurement, there is an error:
 
@@ -126,10 +126,10 @@ $$\boxed{\min_x \frac12\|e(x)\|^2}$$
 
 where:
 
-$$x =\begin{bmatrix}x_1\\ 
+$$x =\begin{bmatrix} x_1\\ 
 x_2\\ 
 \vdots\\ 
-x_n\end{bmatrix}$$
+x_n \end{bmatrix}$$
 
 contains the unknowns.
 
@@ -215,7 +215,7 @@ where $f(x)$ is nonlinear.
 
 For example:
 
-$$f(x)=\begin{bmatrix}\sin x\\ e^x\\ x^2\end{bmatrix}$$
+$$f(x)=\begin{bmatrix} \sin x\\ e^x\\ x^2 \end{bmatrix}$$
 
 There's generally no simple closed-form solution for:
 
