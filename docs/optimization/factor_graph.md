@@ -448,9 +448,9 @@ And when a loop closure arrives:
 Before:
 
 X0 ●──●──●──●──●
+                \
                  \
-                  \
-                   ● X5
+                  ● X5
 
 
 After loop closure:
