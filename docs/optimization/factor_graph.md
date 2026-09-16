@@ -197,6 +197,8 @@ $$
 
 where $\Omega_k$ is the **information matrix**.
 
+> **Note**: $\Omega_k$ is the inverse of that measurement's covariance, $\Omega_k = \Sigma_k^{-1}$ - a precise sensor (small $\Sigma_k$) inverts to a *large* $\Omega_k$, so its error counts more in the sum, while a noisy sensor (large $\Sigma_k$) inverts to a *small* $\Omega_k$ and gets down-weighted. The term $e_k^\top\Omega_k e_k$ is a **Mahalanobis distance** - see [pointcloud_pose_tracking_empirical_note.md Appendix A.3](../filtering/pointcloud_pose_tracking_empirical_note.md#a3-mahalanobis-distance-and-the-information-matrix) for the full derivation and the isotropic special case where it collapses to plain squared error divided by a constant.
+
 So:
 
 > **Factor-graph optimization = find the variable values that make all measurement factors as happy as possible.**
