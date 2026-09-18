@@ -29,15 +29,15 @@ $$\Xi_{\text{wrong}} = DR + \frac{\big[f^{+}(x^{+}) - DR\,f^{-}(x^{-})\big] \oti
 
 ($f^{-}$, $f^{+}$ the pre-/post-impact vector fields, $Dg$ the guard's gradient, $\otimes$ an outer product). It's dimensionally sensible and structurally plausible. It is also **not** the saltation matrix: checked against a from-scratch finite-difference ground truth (perturb the pre-impact state, re-land it on the guard via the pre-impact flow, apply the reset, compare to nominal), the two disagree by $\max|\Xi_{\text{wrong}} - \Xi_{\text{numeric}}| \approx 1.28$ - nowhere near floating-point noise.
 
-**The correct derivation.** Consider a one-parameter family of trajectories $x(t; p)$ ($p$ a perturbation parameter, $p=0$ nominal), each governed by $\dot x = f(x)$ until a $p$-dependent crossing time $t^{*}(p)$ defined implicitly by $g\big(x(t^{*}(p); p)\big) = 0$. Let $S(t) = \left.\dfrac{\partial x(t;p)}{\partial p}\right|_{p=0}$.
+**The correct derivation.** Consider a one-parameter family of trajectories $x(t; p)$ ($p$ a perturbation parameter, $p=0$ nominal), each governed by $\dot x = f(x)$ until a $p$-dependent crossing time $t^{\*}(p)$ defined implicitly by $g\big(x(t^{\*}(p); p)\big) = 0$. Let $S(t) = \left.\dfrac{\partial x(t;p)}{\partial p}\right|_{p=0}$.
 
 Implicit differentiation of the guard condition gives the crossing-time sensitivity:
 
-$$\frac{dt^{*}}{dp} = -\frac{Dg \cdot S(t^{*})}{Dg \cdot f(x^{-})}$$
+$$\frac{dt^{\*}}{dp} = -\frac{Dg \cdot S(t^{\*})}{Dg \cdot f(x^{-})}$$
 
-The pre-impact state's own sensitivity (accounting for both the explicit $p$-dependence and the fact that $t^{*}$ itself moves) is then
+The pre-impact state's own sensitivity (accounting for both the explicit $p$-dependence and the fact that $t^{\*}$ itself moves) is then
 
-$$\frac{d}{dp}\big[x(t^{*}(p); p)\big] = f(x^{-})\,\frac{dt^{*}}{dp} + S(t^{*}) = B(x^{-})\,S(t^{*})$$
+$$\frac{d}{dp}\big[x(t^{\*}(p); p)\big] = f(x^{-})\,\frac{dt^{\*}}{dp} + S(t^{\*}) = B(x^{-})\,S(t^{\*})$$
 
 where
 
