@@ -21,7 +21,7 @@ Imagine a camera looking at a 3D point:
        📷 Camera
 ```
 
-The 3D point `P` gets projected onto the camera image:
+The 3D point $P$ gets projected onto the camera image:
 
 ```text
 3D world                 Image
@@ -39,7 +39,7 @@ If we know:
 * camera intrinsics
 * 3D point position
 
-we can predict where `P` should appear in the image.
+we can predict where $P$ should appear in the image.
 
 Mathematically:
 
@@ -47,10 +47,10 @@ $${p = \pi(TP)}$$
 
 where:
 
-* `P` = 3D point
-* `T` = camera pose
-* `π` = camera projection function
-* `p` = predicted 2D pixel location
+* $P$ = 3D point
+* $T$ = camera pose
+* $\pi$ = camera projection function
+* $p$ = predicted 2D pixel location
 
 ---
 
@@ -416,7 +416,7 @@ Camera variables ─── Landmark variables
        └──── observations ──┘
 ```
 
-Camera `T₁` only directly interacts with the landmarks it observes.
+Camera $T_1$ only directly interacts with the landmarks it observes.
 
 That produces a **sparse optimization problem**.
 

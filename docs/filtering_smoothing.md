@@ -8,7 +8,7 @@ The easiest way to understand **Filtering vs. Optimization/Smoothing in SLAM** i
 
 Suppose a robot moves through a room:
 
-**t₀ → t₁ → t₂ → t₃ → t₄**
+**$t_0 \to t_1 \to t_2 \to t_3 \to t_4$**
 
 At every time, it gets:
 
@@ -40,7 +40,7 @@ This leads to a very useful mental model:
 
 ## 2. Filtering: one step at a time
 
-Imagine the robot is at time `t₃`.
+Imagine the robot is at time $t_3$.
 
 A filter maintains something like:
 
@@ -70,9 +70,9 @@ correction
 x₃ estimated
 ```
 
-Then the robot moves to `t₄`.
+Then the robot moves to $t_4$.
 
-The filter takes the estimate at `t₃`, propagates it forward, incorporates `z₄`, and produces the estimate at `t₄`.
+The filter takes the estimate at $t_3$, propagates it forward, incorporates $z_4$, and produces the estimate at $t_4$.
 
 ### Important property
 
@@ -89,7 +89,7 @@ t₀       t₁       t₂       t₃
 
 It essentially says:
 
-> "I have compressed everything before `t₃` into my current belief. Now let's continue."
+> "I have compressed everything before $t_3$ into my current belief. Now let's continue."
 
 This makes filtering **naturally online and computationally efficient**.
 
@@ -381,7 +381,7 @@ x₃ ───────── x₀
 
 Optimization then asks:
 
-> **"What configuration of x₀, x₁, x₂, x₃ best satisfies all these constraints?"**
+> **"What configuration of $x_0$, $x_1$, $x_2$, $x_3$ best satisfies all these constraints?"**
 
 This is why factor graphs are so common in modern SLAM.
 

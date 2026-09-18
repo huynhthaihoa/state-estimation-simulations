@@ -227,7 +227,7 @@ That's essentially what EKF does.
 
 ---
 
-## 7. Jacobian ≈ "local translator"
+## 7. Jacobian $\approx$ "local translator"
 
 Here's another mental model I really like for robotics - the same idea as the mountain in Section 6, just written as an equation instead of a picture.
 
@@ -407,7 +407,7 @@ $$J_l(\varphi) = I + \frac{1-\cos\theta}{\theta^2}[\varphi]_\times + \frac{\thet
 
 $$J_r(\varphi) = I - \frac{1-\cos\theta}{\theta^2}[\varphi]_\times + \frac{\theta-\sin\theta}{\theta^3}[\varphi]_\times^2$$
 
-Useful identities (all follow from $`{[\varphi]_\times^2}`$ being symmetric and $`{[\varphi]_\times}`$ being antisymmetric):
+Useful identities (all follow from $[\varphi]_\times^2$ being symmetric and $[\varphi]_\times$ being antisymmetric):
 
 $$J_r(\varphi) = J_l(-\varphi) \qquad J_r(\varphi) = J_l(\varphi)^\top \qquad J_l(\varphi) = R(\varphi)\,J_r(\varphi)$$
 

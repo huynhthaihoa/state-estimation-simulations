@@ -45,7 +45,7 @@ But there's a problem.
 
 A rotation matrix has special constraints:
 
-$$R^TR=I$$
+$$R^\top R=I$$
 
 and
 

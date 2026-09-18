@@ -191,7 +191,7 @@ $$
 \boxed{
 \min_X
 \sum_k
-e_k^T\Omega_k e_k
+e_k^\top\Omega_k e_k
 }
 $$
 
@@ -365,7 +365,7 @@ $$e(X+\Delta X)\approx e(X)+J\Delta X$$
 
 Then **[Gauss–Newton](gauss_newton.md)** solves:
 
-$$J^T W J\Delta X =-J^T W e$$
+$$J^\top W J\Delta X =-J^\top W e$$
 
 and updates:
 

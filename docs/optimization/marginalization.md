@@ -3,7 +3,7 @@
 Marginalizing a variable means permanently removing it from the optimization while keeping everything it taught you about its neighbors, packaged as one new prior factor - so a real-time estimator can bound its problem size without lying to itself about what it used to know.
 
 This builds directly on two things you've already seen:
-- **Variable elimination** from [`elimination_tree.md`](elimination_tree.md) ("eliminate x1 → its info gets summarized into a new constraint on x2") - this doc reuses that exact mechanic for a different purpose.
+- **Variable elimination** from [`elimination_tree.md`](elimination_tree.md) ("eliminate $x_1$ → its info gets summarized into a new constraint on $x_2$") - this doc reuses that exact mechanic for a different purpose.
 - **Sparsity and full vs. fixed-lag smoothing** from [filtering_smoothing.md §9-10](../filtering_smoothing.md#9-one-subtle-but-very-important-point) (filtering marginalizes old information, smoothing keeps it) - this doc is the missing mechanical middle ground the diagram there only names.
 
 ---
@@ -34,7 +34,7 @@ Eliminate x1:
     from x1
 ```
 
-That's marginalization. `bayes_tree.md` uses this step to build a *solve order* - x1 is eliminated, but conceptually every variable gets eliminated eventually, and nothing is thrown away for good (§3 below makes this precise). Sliding-window smoothing uses the *identical* elimination math for the opposite reason: to throw x1 away **permanently**, on purpose, because it's the oldest pose in the window and the estimator will never touch it again.
+That's marginalization. `bayes_tree.md` uses this step to build a *solve order* - $x_1$ is eliminated, but conceptually every variable gets eliminated eventually, and nothing is thrown away for good (§3 below makes this precise). Sliding-window smoothing uses the *identical* elimination math for the opposite reason: to throw $x_1$ away **permanently**, on purpose, because it's the oldest pose in the window and the estimator will never touch it again.
 
 ---
 

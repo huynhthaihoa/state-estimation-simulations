@@ -6,67 +6,58 @@ Every filter in [kf_ekf_iekf.md](kf_ekf_iekf.md) and [extra_kf_variants.md](extr
 
 A **hybrid dynamical system** alternates continuous flow with instantaneous discrete jumps, triggered by a **guard condition** and applied via a **reset map**:
 
-- **State**: `x = [p (3,), v (3,)]` — a point mass's position and velocity, plain `R^6` (no rotation, unlike every other script in this repo).
-- **Flow**: `dx/dt = f(x) = [v, (0,0,-g)]` — ordinary free-fall, exactly linear in `x`.
-- **Guard**: `g(x) = p_z`. The system jumps whenever a falling trajectory reaches `g(x) = 0` (touches the ground).
-- **Reset map**: `R(x)`, applied at the guard — here, `v_z ↦ -e·v_z` (an inelastic bounce with restitution `e`), position and horizontal velocity untouched.
+- **State**: $x = (p, v) \in \mathbb{R}^6$ with $p, v \in \mathbb{R}^3$ — a point mass's position and velocity, plain $\mathbb{R}^6$ (no rotation, unlike every other script in this repo).
+- **Flow**: $\dot x = f(x) = \begin{bmatrix} v \\ (0,0,-g) \end{bmatrix}$ — ordinary free-fall, exactly linear in $x$.
+- **Guard**: $g(x) = p_z$. The system jumps whenever a falling trajectory reaches $g(x) = 0$ (touches the ground).
+- **Reset map**: $R(x)$, applied at the guard — here, $v_z \mapsto -e\,v_z$ (an inelastic bounce with restitution $e$), position and horizontal velocity untouched.
 
-This is the textbook canonical example (the word "saltation" is Latin for "leaping"), and it is the simplest possible analog of a foot-strike/ground-contact impact — a discrete velocity reset at a discrete contact event — without SE(3)'s rotational complexity layered on top.
+This is the textbook canonical example (the word "saltation" is Latin for "leaping"), and it is the simplest possible analog of a foot-strike/ground-contact impact — a discrete velocity reset at a discrete contact event — without $SE(3)$'s rotational complexity layered on top.
 
 ## 2. Why the reset map's own Jacobian is not enough
 
-Suppose you want to propagate a covariance `P` through a bounce. The reset map itself is simple and linear: `R(x) = diag(1,1,1,1,1,-e) @ x =: DR @ x`. The natural (and wrong) instinct is `P⁺ = DR @ P⁻ @ DRᵗ`.
+Suppose you want to propagate a covariance $P$ through a bounce. The reset map itself is simple and linear: $R(x) = \text{diag}(1,1,1,1,1,-e)\,x =: DR\,x$. The natural (and wrong) instinct is
 
-This is wrong because `DR` is the Jacobian of "apply the reset to a state already sitting exactly on the guard" — but a *perturbed* trajectory does not reach the guard at the same instant as the nominal one. It crosses slightly earlier or later, and during that extra sliver of time it is still governed by the pre-impact flow `f`. The correct sensitivity of "post-impact state, at its own natural post-impact time" with respect to "pre-impact state, at its own natural pre-impact time" has to account for that time-shift. That correct sensitivity is the **saltation matrix**, `Xi`.
+$$P^+ = DR\,P^-\,DR^\top$$
 
-## 3. Deriving `Xi` — including a wrong turn, caught by verification
+This is wrong because $DR$ is the Jacobian of "apply the reset to a state already sitting exactly on the guard" — but a *perturbed* trajectory does not reach the guard at the same instant as the nominal one. It crosses slightly earlier or later, and during that extra sliver of time it is still governed by the pre-impact flow $f$. The correct sensitivity of "post-impact state, at its own natural post-impact time" with respect to "pre-impact state, at its own natural pre-impact time" has to account for that time-shift. That correct sensitivity is the **saltation matrix**, $\Xi$.
+
+## 3. Deriving $\Xi$ — including a wrong turn, caught by verification
 
 **A formula that looks standard and is wrong.** Before deriving anything, it's worth recording what didn't work, because it's the kind of formula that's easy to misremember and repeat. A plausible-looking candidate is
 
-```
-Xi_wrong = DR + [f⁺(x⁺) − DR·f⁻(x⁻)] ⊗ Dg / (Dg · f⁻(x⁻))
-```
+$$\Xi_{\text{wrong}} = DR + \frac{\big[f^+(x^+) - DR\,f^-(x^-)\big] \otimes Dg}{Dg \cdot f^-(x^-)}$$
 
-(`f⁻`, `f⁺` the pre-/post-impact vector fields, `Dg` the guard's gradient, `⊗` an outer product). It's dimensionally sensible and structurally plausible. It is also **not** the saltation matrix: checked against a from-scratch finite-difference ground truth (perturb the pre-impact state, re-land it on the guard via the pre-impact flow, apply the reset, compare to nominal), the two disagree by `max|Xi_wrong − Xi_numeric| ≈ 1.28` — nowhere near floating-point noise.
+($f^-$, $f^+$ the pre-/post-impact vector fields, $Dg$ the guard's gradient, $\otimes$ an outer product). It's dimensionally sensible and structurally plausible. It is also **not** the saltation matrix: checked against a from-scratch finite-difference ground truth (perturb the pre-impact state, re-land it on the guard via the pre-impact flow, apply the reset, compare to nominal), the two disagree by $\max|\Xi_{\text{wrong}} - \Xi_{\text{numeric}}| \approx 1.28$ — nowhere near floating-point noise.
 
-**The correct derivation.** Consider a one-parameter family of trajectories `x(t; p)` (`p` a perturbation parameter, `p=0` nominal), each governed by `dx/dt = f(x)` until a `p`-dependent crossing time `t*(p)` defined implicitly by `g(x(t*(p); p)) = 0`. Let `S(t) = ∂x(t;p)/∂p |_{p=0}`.
+**The correct derivation.** Consider a one-parameter family of trajectories $x(t; p)$ ($p$ a perturbation parameter, $p=0$ nominal), each governed by $\dot x = f(x)$ until a $p$-dependent crossing time $t^*(p)$ defined implicitly by $g\big(x(t^*(p); p)\big) = 0$. Let $S(t) = \left.\dfrac{\partial x(t;p)}{\partial p}\right|_{p=0}$.
 
 Implicit differentiation of the guard condition gives the crossing-time sensitivity:
 
-```
-dt*/dp = − (Dg · S(t*)) / (Dg · f(x⁻))
-```
+$$\frac{dt^*}{dp} = -\frac{Dg \cdot S(t^*)}{Dg \cdot f(x^-)}$$
 
-The pre-impact state's own sensitivity (accounting for both the explicit `p`-dependence and the fact that `t*` itself moves) is then
+The pre-impact state's own sensitivity (accounting for both the explicit $p$-dependence and the fact that $t^*$ itself moves) is then
 
-```
-d/dp[x(t*(p); p)] = f(x⁻)·(dt*/dp) + S(t*) = B(x⁻) @ S(t*),   where   B(x⁻) = I − f(x⁻) ⊗ Dg / (Dg · f(x⁻))
-```
+$$\frac{d}{dp}\big[x(t^*(p); p)\big] = f(x^-)\,\frac{dt^*}{dp} + S(t^*) = B(x^-)\,S(t^*), \qquad B(x^-) = I - \frac{f(x^-) \otimes Dg}{Dg \cdot f(x^-)}$$
 
-`B` is a projector that removes exactly the "along-the-flow" component of a perturbation — the piece that would otherwise double-count as a pure time-shift rather than a genuine change in the crossing state. Composing with the reset map's own Jacobian gives
+$B$ is a projector that removes exactly the "along-the-flow" component of a perturbation — the piece that would otherwise double-count as a pure time-shift rather than a genuine change in the crossing state. Composing with the reset map's own Jacobian gives
 
-```
-Xi(x⁻) = DR(x⁻) @ B(x⁻) = DR(x⁻) @ [ I − f(x⁻) ⊗ Dg(x⁻) / (Dg(x⁻) · f(x⁻)) ]
-```
+$$\Xi(x^-) = DR(x^-)\,B(x^-) = DR(x^-)\left[I - \frac{f(x^-) \otimes Dg(x^-)}{Dg(x^-) \cdot f(x^-)}\right]$$
 
-This was re-derived a second, independent way (differentiating the "project a nearby point back onto the guard via the pre-impact flow" operator directly) and cross-checked numerically to `~2.9e-8` — machine precision — against the finite-difference ground truth. Both derivations, and the check, are implemented in `saltation_matrix`.
+This was re-derived a second, independent way (differentiating the "project a nearby point back onto the guard via the pre-impact flow" operator directly) and cross-checked numerically to $\sim 2.9\times10^{-8}$ — machine precision — against the finite-difference ground truth. Both derivations, and the check, are implemented in `saltation_matrix`.
 
-## 4. A structural property that matters in practice: `Dg @ Xi = 0`
+## 4. A structural property that matters in practice: $Dg\,\Xi = 0$
 
-For this guard (`g(x) = p_z`), `Xi`'s output row for `p_z` is identically zero, for *any* `x⁻`, `e`, `g`:
+For this guard ($g(x) = p_z$), $\Xi$'s output row for $p_z$ is identically zero, for *any* $x^-$, $e$, $g$:
 
-```python
->>> Dg @ saltation_matrix(x_minus, e, g)
-array([0., 0., 0., 0., 0., 0.])
-```
+$$Dg\,\Xi(x^-) = 0$$
 
-This is not a bug — it's forced by the setup. Every trajectory in the family satisfies `g(x) = 0` exactly at its own crossing (that's what "crossing the guard" means), and the reset map doesn't touch position, so the post-impact height is *exactly* zero for every member of the family, with zero sensitivity to any perturbation. `Xi` is correctly reporting that.
+Equivalently, in code: `Dg @ saltation_matrix(x_minus, e, g)` returns `array([0., 0., 0., 0., 0., 0.])`. This is not a bug — it's forced by the setup. Every trajectory in the family satisfies $g(x) = 0$ exactly at its own crossing (that's what "crossing the guard" means), and the reset map doesn't touch position, so the post-impact height is *exactly* zero for every member of the family, with zero sensitivity to any perturbation. $\Xi$ is correctly reporting that.
 
 The catch: this exact-zero claim is only trustworthy if the filter's *own* estimated crossing time coincides exactly with the true one. It generally will not, once there is any tracking error at all — and comparing a covariance with an (near-)exactly-zero entry against a true trajectory sampled at a fixed tick, not at its own exact crossing, is a direct route to an artificially huge Mahalanobis distance if the two don't line up. `step_hybrid` adds a small isotropic "impact noise" floor after every bounce (identically for both filter variants) specifically to keep this otherwise-correct projection numerically usable; see its own docstring.
 
 ## 5. The empirical finding: not "naive is overconfident, saltation fixes it"
 
-The intuitive story going in was that the naive `P⁺ = DR@P⁻@DRᵗ` update would be measurably overconfident (too-small reported uncertainty) right after each bounce compared to the saltation-corrected one, and a Monte Carlo NEES (Normalized Estimation Error Squared) consistency check would show it. That is not what happens.
+The intuitive story going in was that the naive $P^+ = DR\,P^-\,DR^\top$ update would be measurably overconfident (too-small reported uncertainty) right after each bounce compared to the saltation-corrected one, and a Monte Carlo NEES (Normalized Estimation Error Squared) consistency check would show it. That is not what happens.
 
 Running `saltation_matrix_ekf.py` at its defaults (300+ Monte Carlo trials, 3 well-separated bounces from a 5m drop at `e=0.85`) and looking at NEES in the few ticks immediately following each bounce (excluding the shared spike at the bounce tick itself, which both filters exhibit for the mundane reason that the true trajectory is also close to its own crossing at that tick):
 
@@ -76,9 +67,9 @@ Mean NEES, 5 ticks after each of 3 bounces (seed 0):
   EKF (saltation)  ≈ 3.6
 ```
 
-**The saltation-corrected filter's post-bounce NEES is consistently *higher* than the naive filter's**, reproduced across multiple seeds (0, 1, 3 all show the same ~2.4 vs. ~3.6 pattern; one seed out of four tried landed in a rarer regime where both spike similarly, discussed in §6). Both stay well under the chi-squared 95% bound (`12.59` for 6 DoF) at these settings — this is a modest, not catastrophic, effect, but it is the opposite direction from the naive expectation.
+**The saltation-corrected filter's post-bounce NEES is consistently *higher* than the naive filter's**, reproduced across multiple seeds (0, 1, 3 all show the same ~2.4 vs. ~3.6 pattern; one seed out of four tried landed in a rarer regime where both spike similarly, discussed in §6). Both stay well under the chi-squared 95% bound ($12.59$ for 6 DoF) at these settings — this is a modest, not catastrophic, effect, but it is the opposite direction from the naive expectation.
 
-**Why**: §4's `Dg @ Xi = 0` property means the saltation-corrected update makes the *strongest possible claim* about the guard-normal direction — exactly zero residual uncertainty, beyond the small regularizing floor. The naive update, by contrast, just carries `P`'s existing height-variance forward unchanged (`DR`'s height row is untouched, `[0,0,1,0,0,0]`), a much more modest claim. Once the filter's own estimated bounce time inevitably differs even slightly from the true one — which is the normal case, not a corner case — the *stronger* claim is the one that gets punished harder. The mathematically-exact *local* linearization is, in this specific practical sense, the more fragile one, precisely because it is exact only in the limit of infinitesimal tracking error, which real filters never have.
+**Why**: §4's $Dg\,\Xi = 0$ property means the saltation-corrected update makes the *strongest possible claim* about the guard-normal direction — exactly zero residual uncertainty, beyond the small regularizing floor. The naive update, by contrast, just carries $P$'s existing height-variance forward unchanged ($DR$'s height row is untouched, $[0,0,1,0,0,0]$), a much more modest claim. Once the filter's own estimated bounce time inevitably differs even slightly from the true one — which is the normal case, not a corner case — the *stronger* claim is the one that gets punished harder. The mathematically-exact *local* linearization is, in this specific practical sense, the more fragile one, precisely because it is exact only in the limit of infinitesimal tracking error, which real filters never have.
 
 This is not a reason to prefer the naive update generally — averaged over the whole trajectory (not just the few ticks right after a bounce), the two filters are close, and the naive update has no principled derivation behind it at all, so its accidental "robustness" here isn't something to rely on either. It is, however, a concrete, quantified instance of exactly the gap already flagged as [Open Consideration #1](../../../../private-notes/PhD_Topic/unified_phd_plan.md#open-considerations-from-technical-review) in the dissertation plan: *saltation matrices assume the transition time is known exactly; contact/phase detection is itself uncertain.* A real Hybrid-InEKF implementation needs an explicit model of that detection uncertainty (e.g. an impact-timing noise term scaled by the velocity jump at the event, rather than this script's simple isotropic floor) — using the exact saltation matrix "as-is" is not automatically the safer choice once that uncertainty is real, which is always.
 
@@ -89,6 +80,6 @@ This is not a reason to prefer the naive update generally — averaged over the 
 
 ## Appendix: related terms
 
-- **Guard condition / reset map**: the switching-surface function `g(x)=0` and the (possibly discontinuous) map `R` applied when a trajectory reaches it — the two ingredients that make a system "hybrid" rather than purely continuous.
-- **NEES (Normalized Estimation Error Squared)**: `(x_true−x_est)ᵗ @ P⁻¹ @ (x_true−x_est)`. A well-calibrated `n`-DoF filter's NEES should average to `n` across many independent trials; systematically larger values mean the filter's reported `P` is too small (overconfident) for the errors it's actually making. See [pose_graph_optimization.md §15.3](../optimization/pose_graph_optimization.md#153-objective-function) for the closely-related Mahalanobis-distance framing already used elsewhere in this repo.
+- **Guard condition / reset map**: the switching-surface function $g(x)=0$ and the (possibly discontinuous) map $R$ applied when a trajectory reaches it — the two ingredients that make a system "hybrid" rather than purely continuous.
+- **NEES (Normalized Estimation Error Squared)**: $(x_{\text{true}} - x_{\text{est}})^\top P^{-1} (x_{\text{true}} - x_{\text{est}})$. A well-calibrated $n$-DoF filter's NEES should average to $n$ across many independent trials; systematically larger values mean the filter's reported $P$ is too small (overconfident) for the errors it's actually making. See [pose_graph_optimization.md §15.3](../optimization/pose_graph_optimization.md#153-objective-function) for the closely-related Mahalanobis-distance framing already used elsewhere in this repo.
 - **Zeno behavior**: a hybrid system undergoing infinitely many discrete transitions in a finite time interval — the generic long-run behavior of any lossy bouncing system, and a standard pathology to guard against in hybrid-system simulation, not specific to saltation matrices themselves.

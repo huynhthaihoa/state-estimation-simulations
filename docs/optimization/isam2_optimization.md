@@ -26,7 +26,7 @@ Pose 1 → Pose 2 → Pose 3 → Pose 4 → Pose 5
 
 A naive optimizer might say:
 
-> "New information! Let's optimize x1, x2, x3, x4, x5 all over again."
+> "New information! Let's optimize $x_1$, $x_2$, $x_3$, $x_4$, $x_5$ all over again."
 
 That's expensive.
 
@@ -142,7 +142,7 @@ $$H\Delta x=-g$$
 
 where
 
-$$H=J^TJ$$
+$$H=J^\top J$$
 
 and then we solve this linear system.
 
@@ -222,7 +222,7 @@ These three ideas are the heart of iSAM2.
 
 ## 7. Bayes tree — the most important intuition
 
-Quick recap first: **Sparse Cholesky factorization** splits $H$ into $H = LL^T$ ($L$ lower-triangular), so solving $H\Delta x=-g$ becomes two cheap triangular solves instead of one matrix inversion. "Sparse" means most of $H$ is already zero — two poses only interact if a factor directly connects them — so the factorization skips arithmetic on entries it already knows are zero. The one catch: eliminating a variable can turn some of those zeros into nonzeros ("fill-in"), which is why elimination/variable order matters (§12). Full derivation in [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md); a worked elimination example in [`elimination_tree.md`](elimination_tree.md).
+Quick recap first: **Sparse Cholesky factorization** splits $H$ into $H = LL^\top$ ($L$ lower-triangular), so solving $H\Delta x=-g$ becomes two cheap triangular solves instead of one matrix inversion. "Sparse" means most of $H$ is already zero — two poses only interact if a factor directly connects them — so the factorization skips arithmetic on entries it already knows are zero. The one catch: eliminating a variable can turn some of those zeros into nonzeros ("fill-in"), which is why elimination/variable order matters (§12). Full derivation in [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md); a worked elimination example in [`elimination_tree.md`](elimination_tree.md).
 
 So after linearization, SLAM hands you exactly the $H\Delta x=-g$ system above, and that sparse-elimination process is run for real. Conceptually:
 
@@ -256,7 +256,7 @@ and receives a new measurement involving:
 x5
 ```
 
-Usually, the new information primarily affects the part of the solution around $x5$.
+Usually, the new information primarily affects the part of the solution around $x_5$.
 
 So iSAM2 might conceptually do:
 
@@ -296,7 +296,7 @@ Suppose your robot drives around:
 
 The robot realizes:
 
-> "Wait! x6 is actually close to x1."
+> "Wait! $x_6$ is actually close to $x_1$."
 
 So you add a loop-closure factor:
 
@@ -310,7 +310,7 @@ Now the new measurement can affect **many old poses**.
 
 iSAM2 recognizes this.
 
-It doesn't blindly update only x6.
+It doesn't blindly update only $x_6$.
 
 Instead, it identifies the affected region of the Bayes tree and redoes the necessary computation.
 

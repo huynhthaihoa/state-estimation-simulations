@@ -36,14 +36,14 @@ Each error is unaffected by one specific kind of frame change, and the name tell
 
 The pattern above is easiest to see on the rotation part alone, without the estimate/truth pair. For $R(t) \in SO(3)$, define body-frame and spatial (world-frame) angular velocity by
 
-$$\hat\omega^b = R^T\dot R \qquad \hat\omega^s = \dot RR^T$$
+$$\hat\omega^b = R^\top\dot R \qquad \hat\omega^s = \dot RR^\top$$
 
 (hat denotes the skew-symmetric matrix built from the corresponding vector). Redefining the world frame by a fixed rotation is left-multiplication $R\mapsto R_0R$; redefining the body frame is right-multiplication $R\mapsto RR_0$. Each redefinition cancels out of exactly one of the two velocities:
 
 | | Left-mult. ($R\mapsto R_0R$) | Right-mult. ($R\mapsto RR_0$) |
 |---|---|---|
 | Physical meaning | Redefining the global/world frame | Redefining the local/body frame |
-| Invariant quantity | Body-frame velocity $\hat\omega^b=R^T\dot R$ | Spatial-frame velocity $\hat\omega^s=\dot RR^T$ |
+| Invariant quantity | Body-frame velocity $\hat\omega^b=R^\top\dot R$ | Spatial-frame velocity $\hat\omega^s=\dot RR^\top$ |
 | Geometric term | Left-invariant vector field | Right-invariant vector field |
 
 So $\hat\omega^b$ plays the same role as $\eta_L$ above (indifferent to how you label the world) and $\hat\omega^s$ plays the same role as $\eta_R$ (indifferent to how you label the body).

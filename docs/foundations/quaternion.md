@@ -36,8 +36,8 @@ That's actually enough information to define an orientation change.
 
 We have:
 
-* **Axis:** `(0, 0, 1)`
-* **Angle:** `90°`
+* **Axis:** $(0, 0, 1)$
+* **Angle:** $90°$
 
 A quaternion essentially packages these two things into four numbers:
 
@@ -266,7 +266,7 @@ r_{31} & r_{32} & r_{33} \end{bmatrix}$$
 
 has **9 elements**, even though a rotation has only 3 degrees of freedom.
 
-And those 9 numbers must satisfy several constraints: $R^TR = I$ and $\det(R) = 1$.
+And those 9 numbers must satisfy several constraints: $R^\top R = I$ and $\det(R) = 1$.
 
 Quaternions have only four numbers and one simple normalization constraint: $\|q\| = 1$.
 

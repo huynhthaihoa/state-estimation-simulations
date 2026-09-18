@@ -47,7 +47,7 @@ That's the **pose graph**.
 
 ## 2. Where do the edges come from?
 
-Suppose the robot moves from `x₀` to `x₁`.
+Suppose the robot moves from $x_0$ to $x_1$.
 
 From [odometry](factor_graph.md#2-why-do-we-need-it) or visual odometry, we estimate:
 
@@ -116,7 +116,7 @@ Now suppose the robot eventually recognizes:
 
 > "Hey! I've been here before."
 
-For example, it recognizes the same visual landmark/place corresponding to `x₀`.
+For example, it recognizes the same visual landmark/place corresponding to $x_0$.
 
 We obtain a loop-closure constraint:
 
@@ -130,7 +130,7 @@ This is extremely valuable.
 
 It says:
 
-> **"According to this observation, x₄ should be near x₀ with approximately this relative orientation."**
+> **"According to this observation, $x_4$ should be near $x_0$ with approximately this relative orientation."**
 
 But our accumulated odometry says otherwise.
 
@@ -164,11 +164,11 @@ This is the crucial intuition.
 
 It doesn't necessarily say:
 
-> "x₄ is wrong."
+> "$x_4$ is wrong."
 
 Instead, it says:
 
-> "Maybe x₁, x₂, x₃ and x₄ are all slightly wrong. Let's distribute the error."
+> "Maybe $x_1$, $x_2$, $x_3$ and $x_4$ are all slightly wrong. Let's distribute the error."
 
 ---
 
@@ -481,7 +481,7 @@ the optimizer will care much more about satisfying the first constraint.
 
 So the more complete objective is something like:
 
-$${\min_X \sum_{(i,j) \in \mathcal{E}} e_{ij}^T \Omega_{ij} e_{ij}}$$
+$${\min_X \sum_{(i,j) \in \mathcal{E}} e_{ij}^\top \Omega_{ij} e_{ij}}$$
 
 where $\Omega_{ij}$ is related to the **information/covariance** of the measurement.
 

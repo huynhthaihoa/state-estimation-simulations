@@ -317,7 +317,7 @@ SLAM is highly nonlinear because of:
 * camera projection
 * perspective
 * 3D geometry
-* SE(3) transformations
+* $SE(3)$ transformations
 * reprojection errors
 
 For example:

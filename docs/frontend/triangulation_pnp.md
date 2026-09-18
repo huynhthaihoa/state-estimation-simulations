@@ -23,7 +23,7 @@ Both are front-end problems in the [front-end/back-end split](../frontend_backen
 
 ## 2. Triangulation, worked from the real code
 
-`bundle_adjustment_advanced.py`'s `triangulate_landmark` solves triangulation in closed form: for each observing camera, the calibrated ray direction $d$ (from the camera center through the observed pixel) defines a line in 3D space, and the best point is the one minimizing the sum of squared perpendicular distances to every observing ray - the "closest point to N lines" problem. For a single ray with direction $d$ (unit norm) through camera center $o$, the projector $M = I - dd^\top$ measures perpendicular distance to that ray; summing $M$ and $Mo$ across every observer and solving the resulting 3x3 linear system gives the point directly, no iteration needed.
+`bundle_adjustment_advanced.py`'s `triangulate_landmark` solves triangulation in closed form: for each observing camera, the calibrated ray direction $d$ (from the camera center through the observed pixel) defines a line in 3D space, and the best point is the one minimizing the sum of squared perpendicular distances to every observing ray - the "closest point to N lines" problem. For a single ray with direction $d$ (unit norm) through camera center $o$, the projector $M = I - dd^\top$ measures perpendicular distance to that ray; summing $M$ and $Mo$ across every observer and solving the resulting $3\times3$ linear system gives the point directly, no iteration needed.
 
 ```text
 Camera 1               Camera 2

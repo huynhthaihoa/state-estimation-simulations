@@ -204,7 +204,7 @@ $$P$$
 
 The square-root version instead stores something like:
 
-$$P = SS^T$$
+$$P = SS^\top$$
 
 where $S$ is a square-root factor, often obtained through Cholesky decomposition.
 
