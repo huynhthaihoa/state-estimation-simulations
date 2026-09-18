@@ -31,7 +31,7 @@ nominal:    ●╲                         perturbed:    ●╲
 
 Because their initial states differ, they reach $p_z = 0$ at slightly different times, $t^{\*}$ and $t^{\*}+\delta t$. During that sliver $\delta t$, the perturbed trajectory is still governed by the *pre-impact* flow $f$, exactly like the nominal one - but by the time it finally crosses, it has drifted further along $f$ than a naive "just apply $DR$ to the perturbation at time $t^{\*}$" calculation would credit it for. An ordinary Jacobian, evaluated only at the fixed instant $t^{\*}$, has no way to see this: it silently assumes both trajectories cross at the same instant. Once the guard is close to tangent to the flow (small $Dg\cdot f^{-}$, i.e. a shallow, near-grazing crossing), this timing effect can dominate the reset map's own contribution.
 
-The correct sensitivity of "post-impact state, at its own natural post-impact time" with respect to "pre-impact state, at its own natural pre-impact time" has to account for that time-shift. That correct sensitivity is the **saltation matrix**, $\Xi$ - the ordinary reset Jacobian $DR$, corrected by a term for exactly this event-timing sensitivity. §3 below shows this correction is a rank-one projector removing exactly the "along-the-flow" component of a perturbation - the part that only changes *when* the guard is crossed, not *where*.
+The correct sensitivity of "post-impact state, at its own natural post-impact time" with respect to "pre-impact state, at its own natural pre-impact time" has to account for that time-shift. That correct sensitivity is the **saltation matrix**, $\Xi$ - the ordinary reset Jacobian $DR$, corrected by a term for exactly this event-timing sensitivity. §4 below shows this correction is a rank-one projector removing exactly the "along-the-flow" component of a perturbation - the part that only changes *when* the guard is crossed, not *where*.
 
 At a smooth (non-event) point, the ordinary Jacobian $A = \partial f/\partial x$ is all there is - perturbations evolve continuously, and there is no timing ambiguity to correct for. At a hybrid event, $\Xi$ plays that same role but must additionally carry the event-time correction:
 
@@ -41,7 +41,19 @@ At a smooth (non-event) point, the ordinary Jacobian $A = \partial f/\partial x$
 | Linearization: $A = \partial f/\partial x$ | Linearization: saltation matrix $\Xi$ |
 | No event-time correction needed | Must correct for the crossing-time shift $\delta t$ |
 
-## 3. Deriving $\Xi$ - including a wrong turn, caught by verification
+## 3. A worked example: naive vs. saltation, in numbers
+
+It's worth seeing the two approaches disagree on an actual number, not just abstractly. Take two point masses, both falling with the same downward velocity ($-2\,\text{m/s}$), except the second starts $5\text{cm}$ higher ($\delta p_z = 0.05$, no velocity perturbation at all):
+
+- **Naive prediction** ($DR$ applied to the perturbation carried linearly forward to the nominal crossing time): $DR$'s velocity row only scales the *velocity* perturbation by $-e$ - and that perturbation is exactly zero here (a pure position offset, under free-fall, stays a pure position offset all the way to the nominal crossing time; nothing pushes it into the velocity component). So the naive prediction for the change in post-bounce speed is **exactly $0$**.
+- **True answer** (re-simulated: let the second ball reach its own crossing time, apply the reset there, compare): starting $5\text{cm}$ higher means falling for an extra $\sim\!5\text{ms}$ before impact, so it's moving faster when it lands, and bounces back faster too. True change in post-bounce vertical speed: **$+0.0242\ \text{m/s}$**.
+- **Saltation-corrected prediction** ($\Xi$ applied the same way): **$+0.0243\ \text{m/s}$** - matches to within second-order error.
+
+The naive approach isn't slightly off here, it's qualitatively wrong: it says a pure position perturbation can never affect the bounce speed, when in fact it's the *entire* effect in this example. $DR$ cannot see this because it has no notion of time at all - it only knows how to transform a state that is already sitting on the guard. $\Xi$ sees it because its correction term is built specifically to capture "this trajectory needed a different amount of falling time to get here."
+
+(Computed directly from this repo's own `flow`, `crossing_time`, `reset_map`, `reset_jacobian`, and `saltation_matrix` functions in `saltation_matrix_ekf.py`, not hand-derived - reproducible with $x^{-}_0=(0,0,5,0,0,-2)$, $\delta x_0=(0,0,0.05,0,0,0)$, $e=0.5$, $g=9.81$.)
+
+## 4. Deriving $\Xi$ - including a wrong turn, caught by verification
 
 **A formula that looks standard and is wrong.** Before deriving anything, it's worth recording what didn't work, because it's the kind of formula that's easy to misremember and repeat. A plausible-looking candidate is
 
@@ -49,7 +61,7 @@ $$\Xi_{\text{wrong}} = DR + \frac{\big[f^{+}(x^{+}) - DR\,f^{-}(x^{-})\big] \oti
 
 ($f^{-}$, $f^{+}$ the pre-/post-impact vector fields, $Dg$ the guard's gradient, $\otimes$ an outer product). It's dimensionally sensible and structurally plausible. It is also **not** the saltation matrix: checked against a from-scratch finite-difference ground truth (perturb the pre-impact state, re-land it on the guard via the pre-impact flow, apply the reset, compare to nominal), the two disagree by $\max|\Xi_{\text{wrong}} - \Xi_{\text{numeric}}| \approx 1.28$ - nowhere near floating-point noise.
 
-This formula is not a fabrication, though - it is a real, standard expression from the hybrid-systems literature, which is exactly why it's easy to reach for. It answers a genuinely different question: it's the correct linearization when two trajectories are compared at a *shared* reference time (as in composing saltation matrices across several events into a single Poincaré-map derivative - see [§7](#7-connection-to-poincaré-maps) below), where the post-event vector field $f^{+}$ needs to be folded back in to account for continued flow past the shared time marker. $\Xi$ above answers a different question - "compare each trajectory at its *own* natural post-event time" - which is what propagating a covariance one event at a time actually needs, and it has no such term. Using the shared-time formula here silently smuggles in a spurious correction for a time shift this problem doesn't have.
+This formula is not a fabrication, though - it is a real, standard expression from the hybrid-systems literature, which is exactly why it's easy to reach for. It answers a genuinely different question: it's the correct linearization when two trajectories are compared at a *shared* reference time (as in composing saltation matrices across several events into a single Poincaré-map derivative - see [§8](#8-connection-to-poincaré-maps) below), where the post-event vector field $f^{+}$ needs to be folded back in to account for continued flow past the shared time marker. $\Xi$ above answers a different question - "compare each trajectory at its *own* natural post-event time" - which is what propagating a covariance one event at a time actually needs, and it has no such term. Using the shared-time formula here silently smuggles in a spurious correction for a time shift this problem doesn't have.
 
 **The correct derivation.** Consider a one-parameter family of trajectories $x(t; p)$ ($p$ a perturbation parameter, $p=0$ nominal), each governed by $\dot x = f(x)$ until a $p$-dependent crossing time $t^{\*}(p)$ defined implicitly by $g\big(x(t^{\*}(p); p)\big) = 0$. Let $S(t) = \left.\dfrac{\partial x(t;p)}{\partial p}\right|_{p=0}$.
 
@@ -71,7 +83,7 @@ $$\Xi(x^{-}) = DR(x^{-})\,B(x^{-}) = DR(x^{-})\left[I - \frac{f(x^{-}) \otimes D
 
 This was re-derived a second, independent way (differentiating the "project a nearby point back onto the guard via the pre-impact flow" operator directly) and cross-checked numerically to $\sim 2.9\times10^{-8}$ - machine precision - against the finite-difference ground truth. Both derivations and the check are implemented in `saltation_matrix`.
 
-## 4. A structural property that matters in practice: $Dg\,\Xi = 0$
+## 5. A structural property that matters in practice: $Dg\,\Xi = 0$
 
 For this guard ($g(x) = p_z$), $\Xi$'s output row for $p_z$ is identically zero, for *any* $x^{-}$, $e$, $g$:
 
@@ -81,7 +93,7 @@ Equivalently, in code: `Dg @ saltation_matrix(x_minus, e, g)` returns `array([0.
 
 The catch: this exact-zero claim is only trustworthy if the filter's *own* estimated crossing time coincides exactly with the true one. It generally will not, once there is any tracking error at all - and comparing a covariance with an (near-)exactly-zero entry against a true trajectory sampled at a fixed tick, not at its own exact crossing, is a direct route to an artificially huge Mahalanobis distance if the two don't line up. `step_hybrid` adds a small isotropic "impact noise" floor after every bounce (identically for both filter variants) specifically to keep this otherwise-correct projection numerically usable; see its own docstring.
 
-## 5. The empirical finding: not "naive is overconfident, saltation fixes it"
+## 6. The empirical finding: not "naive is overconfident, saltation fixes it"
 
 The intuitive story going in was that the naive $P^{+} = DR\,P^{-}\,DR^\top$ update would be measurably overconfident (too-small reported uncertainty) right after each bounce compared to the saltation-corrected one, and a Monte Carlo NEES (Normalized Estimation Error Squared) consistency check would show it. That is not what happens.
 
@@ -93,19 +105,19 @@ Mean NEES, 5 ticks after each of 3 bounces (seed 0):
   EKF (saltation)  ≈ 3.6
 ```
 
-**The saltation-corrected filter's post-bounce NEES is consistently *higher* than the naive filter's**, reproduced across multiple seeds (0, 1, 3 all show the same ~2.4 vs. ~3.6 pattern; one seed out of four tried landed in a rarer regime where both spike similarly, discussed in §6). Both stay well under the chi-squared 95% bound ($12.59$ for 6 DoF) at these settings - this is a modest, not catastrophic, effect, but it is the opposite direction from the naive expectation.
+**The saltation-corrected filter's post-bounce NEES is consistently *higher* than the naive filter's**, reproduced across multiple seeds (0, 1, 3 all show the same ~2.4 vs. ~3.6 pattern; one seed out of four tried landed in a rarer regime where both spike similarly, discussed in §7). Both stay well under the chi-squared 95% bound ($12.59$ for 6 DoF) at these settings - this is a modest, not catastrophic, effect, but it is the opposite direction from the naive expectation.
 
-**Why**: §4's $Dg\,\Xi = 0$ property means the saltation-corrected update makes the *strongest possible claim* about the guard-normal direction - exactly zero residual uncertainty, beyond the small regularizing floor. The naive update, by contrast, just carries $P$'s existing height-variance forward unchanged ($DR$'s height row is untouched, $[0,0,1,0,0,0]$), a much more modest claim. Once the filter's own estimated bounce time inevitably differs even slightly from the true one - which is the normal case, not a corner case - the *stronger* claim is the one that gets punished harder. The mathematically exact *local* linearization is, in this specific practical sense, the more fragile one, precisely because it is exact only in the limit of infinitesimal tracking error, which real filters never have.
+**Why**: §5's $Dg\,\Xi = 0$ property means the saltation-corrected update makes the *strongest possible claim* about the guard-normal direction - exactly zero residual uncertainty, beyond the small regularizing floor. The naive update, by contrast, just carries $P$'s existing height-variance forward unchanged ($DR$'s height row is untouched, $[0,0,1,0,0,0]$), a much more modest claim. Once the filter's own estimated bounce time inevitably differs even slightly from the true one - which is the normal case, not a corner case - the *stronger* claim is the one that gets punished harder. The mathematically exact *local* linearization is, in this specific practical sense, the more fragile one, precisely because it is exact only in the limit of infinitesimal tracking error, which real filters never have.
 
 This is not a reason to prefer the naive update generally - averaged over the whole trajectory (not just the few ticks right after a bounce), the two filters are close, and the naive update has no principled derivation behind it at all, so its accidental "robustness" here isn't something to rely on either. A real Hybrid-InEKF implementation needs an explicit model of that detection uncertainty (e.g., an impact-timing noise term scaled by the velocity jump at the event, rather than this script's simple isotropic floor) - using the exact saltation matrix "as-is" is not automatically the safer choice once that uncertainty is real, which is always.
 <!-- It is, however, a concrete, quantified instance of exactly the gap already flagged as [Open Consideration #1](../../../../private-notes/PhD_Topic/unified_phd_plan.md#open-considerations-from-technical-review) in the dissertation plan: *saltation matrices assume the transition time is known exactly; contact/phase detection is itself uncertain.*  -->
 
-## 6. Two things worth knowing before reusing this pattern
+## 7. Two things worth knowing before reusing this pattern
 
-- **Tune the regularizing floor deliberately, not just for numerical stability.** Sweeping `--impact-noise-std` from `0.0005` to `0.02` on this same problem flips which filter looks worse: at very small floors, saltation's exact zero-projection dominates and it comes out *dramatically* worse (NEES in the tens to hundreds vs. the naive filter's ~3); at larger floors (`≥0.02`), the floor itself swamps the structural difference and the two converge to nearly identical, unremarkable NEES. The `~2.4` vs. `~3.6` result quoted in §5 is specific to a floor sized to be "just barely enough" to avoid outright numerical pathology - a deliberate choice, not an arbitrary one, and worth re-checking whenever any of the other parameters change.
+- **Tune the regularizing floor deliberately, not just for numerical stability.** Sweeping `--impact-noise-std` from `0.0005` to `0.02` on this same problem flips which filter looks worse: at very small floors, saltation's exact zero-projection dominates and it comes out *dramatically* worse (NEES in the tens to hundreds vs. the naive filter's ~3); at larger floors (`≥0.02`), the floor itself swamps the structural difference and the two converge to nearly identical, unremarkable NEES. The `~2.4` vs. `~3.6` result quoted in §6 is specific to a floor sized to be "just barely enough" to avoid outright numerical pathology - a deliberate choice, not an arbitrary one, and worth re-checking whenever any of the other parameters change.
 - **Stay well clear of the Zeno regime.** A lossy bounce (`e<1`) produces infinitely many, ever-faster bounces approaching a finite settling time (`~12.4s` for this script's defaults). Well before that time, bounce intervals become comparable to the fixed measurement step `dt`, and comparing a fixed-tick-sampled estimate against a true trajectory that's bouncing many times within a single tick breaks the entire comparison's premise (both filters' NEES explodes into the thousands, for reasons that have nothing to do with the saltation matrix). `--duration`'s default is deliberately chosen to stop after 3 clean, well-separated bounces and before the 4th starts crowding the settling regime.
 
-## 7. Connection to Poincaré maps
+## 8. Connection to Poincaré maps
 
 Saltation matrices show up in a second, related context: analyzing the stability of a *periodic* hybrid trajectory - e.g., a robot repeatedly bouncing (or, for legged locomotion, repeatedly striking the ground once per stride). Sampling the state once per cycle, at a chosen event, defines a discrete return map $x_{k+1} = P(x_k)$, and its derivative $DP$ governs whether nearby trajectories converge back to the periodic orbit or diverge from it - the hybrid-systems analogue of eigenvalue stability analysis for a fixed point.
 
@@ -113,7 +125,7 @@ Over one cycle, $DP$ is a product of continuous-flow Jacobians and saltation mat
 
 $$DP \approx \Phi_3\,\Xi_2\,\Phi_2\,\Xi_1\,\Phi_1$$
 
-This is the setting §3's "wrong turn" formula is actually built for: composing several such factors requires comparing every trajectory in the family against a single shared timeline running through the whole cycle, which is exactly what that formula's extra $f^{+}$ term supplies. This script never needs that composition - it propagates one covariance forward through one event at a time - so $\Xi$ alone, without the shared-timeline correction, is the right and complete tool here.
+This is the setting §4's "wrong turn" formula is actually built for: composing several such factors requires comparing every trajectory in the family against a single shared timeline running through the whole cycle, which is exactly what that formula's extra $f^{+}$ term supplies. This script never needs that composition - it propagates one covariance forward through one event at a time - so $\Xi$ alone, without the shared-timeline correction, is the right and complete tool here.
 
 ## Appendix: related terms
 
