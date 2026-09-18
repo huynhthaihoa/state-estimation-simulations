@@ -39,6 +39,7 @@ Start at [docs/README.md](docs/README.md) for the full index, or [docs/frontend_
 - [bundle_adjustment.py](use_numpy/bundle_adjustment.py): jointly refines camera poses **and** 3D landmarks against pinhole reprojection error - cameras on an arc around a landmark cluster, with a field-of-view cutoff so not every camera observes every landmark. Compares three solvers: **landmarks-only refinement** and **poses-only refinement** (independent 3x3/6x6 GN solves, each a "fix one side" strawman) against **full joint bundle adjustment** (coupled dense GN over poses + landmarks, gauge-fixed with a prior factor on the first two camera poses, then [Umeyama-aligned](docs/foundations/umeyama_alignment.md) to ground truth before reporting absolute error, since monocular BA only recovers the scene up to an unknown similarity transform).
 - [bundle_adjustment_advanced.py](use_numpy/bundle_adjustment_advanced.py): Local **and** Global bundle adjustment, run back to back for direct comparison - the real-time-system-behavior counterpart to `bundle_adjustment.py`'s single-batch scene. A camera moves keyframe-by-keyframe along a forward-facing arc through a landmark corridor instead of sitting on a static ring; a covisibility graph builds incrementally, and every new keyframe triggers a bounded local Gauss-Newton/Levenberg-Marquardt solve over an active window (new keyframe + covisible neighbors, with every other observing keyframe held fixed as a rigid anchor), while a periodic Global BA pass jointly re-solves the whole map so far for contrast. Keyframes 0/1 are hard-fixed forever as the gauge anchor - no prior factor needed, unlike `bundle_adjustment.py`, since a hard anchor already pins the gauge with no residual freedom left to constrain. Guards against Gauss-Newton divergence (Levenberg-Marquardt damping) and the classic point-behind-camera reflection ambiguity (`passes_cheirality`/ `cull_invalid_points`) that a weakly-constrained, forward-motion scene can hit but `bundle_adjustment.py`'s densely-observed toy scene never does.
 - [pnp_estimation.py](use_numpy/pnp_estimation.py): Perspective-n-Point (PnP) - triangulation's exact inverse ([docs/frontend/triangulation_pnp.md](docs/frontend/triangulation_pnp.md)): given known 3D points and their observed pixels, recovers the unknown camera pose via a closed-form linear DLT initial guess (specialized to known intrinsics), then a few Gauss-Newton iterations against the true reprojection error. No `use_manif/` counterpart (single-implementation, like `bayes_tree_construction.py`).
+- [saltation_matrix_ekf.py](use_numpy/saltation_matrix_ekf.py): a bouncing point mass ([docs/filtering/hybrid_saltation_ekf.md](docs/filtering/hybrid_saltation_ekf.md)) tracked through discrete ground-contact events by a naive EKF (reset-Jacobian-only covariance handling) vs. a saltation-matrix-corrected EKF, plus a Monte Carlo NEES consistency check (new to this repo). Plain `R^6` state (position/velocity, no rotation) - no `use_manif/` counterpart, for the same reason as `bayes_tree_construction.py`.
 
 ### [use_manif/](use_manif/) - Same simulations, on `manifpy`
 
@@ -393,5 +394,41 @@ uv run python use_numpy/pnp_estimation.py --n-points 20 --pixel-noise-std 1.0 --
 - `--image-width`/`--image-height`/`--focal-length`: pinhole intrinsics (defaults `640`/`480`/`800.0`)
 - `--pixel-noise-std`: std-dev of Gaussian pixel noise added to each observation (px, default `1.0`)
 - `--gn-tol`/`--gn-max-iters`: Gauss-Newton convergence tolerance and iteration cap (defaults `1e-8`/`20`)
+- `--seed`: RNG seed
+- `--out`: save the figure to this path instead of showing it (default: show)
+
+### 11. Saltation-matrix EKF: tracking a point mass through discrete ground-contact events
+
+#### Purpose
+
+Every other filtering script in this repo assumes smooth, continuous motion between measurements. `docs/filtering/hybrid_saltation_ekf.md` introduces the one exception: a **hybrid dynamical system**, where a point mass in free-fall bounces (inelastically, restitution `e`) off the ground `p_z = 0`. Between bounces the dynamics is exactly linear (mean/covariance propagate exactly, no linearization at all), so any disagreement between the two EKF variants below is attributable entirely to how each one handles the bounce itself.
+
+Three methods are compared: a **dead-reckoning baseline** (propagates the exact dynamics from an uncertain initial guess, never looking at measurements — an initial-condition error still causes growing error, since bounce *timing* is sensitive to the state even though the dynamics model itself is exact); an **EKF with naive bounce handling** (`P+ = DR @ P- @ DR.T`, the reset map's own Jacobian alone — the common mistake, since it is not the correct linearization of "post-impact state as a function of pre-impact state" once a perturbed trajectory reaches the guard at a different time); and an **EKF with saltation-corrected bounce handling** (`P+ = Xi @ P- @ Xi.T`, the true `saltation_matrix`, derived from first principles and verified against a finite-difference ground truth to ~2.9e-8 after an initially-recalled, plausible-looking formula was checked and found wrong by a wide margin).
+
+A Monte Carlo consistency check (`run_monte_carlo_consistency`, NEES - Normalized Estimation Error Squared - new to this repo) repeats both EKFs over many independent noise realizations of the same nominal trajectory. The finding is more interesting than "naive is overconfident, saltation fixes it": the saltation matrix provably drives the guard-normal (height) direction's *reported* variance to exactly zero at every bounce (`Dg @ Xi = 0` identically, verified) - correct only if the filter's own estimated bounce time exactly coincides with the true one, which it generally will not with any real tracking error. Empirically (reproduced across multiple seeds), this makes the saltation-corrected EKF's post-bounce NEES consistently *higher* than the naive EKF's, not lower - see the doc for the full mechanism and its connection to Open Consideration #1 in the dissertation research plan (saltation matrices assume a known transition time; contact/phase detection is itself uncertain). Both EKFs' mean trajectories look nearly identical throughout regardless - this entire effect is invisible in the point estimate.
+
+Plain `R^6` state (position/velocity, no rotation) - no `use_manif/` counterpart, for the same reason as `bayes_tree_construction.py`.
+
+#### Scripts
+
+- [use_numpy/saltation_matrix_ekf.py](use_numpy/saltation_matrix_ekf.py)
+
+#### Usage
+
+```
+uv run python use_numpy/saltation_matrix_ekf.py --duration 5.0 --dt 0.02 --restitution 0.85 --gravity 9.81 --drop-height 5.0 --init-horizontal-vel 1.0 0.5 --pos-noise-std 0.03 --process-noise-std 0.3 --impact-noise-std 0.005 --init-pos-noise-std 0.1 --init-vel-noise-std 0.2 --n-mc-trials 500 --seed 0 --out out.png
+```
+
+- `--duration`: simulation length in seconds (default `5.0`) - kept comfortably below the trajectory's own Zeno settling time (bounce intervals shrink geometrically for a lossy bounce; the default stops after 3 well-separated bounces)
+- `--dt`: filter/measurement step interval in seconds (default `0.02`)
+- `--restitution`: bounce restitution coefficient, 0-1 (default `0.85`)
+- `--gravity`: gravitational acceleration magnitude, m/s^2 (default `9.81`)
+- `--drop-height`: initial height, m (default `5.0`)
+- `--init-horizontal-vel`: initial horizontal velocity, m/s (default `1.0 0.5`)
+- `--pos-noise-std`: position measurement noise std-dev, m (default `0.03`)
+- `--process-noise-std`: assumed acceleration-disturbance noise std-dev, m/s^2 (default `0.3`)
+- `--impact-noise-std`: std-dev of the regularizing floor added to `P` at each bounce, both EKF variants (default `0.005`) - not just a numerical-stability knob; which filter's post-bounce NEES comes out higher is sensitive to this value (see the doc)
+- `--init-pos-noise-std`/`--init-vel-noise-std`: std-dev used to perturb the initial position/velocity guess (defaults `0.1`/`0.2`)
+- `--n-mc-trials`: number of Monte Carlo consistency trials (default `500`)
 - `--seed`: RNG seed
 - `--out`: save the figure to this path instead of showing it (default: show)

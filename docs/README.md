@@ -25,6 +25,7 @@ Conceptual/pedagogical notes on the state-estimation and SLAM ideas behind the c
 - [extra_kf_variants.md](filtering/extra_kf_variants.md): UKF, ESKF, MSCKF and other variants, and why each exists.
 - [left_right_invariant.md](filtering/left_right_invariant.md): left- vs. right-invariant error formulations in the IEKF (builds on `extra_kf_variants.md`).
 - [pointcloud_pose_tracking_empirical_note.md](filtering/pointcloud_pose_tracking_empirical_note.md): an empirical note (not a concept explainer) on why `run_ekf`/`run_iekf` produce bit-identical output in `pointcloud_pose_tracking.py`, why `run_ukf` only comes close but doesn't match either one exactly, and why `run_vanilla_kf` diverges from all three unconditionally, by changing the state representation rather than the linearization.
+- [hybrid_saltation_ekf.md](filtering/hybrid_saltation_ekf.md): the one filtering-lineage doc about *discontinuous* motion rather than continuous motion — what a hybrid dynamical system/guard/reset map is, the saltation matrix that correctly propagates covariance through a discrete event (including a plausible-looking formula that turned out wrong, caught by finite-difference verification), and an empirical finding in `saltation_matrix_ekf.py` that runs against the naive expectation: the mathematically-exact saltation correction is *more* fragile to real tracking error than the naive reset-Jacobian-only update, not less.
 
 ## [`optimization/`](optimization/) - The factor-graph / smoothing lineage
 

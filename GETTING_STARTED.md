@@ -42,6 +42,8 @@ The biggest single payoff script in the repo lives here.
 
 **Then read:** [`docs/filtering/pointcloud_pose_tracking_empirical_note.md`](docs/filtering/pointcloud_pose_tracking_empirical_note.md) — deliberately *after* running the script, since it's written as a post-hoc explanation of exactly that script's output (why EKF/IEKF are bit-identical, why UKF is close-but-not-exact, and why vanilla KF diverges from all three unconditionally).
 
+**Side quest:** [`docs/filtering/hybrid_saltation_ekf.md`](docs/filtering/hybrid_saltation_ekf.md) + [README.md §11](README.md#11-saltation-matrix-ekf-tracking-a-point-mass-through-discrete-ground-contact-events) — [`use_numpy/saltation_matrix_ekf.py`](use_numpy/saltation_matrix_ekf.py). Everything above this point assumes continuous, smooth motion between measurements; this one script in the whole repo doesn't — a point mass bounces off the ground mid-trajectory, and the interesting question is how to propagate *covariance* (not just the mean) correctly through that discrete reset. Read the doc's derivation section first (it includes a formula that looks right and isn't, caught only by finite-difference verification), then run the script and check the Monte Carlo NEES plot — the result runs against the naive expectation (the "mathematically correct" saltation-corrected filter comes out *less* consistent than the naive one here, not more), which the doc explains.
+
 ## Phase 5 — Graph-based batch smoothing
 
 **Read:** [`docs/optimization/levenberg_marquardt.md`](docs/optimization/levenberg_marquardt.md), [`docs/optimization/factor_graph.md`](docs/optimization/factor_graph.md), [`docs/optimization/pose_graph_optimization.md`](docs/optimization/pose_graph_optimization.md).
