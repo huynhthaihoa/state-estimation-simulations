@@ -689,10 +689,10 @@ def main():
     t_hist = np.arange(len(x_true)) * args.dt
     fig, (ax_height, ax_err, ax_nees) = plt.subplots(3, 1, figsize=(9, 11))
 
-    ax_height.plot(t_hist, [x[2] for x in x_true], label="Ground truth", color="black", linewidth=2)
-    ax_height.plot(t_hist, [x[2] for x in x_dr], label="Dead-reckoning (prior only)", color="tab:gray", linestyle="--")
-    ax_height.plot(t_hist, [x[2] for x in x_naive], label="EKF (naive)", color="tab:red", linestyle="--")
-    ax_height.plot(t_hist, [x[2] for x in x_salt], label="EKF (saltation)", color="tab:blue", linestyle=":")
+    ax_height.plot(t_hist, [x[2] for x in x_true], label="Ground truth", color="green", linewidth=2, linestyle="--")
+    ax_height.plot(t_hist, [x[2] for x in x_dr], label="Dead-reckoning (prior only)", color="tab:gray", linestyle=":")
+    ax_height.plot(t_hist, [x[2] for x in x_naive], label="EKF (naive)", color="tab:red", linestyle="-")
+    ax_height.plot(t_hist, [x[2] for x in x_salt], label="EKF (saltation)", color="tab:blue", linestyle="-")
     ax_height.set_ylabel("Height p_z (m)")
     ax_height.set_title("Saltation-matrix EKF: bouncing point mass")
     ax_height.legend()
