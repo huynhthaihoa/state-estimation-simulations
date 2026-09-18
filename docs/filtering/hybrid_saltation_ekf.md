@@ -17,7 +17,7 @@ This is the textbook canonical example (the word "saltation" is Latin for "leapi
 
 Suppose you want to propagate a covariance $P$ through a bounce. The reset map itself is simple and linear: $R(x) = \text{diag}(1,1,1,1,1,-e)\,x =: DR\,x$. The natural (and wrong) instinct is
 
-$$P^+ = DR\,P^-\,DR^\top$$
+$$P^{+} = DR\,P^{-}\,DR^\top$$
 
 This is wrong because $DR$ is the Jacobian of "apply the reset to a state already sitting exactly on the guard" - but a *perturbed* trajectory does not reach the guard at the same instant as the nominal one. It crosses slightly earlier or later, and during that extra sliver of time it is still governed by the pre-impact flow $f$. The correct sensitivity of "post-impact state, at its own natural post-impact time" with respect to "pre-impact state, at its own natural pre-impact time" has to account for that time-shift. That correct sensitivity is the **saltation matrix**, $\Xi$.
 
@@ -25,35 +25,35 @@ This is wrong because $DR$ is the Jacobian of "apply the reset to a state alread
 
 **A formula that looks standard and is wrong.** Before deriving anything, it's worth recording what didn't work, because it's the kind of formula that's easy to misremember and repeat. A plausible-looking candidate is
 
-$$\Xi_{\text{wrong}} = DR + \frac{\big[f^+(x^+) - DR\,f^-(x^-)\big] \otimes Dg}{Dg \cdot f^-(x^-)}$$
+$$\Xi_{\text{wrong}} = DR + \frac{\big[f^{+}(x^{+}) - DR\,f^{-}(x^{-})\big] \otimes Dg}{Dg \cdot f^{-}(x^{-})}$$
 
-($f^-$, $f^+$ the pre-/post-impact vector fields, $Dg$ the guard's gradient, $\otimes$ an outer product). It's dimensionally sensible and structurally plausible. It is also **not** the saltation matrix: checked against a from-scratch finite-difference ground truth (perturb the pre-impact state, re-land it on the guard via the pre-impact flow, apply the reset, compare to nominal), the two disagree by $\max|\Xi_{\text{wrong}} - \Xi_{\text{numeric}}| \approx 1.28$ - nowhere near floating-point noise.
+($f^{-}$, $f^{+}$ the pre-/post-impact vector fields, $Dg$ the guard's gradient, $\otimes$ an outer product). It's dimensionally sensible and structurally plausible. It is also **not** the saltation matrix: checked against a from-scratch finite-difference ground truth (perturb the pre-impact state, re-land it on the guard via the pre-impact flow, apply the reset, compare to nominal), the two disagree by $\max|\Xi_{\text{wrong}} - \Xi_{\text{numeric}}| \approx 1.28$ - nowhere near floating-point noise.
 
-**The correct derivation.** Consider a one-parameter family of trajectories $x(t; p)$ ($p$ a perturbation parameter, $p=0$ nominal), each governed by $\dot x = f(x)$ until a $p$-dependent crossing time $t^*(p)$ defined implicitly by $g\big(x(t^*(p); p)\big) = 0$. Let $S(t) = \left.\dfrac{\partial x(t;p)}{\partial p}\right|_{p=0}$.
+**The correct derivation.** Consider a one-parameter family of trajectories $x(t; p)$ ($p$ a perturbation parameter, $p=0$ nominal), each governed by $\dot x = f(x)$ until a $p$-dependent crossing time $t^{*}(p)$ defined implicitly by $g\big(x(t^{*}(p); p)\big) = 0$. Let $S(t) = \left.\dfrac{\partial x(t;p)}{\partial p}\right|_{p=0}$.
 
 Implicit differentiation of the guard condition gives the crossing-time sensitivity:
 
-$$\frac{dt^*}{dp} = -\frac{Dg \cdot S(t^*)}{Dg \cdot f(x^-)}$$
+$$\frac{dt^{*}}{dp} = -\frac{Dg \cdot S(t^{*})}{Dg \cdot f(x^{-})}$$
 
-The pre-impact state's own sensitivity (accounting for both the explicit $p$-dependence and the fact that $t^*$ itself moves) is then
+The pre-impact state's own sensitivity (accounting for both the explicit $p$-dependence and the fact that $t^{*}$ itself moves) is then
 
-$$\frac{d}{dp}\big[x(t^*(p); p)\big] = f(x^-)\,\frac{dt^*}{dp} + S(t^*) = B(x^-)\,S(t^*)$$
+$$\frac{d}{dp}\big[x(t^{*}(p); p)\big] = f(x^{-})\,\frac{dt^{*}}{dp} + S(t^{*}) = B(x^{-})\,S(t^{*})$$
 
 where
 
-$$B(x^-) = I - \frac{f(x^-) \otimes Dg}{Dg \cdot f(x^-)}$$
+$$B(x^{-}) = I - \frac{f(x^{-}) \otimes Dg}{Dg \cdot f(x^{-})}$$
 
 $B$ is a projector that removes exactly the "along-the-flow" component of a perturbation - the piece that would otherwise double-count as a pure time-shift rather than a genuine change in the crossing state. Composing with the reset map's own Jacobian gives
 
-$$\Xi(x^-) = DR(x^-)\,B(x^-) = DR(x^-)\left[I - \frac{f(x^-) \otimes Dg(x^-)}{Dg(x^-) \cdot f(x^-)}\right]$$
+$$\Xi(x^{-}) = DR(x^{-})\,B(x^{-}) = DR(x^{-})\left[I - \frac{f(x^{-}) \otimes Dg(x^{-})}{Dg(x^{-}) \cdot f(x^{-})}\right]$$
 
 This was re-derived a second, independent way (differentiating the "project a nearby point back onto the guard via the pre-impact flow" operator directly) and cross-checked numerically to $\sim 2.9\times10^{-8}$ - machine precision - against the finite-difference ground truth. Both derivations, and the check, are implemented in `saltation_matrix`.
 
 ## 4. A structural property that matters in practice: $Dg\,\Xi = 0$
 
-For this guard ($g(x) = p_z$), $\Xi$'s output row for $p_z$ is identically zero, for *any* $x^-$, $e$, $g$:
+For this guard ($g(x) = p_z$), $\Xi$'s output row for $p_z$ is identically zero, for *any* $x^{-}$, $e$, $g$:
 
-$$Dg\,\Xi(x^-) = 0$$
+$$Dg\,\Xi(x^{-}) = 0$$
 
 Equivalently, in code: `Dg @ saltation_matrix(x_minus, e, g)` returns `array([0., 0., 0., 0., 0., 0.])`. This is not a bug - it's forced by the setup. Every trajectory in the family satisfies $g(x) = 0$ exactly at its own crossing (that's what "crossing the guard" means), and the reset map doesn't touch position, so the post-impact height is *exactly* zero for every member of the family, with zero sensitivity to any perturbation. $\Xi$ is correctly reporting that.
 
@@ -61,7 +61,7 @@ The catch: this exact-zero claim is only trustworthy if the filter's *own* estim
 
 ## 5. The empirical finding: not "naive is overconfident, saltation fixes it"
 
-The intuitive story going in was that the naive $P^+ = DR\,P^-\,DR^\top$ update would be measurably overconfident (too-small reported uncertainty) right after each bounce compared to the saltation-corrected one, and a Monte Carlo NEES (Normalized Estimation Error Squared) consistency check would show it. That is not what happens.
+The intuitive story going in was that the naive $P^{+} = DR\,P^{-}\,DR^\top$ update would be measurably overconfident (too-small reported uncertainty) right after each bounce compared to the saltation-corrected one, and a Monte Carlo NEES (Normalized Estimation Error Squared) consistency check would show it. That is not what happens.
 
 Running `saltation_matrix_ekf.py` at its defaults (300+ Monte Carlo trials, 3 well-separated bounces from a 5m drop at `e=0.85`) and looking at NEES in the few ticks immediately following each bounce (excluding the shared spike at the bounce tick itself, which both filters exhibit for the mundane reason that the true trajectory is also close to its own crossing at that tick):
 
