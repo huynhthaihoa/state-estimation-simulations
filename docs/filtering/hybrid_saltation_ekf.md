@@ -19,7 +19,27 @@ Suppose you want to propagate a covariance $P$ through a bounce. The reset map i
 
 $$P^{+} = DR\,P^{-}\,DR^\top$$
 
-This is wrong because $DR$ is the Jacobian of "apply the reset to a state already sitting exactly on the guard" - but a *perturbed* trajectory does not reach the guard at the same instant as the nominal one. It crosses slightly earlier or later, and during that extra sliver of time it is still governed by the pre-impact flow $f$. The correct sensitivity of "post-impact state, at its own natural post-impact time" with respect to "pre-impact state, at its own natural pre-impact time" has to account for that time-shift. That correct sensitivity is the **saltation matrix**, $\Xi$.
+The problem is timing, not the reset map itself: $DR$ is the Jacobian of "apply the reset to a state already sitting exactly on the guard" - but a *perturbed* trajectory does not reach the guard at the same instant as the nominal one. Picture two point masses falling on very slightly different trajectories - nominal and perturbed by $\delta x$:
+
+```text
+nominal:    ●╲                         perturbed:    ●╲
+              ╲                                        ╲
+               ╲                                        ╲
+────────────────●──── ground (p_z = 0) ──────────────────●── ground
+                t*                                       t* + δt
+```
+
+Because their initial states differ, they reach $p_z = 0$ at slightly different times, $t^{*}$ and $t^{*}+\delta t$. During that sliver $\delta t$, the perturbed trajectory is still governed by the *pre-impact* flow $f$, exactly like the nominal one - but by the time it finally crosses, it has drifted further along $f$ than a naive "just apply $DR$ to the perturbation at time $t^{*}$" calculation would credit it for. An ordinary Jacobian, evaluated only at the fixed instant $t^{*}$, has no way to see this: it silently assumes both trajectories cross at the same instant. Once the guard is close to tangent to the flow (small $Dg\cdot f^{-}$, i.e. a shallow, near-grazing crossing), this timing effect can dominate the reset map's own contribution.
+
+The correct sensitivity of "post-impact state, at its own natural post-impact time" with respect to "pre-impact state, at its own natural pre-impact time" has to account for that time-shift. That correct sensitivity is the **saltation matrix**, $\Xi$ - the ordinary reset Jacobian $DR$, corrected by a term for exactly this event-timing sensitivity. §3 below shows this correction is a rank-one projector removing exactly the "along-the-flow" component of a perturbation - the part that only changes *when* the guard is crossed, not *where*.
+
+At a smooth (non-event) point, the ordinary Jacobian $A = \partial f/\partial x$ is all there is - perturbations evolve continuously and there is no timing ambiguity to correct for. At a hybrid event, $\Xi$ plays that same role but must additionally carry the event-time correction:
+
+| Smooth dynamics | Hybrid event |
+| --- | --- |
+| Perturbation evolves continuously | Perturbation can jump discontinuously |
+| Linearization: $A = \partial f/\partial x$ | Linearization: saltation matrix $\Xi$ |
+| No event-time correction needed | Must correct for the crossing-time shift $\delta t$ |
 
 ## 3. Deriving $\Xi$ - including a wrong turn, caught by verification
 
@@ -28,6 +48,8 @@ This is wrong because $DR$ is the Jacobian of "apply the reset to a state alread
 $$\Xi_{\text{wrong}} = DR + \frac{\big[f^{+}(x^{+}) - DR\,f^{-}(x^{-})\big] \otimes Dg}{Dg \cdot f^{-}(x^{-})}$$
 
 ($f^{-}$, $f^{+}$ the pre-/post-impact vector fields, $Dg$ the guard's gradient, $\otimes$ an outer product). It's dimensionally sensible and structurally plausible. It is also **not** the saltation matrix: checked against a from-scratch finite-difference ground truth (perturb the pre-impact state, re-land it on the guard via the pre-impact flow, apply the reset, compare to nominal), the two disagree by $\max|\Xi_{\text{wrong}} - \Xi_{\text{numeric}}| \approx 1.28$ - nowhere near floating-point noise.
+
+This formula is not a fabrication, though - it is a real, standard expression from the hybrid-systems literature, which is exactly why it's easy to reach for. It answers a genuinely different question: it's the correct linearization when two trajectories are compared at a *shared* reference time (as in composing saltation matrices across several events into a single Poincaré-map derivative - see [§7](#7-connection-to-poincaré-maps) below), where the post-event vector field $f^{+}$ needs to be folded back in to account for continued flow past the shared time marker. $\Xi$ above answers a different question - "compare each trajectory at its *own* natural post-event time" - which is what propagating a covariance one event at a time actually needs, and it has no such term. Using the shared-time formula here silently smuggles in a spurious correction for a time-shift this problem doesn't have.
 
 **The correct derivation.** Consider a one-parameter family of trajectories $x(t; p)$ ($p$ a perturbation parameter, $p=0$ nominal), each governed by $\dot x = f(x)$ until a $p$-dependent crossing time $t^{\*}(p)$ defined implicitly by $g\big(x(t^{\*}(p); p)\big) = 0$. Let $S(t) = \left.\dfrac{\partial x(t;p)}{\partial p}\right|_{p=0}$.
 
@@ -81,6 +103,16 @@ This is not a reason to prefer the naive update generally - averaged over the wh
 
 - **Tune the regularizing floor deliberately, not just for numerical stability.** Sweeping `--impact-noise-std` from `0.0005` to `0.02` on this same problem flips which filter looks worse: at very small floors, saltation's exact zero-projection dominates and it comes out *dramatically* worse (NEES in the tens to hundreds vs. the naive filter's ~3); at larger floors (`≥0.02`), the floor itself swamps the structural difference and the two converge to nearly identical, unremarkable NEES. The `~2.4` vs. `~3.6` result quoted in §5 is specific to a floor sized to be "just barely enough" to avoid outright numerical pathology - a deliberate choice, not an arbitrary one, and worth re-checking whenever any of the other parameters change.
 - **Stay well clear of the Zeno regime.** A lossy bounce (`e<1`) produces infinitely many, ever-faster bounces approaching a finite settling time (`~12.4s` for this script's defaults). Well before that time, bounce intervals become comparable to the fixed measurement step `dt`, and comparing a fixed-tick-sampled estimate against a true trajectory that's bouncing many times within a single tick breaks the entire comparison's premise (both filters' NEES explodes into the thousands, for reasons that have nothing to do with the saltation matrix). `--duration`'s default is deliberately chosen to stop after 3 clean, well-separated bounces and before the 4th starts crowding the settling regime.
+
+## 7. Connection to Poincaré maps
+
+Saltation matrices show up in a second, related context: analyzing the stability of a *periodic* hybrid trajectory - e.g. a robot repeatedly bouncing (or, for legged locomotion, repeatedly striking the ground once per stride). Sampling the state once per cycle, at a chosen event, defines a discrete return map $x_{k+1} = P(x_k)$, and its derivative $DP$ governs whether nearby trajectories converge back to the periodic orbit or diverge from it - the hybrid-systems analogue of eigenvalue stability analysis for a fixed point.
+
+Over one cycle, $DP$ is a product of continuous-flow Jacobians and saltation matrices, one of each per phase and event the cycle passes through. Write $\Phi$ for the flow's own state-transition Jacobian over a smooth phase - the finite-time integral of the same $A = \partial f/\partial x$ from §2's table, concretely the `Phi` that this repo's `flow()` function already returns alongside the propagated state - and $\Xi$ for the saltation matrix at each event; e.g. for a cycle with three flow phases and two events in between:
+
+$$DP \approx \Phi_3\,\Xi_2\,\Phi_2\,\Xi_1\,\Phi_1$$
+
+This is the setting §3's "wrong turn" formula is actually built for: composing several such factors requires comparing every trajectory in the family against a single shared timeline running through the whole cycle, which is exactly what that formula's extra $f^{+}$ term supplies. This script never needs that composition - it propagates one covariance forward through one event at a time - so $\Xi$ alone, without the shared-timeline correction, is the right and complete tool here.
 
 ## Appendix: related terms
 
