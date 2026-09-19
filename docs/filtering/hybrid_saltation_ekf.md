@@ -53,7 +53,7 @@ It's worth seeing the two approaches disagree on an actual number, not just abst
 
 The naive approach isn't slightly off here, it's qualitatively wrong: it says a pure position perturbation can never affect the bounce speed, when in fact it's the *entire* effect in this example. $DR$ cannot see this because it has no notion of time at all - it only knows how to transform a state that is already sitting on the guard. $\Xi$ sees it because its correction term is built specifically to capture "this trajectory needed a different amount of falling time to get here."
 
-(Computed directly from this repo's own `flow`, `crossing_time`, `reset_map`, `reset_jacobian`, and `saltation_matrix` functions in `saltation_matrix_ekf.py`, not hand-derived - reproducible with $x^{-}_0=(0,0,5,0,0,-2)$, $\delta x_0=(0,0,0.05,0,0,0)$, $e=0.5$, $g=9.81$.)
+(Computed directly from this repo's own `flow`, `crossing_time`, `reset_map`, `reset_jacobian`, and `saltation_matrix` functions in `saltation_matrix_ekf.py`, not hand-derived - reproducible with $x^{-}_0=(0,0,5,0,0,-2)$, $\delta x_0=(0,0,0.05,0,0,0)$, $e=0.5$, $g=9.81$. See the [Appendix](#worked-arithmetic-behind-the-bounce-speed-numbers) for these three numbers worked out by hand, with a calculator - no code required.)
 
 ## 4. Deriving $\Xi$ - including a wrong turn, caught by verification
 
@@ -134,3 +134,33 @@ This is the setting §4's "wrong turn" formula is actually built for: composing 
 - **Guard condition/reset map**: the switching-surface function $g(x)=0$ and the (possibly discontinuous) map $R$ applied when a trajectory reaches it - the two ingredients that make a system "hybrid" rather than purely continuous.
 - **NEES (Normalized Estimation Error Squared)**: $(x_{\text{true}} - x_{\text{est}})^\top P^{-1} (x_{\text{true}} - x_{\text{est}})$. A well-calibrated $n$-DoF filter's NEES should average to $n$ across many independent trials; systematically larger values mean the filter's reported $P$ is too small (overconfident) for the errors it's actually making. See [pose_graph_optimization.md §15.3](../optimization/pose_graph_optimization.md#153-objective-function) for the closely-related Mahalanobis-distance framing already used elsewhere in this repo.
 - **Zeno behavior**: a hybrid system undergoing infinitely many discrete transitions in a finite time interval - the generic long-run behavior of any lossy bouncing system, and a standard pathology to guard against in hybrid-system simulation, not specific to saltation matrices themselves.
+
+### Worked arithmetic behind the bounce-speed numbers
+
+§3's three numbers (naive $0$, true $+0.0242$, saltation $+0.0243$) worked out by hand, with a calculator - no code required. Uses §3's own reproducibility parameters: $x^{-}_0=(0,0,5,0,0,-2)$ (so $p_z^0=5$, $v_z^0=-2$), $\delta x_0=(0,0,0.05,0,0,0)$ (so $\delta p_z^0 = 0.05$), $e=0.5$, $g=9.81$.
+
+**Nominal crossing.** Free-fall height is $p_z(t) = p_z^0 + v_z^0 t - \tfrac12 g t^2$. Solve $5 - 2t - 4.905t^2 = 0$ for the positive root:
+
+$$t^{\*} = \frac{-2+\sqrt{2^2+4(4.905)(5)}}{2(4.905)} = \frac{-2+\sqrt{102.1}}{9.81} \approx 0.82614\ \text{s}$$
+
+Velocity there: $v_z^{-} = -2 - 9.81(0.82614) \approx -10.1045\ \text{m/s}$. Post-bounce: $v_z^{+} = -e\,v_z^{-} \approx +5.0522\ \text{m/s}$.
+
+**Naive prediction ($0$).** $DR=\text{diag}(1,1,1,1,1,-e)$ only touches the velocity slot, and $\delta x_0$'s velocity slot is $0$: a pure position offset stays a pure position offset under free-fall (position never feeds back into the dynamics), so $DR$ is handed $0$ in that slot and returns $0$. No simulation needed - just that $DR$'s only nonzero action lands on a component that's zero here.
+
+**True answer ($+0.0242$).** Solve the same quadratic with $p_z^0=5.05$ (the perturbed ball's own crossing):
+
+$$t^{\*}_{\text{pert}} = \frac{-2+\sqrt{4+4(4.905)(5.05)}}{9.81} \approx 0.83108\ \text{s}, \qquad \delta t \approx 0.004936\ \text{s (}\sim\!4.94\text{ms extra fall)}$$
+
+$v_z^{-}(\text{pert}) = -2-9.81(0.83108)\approx -10.1529\ \text{m/s}$, so $v_z^{+}(\text{pert}) = -e\,v_z^{-}(\text{pert}) \approx +5.0764\ \text{m/s}$.
+
+$$\text{True change} = 5.0764-5.0522 \approx +0.02421\ \text{m/s}$$
+
+**Saltation prediction ($+0.0243$).** From §4's formula $\Xi = DR\left[I - \dfrac{f(x^{-})\otimes Dg}{Dg\cdot f(x^{-})}\right]$, the scalar $\dfrac{Dg\cdot\delta x_0}{Dg\cdot f(x^{-})} = \dfrac{0.05}{-10.1045}\approx -0.004948$ is precisely §4's linearized crossing-time-shift formula, $dt^{\*}/dp$, evaluated here - compare it to the true $-\delta t \approx -0.004936$ just above: close but not identical, since it's only a first-order estimate of the shift. That's the origin of §3's "matches to within second-order error."
+
+The $B$-projector step turns that position offset into an *equivalent velocity offset*, using $f_5=-g$ (the $v_z$-component of $f$, i.e. gravity, is constant):
+
+$$(B\,\delta x_0)_{v_z} = 0-(-9.81)(-0.004948) \approx -0.04854\ \text{m/s}$$
+
+Read this as: *starting 5cm higher behaves, to first order, like starting at the same height but already falling $\approx 0.0485\,\text{m/s}$ faster* - which is a language $DR$ already knows how to handle. Applying $DR$'s bounce law to that equivalent velocity gives the saltation prediction:
+
+$$\text{Saltation change} = -e\times(-0.04854) \approx +0.02427\ \text{m/s}$$
