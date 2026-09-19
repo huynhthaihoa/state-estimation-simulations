@@ -6,10 +6,10 @@ Every filter in [kf_ekf_iekf.md](kf_ekf_iekf.md) and [extra_kf_variants.md](extr
 
 A **hybrid dynamical system** alternates continuous flow with instantaneous discrete jumps, triggered by a **guard condition** and applied via a **reset map**:
 
-- **State**: $x = (p, v) \in \mathbb{R}^6$ with $p, v \in \mathbb{R}^3$ - a point mass's position and velocity, plain $\mathbb{R}^6$ (no rotation, unlike every other script in this repo).
+- **State**: $x = (p, v) \in \mathbb{R}^6$ with $p, v \in \mathbb{R}^3$ - a point mass's position and velocity, plain $\mathbb{R}^6$ (no rotation, unlike most scripts in this repo).
 - **Flow**: $\dot x = f(x) = \begin{bmatrix} v \\ (0,0,-g) \end{bmatrix}$ - ordinary free-fall, exactly linear in $x$.
-- **Guard**: $g(x) = p_z$. The system jumps whenever a falling trajectory reaches $g(x) = 0$ (touches the ground).
-- **Reset map**: $R(x)$, applied at the guard - here, $v_z \mapsto -e\,v_z$ (an inelastic bounce with restitution $e$), position and horizontal velocity untouched.
+- **Guard**: $g(x) = p_z$. The system jumps whenever a falling trajectory reaches $g(x) = 0$ (touches the ground). Its gradient $Dg = \partial g/\partial x$ - which shows up throughout this doc, starting in §2 - is the constant row vector $(0,0,1,0,0,0)$ here: it just picks out the $p_z$ component.
+- **Reset map**: $R(x)$, applied at the guard - here, $v_z \mapsto -e\,v_z$ (an inelastic bounce with restitution $e$), position and horizontal velocity untouched. Throughout this doc, a superscript $-$/$+$ on a state or vector field (e.g. $x^{-}$, $f^{-}$, $x^{+}$, $f^{+}$) means "evaluated just before/after the reset."
 
 This is the textbook canonical example (the word "saltation" is Latin for "leaping"), and it is the simplest possible analog of a foot-strike/ground-contact impact - a discrete velocity reset at a discrete contact event - without $SE(3)$'s rotational complexity layered on top.
 
