@@ -2,6 +2,8 @@
 
 Every filter in [kf_ekf_iekf.md](kf_ekf_iekf.md) and [extra_kf_variants.md](extra_kf_variants.md) assumes the state evolves *continuously* between measurements. Bio-inspired locomotion (a footstep, an inchworm anchor/release cycle, a friction-anisotropic grip-then-slip transition) breaks that assumption on purpose, not by accident: the whole point of these platforms is to move in discrete, hybrid bursts. This doc works through the tool that lets an EKF cross one of those discontinuities without either (a) silently pretending nothing happened, or (b) discarding all uncertainty information at the jump - using [`saltation_matrix_ekf.py`](../../use_numpy/saltation_matrix_ekf.py)'s bouncing-point-mass toy problem as the concrete example.
 
+> **Note (reading order)**: §1-§3 carry the core idea - why an ordinary reset Jacobian isn't enough, and a worked example showing it's wrong by a real, non-tiny amount. That's enough for a first read. §4 is a from-scratch derivation (with a documented wrong turn kept deliberately, as a teaching point) - useful once you want to trust the formula yourself, skippable if you're willing to take it on faith for now. §5-§7 are the practical payoff (a structural property, a counterintuitive empirical finding, and tuning gotchas) and are worth reading even if §4 is skipped. §8 is an explicit tangent into a different, related context (periodic-orbit stability) that this script's own use case never needs - safe to skip entirely unless that's what brought you here.
+
 ## 1. What a hybrid dynamical system is, here
 
 A **hybrid dynamical system** alternates continuous flow with instantaneous discrete jumps, triggered by a **guard condition** and applied via a **reset map**:
@@ -95,7 +97,7 @@ The catch: this exact-zero claim is only trustworthy if the filter's *own* estim
 
 ## 6. The empirical finding: not "naive is overconfident, saltation fixes it"
 
-The intuitive story going in was that the naive $P^{+} = DR\,P^{-}\,DR^\top$ update would be measurably overconfident (too-small reported uncertainty) right after each bounce compared to the saltation-corrected one, and a Monte Carlo NEES (Normalized Estimation Error Squared) consistency check would show it. That is not what happens.
+The intuitive story going in was that the naive $P^{+} = DR\,P^{-}\,DR^\top$ update would be measurably overconfident (too-small reported uncertainty) right after each bounce compared to the saltation-corrected one, and a Monte Carlo NEES (Normalized Estimation Error Squared - a per-trial score for how far the true state falls from the estimate relative to how much uncertainty $P$ claims; a well-calibrated 6-DoF filter should average NEES $\approx 6$, and *persistently* higher values mean $P$ is too small for the errors actually being made - full formula in the [Appendix](#appendix-related-terms)) consistency check would show it. That is not what happens.
 
 Running `saltation_matrix_ekf.py` at its defaults (300+ Monte Carlo trials, 3 well-separated bounces from a 5m drop at `e=0.85`) and looking at NEES in the few ticks immediately following each bounce (excluding the shared spike at the bounce tick itself, which both filters exhibit for the mundane reason that the true trajectory is also close to its own crossing at that tick):
 
