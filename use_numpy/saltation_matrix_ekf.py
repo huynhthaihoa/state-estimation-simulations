@@ -708,7 +708,7 @@ def main():
     ax_nees.plot(t_hist, nees_salt, label="EKF (saltation)", color="tab:blue")
     ax_nees.axhline(6.0, color="black", linestyle="-", linewidth=1, label="Expected NEES (6 DoF)")
     ax_nees.axhline(CHI2_6DOF_95, color="black", linestyle="--", linewidth=1, label="Chi-squared 95% bound")
-    ax_nees.set_ylabel("Monte Carlo avg. NEES")
+    ax_nees.set_ylabel(f"Monte Carlo avg. NEES ({args.n_mc_trials} trials)")
     ax_nees.set_xlabel("Time (s)")
     ax_nees.set_yscale("log")
     ax_nees.legend()
