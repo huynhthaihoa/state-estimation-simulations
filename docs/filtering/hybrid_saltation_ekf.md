@@ -51,7 +51,7 @@ It's worth seeing the two approaches disagree on an actual number, not just abst
 - **True answer** (re-simulated: let the second ball reach its own crossing time, apply the reset there, compare): starting $5\text{cm}$ higher means falling for an extra $\sim\!5\text{ms}$ before impact, so it's moving faster when it lands, and bounces back faster too. True change in post-bounce vertical speed: **$+0.0242\ \text{m/s}$**.
 - **Saltation-corrected prediction** ($\Xi$ applied the same way): **$+0.0243\ \text{m/s}$** - matches to within second-order error.
 
-The naive approach isn't slightly off here, it's qualitatively wrong: it says a pure position perturbation can never affect the bounce speed, when in fact it's the *entire* effect in this example. $DR$ cannot see this because it has no notion of time at all - it only knows how to transform a state that is already sitting on the guard. $\Xi$ sees it because its correction term is built specifically to capture "this trajectory needed a different amount of falling time to get here."
+The naive approach isn't slightly off here; it's qualitatively wrong: it says a pure position perturbation can never affect the bounce speed, when in fact it's the *entire* effect in this example. $DR$ cannot see this because it has no notion of time at all - it only knows how to transform a state that is already sitting on the guard. $\Xi$ sees it because its correction term is built specifically to capture "this trajectory needed a different amount of falling time to get here."
 
 (Computed directly from this repo's own `flow`, `crossing_time`, `reset_map`, `reset_jacobian`, and `saltation_matrix` functions in `saltation_matrix_ekf.py`, not hand-derived - reproducible with $x^{-}_0=(0,0,5,0,0,-2)$, $\delta x_0=(0,0,0.05,0,0,0)$, $e=0.5$, $g=9.81$. See the [Appendix](#worked-arithmetic-behind-the-bounce-speed-numbers) for these three numbers worked out by hand, with a calculator - no code required.)
 
@@ -161,6 +161,6 @@ The $B$-projector step turns that position offset into an *equivalent velocity o
 
 $$(B\,\delta x_0)_{v_z} = 0-(-9.81)(-0.004948) \approx -0.04854\ \text{m/s}$$
 
-Read this as: *starting 5cm higher behaves, to first order, like starting at the same height but already falling $\approx 0.0485\,\text{m/s}$ faster* - which is a language $DR$ already knows how to handle. Applying $DR$'s bounce law to that equivalent velocity gives the saltation prediction:
+Read this as: *starting 5cm higher behaves, to first order, like starting at the same height but already falling ≈0.0485m/s faster* - which is a language $DR$ already knows how to handle. Applying $DR$'s bounce law to that equivalent velocity gives the saltation prediction:
 
 $$\text{Saltation change} = -e\times(-0.04854) \approx +0.02427\ \text{m/s}$$
