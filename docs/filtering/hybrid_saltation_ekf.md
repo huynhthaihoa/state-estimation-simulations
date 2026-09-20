@@ -6,7 +6,7 @@ Every filter in [kf_ekf_iekf.md](kf_ekf_iekf.md) and [extra_kf_variants.md](extr
 
 ## 1. What a hybrid dynamical system is, here
 
-A **hybrid dynamical system** alternates continuous flow with instantaneous discrete jumps, triggered by a **guard condition** and applied via a **reset map**:
+A **hybrid dynamical system** alternates **continuous flow** with **instantaneous discrete jumps**, triggered by a **guard condition** and applied via a **reset map**:
 
 - **State**: $x = (p, v) \in \mathbb{R}^6$ with $p, v \in \mathbb{R}^3$ - a point mass's position and velocity, plain $\mathbb{R}^6$ (no rotation, unlike most scripts in this repo).
 - **Flow**: $\dot x = f(x) = \begin{bmatrix} v \\ (0,0,-g) \end{bmatrix}$ - ordinary free-fall, exactly linear in $x$.
