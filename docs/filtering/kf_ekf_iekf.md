@@ -59,7 +59,7 @@ Every KF cycle alternates two steps, each carrying its own uncertainty as a **co
 
 - **Prediction step**: push the last estimate through the motion model, and grow $P$ by however uncertain that model is ($Q$):
 
-     $$\hat x_{k}^- = F\hat x_{k-1} \qquad P_k^- = FP_{k-1}F^\top + Q$$
+     $${{\hat{x_k}}^{-} = F\hat{x_{k-1}} \qquad P_{k}^{-} = FP_{k-1}F^{\top} + Q}$$
 
 - **Measurement update step**: compare the predicted measurement $H\hat x_k^-$ against what actually arrived ($z_k$), and blend the two using the **Kalman gain** $K_k$:
 
@@ -133,18 +133,19 @@ the EKF computes: $F_k = \frac{\partial f}{\partial x}$
 
 That's the Jacobian.
 
-Then it uses this local linear approximation inside the normal Kalman equations. Concretely, plugging that Jacobian into §1's exact same two-step cycle:
+Then it uses this local linear approximation inside the normal Kalman equations. Concretely, plugging that Jacobian into §1's same two-step cycle:
 
 - **Prediction step**: propagate the mean through the *exact* nonlinear $f$ (not a linear approximation of it - only $P$'s growth is linearized), and grow $P$ using the Jacobian $F_k$:
 
-     $$\hat x_k^- = f(\hat x_{k-1}, u_{k-1}) \qquad F_k = \frac{\partial f}{\partial x}\Big|_{\hat x_{k-1}} \qquad P_k^- = F_kP_{k-1}F_k^\top + Q$$
+     $${\hat{x_k}^{-} = f(\hat{x_{k-1}}, u_{k-1})} \qquad {F_k = \frac{\partial f}{\partial x}}\Big|{ \hat{x_{k-1}}} \qquad {{P_k}^{-} = {F_k}{P_{k-1}}{{F_k}^\top} + Q}$$
+
 
 - **Measurement update step**: identical structure to §1's KF, but with a fresh measurement Jacobian $H_k$, and the innovation computed against the exact nonlinear measurement function $h$ (for $z_k = h(x_k)+v$):
 
      $$H_k = \frac{\partial h}{\partial x}\Big|_{\hat x_k^-} \qquad K_k = P_k^-H_k^\top(H_kP_k^-H_k^\top+R)^{-1}$$
      $$\hat x_k = \hat x_k^- + K_k\big(z_k-h(\hat x_k^-)\big) \qquad P_k = (I-K_kH_k)P_k^-$$
 
-So the only two changes from §1's linear KF are: (a) the mean propagates through the true nonlinear $f$/$h$ instead of a fixed linear $F$/$H$, and (b) $F_k$/$H_k$ are **re-linearized at the current estimate every single step**, rather than being fixed matrices computed once. That second point is exactly the "Jacobians evaluated at the drifting state estimate" issue the next subsection digs into.
+So the only two changes from §1's linear KF are: (a) the mean propagates through the true nonlinear $f$ / $h$ instead of a fixed linear $F$ / $H$, and (b) $F_k$ / $H_k$ are **re-linearized at the current estimate every single step**, rather than being fixed matrices computed once. That second point is exactly the "Jacobians evaluated at the drifting state estimate" issue the next subsection digs into.
 
 ### Intuition
 
@@ -175,7 +176,7 @@ Rotations are not ordinary vectors.
 
 In 2D, composing rotations is easy: rotating by 90° and then another 90° just adds the angles, $90^\circ + 90^\circ = 180^\circ$, and the order doesn't matter.
 
-In 3D it's not that simple. Rotate an object 90° about the x-axis, then 90° about the y-axis, and you get a different orientation than doing it in the reverse order:
+In 3D, it's not that simple. Rotate an object 90° about the x-axis, then 90° about the y-axis, and you get a different orientation than doing it in the reverse order:
 
 $$R_x(90^\circ)\,R_y(90^\circ) \neq R_y(90^\circ)\,R_x(90^\circ)$$
 
@@ -216,7 +217,7 @@ Suppose both robots observe the **same relative motion**.
 If you change the global coordinate system:
 
 ```text
-Before                         After changing frame
+Before                         and after changing the frame
 
      ↑                               ↗
      ●                               ●
@@ -296,7 +297,7 @@ $$\hat T_k^- = \hat T_{k-1}\exp(u_{k-1}\Delta t) \qquad P_k^- = J_{\text{self}}\
 
 | | EKF (world-frame residual) | IEKF (body-frame residual) |
 | --- | --- | --- |
-| Residual | $r_k = z_k - \big(R_{\text{pred}}\,p_i + t_{\text{pred}}\big)$ | $r_k = \big(R_{\text{pred}}^\top(z_k - t_{\text{pred}})\big) - p_i$ |
+| Residual | $r_k = z_k - \big(R_{\text{pred}})$ $p_i + t_{\text{pred}}\big)$ | $r_k = \big(R_{\text{pred}}^\top(z_k - t_{\text{pred}})\big) - p_i$ |
 | Jacobian $H$ | $\begin{bmatrix}R_{\text{pred}} & -R_{\text{pred}}\,p_i^\wedge\end{bmatrix}$ | $\begin{bmatrix}I & -p_i^\wedge\end{bmatrix}$ |
 | Depends on current estimate? | Yes - $R_{\text{pred}}$ appears in $H$ itself | **No** - only the fixed, known $p_i$ appears |
 
@@ -305,7 +306,7 @@ $$K_k = P_k^-H^\top(HP_k^-H^\top+R)^{-1} \qquad \hat T_k = \hat T_k^-\exp(K_k r_
 
 **Why this is the whole point of §2 and §5, made concrete.** The EKF's $H$ has $R_{\text{pred}}$ baked into it - a fresh, drift-dependent linearization every step, exactly the failure mode §2 describes in the abstract. The IEKF's $H$ never mentions $R_{\text{pred}}$ at all: it's built purely from the group action (rotating the *measurement* into the body frame, rather than rotating the *known points* into the world frame), which is precisely §5's "linearized error dynamics independent of the current state estimate." Nothing here is unique to point clouds - it's the general IEKF recipe (express the residual via the group action, and watch the state-dependence cancel out of $H$) applied to one worked example.
 
-One more thing worth internalizing from this side-by-side view: under isotropic measurement noise, these two residual/Jacobian pairs turn out to produce *exactly* the same $K_k r_k$ correction every step (see §7) - $R_{\text{pred}}$ cancels out of the Kalman gain algebraically, since it's an orthogonal matrix acting identically on both sides of the update. So on *this* benchmark, IEKF's advantage isn't accuracy, it's that $H$ never needs to be rebuilt from $R_{\text{pred}}$ - a computational and structural win, not (yet) a statistical one. §7 covers when that changes.
+One more thing worth internalizing from this side-by-side view: under isotropic measurement noise, these two residual/Jacobian pairs turn out to produce *exactly* the same $K_k r_k$ correction every step (see §7) - $R_{\text{pred}}$ cancels out of the Kalman gain algebraically, since it's an orthogonal matrix acting identically on both sides of the update. So on *this* benchmark, IEKF's advantage isn't accuracy; it's that $H$ never needs to be rebuilt from $R_{\text{pred}}$ - a computational and structural win, not (yet) a statistical one. §7 covers when that changes.
 
 ---
 
