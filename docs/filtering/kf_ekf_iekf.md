@@ -137,7 +137,7 @@ Then it uses this local linear approximation inside the normal Kalman equations.
 
 - **Prediction step**: propagate the mean through the *exact* nonlinear $f$ (not a linear approximation of it - only $P$'s growth is linearized), and grow $P$ using the Jacobian $F_k$:
 
-     $${\hat{x_k}^{-} = f(\hat{x_{k-1}}, u_{k-1})} \qquad {F_k = \frac{\partial f}{\partial x}}\Big|{ \hat{x_{k-1}}} \qquad {{P_k}^{-} = {F_k}{P_{k-1}}{{F_k}^\top} + Q}$$
+     $${\hat{x_k}^{-} = f(\hat{x_{k-1}}, u_{k-1})} \qquad {F_k = \frac{\partial f}{\partial x}}\Big|_{\hat{x_{k-1}}} \qquad {{P_k}^{-} = {F_k}{P_{k-1}}{{F_k}^\top} + Q}$$
 
 
 - **Measurement update step**: identical structure to §1's KF, but with a fresh measurement Jacobian $H_k$, and the innovation computed against the exact nonlinear measurement function $h$ (for $z_k = h(x_k)+v$):
@@ -279,11 +279,9 @@ That's a much more natural representation for robot motion.
 
 **A caveat worth remembering**: using $R = \hat R \exp(\delta\theta^\wedge)$ instead of $R - \hat R$ is, by itself, just a *manifold* or *multiplicative* error representation - it is not automatically "invariant." Plenty of widely-used filters (ESKF, MEKF, the error-state formulations behind most VIO pipelines) already define their error this way without being IEKFs. What earns the name **invariant** is a further, more specific choice: picking the error so that it's built from the group action itself (left- or right-invariant), which makes the *linearized error dynamics* independent of the current state estimate. That's the property that actually fixes the consistency problem from §2 - not the exp/log notation on its own.
 
----
+### EKF vs. IEKF, equations side by side
 
-## 5.5. EKF vs. IEKF, equations side by side
-
-§2 wrote down the EKF's predict/update cycle for an ordinary vector state. §5 explained *why* IEKF defines its error differently, but never wrote its equations down. This section does both, on the same concrete example §1 and §7 already use: tracking a pose $T\in SE(3)$ against a known point cloud (`run_ekf`/`run_iekf` in [pointcloud_pose_tracking.py](../../use_numpy/pointcloud_pose_tracking.py)). The point isn't just to see more formulas - it's to see the *one* line where EKF and IEKF actually diverge, since every other line is identical.
+§2 wrote down the EKF's predict/update cycle for an ordinary vector state; the subsections above explained *why* IEKF defines its error differently, but never wrote its equations down. This subsection does both, on the same concrete example §1 and §7 already use: tracking a pose $T\in SE(3)$ against a known point cloud (`run_ekf`/`run_iekf` in [pointcloud_pose_tracking.py](../../use_numpy/pointcloud_pose_tracking.py)). The point isn't just to see more formulas - it's to see the *one* line where EKF and IEKF actually diverge, since every other line is identical.
 
 **Shared setup.** State $T$ (a pose, not a vector) with 6x6 tangent covariance $P$; a per-step body-frame twist input $u$; a point cloud $\{p_i\}$ known in the object's own body frame, observed as noisy world-frame points $z_i$.
 
@@ -304,7 +302,7 @@ $$\hat T_k^- = \hat T_{k-1}\exp(u_{k-1}\Delta t) \qquad P_k^- = J_{\text{self}}\
 Both then finish identically:
 $$K_k = P_k^-H^\top(HP_k^-H^\top+R)^{-1} \qquad \hat T_k = \hat T_k^-\exp(K_k r_k) \qquad P_k = (I-K_kH)P_k^-$$
 
-**Why this is the whole point of §2 and §5, made concrete.** The EKF's $H$ has $R_{\text{pred}}$ baked into it - a fresh, drift-dependent linearization every step, exactly the failure mode §2 describes in the abstract. The IEKF's $H$ never mentions $R_{\text{pred}}$ at all: it's built purely from the group action (rotating the *measurement* into the body frame, rather than rotating the *known points* into the world frame), which is precisely §5's "linearized error dynamics independent of the current state estimate." Nothing here is unique to point clouds - it's the general IEKF recipe (express the residual via the group action, and watch the state-dependence cancel out of $H$) applied to one worked example.
+**Why this is the whole point of §2 and this section's own caveat, made concrete.** The EKF's $H$ has $R_{\text{pred}}$ baked into it - a fresh, drift-dependent linearization every step, exactly the failure mode §2 describes in the abstract. The IEKF's $H$ never mentions $R_{\text{pred}}$ at all: it's built purely from the group action (rotating the *measurement* into the body frame, rather than rotating the *known points* into the world frame), which is precisely the "invariant" caveat's "linearized error dynamics independent of the current state estimate," from earlier in this section. Nothing here is unique to point clouds - it's the general IEKF recipe (express the residual via the group action, and watch the state-dependence cancel out of $H$) applied to one worked example.
 
 One more thing worth internalizing from this side-by-side view: under isotropic measurement noise, these two residual/Jacobian pairs turn out to produce *exactly* the same $K_k r_k$ correction every step (see §7) - $R_{\text{pred}}$ cancels out of the Kalman gain algebraically, since it's an orthogonal matrix acting identically on both sides of the update. So on *this* benchmark, IEKF's advantage isn't accuracy; it's that $H$ never needs to be rebuilt from $R_{\text{pred}}$ - a computational and structural win, not (yet) a statistical one. §7 covers when that changes.
 
