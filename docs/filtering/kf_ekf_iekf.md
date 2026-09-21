@@ -297,8 +297,8 @@ $$\hat T_k^- = \hat T_{k-1}\exp(u_{k-1}\Delta t) \qquad P_k^- = J_{\text{self}}\
 
 | | EKF (world-frame residual) | IEKF (body-frame residual) |
 | --- | --- | --- |
-| Residual | $r_k = z_k - \big(R_{\text{pred}})$ $p_i + t_{\text{pred}}\big)$ | $r_k = \big(R_{\text{pred}}^\top(z_k - t_{\text{pred}})\big) - p_i$ |
-| Jacobian $H$ | $\begin{bmatrix}R_{\text{pred}} & -R_{\text{pred}}\,p_i^\wedge\end{bmatrix}$ | $\begin{bmatrix}I & -p_i^\wedge\end{bmatrix}$ |
+| Residual | $r_k = z_k - \big(R_{\text{pred}}\,p_i + t_{\text{pred}}\big)$ | $r_k = \big(R_{\text{pred}}^\top(z_k - t_{\text{pred}})\big) - p_i$ |
+| Jacobian $H$ | $\left[R_{\text{pred}} \;\; -R_{\text{pred}}\,p_i^\wedge\right]$ | $\left[I \;\; -p_i^\wedge\right]$ |
 | Depends on current estimate? | Yes - $R_{\text{pred}}$ appears in $H$ itself | **No** - only the fixed, known $p_i$ appears |
 
 Both then finish identically:
