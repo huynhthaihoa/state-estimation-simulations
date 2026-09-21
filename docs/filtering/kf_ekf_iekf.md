@@ -137,8 +137,7 @@ Then it uses this local linear approximation inside the normal Kalman equations.
 
 - **Prediction step**: propagate the mean through the *exact* nonlinear $f$ (not a linear approximation of it - only $P$'s growth is linearized), and grow $P$ using the Jacobian $F_k$:
 
-     $${\hat{x_k}^{-} = f(\hat{x_{k-1}}, u_{k-1})} \qquad {F_k = \frac{\partial f}{\partial x}}\Big|_{\hat{x_{k-1}}} \qquad {{P_k}^{-} = {F_k}{P_{k-1}}{{F_k}^\top} + Q}$$
-
+     $$\hat x_k^- = f(\hat x_{k-1}, u_{k-1}) \qquad F_k = \frac{\partial f}{\partial x}\Big|_{\hat x_{k-1}} \qquad P_k^- = F_kP_{k-1}F_k^\top + Q$$
 
 - **Measurement update step**: identical structure to §1's KF, but with a fresh measurement Jacobian $H_k$, and the innovation computed against the exact nonlinear measurement function $h$ (for $z_k = h(x_k)+v$):
 
