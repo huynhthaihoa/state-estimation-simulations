@@ -140,19 +140,40 @@ This is precisely what `filtering_smoothing.md §10`'s "fixed-lag smoothing" box
 
 ---
 
-## 8. What this repo implements (and doesn't)
+## 8. What this repo implements
 
-This doc is conceptual only - unlike most docs in `optimization/`, there is no accompanying script in `use_numpy/` or `use_manif/` that performs marginalization. `pose_graph_incremental.py` (behind [isam2_optimization.md](isam2_optimization.md)) grows its graph but never drops a variable from it. A reader wanting to exercise §4 for real would extend that script to marginalize its oldest node once a fixed window size is exceeded - a natural follow-up, not something currently implemented here.
+[`sliding_window_marginalization.py`](../../use_numpy/sliding_window_marginalization.py) implements exactly the follow-up this section used to say was missing: it streams a chain of odometry edges one node at a time, keeps at most `window_size` poses live in memory, and marginalizes the oldest one out via §4's Schur complement whenever a new node would exceed that. The marginal is represented as a genuine prior factor - a frozen reference pose plus an information matrix, re-linearized against the *current* estimate every solve, exactly like an ordinary edge - rather than a frozen linear term, which is the only representation that stays correct as the surviving poses keep moving across later windows.
+
+Two deliberate scope choices, both flagged directly in the script:
+- **Pure odometry chain, no loop closures.** The oldest pose in a chain window is connected to exactly one surviving neighbor, so marginalizing it produces a *provably unary* prior - verified directly by a test that checks the Schur-complement correction term is exactly zero everywhere outside that one block. §5's fill-in problem (a real cost once a marginalized node had *multiple* neighbors - a landmark, an IMU-bias variable, or a loop closure) is a genuinely different problem, already covered by [`bayes_tree.md`](bayes_tree.md)/[`isam2_optimization.md`](isam2_optimization.md) and by `pose_graph_incremental.py`'s own loop-closure handling; this script isolates the memory-*bounding* property alone.
+- **No First-Estimate Jacobians (§6).** Every pose's Jacobian, including the prior factor's own, is re-evaluated at its newest estimate on every solve - the textbook source of the mild overconfidence FEJ exists to fix. Not implemented here, the same way `pose_graph_incremental.py` explicitly flags what it doesn't implement relative to iSAM2.
+
+## 9. Empirical verification: bounded vs. unbounded, for real
+
+`sliding_window_marginalization.py` compares this bounded approach against `run_full_batch_growing` - the unbounded baseline that re-solves the entire graph from scratch at every new node, exactly the strategy §1 opens with. Since output bookkeeping (final pose estimates for every node, kept only for this script's own error reporting) is unavoidably $O(n)$ for *both* approaches alike, the metric that actually isolates the algorithmic claim is the size of the largest dense information matrix either one ever assembles and solves - reported here as `max_dof`, with an approximate byte count for holding that matrix densely ($\text{max\_dof}^2 \times 8$ bytes, float64):
+
+| Trajectory length | Full-batch `max_dof` | Full-batch peak (~bytes) | Sliding-window `max_dof` (window_size=10) | Sliding-window peak (~bytes) |
+| --- | --- | --- | --- | --- |
+| 8 | 48 | 18,432 | 48 | 18,432 |
+| 16 | 96 | 73,728 | 60 | 28,800 |
+| 32 | 192 | 294,912 | 60 | 28,800 |
+| 64 | 384 | 1,179,648 | 60 | 28,800 |
+| 128 | 768 | 4,718,592 | 60 | 28,800 |
+| 256 | 1536 | 18,874,368 | 60 | 28,800 |
+
+Full-batch's system size grows linearly with trajectory length (so its dense-matrix memory grows *quadratically* - visible directly in the table, roughly $4\times$ per doubling of length) and never stops; sliding-window's caps at exactly $6 \times \text{window\_size}$ the moment the window first fills, and never moves again, confirmed identically across multiple seeds (`max_dof` depends only on trajectory length and `window_size`, not on the noise realization). Average per-step wall-clock time tells the same story less starkly (full-batch: $1.5\,\text{ms} \to 61\,\text{ms}$ as length grows $8 \to 256$; sliding-window: $1.6\,\text{ms} \to 7.0\,\text{ms}$, most of that rise happening only *before* the window first fills - once trajectories exceed `window_size`, its per-step time is nearly flat).
+
+**Accuracy is not sacrificed to get this bound - but the reason why is specific to this setup, not a general property of marginalization.** Final RMS position error is *identical* (to displayed precision, every trajectory length, every seed tried) between full-batch and sliding-window. This isn't a coincidence and isn't the general case: with no loop closures anywhere in this chain, no future edge ever reaches back to inform an already-marginalized pose, so there is nothing later solving could have taught an earlier pose that marginalization threw away - the two approaches are solving genuinely equivalent problems. This is exactly why §6's FEJ subtlety matters in general and is silent here: FEJ protects against *inconsistency* that only shows up once a later loop closure or shared landmark reconnects to something already marginalized, which this script's pure-chain scope never triggers. A loop-closure-carrying version of this same script would be expected to show both §5's fill-in cost and a real (if likely small) accuracy gap from skipping FEJ - a natural further extension, not implemented here.
 
 ---
 
-## 9. One-sentence summary
+## 10. One-sentence summary
 
 > **Marginalization is the same variable-elimination step `bayes_tree.md` uses to build a solve order, aimed instead at permanently discarding an old state - turning it into a dense prior factor over whatever it was still connected to, which is exactly the trick that lets sliding-window/fixed-lag smoothers (MSCKF, VINS-Mono) run in bounded memory and time forever, at the cost of a fill-in penalty and a consistency subtlety (FEJ) that full-batch and iSAM2 never have to deal with.**
 
 ---
 
-## 10. References
+## 11. References
 
 1. Sibley, G., Matthies, L., & Sukhatme, G. (2010). *Sliding Window Filter with Application to Planetary Landing*. Journal of Field Robotics, 27(5), 587-608. https://doi.org/10.1002/rob.20360 - the sliding-window/delayed-state-marginalization formulation behind §4 and §7.
 2. Huang, G. P., Mourikis, A. I., & Roumeliotis, S. I. (2009). *A First-Estimates Jacobian EKF for Improving SLAM Consistency*. In Experimental Robotics: The Eleventh International Symposium (pp. 373-382). Springer. https://doi.org/10.1007/978-3-642-00196-3_43 - the FEJ fix behind §6.
