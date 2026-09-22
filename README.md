@@ -39,7 +39,10 @@ Start at [docs/README.md](docs/README.md) for the full index, or [docs/frontend_
 - [bundle_adjustment.py](use_numpy/bundle_adjustment.py): jointly refines camera poses **and** 3D landmarks against pinhole reprojection error - cameras on an arc around a landmark cluster, with a field-of-view cutoff so not every camera observes every landmark. Compares three solvers: **landmarks-only refinement** and **poses-only refinement** (independent $3\times3$/$6\times6$ GN solves, each a "fix one side" strawman) against **full joint bundle adjustment** (coupled dense GN over poses + landmarks, gauge-fixed with a prior factor on the first two camera poses, then [Umeyama-aligned](docs/foundations/umeyama_alignment.md) to ground truth before reporting absolute error, since monocular BA only recovers the scene up to an unknown similarity transform).
 - [bundle_adjustment_advanced.py](use_numpy/bundle_adjustment_advanced.py): Local **and** Global bundle adjustment, run back to back for direct comparison - the real-time-system-behavior counterpart to `bundle_adjustment.py`'s single-batch scene. A camera moves keyframe-by-keyframe along a forward-facing arc through a landmark corridor instead of sitting on a static ring; a covisibility graph builds incrementally, and every new keyframe triggers a bounded local Gauss-Newton/Levenberg-Marquardt solve over an active window (new keyframe + covisible neighbors, with every other observing keyframe held fixed as a rigid anchor), while a periodic Global BA pass jointly re-solves the whole map so far for contrast. Keyframes 0/1 are hard-fixed forever as the gauge anchor - no prior factor needed, unlike `bundle_adjustment.py`, since a hard anchor already pins the gauge with no residual freedom left to constrain. Guards against Gauss-Newton divergence (Levenberg-Marquardt damping) and the classic point-behind-camera reflection ambiguity (`passes_cheirality`/ `cull_invalid_points`) that a weakly-constrained, forward-motion scene can hit but `bundle_adjustment.py`'s densely-observed toy scene never does.
 - [pnp_estimation.py](use_numpy/pnp_estimation.py): Perspective-n-Point (PnP) - triangulation's exact inverse ([docs/frontend/triangulation_pnp.md](docs/frontend/triangulation_pnp.md)): given known 3D points and their observed pixels, recovers the unknown camera pose via a closed-form linear DLT initial guess (specialized to known intrinsics), then a few Gauss-Newton iterations against the true reprojection error. No `use_manif/` counterpart (single-implementation, like `bayes_tree_construction.py`).
-- [saltation_matrix_ekf.py](use_numpy/saltation_matrix_ekf.py): a bouncing point mass ([docs/filtering/hybrid_saltation_ekf.md](docs/filtering/hybrid_saltation_ekf.md)) tracked through discrete ground-contact events by a naive EKF (reset-Jacobian-only covariance handling) vs. a saltation-matrix-corrected EKF, plus a Monte Carlo NEES consistency check (new to this repo). Plain $\mathbb{R}^6$ state (position/velocity, no rotation) - no `use_manif/` counterpart, for the same reason as `bayes_tree_construction.py`.
+- [saltation_matrix_ekf.py](use_numpy/saltation_matrix_ekf.py): a bouncing point mass ([docs/filtering/hybrid_saltation_ekf.md](docs/filtering/hybrid_saltation_ekf.md)) tracked through discrete ground-contact events by a naive EKF (reset-Jacobian-only covariance handling) vs. a saltation-matrix-corrected EKF, plus a Monte Carlo NEES consistency check (new to this repo), and `--detect-time-bias`/`--detect-time-noise-std` params quantifying what happens once contact-detection timing itself is uncertain (doc §8). Plain $\mathbb{R}^6$ state (position/velocity, no rotation) - no `use_manif/` counterpart, for the same reason as `bayes_tree_construction.py`.
+- [inchworm_zupt_ekf.py](use_numpy/inchworm_zupt_ekf.py): a 1D point mass crawling through a known anchor(dwell)/extend gait cycle ([docs/filtering/inchworm_zupt_ekf.md](docs/filtering/inchworm_zupt_ekf.md)), comparing three zero-velocity-update (ZUPT) policies - `never`, `always`, `phase_conditional` - via the same Monte Carlo NEES pattern as `saltation_matrix_ekf.py`. State $x=[p,v]\in\mathbb{R}^2$ - no `use_manif/` counterpart, for the same reason as `saltation_matrix_ekf.py`.
+- [friction_anisotropic_ekf.py](use_numpy/friction_anisotropic_ekf.py): a crawling unicycle on a friction-anisotropic pad ([docs/filtering/friction_anisotropic_ekf.md](docs/filtering/friction_anisotropic_ekf.md)), comparing `isotropic`/`fixed_anisotropic`/`heading_aware` process-noise policies for the position block of $Q$ as the (exact, noise-free) heading rotates through a full loop. Ordinary EKF throughout (heading itself is exact, so no manifold/linearization question is at stake) - no `use_manif/` counterpart for the same reason.
+- [sliding_window_marginalization.py](use_numpy/sliding_window_marginalization.py): gives [docs/optimization/marginalization.md](docs/optimization/marginalization.md) its accompanying script - streams a pure odometry chain, marginalizes the oldest pose via the Schur complement whenever a `--window-size` cap would be exceeded, and compares the resulting bounded-memory solve against `run_full_batch_growing`'s unbounded re-solve-from-scratch baseline across a sweep of trajectory lengths, reusing `pose_graph.py`/`pose_graph_incremental.py`'s building blocks. No `use_manif/` counterpart - the bounded-vs-unbounded scaling result is backend-agnostic.
 
 ### [use_manif/](use_manif/) - Same simulations, on `manifpy`
 
@@ -419,7 +422,7 @@ Plain $\mathbb{R}^6$ state (position/velocity, no rotation) - no `use_manif/` co
 #### Usage
 
 ```
-uv run python use_numpy/saltation_matrix_ekf.py --duration 5.0 --dt 0.02 --restitution 0.85 --gravity 9.81 --drop-height 5.0 --init-horizontal-vel 1.0 0.5 --pos-noise-std 0.03 --process-noise-std 0.3 --impact-noise-std 0.005 --init-pos-noise-std 0.1 --init-vel-noise-std 0.2 --n-mc-trials 500 --seed 0 --out out.png
+uv run python use_numpy/saltation_matrix_ekf.py --duration 5.0 --dt 0.02 --restitution 0.85 --gravity 9.81 --drop-height 5.0 --init-horizontal-vel 1.0 0.5 --pos-noise-std 0.03 --process-noise-std 0.3 --impact-noise-std 0.005 --init-pos-noise-std 0.1 --init-vel-noise-std 0.2 --detect-time-bias 0.0 --detect-time-noise-std 0.0 --n-mc-trials 500 --seed 0 --out out.png
 ```
 
 - `--duration`: simulation length in seconds (default `5.0`) - kept comfortably below the trajectory's own Zeno settling time (bounce intervals shrink geometrically for a lossy bounce; the default stops after 3 well-separated bounces)
@@ -432,6 +435,105 @@ uv run python use_numpy/saltation_matrix_ekf.py --duration 5.0 --dt 0.02 --resti
 - `--process-noise-std`: assumed acceleration-disturbance noise std-dev, $\text{m/s}^2$ (default `0.3`)
 - `--impact-noise-std`: std-dev of the regularizing floor added to `P` at each bounce, both EKF variants (default `0.005`) - not just a numerical-stability knob; which filter's post-bounce NEES comes out higher is sensitive to this value (see the doc)
 - `--init-pos-noise-std`/`--init-vel-noise-std`: std-dev used to perturb the initial position/velocity guess (defaults `0.1`/`0.2`)
+- `--detect-time-bias`: systematic contact-detection timing offset, s, positive = late detection (default `0.0`, exact detection) - models Open Consideration #1 (`unified_phd_plan.md`): a real contact sensor's own detection latency, on top of whatever the filter's state estimate already gets wrong about the geometric crossing time
+- `--detect-time-noise-std`: std-dev, s, of Gaussian contact-detection timing jitter added on top of `--detect-time-bias` each time a bounce is detected (default `0.0`) - see doc §8 for the measured saltation-vs-naive NEES gap this opens up as jitter grows
 - `--n-mc-trials`: number of Monte Carlo consistency trials (default `500`)
+- `--seed`: RNG seed
+- `--out`: save the figure to this path instead of showing it (default: show)
+
+### 12. Inchworm ZUPT: exploiting a known anchor/dwell schedule
+
+#### Purpose
+
+`docs/filtering/inchworm_zupt_ekf.md` works through a known-schedule anchor(dwell)/extend gait - a 1D point mass alternates between being exactly stationary (anchor) and moving at a commanded cruise speed (extend), state $x=[p,v]$. Unlike `saltation_matrix_ekf.py`, this is *not* a discontinuous-state-reset problem - velocity is externally commanded per phase, an ordinary switched-linear system - so the entire interesting question sits on the *measurement* side: whether the filter exploits the free zero-velocity information an anchor phase provides. Three ZUPT policies sharing an identical predict step and the same noisy position measurement every tick are compared via the same Monte Carlo NEES pattern as `saltation_matrix_ekf.py`:
+
+- **`never`**: only the position measurement is ever fused - never wrong, but leaves free information on the table during every anchor tick.
+- **`always`**: an unconditional ZUPT is fused every tick regardless of true phase - the schedule-unaware mistake.
+- **`phase_conditional`**: ZUPT is fused only on ticks the known schedule marks as anchor - the correct policy.
+
+The finding runs deeper than "`always` is wrong while moving": it's dramatically worse than `phase_conditional` in *both* the anchor and cruise windows, not just during motion, because the overconfidence from misapplying ZUPT during cruise bleeds into the next anchor phase. A second, more subtle finding echoes `saltation_matrix_ekf.py`'s own: `never`, despite discarding real information, ends up at least as well *calibrated* (NEES) as `phase_conditional`, even though `phase_conditional` has the best raw accuracy (lowest velocity RMS) of the three - see the doc for the full numbers and mechanism.
+
+#### Scripts
+
+- [use_numpy/inchworm_zupt_ekf.py](use_numpy/inchworm_zupt_ekf.py)
+
+#### Usage
+
+```
+uv run python use_numpy/inchworm_zupt_ekf.py --duration 10.0 --dt 0.05 --t-anchor 1.0 --t-extend 1.0 --t-ramp 0.2 --v-extend 0.1 --pos-noise-std 0.02 --process-noise-std 0.15 --zupt-noise-std 0.01 --init-pos-noise-std 0.05 --init-vel-noise-std 0.05 --n-mc-trials 500 --seed 0 --out out.png
+```
+
+- `--duration`: simulation length in seconds (default `10.0`)
+- `--dt`: filter/measurement step interval in seconds (default `0.05`)
+- `--t-anchor`: anchor/dwell phase duration per cycle, s (default `1.0`)
+- `--t-extend`: extend phase duration per cycle (including its ramps), s (default `1.0`)
+- `--t-ramp`: linear ramp-up/ramp-down duration at each end of the extend phase, s (default `0.2`) - keeps `true_velocity` continuous everywhere; see the doc's §2 calibration trap for why this (and its interaction with `--process-noise-std`) matters
+- `--v-extend`: commanded cruise speed during the extend phase, m/s (default `0.1`)
+- `--pos-noise-std`: position measurement noise std-dev, m (default `0.02`)
+- `--process-noise-std`: assumed acceleration-disturbance noise std-dev, $\text{m/s}^2$ (default `0.15`)
+- `--zupt-noise-std`: ZUPT pseudo-measurement noise std-dev, m/s (default `0.01`)
+- `--init-pos-noise-std`/`--init-vel-noise-std`: std-dev used to perturb the initial position/velocity guess (defaults `0.05`/`0.05`)
+- `--n-mc-trials`: number of Monte Carlo consistency trials (default `500`)
+- `--seed`: RNG seed
+- `--out`: save the figure to this path instead of showing it (default: show)
+
+### 13. Friction-anisotropic process noise: fixed vs. heading-aware Q
+
+#### Purpose
+
+`docs/filtering/friction_anisotropic_ekf.md` applies this repo's own `pointcloud_pose_tracking_empirical_note.md` argument (a noise ellipsoid fixed in a body frame looks anisotropic-and-rotating in the world frame) to *process* noise instead of measurement noise. A unicycle drives an exact, known circular arc (heading is exact and noise-free, driven by a known commanded turn rate) while true position picks up a random slip disturbance each tick, drawn anisotropically in the pad's own body frame - low variance along grip/forward, high variance along slip/lateral - then rotated into world coordinates by the *true* heading. Three ways of building the position block of the filter's process-noise covariance $Q$ are compared, sharing an identical predict step and the same noisy position measurement each tick:
+
+- **`isotropic`**: direction-blind, same total noise budget as the other two.
+- **`fixed_anisotropic`**: correctly anisotropic in shape, but fixed to the heading at $t=0$ and never updated - the mistake of knowing the pad is anisotropic without re-deriving $Q$ as the robot turns.
+- **`heading_aware`**: correctly anisotropic and re-oriented every predict step using the filter's own current heading estimate - the correct policy.
+
+`fixed_anisotropic` comes out dramatically worse than *both* alternatives at every heading checkpoint, and the worst mismatch sits at a 90° heading difference from its stale reference, not 180° - a covariance ellipse has period $\pi$, not $2\pi$. See the doc for the full Monte Carlo NEES table and an honestly-reported non-robust nuance near 180°.
+
+#### Scripts
+
+- [use_numpy/friction_anisotropic_ekf.py](use_numpy/friction_anisotropic_ekf.py)
+
+#### Usage
+
+```
+uv run python use_numpy/friction_anisotropic_ekf.py --duration 20.0 --dt 0.05 --v-cmd 0.2 --sigma-grip 0.02 --sigma-slip 0.1 --sigma-theta 0.01 --pos-noise-std 0.02 --init-pos-noise-std 0.05 --init-theta-noise-std 0.05 --n-mc-trials 500 --seed 0 --out out.png
+```
+
+- `--duration`: simulation length in seconds (default `20.0`)
+- `--dt`: filter/measurement step interval in seconds (default `0.05`)
+- `--v-cmd`: constant commanded forward speed, m/s (default `0.2`)
+- `--omega-cmd`: constant commanded turn rate, rad/s (default: $2\pi/\text{duration}$, i.e. exactly one full loop, so heading sweeps every orientation relative to the fixed reference)
+- `--sigma-grip`/`--sigma-slip`: true body-frame slip std-dev along the grip/forward and slip/lateral axes, m/s (defaults `0.02`/`0.1`)
+- `--sigma-theta`: assumed heading process-noise std-dev, all three filter variants, rad/s (default `0.01`)
+- `--pos-noise-std`: position measurement noise std-dev, m (default `0.02`)
+- `--init-pos-noise-std`/`--init-theta-noise-std`: std-dev used to perturb the initial position/heading guess (defaults `0.05`/`0.05`)
+- `--n-mc-trials`: number of Monte Carlo consistency trials (default `500`)
+- `--seed`: RNG seed
+- `--out`: save the figure to this path instead of showing it (default: show)
+
+### 14. Sliding-window marginalization: bounded-memory pose-graph smoothing
+
+#### Purpose
+
+`docs/optimization/marginalization.md` §4 derives the Schur complement that turns an eliminated pose into a prior factor over its surviving neighbors; this script is the accompanying implementation the doc used to say was missing. A pure odometry chain (deliberately no loop closures, so the marginal produced at each step is provably unary - isolating the memory-*bounding* property from the fill-in problem `bayes_tree.md`/`isam2_optimization.md` already cover) streams in one node at a time. Whenever the live window would exceed `--window-size`, the oldest pose is marginalized out via the Schur complement and dropped; every other pose keeps optimizing inside a bounded-size Gauss-Newton solve. This is compared against `run_full_batch_growing` - the unbounded baseline that re-solves the entire graph from scratch at every new node - across a sweep of trajectory lengths (`--nodes-per-side-sweep`). The measured result: full-batch's largest dense information matrix (`max_dof`) grows linearly with trajectory length (so its memory grows quadratically), while sliding-window's caps at exactly `6 * window_size` the moment the window first fills and never moves again - with *identical* final RMS position error between the two, a consequence specific to this script's no-loop-closure scope (see the doc §9 for the full numbers and why accuracy isn't sacrificed here).
+
+#### Scripts
+
+- [use_numpy/sliding_window_marginalization.py](use_numpy/sliding_window_marginalization.py)
+
+#### Usage
+
+```
+uv run python use_numpy/sliding_window_marginalization.py --nodes-per-side-sweep 2 4 8 16 32 64 --side-length 2.0 --window-size 10 --pos-noise-std 0.05 --rot-noise-std 0.01 --anchor-weight 1e6 --gn-tol 1e-6 --gn-max-iters 10 --seed 0 --out out.png
+```
+
+- `--nodes-per-side-sweep`: sweep of nodes-per-side values, trajectory has 4x this many total poses per entry (default `2 4 8 16 32 64`) - the resource-constraint result is how cost scales across this sweep, not any single run
+- `--side-length`: side length of the square ground-truth path, m (default `2.0`)
+- `--window-size`: sliding-window size, poses kept live at once (default `10`)
+- `--pos-noise-std`: odometry-edge translation noise std-dev, m (default `0.05`)
+- `--rot-noise-std`: odometry-edge rotation noise std-dev, rad (default `0.01`)
+- `--anchor-weight`: information weight of the node-0 gauge-fixing prior (default `1e6`)
+- `--gn-tol`: Gauss-Newton convergence tolerance (default `1e-6`)
+- `--gn-max-iters`: maximum Gauss-Newton iterations per solve (default `10`)
 - `--seed`: RNG seed
 - `--out`: save the figure to this path instead of showing it (default: show)
