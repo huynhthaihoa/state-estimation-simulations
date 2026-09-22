@@ -2,7 +2,7 @@
 
 ## Intuition
 
-A hybrid system alternates ordinary smooth motion (falling) with sudden, instantaneous jumps (bouncing), triggered the instant some condition is hit (touching the ground). The tricky part isn't the jump itself — it's that two nearby trajectories don't hit that condition at exactly the same moment:
+A hybrid system alternates ordinary smooth motion (falling) with sudden, instantaneous jumps (bouncing), triggered the instant some condition is hit (touching the ground). The tricky part isn't the jump itself - it's that two nearby trajectories don't hit that condition at exactly the same moment:
 
 ```
 ball A (nominal):     ●
@@ -14,14 +14,14 @@ higher):                    ╲╲
                               ╲╲
 ──────────────────────────────●●──── ground
                                A B
-                           A lands first, B a moment later —
+                           A lands first, B a moment later -
                            having had farther to fall, B is
                            already moving faster when it lands
 ```
 
-Ball A and ball B start almost identically — B is just 5 cm higher. But because B has slightly farther to fall, it lands a fraction of a second *later* than A, by which point B has picked up extra speed from that extra bit of falling time. So B's bounce isn't just "the same bounce rule applied to a slightly different starting state" — it's applied to a state that's had a bit more time to accelerate first.
+Ball A and ball B start almost identically - B is just 5 cm higher. But because B has slightly farther to fall, it lands a fraction of a second *later* than A, by which point B has picked up extra speed from that extra bit of falling time. So B's bounce isn't just "the same bounce rule applied to a slightly different starting state" - it's applied to a state that's had a bit more time to accelerate first.
 
-An ordinary Jacobian (the reset map's own derivative, called $DR$ below) only captures the first part — how the bounce transforms a state already sitting at the ground — and implicitly assumes both balls land at the same instant. It has no way to see B's extra falling time. The **saltation matrix** ($\Xi$) is the correction for exactly that: it works out how much *extra time* a perturbed trajectory needs to reach the same ground condition, converts that timing difference into an equivalent velocity change, and only then applies the bounce. This doc's central finding is that skipping this correction isn't a minor rounding error — §3 below works a case where the naive approach predicts a position offset has *zero* effect on the bounce, when in fact it's the *entire* effect.
+An ordinary Jacobian (the reset map's own derivative, called $DR$ below) only captures the first part - how the bounce transforms a state already sitting at the ground - and implicitly assumes both balls land at the same instant. It has no way to see B's extra falling time. The **saltation matrix** ($\Xi$) is the correction for exactly that: it works out how much *extra time* a perturbed trajectory needs to reach the same ground condition, converts that timing difference into an equivalent velocity change, and only then applies the bounce. This doc's central finding is that skipping this correction isn't a minor rounding error - §3 below works a case where the naive approach predicts a position offset has *zero* effect on the bounce, when in fact it's the *entire* effect.
 
 Every filter in [kf_ekf_iekf.md](kf_ekf_iekf.md) and [extra_kf_variants.md](extra_kf_variants.md) assumes the state evolves *continuously* between measurements. Bio-inspired locomotion (a footstep, an inchworm anchor/release cycle, a friction-anisotropic grip-then-slip transition) breaks that assumption on purpose, not by accident: the whole point of these platforms is to move in discrete, hybrid bursts. This doc works through the tool that lets an EKF cross one of those discontinuities without either (a) silently pretending nothing happened, or (b) discarding all uncertainty information at the jump - using [`saltation_matrix_ekf.py`](../../use_numpy/saltation_matrix_ekf.py)'s bouncing-point-mass toy problem as the concrete example.
 
