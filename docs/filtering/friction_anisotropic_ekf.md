@@ -60,7 +60,7 @@ Monte Carlo NEES (500 trials, seed 0, $dt = 0.02\,\text{s}$, one full loop over 
 
 (A consistent 3-DoF filter should average $\text{NEES} \approx 3$ everywhere; `isotropic` and `heading_aware` both sit close to that at every checkpoint. `fixed_anisotropic` clears the $\chi^2$ 95% bound ($7.8$) in two of the four bins.)
 
-This part is robust: verified across seeds 0-3, `fixed_anisotropic` is worse than *both* alternatives at *every* checkpoint, by a wide margin, in every seed tried - not just "eventually," from the very first bin. RMS position error tells a smaller but consistent story too: $\text{heading\_aware}\ (0.0108\,\text{m}) < \text{isotropic}\ (0.0118\,\text{m}) < \text{fixed\_anisotropic}\ (0.0131\,\text{m})$ - getting the shape right and pointed the right way is both more accurate and, as the table shows, far better calibrated.
+This part is robust: verified across seeds 0-3, `fixed_anisotropic` is worse than *both* alternatives at *every* checkpoint, by a wide margin, in every seed tried - not just "eventually," from the very first bin. RMS position error tells a smaller but consistent story too: $`\text{heading\_aware}\ (0.0108\,\text{m}) < \text{isotropic}\ (0.0118\,\text{m}) < \text{fixed\_anisotropic}\ (0.0131\,\text{m})`$ - getting the shape right and pointed the right way is both more accurate and, as the table shows, far better calibrated.
 
 ## 3. A secondary finding, and where it stops being clean
 
