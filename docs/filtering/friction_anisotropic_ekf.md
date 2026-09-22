@@ -1,5 +1,28 @@
 # Heading-dependent process noise for friction-anisotropic locomotion
 
+## Intuition
+
+"Anisotropic friction" means grips well in one direction, slides easily in the other — the canonical image is a snake's belly scales, or a ratchet:
+
+```
+        low-friction (slide) axis
+                 ↑
+                 │
+  grip axis ──── ● ──── grip axis      (small slip noise along grip axis,
+                 │                      large slip noise along slide axis)
+                 ↓
+        low-friction (slide) axis
+```
+
+That noise ellipse is fixed *to the pad*, i.e. to the robot's body frame. The catch this doc explores: as the robot turns, that ellipse turns with it in the world frame —
+
+```
+heading = 0°:        heading = 45°:       heading = 90°:
+   ⬭ (flat)             ⬮ (tilted)            |‾| (rotated 90°)
+```
+
+So a filter whose process-noise model uses a *fixed* orientation for that ellipse (set once, e.g. at $t = 0$) is only correct at the instant it was set — as soon as the robot turns, it's confidently modeling slip in the wrong direction. The toy problem below (a unicycle looping through every heading) is built to expose exactly that: `fixed_anisotropic` (wrong orientation once turned) vs. `heading_aware` (ellipse re-oriented every step to match current heading) vs. `isotropic` (no directional claim at all, the safe fallback).
+
 Consider this claim about friction-anisotropic platforms (pads that grip well in one direction and slide easily in another — "the way a snake's belly scales do"): 
 
 > Anisotropic-friction slip variance is a function of heading relative to the pad's fixed friction axis (refs. 19–21 characterize this directly), not just which discrete contact mode is active — a mode-switching saltation matrix with an otherwise-isotropic $Q$ would treat slip along the low-friction axis the same as the high-friction axis

@@ -1,5 +1,23 @@
 # Phase-conditional ZUPT: exploiting a known anchor/dwell schedule
 
+## Intuition
+
+An inchworm (real or robotic) doesn't move continuously — it cycles between two phases:
+
+```
+ANCHOR                    EXTEND                     ANCHOR
+(grip, hold still)   (release, push/pull body)   (grip again, hold still)
+
+  ▓▓●━━━━━●            ▓▓●╲     ╱●--->              ●━━━━━●▓▓
+   front anchored        body extends/stretches       new anchor set,
+   to ground, v = 0      forward, then contracts       v = 0 again
+```
+
+- **Anchor**: one end is planted on the ground — the robot is, by construction, perfectly stationary ($v = 0$). No ambiguity, no noise — it's known ground truth.
+- **Extend**: the anchor releases, the body extends/pushes forward at some commanded speed, then the new end plants and grips.
+
+The idea this doc explores: during anchor, "velocity = 0" is a *free, trustworthy measurement* (a ZUPT — zero-velocity update) you can feed into the filter — but only during anchor. Feed it in during extend (when the robot is actually moving) and you're telling the filter a lie with high confidence, which is exactly the failure mode the `always` variant below demonstrates.
+
 Consider an observation specific to inchworm-like locomotion as below:
 
 > During the anchored/dwell portion of an inchworm cycle the robot is (by definition) stationary — close to free ground truth for a zero-velocity/zero-angular-rate pseudo-measurement (ZUPT/ZARU), and the one moment the accelerometer is a trustworthy gravity reference; during the anchor-release/extend burst neither holds
