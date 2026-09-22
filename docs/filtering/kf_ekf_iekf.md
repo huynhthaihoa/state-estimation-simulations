@@ -57,11 +57,11 @@ $Q$ and $R$ - not $w$ and $v$ themselves - are what the filter actually needs as
 
 Every KF cycle alternates two steps, each carrying its own uncertainty as a **covariance matrix** $P$ (how spread-out/correlated the filter's belief about $x$ currently is):
 
-**Prediction step.** Push the last estimate through the motion model, and grow $P$ by however uncertain that model is ($Q$):
+- **Prediction step:** push the last estimate through the motion model, and grow $P$ by however uncertain that model is ($Q$):
 
 $$\hat x_k^- = F\hat x_{k-1} \qquad P_k^- = FP_{k-1}F^\top + Q$$
 
-**Measurement update step.** Compare the predicted measurement $H\hat x_k^-$ against what actually arrived ($z_k$), and blend the two using the **Kalman gain** $K_k$:
+- **Measurement update step:** compare the predicted measurement $H\hat x_k^-$ against what actually arrived ($z_k$), and blend the two using the **Kalman gain** $K_k$:
 
 $$K_k = P_k^- H^\top(HP_k^-H^\top + R)^{-1} \qquad \hat x_k = \hat x_k^- + K_k(z_k - H\hat x_k^-) \qquad P_k = (I-K_kH)P_k^-$$
 
@@ -135,11 +135,11 @@ That's the Jacobian.
 
 Then it uses this local linear approximation inside the normal Kalman equations. Concretely, plugging that Jacobian into §1's same two-step cycle:
 
-**Prediction step.** Propagate the mean through the *exact* nonlinear $f$ (not a linear approximation of it - only $P$'s growth is linearized), and grow $P$ using the Jacobian $F_k$:
+- **Prediction step:** propagate the mean through the *exact* nonlinear $f$ (not a linear approximation of it - only $P$'s growth is linearized), and grow $P$ using the Jacobian $F_k$:
 
 $$\hat x_k^- = f(\hat x_{k-1}, u_{k-1}) \qquad F_k = \frac{\partial f}{\partial x}\Big|_{\hat x_{k-1}} \qquad P_k^- = F_kP_{k-1}F_k^\top + Q$$
 
-**Measurement update step.** Identical structure to §1's KF, but with a fresh measurement Jacobian $H_k$, and the innovation computed against the exact nonlinear measurement function $h$ (for $z_k = h(x_k)+v$):
+- **Measurement update step:** identical structure to §1's KF, but with a fresh measurement Jacobian $H_k$, and the innovation computed against the exact nonlinear measurement function $h$ (for $z_k = h(x_k)+v$):
 
 $$H_k = \frac{\partial h}{\partial x}\Big|_{\hat x_k^-} \qquad K_k = P_k^-H_k^\top(H_kP_k^-H_k^\top+R)^{-1}$$
 $$\hat x_k = \hat x_k^- + K_k\big(z_k-h(\hat x_k^-)\big) \qquad P_k = (I-K_kH_k)P_k^-$$
