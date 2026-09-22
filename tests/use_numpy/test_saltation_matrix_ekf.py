@@ -26,6 +26,22 @@ def test_flow_and_crossing_time_known_vertical_drop(saltation_matrix_ekf):
     assert np.allclose(Phi[0:3, 3:6], tau * np.eye(3))
 
 
+def test_crossing_time_ignores_ascending_root_below_guard(saltation_matrix_ekf):
+    # A point mass starting BELOW the guard moving upward (the exact state
+    # step_hybrid's detect_time_* off-guard resets can produce -- see
+    # crossing_time's docstring) crosses p_z=0 again almost immediately on
+    # its way back out; that ascending crossing is not a real impact and
+    # must be skipped in favor of the next genuinely descending one.
+    m = saltation_matrix_ekf
+    g = 9.81
+    x0 = np.array([0.0, 0.0, -0.05, 0.0, 0.0, 7.0])  # 5cm under "ground", moving up at 7 m/s
+    tau = m.crossing_time(x0, g)
+    assert tau is not None
+    x_at_tau, _ = m.flow(x0, tau, g)
+    assert np.isclose(x_at_tau[2], 0.0, atol=1e-9)  # genuinely on the guard
+    assert x_at_tau[5] < 0.0  # descending, i.e. the real return-impact, not the rising exit
+
+
 def test_crossing_time_none_when_moving_away_from_guard(saltation_matrix_ekf):
     m = saltation_matrix_ekf
     # already on the ground, moving upward -- no future crossing under free-fall
@@ -132,6 +148,86 @@ def test_generate_ground_truth_bounces_and_stays_above_ground(saltation_matrix_e
     assert len(bounce_ticks) >= 2  # at least a couple of bounces in 5s at these settings
 
     assert z.shape == (len(x_true), 3)
+
+
+# --- contact/phase-detection timing uncertainty (detect_time_bias / detect_time_noise_std) ---
+
+def test_step_hybrid_default_detection_matches_exact_crossing(saltation_matrix_ekf):
+    # Backward-compat: with detect_time_bias/detect_time_noise_std left at their
+    # defaults (0.0), the reset must still land exactly at the true geometric
+    # crossing time, i.e. the behavior step_hybrid had before these params existed.
+    m = saltation_matrix_ekf
+    g, e = 9.81, 0.6
+    x0 = np.array([0.0, 0.0, 5.0, 1.0, 0.5, -2.0])
+    P0 = np.eye(6) * 0.01
+    dt = 1.0  # long enough to contain exactly one bounce, not a second
+
+    x_out, P_out = m.step_hybrid(x0, P0, dt, e, g, accel_noise_std=0.0, use_saltation=True)
+
+    tau = m.crossing_time(x0, g)
+    x_minus, Phi_pre = m.flow(x0, tau, g)
+    P_minus = Phi_pre @ P0 @ Phi_pre.T  # process noise is 0 (accel_noise_std=0)
+    Xi = m.saltation_matrix(x_minus, e, g)
+    x_plus = m.reset_map(x_minus, e)
+    P_plus = Xi @ P_minus @ Xi.T  # impact-noise floor is 0 (impact_noise_std default)
+    x_expected, Phi_rest = m.flow(x_plus, dt - tau, g)
+    P_expected = Phi_rest @ P_plus @ Phi_rest.T
+
+    assert np.allclose(x_out, x_expected, atol=1e-9)
+    assert np.allclose(P_out, P_expected, atol=1e-9)
+
+
+def test_step_hybrid_large_detect_bias_clips_to_tick_and_still_bounces(saltation_matrix_ekf):
+    # A detection delay far larger than the tick clips to the tick boundary (the
+    # documented single-tick-horizon simplification) rather than silently skipping
+    # the bounce or blowing up -- and produces the expected "tunnels through the
+    # ground before the late reset fires" artifact.
+    m = saltation_matrix_ekf
+    g, e = 9.81, 0.6
+    x0 = np.array([0.0, 0.0, 5.0, 1.0, 0.5, -2.0])
+    P0 = np.eye(6) * 0.01
+    dt = 1.0
+
+    x_out, P_out = m.step_hybrid(x0, P0, dt, e, g, accel_noise_std=0.0, use_saltation=True,
+                                  detect_time_bias=100.0)
+
+    assert np.all(np.isfinite(x_out)) and np.all(np.isfinite(P_out))
+    assert x_out[2] < 0.0  # detected late enough to have fallen through the ground first
+    assert x_out[5] > 0.0  # the (late) bounce still flips vertical velocity positive
+
+
+def test_detect_time_bias_shifts_reset_outcome(saltation_matrix_ekf):
+    m = saltation_matrix_ekf
+    g, e = 9.81, 0.6
+    x0 = np.array([0.0, 0.0, 5.0, 1.0, 0.5, -2.0])
+    P0 = np.eye(6) * 0.01
+    dt = 1.0
+
+    x_exact, P_exact = m.step_hybrid(x0.copy(), P0.copy(), dt, e, g, accel_noise_std=0.0,
+                                      use_saltation=True)
+    x_biased, P_biased = m.step_hybrid(x0.copy(), P0.copy(), dt, e, g, accel_noise_std=0.0,
+                                        use_saltation=True, detect_time_bias=0.05)
+
+    assert not np.allclose(x_exact, x_biased)
+    assert not np.allclose(P_exact, P_biased)
+
+
+def test_step_hybrid_detect_noise_is_reproducible_given_seeded_rng(saltation_matrix_ekf):
+    m = saltation_matrix_ekf
+    g, e = 9.81, 0.6
+    x0 = np.array([0.0, 0.0, 5.0, 1.0, 0.5, -2.0])
+    P0 = np.eye(6) * 0.01
+    dt = 1.0
+
+    x_a, _ = m.step_hybrid(x0.copy(), P0.copy(), dt, e, g, accel_noise_std=0.0, use_saltation=True,
+                            detect_time_noise_std=0.01, detect_rng=np.random.default_rng(42))
+    x_b, _ = m.step_hybrid(x0.copy(), P0.copy(), dt, e, g, accel_noise_std=0.0, use_saltation=True,
+                            detect_time_noise_std=0.01, detect_rng=np.random.default_rng(42))
+    x_c, _ = m.step_hybrid(x0.copy(), P0.copy(), dt, e, g, accel_noise_std=0.0, use_saltation=True,
+                            detect_time_noise_std=0.01, detect_rng=np.random.default_rng(7))
+
+    assert np.array_equal(x_a, x_b)  # same seed -> identical draw -> identical result
+    assert not np.array_equal(x_a, x_c)  # different seed -> (almost certainly) different result
 
 
 def test_run_ekf_variants_beat_dead_reckoning(saltation_matrix_ekf):
