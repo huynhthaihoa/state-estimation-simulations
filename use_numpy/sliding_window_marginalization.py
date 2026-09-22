@@ -3,13 +3,12 @@ Gives docs/optimization/marginalization.md its first accompanying script --
 its own §8 names this exact gap: "there is no accompanying script... a
 reader wanting to exercise §4 for real would extend [pose_graph_incremental.
 py] to marginalize its oldest node once a fixed window size is exceeded."
-This is that extension, addressing `unified_phd_plan.md`'s "resource
-constraints" row: "algorithm-level efficiency (sparse factor graphs,
-hierarchical pose pruning) on commodity embedded hardware" is the core
-commitment there (GAP9's <500kB target is explicitly Stretch, not core) --
-this script demonstrates the specific algorithmic property that matters for
-that claim: bounded, not merely fast, memory/compute as a trajectory grows
-without bound.
+This is that extension, addressing a resource-constrained-deployment concern:
+algorithm-level efficiency (sparse factor graphs, hierarchical pose pruning)
+on commodity embedded hardware, where a concrete memory budget like GAP9's
+<500kB target is a useful stress test -- this script demonstrates the
+specific algorithmic property that matters for that claim: bounded, not
+merely fast, memory/compute as a trajectory grows without bound.
 
 A robot drives a growing chain of noisy odometry edges (no loop closure --
 see below for why) and two solvers process the same stream:

@@ -57,13 +57,12 @@ EKF's post-bounce NEES consistently *higher* than the naive EKF's at the same
 regularization level, not lower: the mathematically-exact local correction is
 also the more fragile one once event-detection itself carries uncertainty, a
 concrete instance of exactly the gap between "saltation matrices assume a
-known transition time" and "contact/phase detection is itself uncertain"
-already flagged as Open Consideration #1 in `unified_phd_plan.md`. Both EKFs'
-*mean* trajectories still look nearly identical throughout regardless: this
-entire effect is invisible in the point estimate and only shows up in
-whether the reported uncertainty can be trusted.
+known transition time" and "contact/phase detection is itself uncertain".
+Both EKFs' *mean* trajectories still look nearly identical throughout
+regardless: this entire effect is invisible in the point estimate and only
+shows up in whether the reported uncertainty can be trusted.
 
-That finding above is itself already a symptom of Open Consideration #1 --
+That finding above is itself already a symptom of that same gap --
 but only as a side effect of ordinary state-estimation error making the
 filter's *own* crossing_time() calculation drift from the true one. A real
 contact sensor has a second, independent source of the same problem: its
@@ -340,11 +339,11 @@ def step_hybrid(x, P, dt, e, g, accel_noise_std, use_saltation, impact_noise_std
     source of bounce-timing error: a real contact sensor (IMU spike, force
     threshold -- see Cizek et al. 2018) has its own detection latency/jitter
     on top of whatever the filter's state estimate already gets wrong about
-    the geometric crossing time. This is Open Consideration #1 from
-    `unified_phd_plan.md` ("saltation matrices assume a known transition
-    time; contact/phase detection is itself uncertain"), modeled directly:
-    the reset (mean and covariance both) is applied at a *detected* crossing
-    time `tau_detect = clip(tau + detect_time_bias [+ N(0, detect_time_noise_std)],
+    the geometric crossing time. This models directly the gap between
+    "saltation matrices assume a known transition time" and "contact/phase
+    detection is itself uncertain": the reset (mean and covariance both) is
+    applied at a *detected* crossing time
+    `tau_detect = clip(tau + detect_time_bias [+ N(0, detect_time_noise_std)],
     0, remaining)` instead of the true geometric `tau`. Since `x` is only
     flowed forward to `tau_detect`, not `tau`, its height is generally
     nonzero there (early detection: still above ground; late detection: the
@@ -716,9 +715,8 @@ def main():
 
     parser.add_argument("--detect-time-bias", type=float, default=0.0,
                          help="Systematic contact-detection timing offset (s), positive = late "
-                              "detection. Models Open Consideration #1 (unified_phd_plan.md): a "
-                              "real contact sensor's own detection latency, on top of whatever "
-                              "the filter's state estimate already gets wrong about the geometric "
+                              "detection. Models a real contact sensor's own detection latency, "
+                              "on top of whatever the filter's state estimate already gets wrong about the geometric "
                               "crossing time -- see step_hybrid's docstring. 0.0 reproduces "
                               "exact-detection behavior (the only behavior this script had before "
                               "this parameter existed)")

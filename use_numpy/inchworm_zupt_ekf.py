@@ -2,8 +2,8 @@
 Tracks a 1D point mass crawling like an inchworm: a repeating anchor (dwell,
 exactly stationary) / extend (moving at a constant commanded speed) gait
 cycle, with a *known, deterministic* phase schedule -- the simplest possible
-model of `unified_phd_plan.md`'s "the anchored/dwell portion of an inchworm
-cycle is, by definition, stationary" observation. State `x = [p, v]`, plain
+model of the observation that the anchored/dwell portion of an inchworm
+cycle is, by definition, stationary. State `x = [p, v]`, plain
 R^2 -- deliberately scoped down to translation-only (no ZARU/orientation/
 accel-bias: those need an orientation state this toy doesn't carry) and a
 known schedule (phase-*detection* uncertainty is a separate, already-studied

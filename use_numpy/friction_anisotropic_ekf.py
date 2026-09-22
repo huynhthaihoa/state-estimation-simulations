@@ -7,9 +7,9 @@ heading increases smoothly and continuously throughout -- deliberately not
 hybrid/switched, unlike saltation_matrix_ekf.py's bounce or
 inchworm_zupt_ekf.py's anchor/extend gait. State `x = [p_x, p_y, theta]`.
 
-This is `unified_phd_plan.md`'s item 2 in its simplest concrete form:
-"friction-anisotropic locomotion needs heading-dependent process noise, not
-just another hybrid mode." The pad's slip is anisotropic in its own body
+This is the simplest concrete form of a claim about friction-anisotropic
+locomotion: it needs heading-dependent process noise, not just another
+hybrid mode. The pad's slip is anisotropic in its own body
 frame (low variance along the grip/forward axis, high variance along the
 slip/lateral axis), not in the world frame -- so a real slip event, expressed
 in world coordinates, is a random displacement drawn in the body frame and
