@@ -24,6 +24,20 @@ a decoupled "rotate then translate" Euler step, the SE(3) exponential map
 couples the rotation and translation parts of the update, which is what makes
 it the true closed-form solution for constant-twist motion.
 
+Note this is a single shared ground truth used to score *both* estimators,
+unlike the use_numpy twin, which tracks two separate noise-free ground-truth
+trajectories (one per estimator, each via that estimator's own composition
+rule). The two conventions are mathematically equivalent for the exp-map
+estimator (both amount to "exact SO(3)/SE(3) exp-map of the same noise-free
+rates", so use_numpy's and this script's final exp-map rotation error match
+to ~5e-12 deg at the default CLI args), but not for the naive estimator,
+whose reported final rotation error differs by ~0.36 deg between the two
+backends purely because of this ground-truth choice (use_numpy: 70.78 deg;
+here: 70.42 deg, default args, seed 0) - small next to the ~70 deg naive
+error itself, so it doesn't change either script's "naive breaks down,
+exp-map doesn't" conclusion, but it is a real inconsistency between the two
+backends' ground truths, not just a coincidence of close headline numbers.
+
 This version fully delegates the manifold math to the manif library
 (https://github.com/artivis/manif) via its Python bindings (manifpy), instead
 of hand-rolled skew-symmetric / Rodrigues-formula numpy code. Correspondence:

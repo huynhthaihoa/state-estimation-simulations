@@ -49,8 +49,10 @@ cost" claims concrete:
 
 Both hard-fix keyframes 0 and 1 forever (never entered into any optimizable
 set) as the gauge anchor, instead of bundle_adjustment.py's soft
-gauge-prior factor: once >=1 hard-fixed keyframe anchors a window there is
-no residual gauge freedom left to prior-constrain, so windowing itself
+gauge-prior factor: fixing keyframe 0 alone would remove only the 6 rigid
+DoF and leave scale unobservable, but fixing *two* keyframes also pins the
+distance between them, so with both hard-fixed there is no residual gauge
+freedom left to prior-constrain, and windowing itself
 removes the need for the prior-factor machinery run_bundle_adjustment uses
 (and removes the need for run_bundle_adjustment's omega_pixel/Omega_prior
 relative weighting too -- with only one factor type left, a uniform scalar
@@ -73,10 +75,16 @@ On an open (non-looping) path -- the default --arc-span-deg 90 -- a
 periodic Global BA pass has no genuinely *new* geometric constraint to
 exploit beyond what the overlapping local windows already used -- that
 only comes from revisiting a place (loop closure) or an absolute
-measurement. Comparing the two runs here still shows Global BA helping on
-most noise realizations (a global joint solve is less path-dependent than
-a bounded sequential one), but not as dramatically or as reliably as it
-would with an actual loop closure.
+measurement. Comparing the two runs here shows the default seed doing well
+(Global BA beating Local-only by 32% RMS trajectory error), but that's not
+the typical case: a wider sweep across seeds (see this module's own tests)
+shows Global BA is close to a wash against Local-only overall -- a roughly
+50% per-seed win rate, with the *median* difference near zero either way --
+not a reliable "helps on most noise draws" story. A handful of individual
+seeds also diverge to thousands of meters in *either* run mode (a rare bad
+local minimum in the windowed GN solve that neither mode is protected
+from), which is a bigger, more important effect on this open path than
+which mode wins on average.
 
 A genuine loop closure doesn't need any different machinery -- the
 covisibility bookkeeping below, build_active_window, and run_global_ba are
@@ -86,7 +94,7 @@ already general (none of them assume temporal locality). It only needs the
 so a late keyframe re-observes a landmark last seen by an early one. This
 is detected automatically (loop_closure_min_gap below) and reported/plotted
 when it happens -- see run_incremental_local_ba's loop_closure_keyframe.
-See also docs/bundle_adjustment.md Section 13's pointer to "loop closure +
+See also docs/optimization/bundle_adjustment.md Section 13's pointer to "loop closure +
 pose-graph optimization" as Local BA's other, complementary correction
 mechanism (pose_graph_optimization.md).
 
@@ -321,7 +329,7 @@ def simulate_frontend_trajectory(T_true, relative_pose_noise_std, rng):
 def triangulate_landmark(T_obs_list, z_list, K):
     """Closed-form multi-view ray-intersection initial guess for a new
     landmark: the least-squares point closest to every observing keyframe's
-    back-projected ray (docs/bundle_adjustment.md Section 5's "bundle of
+    back-projected ray (docs/optimization/bundle_adjustment.md Section 5's "bundle of
     rays" intuition, solved in closed form rather than iteratively).
     Arguments:
         T_obs_list: list of observing camera poses (4,4)
@@ -432,7 +440,7 @@ def build_active_window(k, shared_count, landmarks_by_keyframe, observers_by_lan
     triangulated landmark any of them observes (active_points), and every
     other keyframe that also observes one of those landmarks, held fixed as
     a rigid anchor (fixed_keyframes) -- directly implementing
-    docs/bundle_adjustment.md Section 13's diagram.
+    docs/optimization/bundle_adjustment.md Section 13's diagram.
     Arguments:
         k: the new keyframe index
         shared_count: dict {pair_key(i,j): shared landmark count}
@@ -505,7 +513,7 @@ def run_windowed_gn_lm(T_est, P_est, pose_idx, point_idx, obs_list, K, gn_tol, g
 
     Also gates out any observation that's already cheirality-inconsistent
     at entry (its point behind that camera given the *current* estimates,
-    before this solve touches anything) -- docs/bundle_adjustment.md
+    before this solve touches anything) -- docs/optimization/bundle_adjustment.md
     Section 13's table names exactly this ("chi-square gating") as part of
     real Local BA's outlier handling. It matters here because a keyframe
     entering its very first window still carries its raw, drift-compounded
@@ -858,8 +866,9 @@ def main():
     if lc_keyframe is None:
         print("(This path never revisits a place -- no loop closure -- so periodic Global BA has no "
               "genuinely new constraint to exploit, only a joint re-solve of the same information; "
-              "it still helps on most noise draws, just not as dramatically as it would with a loop. "
-              "Pass --arc-span-deg close to 360 to make the path loop back and trigger one.)")
+              "across a wider seed sweep it's close to a wash against Local-only here (~50% per-seed "
+              "win rate, median difference near zero), not a reliable win the way an actual loop "
+              "closure is. Pass --arc-span-deg close to 360 to make the path loop back and trigger one.)")
     else:
         lc_partner = hist_hybrid["loop_closure_partner"]
         idx_at_lc = hist_hybrid["traj_step"].index(lc_keyframe)

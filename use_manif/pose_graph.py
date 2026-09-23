@@ -9,7 +9,7 @@ optimizing every node pose against each edge's residual
 e_ij = Log(Z_ij^-1 * X_i^-1 * X_j) (Z_ij the measured relative pose, X_i/X_j
 the current pose estimates), using manif's analytical `compose`/`rminus`
 Jacobians -- the same Jacobian-chaining pattern as the motion factors in
-`run_batch_gn` (pointcloud_pose_tracking_manif.py): a factor's Jacobian wrt
+`run_batch_gn` (use_manif/pointcloud_pose_tracking.py): a factor's Jacobian wrt
 the upstream node is the downstream node's "other" Jacobian chained through
 the upstream node's own Jacobian in the predicted-pose composition.
 
@@ -108,7 +108,7 @@ def run_pose_graph_optimization(T_init_list, constraints, info_matrix, damping, 
     its Jacobian wrt Xi is that same rminus "other" Jacobian chained through
     compose's "self" Jacobian (the predicted pose T_pred = Xi.compose(Z_ij)'s
     own sensitivity to Xi) -- exactly the motion-factor Jacobian-chaining
-    pattern used in run_batch_gn (pointcloud_pose_tracking_manif.py),
+    pattern used in run_batch_gn (use_manif/pointcloud_pose_tracking.py),
     generalized from a twist-based motion model to a directly-measured
     relative pose.
 

@@ -29,7 +29,7 @@ the vanilla KF, which deliberately avoids SE(3) altogether:
     T_0..T_N at once against three factor types (an initial-pose prior, N
     motion factors between consecutive poses, and (N+1)*n_points measurement
     factors), generalizing the single-pose GN correction loop already used in
-    robot_imu_simulation_manif.py to a multi-pose graph. Has access to the
+    use_manif/robot_imu_simulation.py to a multi-pose graph. Has access to the
     full trajectory (not just causal history), so it can do at least as well
     as the EKF.
 

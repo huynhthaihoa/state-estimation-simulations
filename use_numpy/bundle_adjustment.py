@@ -1,7 +1,7 @@
 '''
 Bundle Adjustment: jointly refines camera poses AND 3D landmarks against
 reprojection error -- the classic multi-view structure-from-motion problem,
-matching docs/bundle_adjustment.md's
+matching docs/optimization/bundle_adjustment.md's
 
     min_{T_i,P_j} sum_{(i,j) in O} ||z_ij - pi(T_i^-1 P_j)||^2
 
@@ -431,7 +431,7 @@ def pose_errors(T_true_list, T_est_list):
 
 def reprojection_rms(T_list, P_list, observations, K):
     """RMS pixel reprojection error over every observed (camera, landmark)
-    pair -- directly implements docs/bundle_adjustment.md's own
+    pair -- directly implements docs/optimization/bundle_adjustment.md's own
     sum_{(i,j) in O} ||z_ij - pi(T_i P_j)||^2 objective.
     Arguments:
         T_list: list of camera poses (4,4)

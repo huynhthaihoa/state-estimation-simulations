@@ -6,14 +6,25 @@ canonical square-loop pose-graph topology (`pose_graph.py`'s
 generate_ground_truth_trajectory: a ring of `4 * nodes_per_side` nodes, one
 odometry edge between each pair of consecutive nodes, one loop-closure edge
 from the last node back to the first), then asks `bayes_tree_affected_path`
-which cliques a new factor would invalidate, for two scenarios: an ordinary
-odometry edge vs. the loop-closure edge.
+which variables a new factor would invalidate, for two scenarios: an
+ordinary odometry edge vs. the loop-closure edge.
+
+Note the terminology: this script builds and queries the *elimination tree*
+(one node per variable) via symbolic elimination -- it never merges
+consecutive same-separator nodes into the coarser Bayes-tree *cliques* a
+real implementation would, so "N/16 affected" below counts elimination-tree
+variables, not merged cliques (the true clique count for this topology would
+be smaller, since several of the constant-size-2-separator nodes along the
+chain would merge into one clique each).
 
 Pure index/topology bookkeeping -- no pose math, SE(3), or Lie algebra is
-involved at any point, so unlike every other script in this repo there is no
-use_manif/ counterpart: the result would be structurally identical, since
-the tree only depends on which node indices a factor connects, never on the
-noisy relative-pose values themselves.
+involved at any point, so, like 5 other numpy-only scripts in this repo that
+also have no Lie-group math to delegate to manif (friction_anisotropic_ekf.py,
+inchworm_zupt_ekf.py, pnp_estimation.py, saltation_matrix_ekf.py,
+sliding_window_marginalization.py), there is no use_manif/ counterpart: the
+result would be structurally identical, since the tree only depends on which
+node indices a factor connects, never on the noisy relative-pose values
+themselves.
 
 Elimination order is fixed as oldest-first (node 0 first, the newest node
 last/root) -- a simple, deterministic choice, not iSAM2's dynamic COLAMD
@@ -21,10 +32,12 @@ reordering (out of scope here, see docs/optimization/isam2_optimization.md
 Section 12). Worked out by hand before writing this script: under that
 order, the loop-closure edge connects the *first*-eliminated node (the
 deepest possible leaf) to the root, so the resulting tree is a straight
-chain of ever-growing separators, and the loop closure invalidates the
-*entire* chain -- the worst case a fill-reducing reordering like COLAMD
-exists specifically to avoid. That worst case isn't hidden here; it's the
-whole point of the comparison this script prints and plots.
+chain (constant-size-2 separators throughout, per this script's own printed
+"Largest separator" line -- not "ever-growing" as an earlier version of this
+docstring claimed), and the loop closure invalidates the *entire* chain --
+the worst case a fill-reducing reordering like COLAMD exists specifically to
+avoid. That worst case isn't hidden here; it's the whole point of the
+comparison this script prints and plots.
 
 This implements the Bayes tree's *symbolic construction* and *affected-
 region query* only: no numeric fluid-relinearization solve (that is
@@ -93,7 +106,7 @@ def layout_tree(children, root):
 
 
 def plot_scenario(ax, parent, pos, affected, touched_vars, title, node_size, label_nodes):
-    """Draws one Bayes-tree subplot: every clique/edge in gray, the
+    """Draws one elimination-tree subplot: every node/edge in gray, the
     affected region (the root-ward path from `touched_vars`) highlighted in
     red, and the touched variables themselves marked with a star.
     Arguments:
@@ -127,7 +140,7 @@ def plot_scenario(ax, parent, pos, affected, touched_vars, title, node_size, lab
         x, y = pos[v]
         ax.scatter(x, y, s=node_size * 3.2, marker="*", color="gold", edgecolor="black", zorder=4)
 
-    ax.set_title(f"{title}\n{len(affected)}/{len(pos)} cliques affected")
+    ax.set_title(f"{title}\n{len(affected)}/{len(pos)} variables affected")
     ax.axis("off")
 
 
@@ -162,9 +175,9 @@ def main():
     affected_loop = bayes_tree_affected_path(parent, loop_edge)
 
     print(f"\nAffected region if odometry edge {newest_odom_edge} arrives: "
-          f"{len(affected_odom)}/{n_poses} cliques ({100 * len(affected_odom) / n_poses:.1f}%)")
+          f"{len(affected_odom)}/{n_poses} variables ({100 * len(affected_odom) / n_poses:.1f}%)")
     print(f"Affected region if loop-closure edge {loop_edge} arrives:     "
-          f"{len(affected_loop)}/{n_poses} cliques ({100 * len(affected_loop) / n_poses:.1f}%)")
+          f"{len(affected_loop)}/{n_poses} variables ({100 * len(affected_loop) / n_poses:.1f}%)")
     print("\nSame fixed elimination order, wildly different cost: this is exactly why real "
           "iSAM2 needs dynamic reordering (COLAMD) instead of a fixed one -- not implemented "
           "here, see docs/optimization/isam2_optimization.md Section 12.")

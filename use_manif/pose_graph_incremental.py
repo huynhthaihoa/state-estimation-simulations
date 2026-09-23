@@ -31,12 +31,16 @@ edge, then the next node). Two solvers process the same stream:
 
 What this deliberately does *not* implement: Section 7's Bayes tree
 (iSAM2's further refinement -- selective relinearization of only the
-affected subtree) and variable reordering (COLAMD) to bound fill-in. Both
-are explicitly out of scope here; this script implements iSAM's original
-QR/square-root-information mechanism (Kaess et al. 2008), not iSAM2. The
-incremental solver also runs plain Gauss-Newton (no Levenberg-Marquardt
-damping) between/at relinearizations -- the always-present anchor prior on
-node 0 already keeps the system well-conditioned.
+affected subtree), nor any variable reordering (COLAMD) to bound fill-in.
+Only the Bayes tree is genuinely iSAM2-specific -- periodic batch variable
+reordering is already part of original iSAM (Kaess et al. 2008); iSAM2's
+actual contribution there is making that reordering incremental/fluid
+instead of a periodic full pass. This script skips reordering of either
+kind, a simplification relative to the 2008 original, not just relative to
+iSAM2. The incremental solver also runs plain Gauss-Newton (no
+Levenberg-Marquardt damping) between/at relinearizations -- the
+always-present anchor prior on node 0 already keeps the system
+well-conditioned.
 '''
 
 import argparse
