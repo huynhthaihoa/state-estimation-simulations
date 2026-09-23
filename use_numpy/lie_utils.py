@@ -112,8 +112,38 @@ def se3_log(T):
         omega = np.zeros(3)
         V_inv = I3
     else:
-        omega_hat = (theta / (2.0 * np.sin(theta))) * (R - R.T)
-        omega = np.array([-omega_hat[1, 2], omega_hat[0, 2], -omega_hat[0, 1]])
+        if theta > np.pi - 1e-3:
+            # Near theta=pi, the classic (R - R^T)/(2 sin(theta)) formula
+            # below divides by sin(theta) -> 0, cancelling catastrophically
+            # against a numerator that vanishes just as fast -- empirically,
+            # its error is already ~1e-3 by theta = pi - 1e-6, well before
+            # theta is actually close enough to pi for that to be
+            # unavoidable. Rodrigues' formula gives, for *any* theta:
+            #   Sym(R) := (R + R^T)/2 = cos(theta)*I + (1-cos(theta))*axis@axis.T
+            # (the sin(theta)*skew(axis) term is antisymmetric and cancels
+            # here), so axis@axis.T = (Sym(R) - cos(theta)*I)/(1-cos(theta))
+            # exactly. That division is safe here (1-cos(theta) ~ 2 near
+            # pi) -- unlike near theta=0, where it vanishes *quadratically*
+            # and this formula would need its own small-angle branch; that's
+            # exactly why this is gated to the near-pi case only, not used
+            # in place of the regular branch below. Accurate to machine
+            # precision down to the inherent (unavoidable) ~1e-8
+            # conditioning floor of arccos itself within ~1e-7 of exactly
+            # pi, where the log map's axis becomes a genuine, mathematically
+            # real sign ambiguity, not a numerical one.
+            axis_outer = (0.5 * (R + R.T) - cos_theta * I3) / (1.0 - cos_theta)
+            diag = np.clip(np.diag(axis_outer), 0.0, None)
+            k = int(np.argmax(diag))
+            axis = axis_outer[:, k] / np.sqrt(diag[k])
+            axis = axis / np.linalg.norm(axis)
+            R_antisym = R - R.T
+            sign_hint = np.array([-R_antisym[1, 2], R_antisym[0, 2], -R_antisym[0, 1]])
+            if np.dot(axis, sign_hint) < 0:
+                axis = -axis
+            omega = axis * theta
+        else:
+            omega_hat = (theta / (2.0 * np.sin(theta))) * (R - R.T)
+            omega = np.array([-omega_hat[1, 2], omega_hat[0, 2], -omega_hat[0, 1]])
 
         omega_skew = skew(omega)
         omega_skew_sq = np.dot(omega_skew, omega_skew)

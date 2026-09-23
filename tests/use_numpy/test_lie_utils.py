@@ -129,6 +129,31 @@ def test_se3_exp_se3_log_roundtrip(lie_utils, xi):
     assert np.allclose(T_recovered, T, atol=1e-6)
 
 
+# Regression coverage for the near-theta=pi branch of se3_log: the classic
+# (R - R^T)/(2 sin(theta)) axis-extraction formula divides by sin(theta),
+# which loses precision catastrophically well before theta is actually
+# within any reasonable "small-angle"-style threshold of pi (empirically,
+# round-trip error was already ~1e-3 by theta = pi - 1e-6 pre-fix). A
+# tight atol here (well below that pre-fix error) is deliberate: it fails
+# loudly if this regresses back to the old formula.
+NEAR_PI_THETAS = [np.pi - 1e-3, np.pi - 1e-5, np.pi - 1e-7, np.pi - 1e-9, np.pi]
+NEAR_PI_AXES = [
+    np.array([1.0, 0.0, 0.0]),
+    np.array([0.0, 1.0, 0.0]),
+    np.array([1.0, 1.0, 1.0]) / np.sqrt(3.0),
+    np.array([0.3, -0.7, 0.2]) / np.linalg.norm([0.3, -0.7, 0.2]),
+]
+
+
+@pytest.mark.parametrize("theta", NEAR_PI_THETAS)
+@pytest.mark.parametrize("axis", NEAR_PI_AXES)
+def test_se3_log_near_pi_roundtrip_stays_accurate(lie_utils, theta, axis):
+    xi = np.concatenate([np.array([0.5, -0.3, 0.2]), axis * theta])
+    T = lie_utils.se3_exp(xi)
+    T_recovered = lie_utils.se3_exp(lie_utils.se3_log(T))
+    assert np.allclose(T_recovered, T, atol=1e-6)
+
+
 @pytest.mark.parametrize("xi", XIS)
 def test_se3_inv(lie_utils, xi):
     T = lie_utils.se3_exp(xi)

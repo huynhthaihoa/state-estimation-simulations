@@ -77,58 +77,69 @@ def test_reset_jacobian_matches_reset_map_directly(saltation_matrix_ekf):
 
 # --- saltation_matrix: the critical correctness check ---
 
-def test_saltation_matrix_matches_finite_difference(saltation_matrix_ekf):
+def test_saltation_matrix_composes_to_the_fixed_dt_jacobian(saltation_matrix_ekf):
+    # saltation_matrix must satisfy the property step_hybrid actually needs:
+    # composed with the ordinary flow Jacobians before/after the event
+    # (Phi_after @ Xi @ Phi_before), it must equal the exact Jacobian of the
+    # WHOLE fixed-dt map (every state compared at the same external clock
+    # time T, not at each trajectory's own natural crossing time) -- checked
+    # here directly against a from-scratch finite difference of that map.
     m = saltation_matrix_ekf
     g, e = 9.81, 0.6
-    rng = np.random.default_rng(7)
+    x0 = np.array([0.0, 0.0, 0.05, 0.3, 0.2, -2.0])  # close to the guard: crosses well within dt
+    dt_tick = 0.05
 
-    x0 = np.array([0.0, 0.0, 5.0, 1.0, 0.5, -2.0])
-    tau = m.crossing_time(x0, g)
-    x_minus, _ = m.flow(x0, tau, g)
-    x_plus = m.reset_map(x_minus, e)
-    Xi = m.saltation_matrix(x_minus, e, g)
+    def one_bounce_map(x, dt):
+        tau = m.crossing_time(x, g)
+        assert tau is not None and tau < dt  # sanity: this scenario crosses within the tick
+        x_minus, _ = m.flow(x, tau, g)
+        x_plus = m.reset_map(x_minus, e)
+        x_final, _ = m.flow(x_plus, dt - tau, g)
+        return x_final
+
+    x_final = one_bounce_map(x0, dt_tick)
 
     eps = 1e-6
-    Xi_numeric = np.zeros((6, 6))
+    J_numeric = np.zeros((6, 6))
     for i in range(6):
         d = np.zeros(6)
         d[i] = eps
-        x_offguard = x_minus + d
-        # re-land the perturbed point exactly on the guard via the SAME
-        # pre-impact flow (closed-form quadratic, not step_hybrid's fixed-dt
-        # stepper), then apply the reset -- the standard finite-difference
-        # recipe for a saltation matrix.
-        p0, v0 = x_offguard[0:3], x_offguard[3:6]
-        a_coef, b_coef, c_coef = -0.5 * g, v0[2], p0[2]
-        disc = b_coef ** 2 - 4 * a_coef * c_coef
-        r1 = (-b_coef + np.sqrt(disc)) / (2 * a_coef)
-        r2 = (-b_coef - np.sqrt(disc)) / (2 * a_coef)
-        tau_correction = min([r1, r2], key=abs)
-        x_actual_minus, _ = m.flow(x_offguard, tau_correction, g)
-        x_actual_plus = m.reset_map(x_actual_minus, e)
-        Xi_numeric[:, i] = (x_actual_plus - x_plus) / eps
+        J_numeric[:, i] = (one_bounce_map(x0 + d, dt_tick) - x_final) / eps
 
-    assert np.allclose(Xi, Xi_numeric, atol=1e-4)
+    tau = m.crossing_time(x0, g)
+    x_minus, Phi_before = m.flow(x0, tau, g)
+    Xi = m.saltation_matrix(x_minus, e, g)
+    x_plus = m.reset_map(x_minus, e)
+    _, Phi_after = m.flow(x_plus, dt_tick - tau, g)
+    J_analytic = Phi_after @ Xi @ Phi_before
 
-    # and confirm this genuinely differs from the naive reset Jacobian alone --
-    # not just that the code runs, but that the correction actually matters.
+    assert np.allclose(J_analytic, J_numeric, atol=1e-4)
+
+    # and confirm this genuinely differs from composing the naive reset
+    # Jacobian alone -- not just that the code runs, but that the correction
+    # actually matters for this fixed-dt comparison too.
     DR = m.reset_jacobian(e)
-    assert np.max(np.abs(DR - Xi_numeric)) > 0.5
+    J_naive = Phi_after @ DR @ Phi_before
+    assert np.max(np.abs(J_naive - J_numeric)) > 0.5
 
 
-def test_saltation_matrix_annihilates_guard_normal_direction(saltation_matrix_ekf):
-    # Structural property (not a numerical coincidence): every trajectory in
-    # the perturbed family satisfies g(x) = p_z = 0 exactly at its own
-    # crossing, so Dg @ Xi = 0 identically, for any x_minus/e/g.
+def test_saltation_matrix_guard_normal_row_scales_by_minus_e(saltation_matrix_ekf):
+    # Structural property (not a numerical coincidence): Dg @ Xi = -e * Dg
+    # identically, for any x_minus/e/g -- see saltation_matrix's docstring
+    # for the derivation. Reduced, not zero: unlike the "compare each
+    # trajectory at its own crossing time" quantity this function used to
+    # (wrongly) return, this fixed-reference-time quantity does not claim
+    # exactly-zero sensitivity in the guard-normal direction.
     m = saltation_matrix_ekf
     rng = np.random.default_rng(11)
     Dg = np.array([0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
     for _ in range(5):
         x_minus = rng.normal(size=6)
         x_minus[2] = 0.0  # on the guard
+        x_minus[5] = -abs(x_minus[5]) - 0.1  # descending, nonzero impact speed
         e = rng.uniform(0.0, 1.0)
         Xi = m.saltation_matrix(x_minus, e, 9.81)
-        assert np.allclose(Dg @ Xi, 0.0, atol=1e-12)
+        assert np.allclose(Dg @ Xi, -e * Dg, atol=1e-10)
 
 
 # --- step_hybrid / generate_ground_truth_and_data: sanity on a real bounce ---

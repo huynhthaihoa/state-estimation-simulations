@@ -58,6 +58,28 @@ def test_incremental_matches_batch_on_same_constraint_set(pose_graph, pose_graph
     assert np.sqrt(np.mean(pos_incr ** 2)) < np.sqrt(np.mean(pos_dr ** 2))
 
 
+def test_relinearize_to_convergence_R_d_matches_returned_x(pose_graph, pose_graph_incremental):
+    # relinearize_to_convergence's docstring promises R, d are "already built at
+    # that point" (the returned x_current). Checked directly against
+    # full_relinearize -- the ground-truth definition of "R, d built at a given
+    # x" -- at low gn_max_iters, where a version that relinearized before each
+    # retraction (rather than after) would return R, d from the *previous*
+    # iteration's x, one retraction stale.
+    gt_poses, odometry_constraints, loop_constraints = _noisy_scenario(pose_graph, seed=0, nodes_per_side=4)
+    info_matrix = np.eye(6)
+
+    x_init = pose_graph.run_dead_reckoning(gt_poses[0], odometry_constraints)
+
+    for gn_max_iters in (1, 2, 3):
+        x_out, R, d = pose_graph_incremental.relinearize_to_convergence(
+            x_init, odometry_constraints, loop_constraints, info_matrix,
+            anchor_weight=1e6, gn_tol=1e-12, gn_max_iters=gn_max_iters)
+        R_expected, d_expected = pose_graph_incremental.full_relinearize(
+            x_out, odometry_constraints, loop_constraints, info_matrix, anchor_weight=1e6)
+        assert np.allclose(R, R_expected, atol=1e-8)
+        assert np.allclose(d, d_expected, atol=1e-8)
+
+
 def test_incremental_matches_batch_across_relinearize_schedules(pose_graph, pose_graph_incremental):
     # Regardless of how often periodic relinearization fires, the
     # loop-closure edge always forces a final full relinearization to

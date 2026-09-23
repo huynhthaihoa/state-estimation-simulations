@@ -1,18 +1,13 @@
 '''
 This script simulates a robot attempting to track a moving target trajectory over
-several timesteps under the same unbalanced noise profile
-(highly accurate GPS translation, but imperfect IMU).
+several timesteps against a genuinely noisy, position-only "Global Position
+Measurement" (GPS-style: it reads translation, never orientation) fused with an
+imperfect IMU's dead-reckoned twist propagation.
 
 Same simulation as robot_imu_simulation.py, but the SE(3) manifold math (Exp/Log
-maps, right-minus, inverse right Jacobian) is delegated to the manif library
+maps, right-plus) is delegated to the manif library
 (https://github.com/artivis/manif) instead of hand-rolled numpy formulas.
 
-Key correspondence with the original script:
-  se3_exp(xi)                         -> manif.SE3Tangent(xi).exp() / T.rplus(tangent)
-  se3_log(inv(T_true) @ T_est)        -> T_est.rminus(T_true)
-  compute_se3_inv_right_jacobian(e)   -> the J_self Jacobian rminus() writes out,
-                                          i.e. the Jacobian of (T_est rminus T_true)
-                                          with respect to a right-perturbation of T_est.
 manif's tangent vector layout is [vx, vy, vz, wx, wy, wz], matching the original
 script's [linear, angular] convention.
 '''
@@ -22,12 +17,41 @@ import argparse
 import manifpy as manif
 
 
+def position_observation_jacobian(T_est):
+    """d(position)/d(xi) for a right perturbation T_est <- T_est.rplus(xi),
+    xi=[v,omega] (manif's translation-first tangent convention, matching this
+    codebase's own): only the linear-velocity block affects translation to
+    first order, so this is [R_est | 0] -- verified against finite
+    differences in this module's tests. Factored out from run_simulation's
+    correction loop so it's independently testable: this Jacobian's all-zero
+    angular block is exactly what makes a position-only measurement
+    structurally unable to correct orientation, no matter how it's weighted
+    -- the property this module's tests check for directly, not just
+    inferred from behavior.
+    Arguments:
+        T_est: current pose estimate (manif.SE3)
+    Returns:
+        J: (3,6) Jacobian of position wrt xi
+    """
+    return np.hstack([T_est.rotation(), np.zeros((3, 3))])
+
+
 def run_simulation(dt_imu, total_seconds, snapshots_per_second, gn_tol, gn_max_iters,
-                    max_linear_vel, max_angular_vel, omega_info, rng):
+                    max_linear_vel, max_angular_vel, pos_noise_std, pos_info, rng):
     """Runs the full IMU-propagation + low-rate correction timeline (100 Hz IMU
-    guesses, 1 Hz Gauss-Newton correction against a precise GPS-style position
+    guesses, 1 Hz Gauss-Newton correction against a noisy GPS-style position
     measurement), printing the same interactive trace the original inline
     __main__ block did.
+
+    The correction is a genuine position-only observation, z = T_true's
+    translation + noise -- not T_true itself. Its Jacobian wrt a right
+    perturbation of T_est is [R_est | 0]: only the linear-velocity block
+    affects position to first order, so this measurement can only ever
+    correct translation. Orientation is never touched by it and relies
+    entirely on the IMU's own dead-reckoning between corrections -- the
+    realistic version of "precision GPS, imperfect gyro": GPS supplies no
+    orientation information at all, rather than a full 6-DoF pose reading
+    merely *weighted* to trust rotation less.
     Arguments:
         dt_imu: IMU update interval (s)
         total_seconds: total simulated duration (s)
@@ -36,8 +60,9 @@ def run_simulation(dt_imu, total_seconds, snapshots_per_second, gn_tol, gn_max_i
         gn_max_iters: maximum Gauss-Newton iterations per per-second correction
         max_linear_vel: max magnitude of the (fixed, randomly drawn) linear body-rate component (m/s)
         max_angular_vel: max magnitude of the (fixed, randomly drawn) angular body-rate component (rad/s)
-        omega_info: (6,6) information (inverse-covariance) matrix for the correction step
-        rng: numpy random Generator (drives the true twist velocity and IMU noise)
+        pos_noise_std: std-dev (m) of the position measurement's per-axis Gaussian noise
+        pos_info: (3,3) information (inverse-covariance) matrix for the position correction
+        rng: numpy random Generator (drives the true twist velocity, IMU noise, and GPS noise)
     Returns:
         T_true: final ground-truth pose (manif.SE3)
         T_est: final estimated pose (manif.SE3)
@@ -86,6 +111,11 @@ def run_simulation(dt_imu, total_seconds, snapshots_per_second, gn_tol, gn_max_i
 
         # --- PHASE 2: LOWER FREQUENCY POSITION FILTERING (1 Hz Update) ---
         print(f"\n[SENSOR TICK] Global Position Measurement Arrived!")
+        # A genuine GPS-style reading: the true position plus per-axis Gaussian
+        # noise -- not T_true itself. This is the one measurement T_est ever
+        # gets corrected against, and it carries no orientation information.
+        z_pos = T_true.translation() + rng.normal(0.0, pos_noise_std, 3)
+
         pre_correction_error = np.linalg.norm(T_true.translation() - T_est.translation())
         pre_correction_errors.append(pre_correction_error)
         print(f"  Pre-Correction Error Distance: {pre_correction_error:.4f} meters")
@@ -93,14 +123,13 @@ def run_simulation(dt_imu, total_seconds, snapshots_per_second, gn_tol, gn_max_i
         # Run local optimization cycles using manif's manifold operators, iterating
         # until the correction step shrinks below gn_tol (or gn_max_iters is hit)
         for opt_iter in range(gn_max_iters):
-            # Compute tracking residual directly on the manifold: e = Log(T_true^-1 T_est),
-            # expressed as a right-perturbation of T_est, together with its analytical Jacobian
-            J = np.zeros((6, 6))
-            e_vector = T_est.rminus(T_true, J).coeffs()
+            # Position-only residual: r = z_pos - T_est's translation.
+            r_vector = z_pos - T_est.translation()
+            J = position_observation_jacobian(T_est)
 
             # Solve normal system with our confidence profile
-            H = np.dot(J.T, np.dot(omega_info, J)) + np.eye(6) * 1e-4
-            g = -np.dot(J.T, np.dot(omega_info, e_vector))
+            H = np.dot(J.T, np.dot(pos_info, J)) + np.eye(6) * 1e-4
+            g = np.dot(J.T, np.dot(pos_info, r_vector))
             delta_xi = np.linalg.solve(H, g)
 
             # Correct the estimate matrix
@@ -143,6 +172,10 @@ if __name__ == "__main__":
     parser.add_argument("--max-linear-vel", type=float, default=1.0, help="Maximum linear velocity magnitude in m/s (default: 1.0)")
     parser.add_argument("--max-angular-vel", type=float, default=0.5, help="Maximum angular velocity magnitude in rad/s (default: 0.5)")
 
+    # Position measurement noise (the "precision GPS" -- precise, but not exact)
+    parser.add_argument("--pos-noise-std", type=float, default=0.05,
+                         help="Per-axis std-dev (m) of the Global Position Measurement's Gaussian noise (default: 0.05)")
+
     parser.add_argument("--seed", type=int, default=0, help="RNG seed (default: 0)")
 
     args = parser.parse_args()
@@ -151,10 +184,8 @@ if __name__ == "__main__":
 
     rng = np.random.default_rng(args.seed)
 
-    # Setup Correction Weights (Precision GPS for position, noisy gyro)
-    unbalanced_cov = np.zeros((6, 6))
-    np.fill_diagonal(unbalanced_cov, [0.001, 0.001, 0.001, 1000.0, 1000.0, 1000.0])
-    omega_info = np.linalg.inv(unbalanced_cov)
+    pos_info = np.eye(3) / args.pos_noise_std ** 2
 
     run_simulation(args.dt_imu, args.total_seconds, args.snapshots_per_second, args.gn_tol,
-                   args.gn_max_iters, args.max_linear_vel, args.max_angular_vel, omega_info, rng)
+                   args.gn_max_iters, args.max_linear_vel, args.max_angular_vel,
+                   args.pos_noise_std, pos_info, rng)

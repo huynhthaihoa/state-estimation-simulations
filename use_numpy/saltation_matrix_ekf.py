@@ -37,51 +37,53 @@ Three ways to track the trajectory are implemented:
     the covariance at each bounce with the true `saltation_matrix` instead of
     the reset Jacobian alone. See `saltation_matrix`'s own docstring for the
     derivation (verified against a from-scratch finite-difference ground
-    truth to ~2.9e-8, i.e. machine precision, after an initially-recalled,
-    plausible-looking formula was checked and found wrong).
+    truth of the exact quantity `step_hybrid` needs -- composed with the
+    ordinary flow Jacobians before/after the event, to ~7e-6 -- after a
+    different, also-standard-looking formula, correct for a *different*
+    question, was checked against the same ground truth and found wrong by a
+    wide margin for *this* one).
 
 A Monte Carlo consistency check (`run_monte_carlo_consistency`, new to this
 repo -- there is no existing NEES/NIS/chi-squared helper anywhere else here)
 repeats the naive and saltation-corrected EKFs over many independent noise
 realizations of the same nominal trajectory and averages each one's NEES
-(Normalized Estimation Error Squared) per step. The finding here is more
-interesting, and more useful, than "naive is overconfident, saltation fixes
-it": `saltation_matrix` provably drives the guard-normal (height) direction's
-*reported* variance to exactly zero at every bounce (it is derived to do
-exactly that -- see its own docstring's `Dg @ Xi = 0` identity), which is
-correct *only* if the filter's own estimated bounce time exactly coincides
-with the true one. It generally does not, once there is any tracking error
-at all -- and empirically (verified across multiple seeds, see
-`docs/filtering/hybrid_saltation_ekf.md`), this makes the saltation-corrected
-EKF's post-bounce NEES consistently *higher* than the naive EKF's at the same
-regularization level, not lower: the mathematically-exact local correction is
-also the more fragile one once event-detection itself carries uncertainty, a
-concrete instance of exactly the gap between "saltation matrices assume a
-known transition time" and "contact/phase detection is itself uncertain".
-Both EKFs' *mean* trajectories still look nearly identical throughout
-regardless: this entire effect is invisible in the point estimate and only
-shows up in whether the reported uncertainty can be trusted.
+(Normalized Estimation Error Squared) per step. The finding here is modest,
+not dramatic: the saltation-corrected EKF's post-bounce NEES runs slightly
+*higher* than the naive EKF's (~2.5 vs. ~2.4 at this script's defaults, a
+~5% gap -- see docs/filtering/hybrid_saltation_ekf.md §6 for the full
+numbers), the opposite direction from the naive "saltation fixes naive's
+overconfidence" expectation, but nowhere near large enough to call either
+filter's calibration meaningfully broken. `saltation_matrix` reduces (but,
+unlike the rejected formula, does not zero out) the guard-normal (height)
+direction's *reported* variance at every bounce -- see its own docstring's
+`Dg @ Xi = -e * Dg` identity -- which is *most* accurate when the filter's
+own estimated bounce time coincides with the true one, and tracking error
+generally keeps that from being exact; the small residual gap above is that
+effect, still present but far more muted than the near-singular-covariance
+version an incorrect formula without the `f+` term would produce. Both EKFs'
+*mean* trajectories still look nearly identical throughout regardless: this
+entire effect is invisible in the point estimate and only shows up in
+whether the reported uncertainty can be trusted.
 
-That finding above is itself already a symptom of that same gap --
-but only as a side effect of ordinary state-estimation error making the
-filter's *own* crossing_time() calculation drift from the true one. A real
-contact sensor has a second, independent source of the same problem: its
-own detection latency/jitter, on top of whatever the state estimate already
-gets wrong. `step_hybrid`'s `detect_time_bias`/`detect_time_noise_std`
-parameters (both default 0.0, reproducing the exact-detection behavior this
-script had before they existed) model that directly, by applying the bounce
-reset at a `tau_detect` offset from the true geometric crossing instead of
-at the crossing itself. Quantified (see docs/filtering/hybrid_saltation_ekf.md
-§8 for the full sweep): the naive-vs-saltation post-bounce NEES gap above
-(already inverted at exact detection, ~1.5x) widens sharply as
---detect-time-noise-std grows, reaching ~5.5x once jitter reaches half the
-measurement interval -- the saltation matrix's exact `Dg @ Xi = 0` claim
-about the guard-normal direction makes it dramatically more sensitive to
-detection jitter than the naive update, not just somewhat more so. Getting
-this measurement right required a real bug fix, not just a new parameter:
-`crossing_time` originally accepted any future zero-crossing, which was
-harmless as long as every reset landed exactly on the guard, but once
-detect_time_* can leave a reset off-guard, the point mass can end up
+A real contact sensor adds a second, independent source of timing error on
+top of that: its own detection latency/jitter, beyond whatever the state
+estimate already gets wrong about the geometric crossing time.
+`step_hybrid`'s `detect_time_bias`/`detect_time_noise_std` parameters (both
+default 0.0, reproducing the exact-detection behavior above) model that
+directly, by applying the bounce reset at a `tau_detect` offset from the
+true geometric crossing instead of at the crossing itself. Quantified (see
+docs/filtering/hybrid_saltation_ekf.md §8 for the full sweep): the
+naive-vs-saltation post-bounce NEES gap above (already present at exact
+detection, ~1.05x) widens further as --detect-time-noise-std grows, reaching
+~1.6x once jitter reaches half the measurement interval -- both filters
+degrade (unsurprising, since neither one's P accounts for detection
+uncertainty at all), and saltation degrades somewhat faster, a real if
+modest instance of the general gap between "saltation matrices assume a
+known transition time" and "contact/phase detection is itself uncertain".
+Getting this measurement right required a real bug fix, not just a new
+parameter: `crossing_time` originally accepted any future zero-crossing,
+which was harmless as long as every reset landed exactly on the guard, but
+once detect_time_* can leave a reset off-guard, the point mass can end up
 slightly below `p_z = 0` and immediately re-cross it on the way back *up*
 -- an ascending, non-physical "impact" that (before the fix) triggered a
 cascade of spurious re-bounces and inflated NEES/position error by 4-5
@@ -227,51 +229,65 @@ def reset_jacobian(e):
 
 def saltation_matrix(x_minus, e, g):
     """The saltation matrix: the correct linearization of the post-impact
-    state (at its own natural post-impact time) with respect to the
-    pre-impact state (at its own natural pre-impact time) -- NOT simply
-    reset_jacobian(e), because a perturbed trajectory reaches the guard
-    p_z = 0 at a slightly different time, and during that extra sliver of
-    time it is still governed by the free-fall flow.
+    state, propagated forward to a *fixed* later reference time shared by
+    every trajectory in the family (as `step_hybrid` below needs: it always
+    compares states at fixed-size dt ticks, not at each trajectory's own
+    natural crossing time) -- NOT simply reset_jacobian(e), because a
+    perturbed trajectory reaches the guard p_z = 0 at a slightly different
+    time, and during that extra sliver of time it is still governed by the
+    free-fall flow, both before *and after* the reset.
 
     Derivation: for a family of trajectories x(t; p) governed by dx/dt =
     f(x) up to a guard g(x) = 0 crossed at a p-dependent time t*(p), with a
-    reset x+ = R(x-) applied there, implicit differentiation of
-    g(x(t*(p); p)) = 0 gives dt*/dp = -(Dg . S(t*)) / (Dg . f(x-)), where
-    S(t) = dx(t;p)/dp. Substituting back into d/dp[x(t*(p); p)] and then
-    into d/dp[R(x(t*(p); p))] gives
+    reset x+ = R(x-) applied there and the same flow resumed afterward,
+    fix a later reference time T (independent of p) and ask for
+    d/dp[x(T;p)]. Implicit differentiation of g(x(t*(p);p))=0 gives the
+    familiar crossing-time sensitivity dt*/dp = -(Dg.S(t*))/(Dg.f(x-)),
+    where S(t) = dx(t;p)/dp; the state at T is x(T;p) = Phi(x+(p), T-t*(p))
+    (the flow map, run for the *remaining* time T-t*(p) starting from the
+    post-reset state). Differentiating that through the chain rule, and
+    using the standard flow identity D_xPhi(x,s).f(x) = f(Phi(x,s)) (an
+    autonomous flow's own linearization always carries its generating
+    vector field forward to the vector field at the flowed-to point), the
+    two time-dependent pieces combine into
 
-        Xi = DR(x-) @ [ I - f(x-) (outer) Dg / (Dg . f(x-)) ]
+        Xi = DR(x-) + [f+(x+) - DR(x-).f-(x-)] (outer) Dg / (Dg . f-(x-))
 
-    -- DR corrected by a rank-1 term that removes exactly the
-    "along-the-flow" component of a perturbation (the piece that would
-    otherwise double-count as a pure time-shift of when the guard is
-    crossed, rather than a genuine change in the crossing state itself).
+    (f- = f(x-), f+ = f(x+) = f(R(x-)) -- the SAME vector field, just
+    evaluated pre- vs. post-reset). This composes with the ordinary flow
+    Jacobians before and after the event -- Phi_after @ Xi @ Phi_before --
+    to give the exact Jacobian of the whole fixed-time map, matching a
+    from-scratch finite-difference ground truth of that exact quantity to
+    ~7e-6 (limited by the finite-difference step itself, not this formula).
 
-    Verified against a from-scratch finite-difference ground truth (perturb
-    x- directly, re-land it on the guard via the pre-impact flow, apply
-    reset_map, compare to nominal) to ~2.9e-8, i.e. machine precision -- see
-    docs/filtering/hybrid_saltation_ekf.md for the full derivation and for a
-    different, plausible-looking formula (DR + [f+(x+) - DR@f-(x-)] (outer)
-    Dg / (Dg.f-(x-)), commonly seen written down from memory) that was
-    checked against the same finite-difference ground truth and found wrong
-    by a wide margin (max abs diff ~1.28, not floating-point noise) --
-    keeping that failed check is a deliberate teaching point, not an
-    afterthought.
+    A different, also-standard-looking formula, DR(x-) @ [I - f-(x-) (outer)
+    Dg/(Dg.f-(x-))], answers a *different* question -- the sensitivity of
+    the post-impact state at its *own* natural post-impact time (no shared
+    reference time at all) with respect to the pre-impact state at its own
+    natural pre-impact time. That quantity is correct for what it measures
+    (verified separately, to ~2.9e-8, in this module's tests) and is
+    exactly the building block composed-across-events for Poincare-map
+    stability analysis (docs/filtering/hybrid_saltation_ekf.md's §9) -- but
+    it is missing the f+ term entirely, and using it here, where every
+    comparison is against a fixed dt tick rather than each trajectory's own
+    crossing time, was checked against this function's own finite-difference
+    ground truth and found wrong by a wide margin (max abs diff ~4.4, not
+    floating-point noise) -- this module's docs/tests keep that failed
+    check as a deliberate point: getting the *shape* of a saltation-matrix
+    formula right is not the same as getting the right saltation matrix for
+    the specific comparison at hand.
 
-    A structural property worth knowing before using this in an EKF: since
-    every trajectory in the family satisfies g(x) = 0 exactly at its own
-    crossing, Dg @ Xi = 0 identically (checked: `Dg @ saltation_matrix(...)`
-    is exactly the zero vector for any x_minus/e/g) -- the guard-normal
-    output direction (p_z here) has *exactly* zero sensitivity to any input
-    perturbation. That is mathematically correct, but it drives the p_z
-    row/column of `Xi @ P @ Xi.T` to exactly zero every bounce, which is only
-    trustworthy if the filter's own estimated crossing time exactly matches
-    the true one -- it generally won't, once there is any state-estimation
-    error at all. `step_hybrid` below adds a small regularizing "impact
-    noise" floor after every bounce (both branches, so the comparison stays
-    fair) specifically to keep this exact, correct projection numerically
-    usable once compared against a true trajectory sampled at fixed ticks
-    rather than at its own exact crossing times.
+    A structural property worth knowing before using this in an EKF:
+    Dg @ Xi = -e * Dg identically (checked: `Dg @ saltation_matrix(...)`
+    always equals `-e` times the guard gradient, for any x_minus/e/g) --
+    the guard-normal (p_z) output direction has a *reduced*, not zero,
+    sensitivity to perturbations along the guard-normal input direction,
+    scaled by the restitution coefficient. Unlike the rejected formula
+    above, this one does not drive P's guard-normal row/column to exactly
+    zero every bounce, so it needs no artificial regularizing floor to stay
+    numerically well-behaved against a true trajectory sampled at fixed
+    ticks -- see `step_hybrid` below and docs/filtering/hybrid_saltation_ekf.md
+    §5 for what that changes about this script's own empirical findings.
     Arguments:
         x_minus: pre-impact state (6,), assumed to already satisfy p_z = 0
         e: restitution coefficient
@@ -280,10 +296,12 @@ def saltation_matrix(x_minus, e, g):
         Xi: (6,6) saltation matrix
     """
     f_minus = np.concatenate([x_minus[3:6], [0.0, 0.0, -g]])
+    x_plus = reset_map(x_minus, e)
+    f_plus = np.concatenate([x_plus[3:6], [0.0, 0.0, -g]])
     Dg = np.array([0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
+    DR = reset_jacobian(e)
     denom = Dg @ f_minus
-    B = np.eye(6) - np.outer(f_minus, Dg) / denom
-    return reset_jacobian(e) @ B
+    return DR + np.outer(f_plus - DR @ f_minus, Dg) / denom
 
 
 def process_noise_covariance(h, accel_noise_std):
@@ -322,18 +340,18 @@ def step_hybrid(x, P, dt, e, g, accel_noise_std, use_saltation, impact_noise_std
 
     A small isotropic "impact noise" floor (impact_noise_std**2 * I) is added
     to P immediately after every bounce's covariance update, applied
-    identically regardless of use_saltation. This exists specifically to
-    counter saltation_matrix's own Dg@Xi=0 property (see its docstring): the
-    exact saltation projection drives the guard-normal (p_z) row/column of P
-    to exactly zero, which is only trustworthy if the filter's own estimated
-    crossing time exactly matches the true one -- with any state-estimation
-    error this won't hold, and comparing a near-singular P against a true
-    trajectory sampled at a fixed tick (not at its own exact crossing) blows
-    up the NEES/Mahalanobis distance purely numerically, not because the
-    saltation-corrected filter is somehow worse. Real contact-aided
-    EKF/InEKF implementations handle this with an explicit impact-timing or
-    model-uncertainty term; this isotropic floor is a simplified stand-in for
-    that, not a claim of matching that rigor.
+    identically regardless of use_saltation. saltation_matrix's `Dg @ Xi =
+    -e * Dg` property (see its docstring) means the guard-normal (p_z)
+    row/column of P is *reduced*, not driven to exactly zero, at each bounce
+    -- unlike a formula without the `f+` correction term, which would zero
+    it out and make P numerically fragile against a true trajectory sampled
+    at fixed ticks rather than at its own exact crossing. This floor is
+    consequently no longer strictly required for numerical sanity here (with
+    `impact_noise_std=0`, NEES stays modest rather than exploding -- see
+    docs/filtering/hybrid_saltation_ekf.md §7); it remains as a simplified
+    stand-in for the explicit impact-timing/model-uncertainty term a real
+    contact-aided EKF/InEKF implementation would carry, not a numerical
+    necessity for this script's own formula.
 
     `detect_time_bias`/`detect_time_noise_std` model a second, independent
     source of bounce-timing error: a real contact sensor (IMU spike, force
@@ -809,13 +827,13 @@ def main():
         print(f"  EKF (naive)      mean NEES={np.mean(post_bounce_naive):8.2f}")
         print(f"  EKF (saltation)  mean NEES={np.mean(post_bounce_salt):8.2f}")
 
-    print("\nAverage time complexity + space complexity per approach (per-step, empirical):")
+    print("\nAverage time (per-step) and peak memory (whole-run) per approach, empirical:")
     for name, avg_time, avg_mem in [
         ("Dead-reckoning", time_dr, mem_dr),
         ("EKF (naive)", time_naive, mem_naive),
         ("EKF (saltation)", time_salt, mem_salt),
     ]:
-        print(f"  {name:<18s} avg time={avg_time * 1e6:9.2f} us/step | avg peak mem={avg_mem / 1024.0:9.3f} KB/step")
+        print(f"  {name:<18s} avg time={avg_time * 1e6:9.2f} us/step | peak mem={avg_mem / 1024.0:9.3f} KB")
 
     t_hist = np.arange(len(x_true)) * args.dt
     fig, (ax_height, ax_err, ax_nees) = plt.subplots(3, 1, figsize=(9, 11))

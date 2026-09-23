@@ -494,13 +494,13 @@ def main():
               f"fixed_anisotropic={np.mean(nees_fixed[mask]):8.2f} | "
               f"heading_aware={np.mean(nees_aware[mask]):8.2f}")
 
-    print("\nAverage time complexity + space complexity per approach (per-step, empirical):")
+    print("\nAverage time (per-step) and peak memory (whole-run) per approach, empirical:")
     for name, avg_time, avg_mem in [
         ("isotropic", time_iso, mem_iso),
         ("fixed_anisotropic", time_fixed, mem_fixed),
         ("heading_aware", time_aware, mem_aware),
     ]:
-        print(f"  {name:<18s} avg time={avg_time * 1e6:9.2f} us/step | avg peak mem={avg_mem / 1024.0:9.3f} KB/step")
+        print(f"  {name:<18s} avg time={avg_time * 1e6:9.2f} us/step | peak mem={avg_mem / 1024.0:9.3f} KB")
 
     t_hist = np.arange(len(x_true)) * args.dt
     fig, (ax_path, ax_err, ax_nees) = plt.subplots(3, 1, figsize=(9, 12))

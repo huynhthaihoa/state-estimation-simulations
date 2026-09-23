@@ -713,7 +713,7 @@ def main():
         print(f"  {name:<18s} final rot={rot_err[-1]:7.3f} deg, pos={pos_err[-1]:7.4f} m | "
               f"RMS rot={np.sqrt(np.mean(rot_err**2)):7.3f} deg, pos={np.sqrt(np.mean(pos_err**2)):7.4f} m")
 
-    print("\nAverage time complexity + space complexity per approach (per-step, empirical):")
+    print("\nAverage time (per-step) and peak memory (whole-run) per approach, empirical:")
     for name, avg_time, avg_mem in [
         ("Dead-reckoning", time_dr, mem_dr),
         ("EKF (recursive)", time_ekf, mem_ekf),
@@ -722,7 +722,7 @@ def main():
         ("UKF (unscented)", time_ukf, mem_ukf),
         ("Vanilla KF", time_vkf, mem_vkf),
     ]:
-        print(f"  {name:<18s} avg time={avg_time * 1e6:9.2f} µs/step | avg peak mem={avg_mem / 1024.0:9.3f} KB/step")
+        print(f"  {name:<18s} avg time={avg_time * 1e6:9.2f} µs/step | peak mem={avg_mem / 1024.0:9.3f} KB")
 
     t_hist = np.arange(len(T_true)) * args.dt
     fig, (ax_rot, ax_pos, ax_traj) = plt.subplots(3, 1, figsize=(9, 11))

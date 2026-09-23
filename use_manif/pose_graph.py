@@ -99,8 +99,8 @@ def run_dead_reckoning(T_init, odometry_constraints):
 
 
 def run_pose_graph_optimization(T_init_list, constraints, info_matrix, damping, gn_tol, gn_max_iters):
-    """Batch Gauss-Newton / Levenberg-Marquardt pose-graph relaxation: jointly
-    optimizes every node pose against all edge residuals
+    """Batch Levenberg-Marquardt pose-graph relaxation: jointly optimizes
+    every node pose against all edge residuals
     e_ij = Xj.rminus(Xi.compose(Z_ij)) = Log(Z_ij^-1 * Xi^-1 * Xj), fixing the
     gauge freedom by heavily anchoring node 0.
 
@@ -111,26 +111,49 @@ def run_pose_graph_optimization(T_init_list, constraints, info_matrix, damping, 
     pattern used in run_batch_gn (pointcloud_pose_tracking_manif.py),
     generalized from a twist-based motion model to a directly-measured
     relative pose.
+
+    Uses adaptive (Marquardt-scaled) damping -- accept a step only if it
+    actually reduces total chi-squared error, growing the damping and
+    retrying otherwise, shrinking it after every accepted step -- the same
+    pattern bundle_adjustment_advanced.py's run_windowed_gn_lm uses (and its
+    use_numpy twin here), rather than a fixed damping term added once per
+    iteration regardless of whether the resulting step helps. A fixed-damping
+    scheme only happens to work when the problem is already well-conditioned
+    enough that every step helps (true for this script's own well-anchored
+    toy scenes); it isn't a substitute for an accept/reject criterion in
+    general, and a fixed-damping *baseline* solver used purely as an
+    "eventually converges however long it takes" reference (e.g.
+    pose_graph_incremental.py's run_batch_streaming) needs the adaptivity to
+    actually reach that reference point in a bounded number of iterations.
     Arguments:
         T_init_list: list of initial pose guesses (manif.SE3)
         constraints: list of (idx_i, idx_j, Z_ij) edges (manif.SE3 measurements)
         info_matrix: 6x6 information (inverse covariance) matrix shared by every edge (numpy array)
-        damping: Levenberg-Marquardt damping added to the normal equations' diagonal
+        damping: initial Levenberg-Marquardt damping (lambda); adapted automatically from here
         gn_tol: convergence tolerance on the correction step norm
-        gn_max_iters: maximum number of iterations
+        gn_max_iters: maximum number of accepted-step iterations
     Returns:
         T_est: list of optimized poses (manif.SE3)
     """
     n_poses = len(T_init_list)
     dof = 6 * n_poses
+
+    def cost(T_list):
+        total = 0.0
+        for idx_i, idx_j, Z_ij in constraints:
+            e_vec = T_list[idx_j].rminus(T_list[idx_i].compose(Z_ij)).coeffs()
+            total += e_vec @ info_matrix @ e_vec
+        return total
+
     T_est = list(T_init_list)
+    cur_cost = cost(T_est)
+    lam = damping
 
     for it in range(gn_max_iters):
         H = np.zeros((dof, dof))
         g = np.zeros(dof)
         H[0:6, 0:6] += np.eye(6) * 1e6  # anchor node 0 (gauge freedom)
 
-        total_error = 0.0
         for idx_i, idx_j, Z_ij in constraints:
             Xi, Xj = T_est[idx_i], T_est[idx_j]
 
@@ -143,8 +166,6 @@ def run_pose_graph_optimization(T_init_list, constraints, info_matrix, damping, 
             J_i = Jb @ Jc_self  # d e_ij / d Xi, chained through T_pred
             J_j = Ja            # d e_ij / d Xj
 
-            total_error += e_vec @ info_matrix @ e_vec
-
             c0, c1 = 6 * idx_i, 6 * idx_j
             H[c0:c0 + 6, c0:c0 + 6] += J_i.T @ info_matrix @ J_i
             H[c1:c1 + 6, c1:c1 + 6] += J_j.T @ info_matrix @ J_j
@@ -153,16 +174,30 @@ def run_pose_graph_optimization(T_init_list, constraints, info_matrix, damping, 
             g[c0:c0 + 6] += -J_i.T @ info_matrix @ e_vec
             g[c1:c1 + 6] += -J_j.T @ info_matrix @ e_vec
 
-        print(f"    Iteration {it + 1}: total chi-squared error = {total_error:.6f}")
+        diag_H = np.diag(H).copy()
+        diag_H[diag_H < 1e-12] = 1e-12
 
-        H += np.eye(dof) * damping
-        delta = np.linalg.solve(H, g)
+        print(f"    Iteration {it + 1}: total chi-squared error = {cur_cost:.6f} (lambda={lam:.2e})")
 
-        for k in range(n_poses):
-            T_est[k] = T_est[k] + manif.SE3Tangent(delta[6 * k:6 * k + 6])
+        accepted = False
+        delta = np.zeros(dof)
+        for _retry in range(10):
+            delta = np.linalg.solve(H + lam * np.diag(diag_H), g)
+            T_trial = [T_est[k] + manif.SE3Tangent(delta[6 * k:6 * k + 6]) for k in range(n_poses)]
+            trial_cost = cost(T_trial)
+            if trial_cost < cur_cost:
+                T_est = T_trial
+                cur_cost = trial_cost
+                lam = max(lam * 0.5, 1e-7)
+                accepted = True
+                break
+            lam = max(lam * 2.0, 1e-6)
 
-        step_norm = np.linalg.norm(delta)
-        if step_norm < gn_tol:
+        if not accepted:
+            print(f"    Step rejected at every damping level tried; stopping "
+                  f"(final chi-squared = {cur_cost:.6f})")
+            break
+        if np.linalg.norm(delta) < gn_tol:
             print(f"    Converged after {it + 1} iteration(s) (|delta| < {gn_tol})")
             break
     else:

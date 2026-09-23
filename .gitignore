@@ -1,13 +1,9 @@
 *.dat
 __pycache__
 # *.jpg
-# *.png
+*.png
 # *.tiff
 # *.mp4
 # *.MOV
 # *webm
-*.xml
-*.rar
-omnicalib
-*.pdf
 .venv

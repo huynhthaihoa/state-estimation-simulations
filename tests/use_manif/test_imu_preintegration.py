@@ -99,7 +99,14 @@ def test_bias_correction_jacobian_matches_finite_difference(imu_preintegration, 
 
     bundle = _run_bundle(imu_preintegration, b_g0, b_a0, raw_vs, raw_ws, dt)
 
-    eps = 1e-6
+    # eps=1e-6 paired with atol=1e-4 made this test vacuous: the perturbation's
+    # actual effect on the output is only ~1e-7 (200x below atol), so a
+    # zeroed-out Jacobian still passed. eps=1e-4/atol=1e-8 instead gives a
+    # ~1000x margin on both sides (checked empirically across all 6
+    # parametrized cases): a correct Jacobian's Taylor-truncation error stays
+    # around 1e-11, while a zeroed Jacobian's error is ~1e-5 -- comfortably on
+    # opposite sides of atol.
+    eps = 1e-4
     delta = np.zeros(3)
     delta[axis] = eps
     if bias_kind == "gyro":
@@ -110,9 +117,9 @@ def test_bias_correction_jacobian_matches_finite_difference(imu_preintegration, 
     perturbed_bundle = _run_bundle(imu_preintegration, new_b_g, new_b_a, raw_vs, raw_ws, dt)
     pred_R, pred_v, pred_p = bundle.get_corrected_measurement(new_b_g, new_b_a)
 
-    assert np.allclose(pred_R.coeffs(), perturbed_bundle.delta_R.coeffs(), atol=1e-4)
-    assert np.allclose(pred_v, perturbed_bundle.delta_v, atol=1e-4)
-    assert np.allclose(pred_p, perturbed_bundle.delta_p, atol=1e-4)
+    assert np.allclose(pred_R.coeffs(), perturbed_bundle.delta_R.coeffs(), atol=1e-8)
+    assert np.allclose(pred_v, perturbed_bundle.delta_v, atol=1e-8)
+    assert np.allclose(pred_p, perturbed_bundle.delta_p, atol=1e-8)
 
 
 def test_no_motion_leaves_bundle_at_identity(imu_preintegration):

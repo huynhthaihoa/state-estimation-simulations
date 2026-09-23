@@ -49,9 +49,11 @@ ends. A second, more subtle finding echoes saltation_matrix_ekf.py's own:
 *calibrated* (NEES) as `phase_conditional`, even though `phase_conditional`
 has the best raw *accuracy* (lowest velocity RMS) of the three -- correctly
 staking confidence on a strong pseudo-measurement is still measurably more
-fragile than never staking it at all, the same theme as saltation matrices'
-`Dg @ Xi = 0` exact-zero claim in the sibling script's §8. Verified stable
-across seeds 0-3 before being written up here or in the doc.
+fragile than never staking it at all, the same theme as the saltation-
+corrected filter in the sibling script running slightly *worse*-calibrated
+than the naive one once its own timing assumption stops being exact (see
+hybrid_saltation_ekf.md §6/§8). Verified stable across seeds 0-3 before
+being written up here or in the doc.
 '''
 
 import argparse
@@ -493,13 +495,13 @@ def main():
               f"anchor-only={np.mean(nees_arr[is_anchor]):8.2f} | "
               f"cruise-only={np.mean(nees_arr[is_cruise]):8.2f}")
 
-    print("\nAverage time complexity + space complexity per approach (per-step, empirical):")
+    print("\nAverage time (per-step) and peak memory (whole-run) per approach, empirical:")
     for name, avg_time, avg_mem in [
         ("never", time_never, mem_never),
         ("always", time_always, mem_always),
         ("phase_conditional", time_phase, mem_phase),
     ]:
-        print(f"  {name:<18s} avg time={avg_time * 1e6:9.2f} us/step | avg peak mem={avg_mem / 1024.0:9.3f} KB/step")
+        print(f"  {name:<18s} avg time={avg_time * 1e6:9.2f} us/step | peak mem={avg_mem / 1024.0:9.3f} KB")
 
     t_hist = np.arange(len(x_true)) * args.dt
     fig, (ax_vel, ax_err, ax_nees) = plt.subplots(3, 1, figsize=(9, 11))

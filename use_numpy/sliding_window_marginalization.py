@@ -169,10 +169,28 @@ def marginalize_oldest(x_window, prior_ref, prior_info, edges_window, info_matri
     """
     H, _ = assemble_window_system(x_window, prior_ref, prior_info, edges_window, info_matrix)
     Lambda_aa = H[0:6, 0:6]
-    Lambda_ab = H[0:6, 6:]
-    Lambda_ba = H[6:, 0:6]
+    Lambda_ab = H[0:6, 6:12]
+    Lambda_ba = H[6:12, 0:6]
     correction = Lambda_ba @ np.linalg.solve(Lambda_aa, Lambda_ab)
-    new_prior_info = correction[0:6, 0:6]
+
+    # The new prior must replace exactly what marginalizing x_window[0] away
+    # removes: its own prior (already folded into Lambda_aa above) plus its
+    # one edge to x_window[1]. It must NOT include x_window[1]'s edge to
+    # x_window[2] (if the window still has one) -- that edge survives
+    # unchanged in edges_window for the next round, so folding its
+    # contribution into the prior too would double-count it once that round
+    # re-assembles the system. Lambda_bb read off the *full* H above would
+    # do exactly that (H's (b,b) block sums every edge touching b, not just
+    # the a-b edge), so the a-b edge's own contribution is isolated here
+    # instead, via a system built from that single edge alone.
+    edges_touching_a = [(i, j, Z) for (i, j, Z) in edges_window if i == 0]
+    assert len(edges_touching_a) == 1, (
+        "marginalize_oldest assumes a pure chain: x_window[0] must have exactly one edge"
+    )
+    H_ab_edge_only, _ = assemble_window_system(x_window, None, None, edges_touching_a, info_matrix)
+    Lambda_bb_from_ab_edge = H_ab_edge_only[6:12, 6:12]
+
+    new_prior_info = Lambda_bb_from_ab_edge - correction
     new_prior_ref = x_window[1]
     x_dropped = x_window[0]
     return new_prior_ref, new_prior_info, x_dropped
@@ -334,8 +352,8 @@ def main():
           "script's own O(n_poses) output bookkeeping, shared by both -- see module docstring):")
     for r in results:
         print(f"  n_poses={r['n_poses']:<6d} batch: {r['t_batch']*1e6:8.2f} us/step, "
-              f"{r['mem_batch']/1024:8.2f} KB/step | window: {r['t_window']*1e6:8.2f} us/step, "
-              f"{r['mem_window']/1024:8.2f} KB/step")
+              f"{r['mem_batch']/1024:8.2f} KB peak | window: {r['t_window']*1e6:8.2f} us/step, "
+              f"{r['mem_window']/1024:8.2f} KB peak")
 
     print("\nFinal RMS position error (accuracy isn't sacrificed for bounded memory):")
     for r in results:

@@ -154,13 +154,20 @@ def relinearize_to_convergence(x_current, odom_seen, loop_seen, info_matrix, anc
         x_current: converged pose estimates (manif.SE3 each)
         R, d: sqrt-information system at the converged linearization point
     """
-    R, d = None, None
+    # Relinearize *before* checking/applying each step, not after, so R, d are
+    # always built at the x_current this function is about to return -- never
+    # one retraction behind it. (A version that relinearized once per loop
+    # iteration and returned right after that iteration's retraction would
+    # hand back R, d from the *previous* linearization point paired with the
+    # newly-retracted x_current -- caught by a direct test comparing the
+    # re-applied step against the true remaining step.)
+    R, d = full_relinearize(x_current, odom_seen, loop_seen, info_matrix, anchor_weight)
     for _ in range(gn_max_iters):
-        R, d = full_relinearize(x_current, odom_seen, loop_seen, info_matrix, anchor_weight)
         delta = solve_triangular(R, d)
-        x_current = [x_current[k] + manif.SE3Tangent(delta[6 * k:6 * k + 6]) for k in range(len(x_current))]
         if np.linalg.norm(delta) < gn_tol:
             break
+        x_current = [x_current[k] + manif.SE3Tangent(delta[6 * k:6 * k + 6]) for k in range(len(x_current))]
+        R, d = full_relinearize(x_current, odom_seen, loop_seen, info_matrix, anchor_weight)
     return x_current, R, d
 
 

@@ -265,23 +265,40 @@ def bayes_tree_affected_path(parent, touched_vars):
 
 
 def measure_performance(fn, *args, n_steps, **kwargs):
-    """Runs `fn` once, measuring wall-clock time and peak memory allocated
-    during the call (via tracemalloc), and reports both as per-step averages
-    so the three approaches (different amounts of work per step) are
-    comparable on the same footing.
+    """Runs `fn` twice -- once cleanly to measure wall-clock time, once more
+    with tracemalloc active to measure peak memory -- and reports the
+    former as a per-step average, the latter as a whole-call total.
+    Two separate runs, not one: tracemalloc's own bookkeeping overhead is
+    substantial and uneven across different algorithms (measured
+    empirically at 2.7x-5.8x depending on how much allocation each one
+    does), which would otherwise skew exactly the cross-method timing
+    comparison this function exists to make fair. (Safe to call fn twice
+    for every caller in this repo: none of them mutate shared state in a
+    way a second call would corrupt, and any RNG argument they take is a
+    fresh, single-use generator whose state nothing reads afterward.)
+    Time is normalized by n_steps because it's a throughput quantity --
+    meaningfully comparable per-step regardless of how much work each
+    method does per step. Peak memory deliberately is *not* normalized
+    this way: it's a high-water mark, not a rate, so dividing it by
+    n_steps would make an O(1)-memory algorithm's reported number shrink
+    as the trajectory grows, the opposite of what "resource usage" should
+    mean here.
     Arguments:
         fn: callable to run and measure
-        *args, **kwargs: forwarded to fn
-        n_steps: number of trajectory steps, used to normalize both metrics
+        *args, **kwargs: forwarded to fn (twice)
+        n_steps: number of trajectory steps, used to normalize the time metric
     Returns:
-        result: fn(*args, **kwargs)'s return value
+        result: fn(*args, **kwargs)'s return value (from the timing run)
         avg_time_per_step: wall-clock time / n_steps (s)
-        avg_mem_per_step: peak traced memory / n_steps (bytes)
+        peak_mem: peak traced memory over the whole call (bytes)
     """
-    tracemalloc.start()
     t_start = time.perf_counter()
     result = fn(*args, **kwargs)
     elapsed = time.perf_counter() - t_start
+
+    tracemalloc.start()
+    fn(*args, **kwargs)
     _, peak_mem = tracemalloc.get_traced_memory()
     tracemalloc.stop()
-    return result, elapsed / n_steps, peak_mem / n_steps
+
+    return result, elapsed / n_steps, peak_mem

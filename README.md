@@ -30,7 +30,7 @@ Start at [docs/README.md](docs/README.md) for the full index, or [docs/frontend_
 
 - [lie_utils.py](use_numpy/lie_utils.py): shared module of the hand-rolled Lie-group helpers (`skew`, `rotation_geodesic_error`, `so3_exp`, `so3_right_jacobian`, `se3_exp`, `se3_log`, `se3_inv`, `se3_adjoint`, `compute_so3_inv_right_jacobian`, `compute_se3_inv_right_jacobian`, `se3_right_jacobian`), imported by every other script in this directory (`imu_integration_comparison.py`, `robot_imu_simulation.py`, `imu_preintegration.py`, `pointcloud_pose_tracking.py`, `pose_graph.py`, and `bundle_adjustment.py`) - none of them keep their own inline copies of the skew/Jacobian helpers anymore.
 - [imu_integration_comparison.py](use_numpy/imu_integration_comparison.py): naive Euler-angle vs. $SO(3)$ exp-map orientation integration.
-- [robot_imu_simulation.py](use_numpy/robot_imu_simulation.py): high-rate IMU propagation + a low-rate Gauss-Newton pose correction (à la a GPS fix), reusing `lie_utils.py`'s $SE(3)$ $Exp$ / $Log$ / inverse-right-Jacobian math.
+- [robot_imu_simulation.py](use_numpy/robot_imu_simulation.py): high-rate IMU propagation + a low-rate Gauss-Newton position-only correction against a noisy GPS-style fix (the correction's Jacobian has a structurally zero angular block, so orientation is never touched by it, only ever dead-reckoned by the IMU), reusing `lie_utils.py`'s $SE(3)$ $Exp$ math.
 - [imu_preintegration.py](use_numpy/imu_preintegration.py): IMU pre-integration - compresses a burst of high-frequency IMU samples into one relative measurement plus first-order bias Jacobians, then shows an instant Taylor-expansion correction when the bias estimate changes, without re-integrating.
 - [pointcloud_pose_tracking.py](use_numpy/pointcloud_pose_tracking.py): tracks a rigid object's pose from a motion-model prior (noisy control inputs) fused with noisy point-cloud measurements of its known geometry, comparing a recursive **EKF**, a recursive **invariant EKF** (body-frame residual, state-independent measurement Jacobian), a **batch Gauss-Newton** smoother over the whole trajectory, a recursive **UKF** (sigma-point unscented transform via right-perturbation retraction, no Jacobians at all), and a recursive **vanilla KF** (redundant 12-dim `[vec(R), t]` ambient state instead of the $SE(3)$ tangent state - exactly linear observation model, but needs a small-angle motion-model truncation and an explicit SVD re-projection back onto $SO(3)$ after every update), reusing `lie_utils.py`'s $SE(3)$ $Exp$ / $Log$ /inverse-right-Jacobian math plus a hand-rolled adjoint/right-Jacobian for the motion-model Jacobians. Also reports empirical per-step time and peak memory for each of the six approaches.
 - [pose_graph.py](use_numpy/pose_graph.py): a small closed-loop 3D pose-graph relaxation (odometry drift + one loop closure), jointly optimized via Levenberg-Marquardt, reusing the same `lie_utils.py` $SE(3)$ $Exp$ / $Log$ / inverse-right-Jacobian/adjoint math as `pointcloud_pose_tracking.py`.
@@ -57,20 +57,19 @@ Start at [docs/README.md](docs/README.md) for the full index, or [docs/frontend_
 
 ### Root
 
-- [main.py](main.py): unused `uv init` placeholder entry point.
-- [pyproject.toml](pyproject.toml): uv project file. `manifpy` is sourced from the local sibling checkout `../manif` (see Installation below).
+- [pyproject.toml](pyproject.toml): uv project file. `manifpy` is an optional dependency (the `manif` extra) sourced from the local sibling checkout `../manif` (see Installation below).
 
 ## D. Installation
 
 - Install [uv](https://docs.astral.sh/uv/).
-- `manifpy` is not on PyPI here - this project's `pyproject.toml` points `uv` at a local sibling checkout (`../manif`), which must already have its Python bindings built (`pip3 install --user ../manif`, requires a working Eigen3 + CMake toolchain) before `uv sync` can resolve it. The [use_numpy/](use_numpy/) scripts don't need this - only the [use_manif/](use_manif/) scripts do.
-- Then sync dependencies: `uv sync`
+- `uv sync` alone installs everything the [use_numpy/](use_numpy/) scripts need, with no `manifpy`/`../manif` requirement at all.
+- The [use_manif/](use_manif/) scripts additionally need `manifpy`, which isn't on PyPI: this project's `pyproject.toml` points `uv` at a local sibling checkout (`../manif`) and builds it automatically (requires a working Eigen3 + CMake toolchain) when you request the `manif` extra: `uv sync --extra manif`.
 - Run any script with `uv run` from this repository's root directory, e.g.:
   `uv run python use_numpy/imu_integration_comparison.py`
 
 ### Running the tests
 
-`tests/` has a pytest suite covering `utils.py`, `use_numpy/lie_utils.py`'s Lie-group math (round-trip and Jacobian-identity checks), and the testable functions in every `use_numpy/`/`use_manif/` simulation script (deterministic, fixed-seed regression checks - e.g. optimized error beats an uncorrected baseline, two solvers agree on the same input, a filter matches its own documented exact-agreement claim). `use_manif/` tests skip cleanly (not fail) in an environment without `manifpy` built.
+`tests/` has a pytest suite covering `utils.py`, `use_numpy/lie_utils.py`'s Lie-group math (round-trip and Jacobian-identity checks), and the testable functions in every `use_numpy/`/`use_manif/` simulation script (deterministic, fixed-seed regression checks - e.g. optimized error beats an uncorrected baseline, two solvers agree on the same input, a filter matches its own documented exact-agreement claim). `use_manif/` tests skip cleanly (not fail) if you ran plain `uv sync` (no `manif` extra, so `manifpy` isn't installed).
 
 ```
 uv run pytest tests/ -v
@@ -108,7 +107,7 @@ uv run python use_numpy/imu_integration_comparison.py --duration 20.0 --dt 0.005
 
 #### Purpose
 
-Simulates a robot with a 100 Hz IMU (noisy body twist) and a 1 Hz high-accuracy global position fix (e.g. GPS). Each second: propagate the pose estimate through 100 noisy IMU micro-steps on $SE(3)$, then run a Gauss-Newton correction against the position fix (an unbalanced information matrix trusts position far more than orientation) until the correction step norm drops below `--gn-tol` or `--gn-max-iters` is hit. Prints pre/post correction error each second (no plot).
+Simulates a robot with a 100 Hz IMU (noisy body twist) and a 1 Hz noisy global position fix (e.g. GPS). Each second: propagate the pose estimate through 100 noisy IMU micro-steps on $SE(3)$, then run a Gauss-Newton correction against a genuinely noisy position-only measurement (its Jacobian wrt a right perturbation is $[R_{\text{est}} \mid 0]$ - the angular block is exactly zero, so this measurement structurally cannot correct orientation, however it's weighted; orientation is left entirely to the IMU's own dead-reckoning between corrections) until the correction step norm drops below `--gn-tol` or `--gn-max-iters` is hit. Prints pre/post correction error each second (no plot).
 
 #### Scripts
 
@@ -119,7 +118,7 @@ Simulates a robot with a 100 Hz IMU (noisy body twist) and a 1 Hz high-accuracy 
 #### Usage
 
 ```
-uv run python use_numpy/robot_imu_simulation.py --dt-imu 0.01 --total-seconds 3 --snapshots-per-second 4 --gn-tol 1e-6 --gn-max-iters 10 --max-linear-vel 1.0 --max-angular-vel 0.5
+uv run python use_numpy/robot_imu_simulation.py --dt-imu 0.01 --total-seconds 3 --snapshots-per-second 4 --gn-tol 1e-6 --gn-max-iters 10 --max-linear-vel 1.0 --max-angular-vel 0.5 --pos-noise-std 0.05
 ```
 
 - `--dt-imu`: IMU update interval in seconds (default `0.01`, i.e. 100 Hz)
@@ -129,6 +128,7 @@ uv run python use_numpy/robot_imu_simulation.py --dt-imu 0.01 --total-seconds 3 
 - `--gn-max-iters`: maximum Gauss-Newton iterations (default `10`)
 - `--max-linear-vel`: max linear velocity magnitude for the random true twist, m/s (default `1.0`)
 - `--max-angular-vel`: max angular velocity magnitude for the random true twist, rad/s (default `0.5`)
+- `--pos-noise-std`: per-axis std-dev (m) of the Global Position Measurement's Gaussian noise (default `0.05`)
 
 ### 3. IMU pre-integration with bias Jacobians
 
@@ -409,9 +409,9 @@ Every other filtering script in this repo assumes smooth, continuous motion betw
 Three methods are compared: 
 - A **dead-reckoning baseline**: propagates the exact dynamics from an uncertain initial guess, never looking at measurements - an initial-condition error still causes growing error, since bounce *timing* is sensitive to the state even though the dynamics model itself is exact
 - An **EKF with naive bounce handling**: $P^+ = DR\,P^-\,DR^\top$, the reset map's own Jacobian alone - the common mistake, since it is not the correct linearization of "post-impact state as a function of pre-impact state" once a perturbed trajectory reaches the guard at a different time
-- An **EKF with saltation-corrected bounce handling**: $P^+ = \Xi\,P^-\,\Xi^\top$, the true `saltation_matrix`, derived from first principles and verified against a finite-difference ground truth to ~2.9e-8 after an initially-recalled, plausible-looking formula was checked and found wrong by a wide margin
+- An **EKF with saltation-corrected bounce handling**: $P^+ = \Xi\,P^-\,\Xi^\top$, the true `saltation_matrix` composed with the ordinary flow Jacobians before/after the bounce (the fixed-tick comparison this filter actually needs), derived from first principles and verified against a finite-difference ground truth to ~7e-6 after a formula correct for a *different* comparison (each trajectory at its own crossing time, not a shared fixed tick) was checked against this same ground truth and found wrong by a wide margin
 
-A Monte Carlo consistency check (`run_monte_carlo_consistency`, NEES - Normalized Estimation Error Squared - new to this repo) repeats both EKFs over many independent noise realizations of the same nominal trajectory. The finding is more interesting than "naive is overconfident, saltation fixes it": the saltation matrix provably drives the guard-normal (height) direction's *reported* variance to exactly zero at every bounce ($Dg\,\Xi = 0$ identically, verified) - correct only if the filter's own estimated bounce time exactly coincides with the true one, which it generally will not with any real tracking error. Empirically (reproduced across multiple seeds), this makes the saltation-corrected EKF's post-bounce NEES consistently *higher* than the naive EKF's, not lower - see the doc for the full mechanism: saltation matrices assume a known transition time, but contact/phase detection is itself uncertain. Both EKFs' mean trajectories look nearly identical throughout regardless - this entire effect is invisible in the point estimate.
+A Monte Carlo consistency check (`run_monte_carlo_consistency`, NEES - Normalized Estimation Error Squared - new to this repo) repeats both EKFs over many independent noise realizations of the same nominal trajectory. The finding runs slightly against "naive is overconfident, saltation fixes it": the saltation matrix reduces, but does not zero out, the guard-normal (height) direction's *reported* variance at every bounce ($Dg\,\Xi = -e\,Dg$ identically, verified) - most accurate only if the filter's own estimated bounce time exactly coincides with the true one, which it generally will not with any real tracking error. Empirically (reproduced across multiple seeds), this makes the saltation-corrected EKF's post-bounce NEES modestly, consistently *higher* than the naive EKF's (~5-6% at this script's defaults), not lower - a small but real instance of the same underlying gap: saltation matrices assume a known transition time, but contact/phase detection is itself uncertain (see the doc for the full mechanism and how the gap grows, still modestly, once detection jitter is added). Both EKFs' mean trajectories look nearly identical throughout regardless - this entire effect is invisible in the point estimate.
 
 Plain $\mathbb{R}^6$ state (position/velocity, no rotation) - no `use_manif/` counterpart, for the same reason as `bayes_tree_construction.py`.
 
@@ -433,7 +433,7 @@ uv run python use_numpy/saltation_matrix_ekf.py --duration 5.0 --dt 0.02 --resti
 - `--init-horizontal-vel`: initial horizontal velocity, m/s (default `1.0 0.5`)
 - `--pos-noise-std`: position measurement noise std-dev, m (default `0.03`)
 - `--process-noise-std`: assumed acceleration-disturbance noise std-dev, $\text{m/s}^2$ (default `0.3`)
-- `--impact-noise-std`: std-dev of the regularizing floor added to `P` at each bounce, both EKF variants (default `0.005`) - not just a numerical-stability knob; which filter's post-bounce NEES comes out higher is sensitive to this value (see the doc)
+- `--impact-noise-std`: std-dev of the regularizing floor added to `P` at each bounce, both EKF variants (default `0.005`) - no longer numerically load-bearing (both filters stay well-behaved even at `0`), but still shifts both filters' absolute NEES level together as it grows (see the doc §7)
 - `--init-pos-noise-std`/`--init-vel-noise-std`: std-dev used to perturb the initial position/velocity guess (defaults `0.1`/`0.2`)
 - `--detect-time-bias`: systematic contact-detection timing offset, s, positive = late detection (default `0.0`, exact detection) - models a real contact sensor's own detection latency, on top of whatever the filter's state estimate already gets wrong about the geometric crossing time
 - `--detect-time-noise-std`: std-dev, s, of Gaussian contact-detection timing jitter added on top of `--detect-time-bias` each time a bounce is detected (default `0.0`) - see doc §8 for the measured saltation-vs-naive NEES gap this opens up as jitter grows

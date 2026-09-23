@@ -65,6 +65,54 @@ def test_marginalized_window_matches_joint_batch_solve(pose_graph, swm):
         assert np.allclose(T_batch[0:3, 3], T_window[0:3, 3], atol=1e-6)
 
 
+def test_marginalized_window_covariance_matches_joint_batch_marginal(pose_graph, swm):
+    # test_marginalized_window_matches_joint_batch_solve (above) can't catch a wrong
+    # marginal *information/covariance*: on a pure chain the GN point estimate is exact
+    # dead reckoning regardless of the prior's information (any prior gives the same
+    # optimum), so matching final poses alone is blind to this. This test checks the
+    # covariance directly -- streaming through *two* marginalization steps (so a wrong
+    # prior would compound) -- against the true marginal covariance read off the full
+    # joint batch system's inverse.
+    gt_poses, odometry_constraints = _chain_scenario(pose_graph, seed=11, n_poses=4)
+    info_matrix = np.eye(6) * 100
+    anchor_weight = 1e6
+    gn_tol, gn_max_iters = 1e-12, 50
+
+    edges_all = [(k, k + 1, odometry_constraints[k][2]) for k in range(3)]
+    x_init = pose_graph.run_dead_reckoning(gt_poses[0], odometry_constraints)
+    x_batch, _ = swm.solve_to_convergence(x_init, gt_poses[0], anchor_weight * np.eye(6),
+                                           edges_all, info_matrix, gn_tol, gn_max_iters)
+    H_batch, _ = swm.assemble_window_system(x_batch, gt_poses[0], anchor_weight * np.eye(6),
+                                             edges_all, info_matrix)
+    cov_batch_last2 = np.linalg.inv(H_batch)[12:, 12:]  # marginal covariance of nodes 2, 3
+
+    # Sliding-window path with window_size=2, streaming through nodes 0..3: marginalizes
+    # node 0 (once node 1 arrives) and then node 1 (once node 2 arrives), leaving a final
+    # window of exactly nodes [2, 3] -- inlined from run_sliding_window_pose_graph's own
+    # loop to get direct access to the final window's system, not just its point estimate.
+    window_size = 2
+    prior_ref, prior_info = gt_poses[0], anchor_weight * np.eye(6)
+    x_window = [gt_poses[0]]
+    edges_window = []
+    for k in range(1, 4):
+        if len(x_window) >= window_size:
+            new_prior_ref, new_prior_info, _ = swm.marginalize_oldest(
+                x_window, prior_ref, prior_info, edges_window, info_matrix)
+            prior_ref, prior_info = new_prior_ref, new_prior_info
+            x_window = x_window[1:]
+            edges_window = [(i - 1, j - 1, Z) for (i, j, Z) in edges_window[1:]]
+        x_window.append(x_window[-1] @ odometry_constraints[k - 1][2])
+        edges_window.append((len(x_window) - 2, len(x_window) - 1, odometry_constraints[k - 1][2]))
+        x_window, _ = swm.solve_to_convergence(x_window, prior_ref, prior_info, edges_window,
+                                                info_matrix, gn_tol, gn_max_iters)
+
+    H_window, _ = swm.assemble_window_system(x_window, prior_ref, prior_info, edges_window,
+                                              info_matrix)
+    cov_window = np.linalg.inv(H_window)
+
+    assert np.allclose(cov_window, cov_batch_last2, rtol=1e-4, atol=1e-6)
+
+
 def test_marginalization_produces_no_fill_in_on_a_chain(pose_graph, swm):
     # Structural check: the Schur-complement correction term, before extracting just the
     # (0,0) block, must be exactly zero everywhere else -- a chain's oldest pose only ever
