@@ -564,8 +564,6 @@ Examples include:
 * GTSAM-style smoothing
 * pose-graph optimization
 
-<!-- And **this distinction is probably more important for your PhD than memorizing every KF variant**. -->
-
 A particularly useful learning progression is:
 
 $$\boxed{KF \rightarrow EKF \rightarrow ESKF \rightarrow Lie\ Groups \rightarrow IEKF \rightarrow Factor\ Graphs/Smoothing}$$

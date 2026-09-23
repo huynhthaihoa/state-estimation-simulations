@@ -388,7 +388,7 @@ This is called **selective relinearization**.
 
 ## 11. Why is that powerful?
 
-Imagine a SLAM graph containing $10,000$ poses.
+Imagine a SLAM graph containing 10,000 poses.
 
 After a new measurement, maybe only $50$ variables have changed significantly.
 
@@ -645,7 +645,7 @@ And the three keywords to remember are:
 
 Partially — and it's worth being precise about which part rather than leaving it as one bare claim. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds this doc's §7 Bayes tree for real (symbolic elimination over this repo's pose-graph topology, via `symbolic_eliminate`/`bayes_tree_affected_path` in `utils.py`) and quantifies §9's "small vs. large affected region" claim with a computed example instead of only prose — see [`bayes_tree.md` §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo) for the details, including a genuinely useful finding: with a *fixed* elimination order (oldest node first, since §12's variable reordering is explicitly not implemented), this repo's loop-closure edge produces the worst possible case — the entire tree, not just a subtree, gets invalidated.
 
-**§10 selective relinearization and §12 variable reordering (COLAMD) remain unimplemented** — no numeric solve is integrated with the tree above. That's still [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`)'s job, and it implements the original **iSAM v1** mechanism described in [`isam_optimization.md`](isam_optimization.md) instead — incremental Givens-rotation QR row insertion into a running square-root-information matrix, plus periodic/loop-closure-triggered full relinearization, with no Bayes tree involved at all. Its own module docstring explicitly calls out the Bayes tree and COLAMD as out of scope; see [`isam_optimization.md` §14 (isam_optimization.md#14-where-this-is-implemented-in-this-repo) for exactly where that line is drawn.
+**§10 selective relinearization and §12 variable reordering (COLAMD) remain unimplemented** — no numeric solve is integrated with the tree above. That's still [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`)'s job, and it implements the original **iSAM v1** mechanism described in [`isam_optimization.md`](isam_optimization.md) instead — incremental Givens-rotation QR row insertion into a running square-root-information matrix, plus periodic/loop-closure-triggered full relinearization, with no Bayes tree involved at all. Its own module docstring explicitly calls out the Bayes tree and COLAMD as out of scope; see [`isam_optimization.md` §14](isam_optimization.md#14-where-this-is-implemented-in-this-repo) for exactly where that line is drawn.
 
 So this page's Bayes tree now has a real, runnable counterpart, but iSAM2 as a whole — the tree, selective relinearization, and dynamic reordering working together against an actual numeric solve — is still the conceptual target no single script in `use_numpy/`/`use_manif/` reaches.
 

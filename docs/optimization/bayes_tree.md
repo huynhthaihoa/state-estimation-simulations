@@ -242,7 +242,7 @@ The Bayes tree lets iSAM2 identify the affected portion of the tree.
 Conceptually:
 
 ```text
-       x1
+       x1    ← affected
        │
        x2    ← affected
        │
@@ -252,6 +252,8 @@ Conceptually:
        │
        x5    ← affected
 ```
+
+`x1` is affected too, not just `x2`-`x5`: the new factor touches `x1` directly, and `x1` is also the deepest leaf under this chain's elimination order, so it must be re-eliminated along with everything above it on the path to `x5`. (The repo's own `bayes_tree_construction.py` demonstrates exactly this on its square-loop topology: a single loop-closure edge affects all 16/16 variables, including the one at the very bottom of the chain.)
 
 The affected section is removed/re-eliminated and then reinserted into the Bayes tree.
 

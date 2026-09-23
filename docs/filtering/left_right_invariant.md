@@ -59,6 +59,15 @@ Rule of thumb for picking one:
 | Situation | Natural choice |
 |---|---|
 | Propagation driven by body-mounted sensors (IMU gyro/accel, wheel odometry) | often **left**-invariant - error dynamics driven by body-frame noise become state-independent |
-| Measurements given directly in the world frame (GPS, known landmark positions), or "group-affine" IMU dead-reckoning models (pose+velocity, as in legged-robot contact-aided IEKF) | often **right**-invariant - makes propagation/measurement Jacobians state-independent instead |
+| A sensor measures the robot's own position directly in the world frame (GPS: $h(X) = X\,b$ for a fixed body-frame point $b$, e.g. the antenna location), or "group-affine" IMU dead-reckoning models (pose+velocity, as in legged-robot contact-aided IEKF) | often **right**-invariant - substituting $X=\eta_R\hat X$ gives $h(X) = \eta_R\cdot h(\hat X)$, so the innovation's Jacobian depends only on the *predicted* measurement, not on the rotation estimate |
+| A body-mounted sensor observes a landmark whose position is known in the world frame, and the residual is formed in the *body* frame ($h(X) = X^{-1}d$ for a fixed world-frame point $d$ - this repo's own `pointcloud_pose_tracking.py` IEKF, whose residual is exactly `T_pred⁻¹.act(z_i) - p_i`) | often **left**-invariant - substituting $X=\hat X\eta_L$ gives $h(X) = \eta_L^{-1}\cdot h(\hat X)$, the dual of the GPS case above |
+
+These last two rows look superficially similar - both involve "a known position in the world frame" - but they're genuinely different measurement shapes ($X b$ vs. $X^{-1}d$), and they pair with opposite invariant-error conventions; conflating "GPS" with "known landmark position" under one label (an earlier version of this table did exactly that) is a real, checkable mistake, not just a matter of taste - see the [`run_iekf` entry](pointcloud_pose_tracking_empirical_note.md#appendix-related-terms) in `pointcloud_pose_tracking_empirical_note.md`'s appendix for the repo's own worked confirmation of the landmark case.
 
 In practice, papers pick whichever one makes *their* sensor model's Jacobian trajectory-independent - that's the real design criterion, not a fixed rule. But the mental picture to keep is simple: **left = error viewed from your own cockpit, right = error viewed from a fixed point on the ground.**
+
+---
+
+## 5. References
+
+1. Barrau, A., & Bonnabel, S. (2017). *The Invariant Extended Kalman Filter as a Stable Observer*. IEEE Transactions on Automatic Control, 62(4), 1797-1812. https://doi.org/10.1109/TAC.2016.2594085 - the original left-/right-invariant error framework this whole doc explains, including the group-affine dynamics property behind row 2 of §4's table.

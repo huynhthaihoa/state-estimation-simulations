@@ -491,7 +491,7 @@ This is why sensor uncertainty matters - though it's worth noting that `pose_gra
 
 ## 13. The most important intuition
 
-You can connect the three concepts we've discussed like this:
+The three concepts above connect like this:
 
 ```text
                 SLAM
@@ -748,10 +748,10 @@ $$s_{ij} = \min\left(1, \; \frac{2 \Phi}{\Phi + e_{ij}^2}\right)$$
 | **Standard $L_2$** | Unbounded Quadratic ($e^2$) | Constant ($1.0$) | **None** (1 outlier ruins the map) |
 | **Huber** | Unbounded Linear ($\delta e$) | $\propto \frac{1}{e}$ | **Low/Moderate** (Dampens, but still pulls graph) |
 | **Cauchy** | Logarithmic ($\ln e^2$) | $\propto \frac{1}{e^2}$ | **High** |
-| **DCS** | Redescending ($\to 0$) | $\propto \frac{1}{e^4}$ | **Very High** (Effectively turns off bad edges) |
+| **DCS** | Saturation / Bounded ($=\Phi$, see below) | $\propto \frac{1}{e^4}$ | **Very High** (Effectively turns off bad edges) |
 | **Geman-McClure** | Saturation / Bounded | $\propto \frac{1}{(1 + e^2)^2}$ | **Very High** |
 
-Note the distinction in the first column: Geman-McClure's cost $\rho(e)=e^2/(1+e^2)$ genuinely **saturates**, monotonically approaching a constant ($1$) as $e\to\infty$. DCS's effective cost $s_{ij}^2 e_{ij}^2 = \frac{4\Phi^2 e^2}{(\Phi+e^2)^2}$ is stronger than that - for $e^2>\Phi$ it is *decreasing* in $e$ and decays all the way back to $0$ as $e\to\infty$ (differentiate w.r.t. $x=e^2$: $\frac{d}{dx}\frac{4\Phi^2 x}{(\Phi+x)^2} = \frac{4\Phi^2(\Phi-x)}{(\Phi+x)^3} < 0$ for $x>\Phi$). This **redescending** behavior is why DCS suppresses extreme outliers even more aggressively than Geman-McClure, and also why it's every bit as non-convex - the "Graduated Non-Convexity" caveat below applies to it for exactly this reason.
+Note the distinction in the first column - but be careful what "DCS's cost" actually means here, since it's easy to under-count it. $s_{ij}^2 e_{ij}^2 = \frac{4\Phi^2 e^2}{(\Phi+e^2)^2}$ is only the *first* term of DCS's true objective - DCS comes from Switchable Constraints' augmented cost $\Psi(s, e) = s^2e^2 + \Phi(s-1)^2$ (the second term is the prior that keeps the switch $s$ near $1$ unless the data really justifies turning an edge off), and DCS's whole point is a closed-form $s$ that approximates the optimal solve of that *joint* cost, not $s^2e^2$ alone. Substituting $s=\frac{2\Phi}{\Phi+e^2}$ into the *full* $\Psi(s,e)$ (for $e^2>\Phi$) and simplifying: $s^2e^2 + \Phi(s-1)^2 = \frac{4\Phi^2e^2 + \Phi(\Phi-e^2)^2}{(\Phi+e^2)^2} = \frac{\Phi\left[4\Phi e^2 + (\Phi-e^2)^2\right]}{(\Phi+e^2)^2} = \frac{\Phi(\Phi+e^2)^2}{(\Phi+e^2)^2} = \Phi$ - a **constant**, independent of $e$, for every $e^2>\Phi$. So DCS's actual cost doesn't decay back to $0$ as $e\to\infty$ - it **saturates** at exactly $\Phi$, immediately upon crossing the threshold (a flatter, even more abrupt saturation than Geman-McClure's asymptotic approach to $1$). This is also the source of the DCS/Geman-McClure equivalence result (MacTavish & Barfoot, 2015): both cost functions saturate rather than diverge or decay, which is exactly why both make sense as $\frac{1}{e^4}$-weight, redescending M-estimators, and why both carry the same "Graduated Non-Convexity" caveat below.
 
 ### 16.5 Practical Considerations in Implementation
 
@@ -770,3 +770,4 @@ This section is theory only: neither `use_numpy/pose_graph.py` nor `use_manif/po
 4. Huber, P. J. (1964). *Robust Estimation of a Location Parameter*. Annals of Mathematical Statistics, 35(1), 73-101. https://doi.org/10.1214/aoms/1177703732 - the Huber loss in §16.2.
 5. Geman, S., & McClure, D. E. (1985). *Bayesian Image Analysis: An Application to Single Photon Emission Tomography*. Proceedings of the American Statistical Association, Statistical Computing Section, 12-18. - the Geman-McClure loss named in §16.4's comparison table.
 6. Agarwal, P., Tipaldi, G. D., Spinello, L., Stachniss, C., & Burgard, W. (2013). *Robust Map Optimization Using Dynamic Covariance Scaling*. ICRA 2013, 62-69. https://doi.org/10.1109/ICRA.2013.6630557 - Dynamic Covariance Scaling in §16.3, already named inline there as "Agarwal et al., 2013".
+7. MacTavish, K., & Barfoot, T. D. (2015). *At all Costs: A Comparison of Robust Cost Functions for Camera Correspondence Outliers*. 12th Conference on Computer and Robot Vision (CRV), 62-69. https://doi.org/10.1109/CRV.2015.52 - the DCS/Geman-McClure equivalence result named in §16.4.

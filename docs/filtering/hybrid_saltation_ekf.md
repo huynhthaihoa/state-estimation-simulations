@@ -212,3 +212,10 @@ Read this as: *starting 5cm higher behaves, to first order, like starting at the
 $$\Xi_{\text{own-time}}\text{ change} = -e\times(-0.04854) \approx +0.02427\ \text{m/s}$$
 
 matching the true (own-crossing-time) answer to within second-order error, same as before. This scalar shortcut doesn't extend to $\Xi$ (§4's boxed formula, what `saltation_matrix` actually computes): the extra $f^{+}$ term and the subsequent composition with $\Phi_{\text{before}}$/$\Phi_{\text{after}}$ genuinely need matrices, which is why §3 computes its numbers from code rather than by hand.
+
+---
+
+## References
+
+1. Kong, N. J., Payne, J. J., Zhu, J., & Johnson, A. M. (2023). *Saltation Matrices: The Essential Tool for Linearizing Hybrid Dynamical Systems*. arXiv:2306.06862. https://doi.org/10.48550/arXiv.2306.06862 - a modern tutorial/survey on saltation matrices, covering the same $\Xi(x^-)$ derivation this doc works through in §4, including the own-crossing-time vs. fixed-external-time distinction at the center of §4's "wrong turn."
+2. Kong, N. J., Payne, J. J., Council, G., & Johnson, A. M. (2021). *The Salted Kalman Filter: Kalman Filtering on Hybrid Dynamical Systems*. Automatica, 131, 109752. https://doi.org/10.1016/j.automatica.2021.109752 - the direct precedent for this doc's whole exercise: propagating a Kalman filter's covariance correctly through a hybrid guard-crossing event via the saltation matrix, exactly what `saltation_matrix_ekf.py` implements for a single bounce.

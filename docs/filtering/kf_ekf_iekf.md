@@ -309,8 +309,6 @@ One more thing worth internalizing from this side-by-side view: under isotropic 
 
 ## 6. Why is this useful for SLAM?
 
-<!-- This becomes especially relevant to your PhD topic because you're dealing with **SLAM and state estimation for robots with unusual motion**. -->
-
 Consider a robot state:
 
 $${X = \begin{bmatrix} R & p & v & b_g & b_a \end{bmatrix} }$$

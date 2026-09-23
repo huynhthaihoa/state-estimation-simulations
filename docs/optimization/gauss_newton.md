@@ -1,6 +1,6 @@
 # Gauss-Newton Optimization
 
-Since you're working with **SLAM, [bundle adjustment](bundle_adjustment.md), and [pose-graph optimization](pose_graph_optimization.md)**, Gauss-Newton is one of the most important optimization ideas to understand intuitively.
+For **SLAM, [bundle adjustment](bundle_adjustment.md), and [pose-graph optimization](pose_graph_optimization.md)**, Gauss-Newton is one of the most important optimization ideas to understand intuitively.
 
 ---
 
@@ -396,3 +396,9 @@ Or even more intuitively:
 > **"I'm going to pretend the world is linear around where I currently am, take the best step according to that approximation, and then update my approximation."**
 
 That idea is the bridge from **[Jacobian](../foundations/jacobian.md) → Gauss-Newton → [bundle adjustment](bundle_adjustment.md) → [pose-graph optimization](pose_graph_optimization.md) → SLAM**.
+
+---
+
+## 13. References
+
+1. Nocedal, J., & Wright, S. J. (2006). *Numerical Optimization* (2nd ed.). Springer. https://doi.org/10.1007/978-0-387-40065-5 - the standard textbook treatment of the Gauss-Newton method (Chapter 10) behind this whole doc, including the relationship to Newton's method (§11) and gradient descent (§10) covered here.

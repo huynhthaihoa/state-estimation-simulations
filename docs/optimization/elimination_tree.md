@@ -64,11 +64,11 @@ Because every variable, except the root, has a parent.
 For example:
 
 ```text
-       4
+       5
       / \
-     2   3
+     3   4
     / \
-   1   5
+   1   2
 ```
 
 might represent dependencies created during elimination.
@@ -283,29 +283,29 @@ So the tree is closely related to how the sparse factor $L$ is structured.
 Suppose the tree looks like:
 
 ```text
-        10
+        8
        /  \
-      5    8
+      6    7
      / \    \
-    2   3    7
+    4   5    1
    / \
-  1   4
+  2   3
 ```
 
-Variables 1 and 4 can be processed before 2.
+Variables 2 and 3 can be processed before 4.
 
-Similarly, 2 and 3 can potentially be processed independently before 5.
+Similarly, 4 and 5 can potentially be processed independently before 6.
 
 You can see computational dependencies immediately:
 
 ```text
-1 ─┐
-   ├──> 2 ─┐
-4 ─┘       │
-           ├──> 5 ─┐
-3 ─────────┘       │
+2 ─┐
+   ├──> 4 ─┐
+3 ─┘       │
+           ├──> 6 ─┐
+5 ─────────┘       │
                    ▼
-                  10
+                   8
 ```
 
 This exposes **parallelism**.
@@ -313,8 +313,6 @@ This exposes **parallelism**.
 ---
 
 ## 7. This becomes very important for iSAM2
-
-And this connects directly to what you asked about previously.
 
 iSAM2 uses a **Bayes tree**, which is closely related to the elimination tree.
 
@@ -458,7 +456,7 @@ That's why two matrices with similar sparsity patterns can behave differently un
 
 ## 11. The big picture
 
-You can now connect the concepts you've been learning:
+The concepts covered above connect into a bigger picture:
 
 ```text
                 SLAM
@@ -524,3 +522,9 @@ If you remember three things:
 > "What computations depend on what other computations?"
 
 That mental model will make **Bayes trees and iSAM2** much easier to understand.
+
+---
+
+## 12. References
+
+1. Liu, J. W. H. (1990). *The Role of Elimination Trees in Sparse Factorization*. SIAM Journal on Matrix Analysis and Applications, 11(1), 134-172. https://doi.org/10.1137/0611010 - the original definition and analysis of the elimination tree this doc builds intuition for, including the parent/child dependency-structure framing used throughout.

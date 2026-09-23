@@ -1,6 +1,6 @@
 # Quaternion intuitive explanation
 
-Since you're working with **SLAM, state estimation, and robotics**, the most useful way to understand a quaternion is as a clever mathematical way to represent **3D orientation** without some of the problems of Euler angles.
+For **SLAM, state estimation, and robotics**, the most useful way to understand a quaternion is as a clever mathematical way to represent **3D orientation** without some of the problems of Euler angles.
 
 ## 1. First: what problem is a quaternion solving?
 
@@ -256,8 +256,6 @@ You might reasonably ask:
 
 > "If rotation matrices work, why bother with quaternions?"
 
-Good question.
-
 A rotation matrix:
 
 $$R= \begin{bmatrix} r_{11} & r_{12} & r_{13}\\
@@ -326,7 +324,7 @@ This becomes particularly important when working with **optimization, SLAM, EKF,
 
 ---
 
-## 11. The connection to your Kalman-filter question
+## 11. The connection to Kalman filtering
 
 This is actually where quaternions become especially relevant.
 
@@ -368,9 +366,15 @@ If you remember only one thing:
 
 > **A quaternion is a clever four-number representation of a 3D rotation, essentially encoding "rotate by this angle around this axis," in a form that makes chaining and estimating rotations much easier.**
 
-And for your robotics work, I'd mentally organize it as:
+And in a robotics context, it's worth mentally organizing it as:
 
 $${ \boxed{ \text{Euler angles} \rightarrow \text{Quaternion} \rightarrow SO(3) \rightarrow \mathfrak{so}(3) \rightarrow \text{Lie-group state estimation} } }
 $$
 
 The really interesting next step is **why quaternion multiplication actually performs rotation**, because that is the part that makes quaternions initially feel like magic.
+
+---
+
+## 13. References
+
+1. Diebel, J. (2006). *Representing Attitude: Euler Angles, Unit Quaternions, and Rotation Vectors*. Stanford University Technical Report. https://www.astro.rug.nl/software/kapteyn-beta/_downloads/attitude.pdf - a widely-cited technical reference covering the quaternion/Euler-angle/rotation-vector conversions and conventions this doc builds intuition for.

@@ -95,10 +95,16 @@ Running `umeyama_alignment(X, Y)` recovers $\hat{s} = 2.0$, $\hat{R} = R_{\text{
 ## 6. Where this is (and isn't) used in this repo
 
 - **[`bundle_adjustment.py`](../../use_numpy/bundle_adjustment.py)** (both `use_numpy/` and `use_manif/`) calls `umeyama_alignment` on the *camera positions* after solving, then applies the recovered $(s, R, t)$ to **both** the camera poses and the landmark positions before computing `pose_errors`/`landmark_errors` against ground truth. This is standard practice for evaluating monocular BA/SfM (Structure from Motion) output - see [bundle_adjustment.md](../optimization/bundle_adjustment.md) for how the alignment step fits into the rest of that script. Note that reprojection error itself is computed *before* alignment and is unaffected by it - only the absolute pose/landmark error numbers depend on this step.
-- **[`bundle_adjustment_advanced.py`](../../use_numpy/bundle_adjustment_advanced.py)** deliberately does **not** call it. That script hard-fixes two keyframes as a gauge anchor instead of using a soft gauge-prior factor; once $\ge 1$ keyframe is hard-fixed, there is no residual rigid *or* scale freedom left in the solution to align away, so the alignment step this doc describes simply doesn't apply there.
+- **[`bundle_adjustment_advanced.py`](../../use_numpy/bundle_adjustment_advanced.py)** deliberately does **not** call it. That script hard-fixes **two** keyframes (poses 0 and 1) as a gauge anchor instead of using a soft gauge-prior factor. Fixing a single keyframe removes only the 6 rigid DoF (translation + rotation) - scale stays completely unobservable from that alone, since the same reconstruction rescaled about the one fixed pose satisfies every constraint equally well. It takes a *second* fixed keyframe to pin scale too, because it also fixes the *distance* between the two anchors, and with both rigid and scale freedom gone there's no residual transform left in the solution to align away - so the alignment step this doc describes simply doesn't apply there.
 
 ---
 
 ## 7. One-sentence intuition
 
 > **Umeyama alignment is least-squares curve-fitting applied to whole point clouds instead of scalar points - it finds the one scale+rotation+translation that best overlays an estimate onto ground truth, which is exactly the piece missing before "position error in meters" against monocular reconstruction output means anything.**
+
+---
+
+## 8. References
+
+1. Umeyama, S. (1991). *Least-Squares Estimation of Transformation Parameters Between Two Point Patterns*. IEEE Transactions on Pattern Analysis and Machine Intelligence, 13(4), 376-380. https://doi.org/10.1109/34.88573 - the original closed-form SVD-based derivation behind §3, and the namesake of `umeyama_alignment` in `utils.py`.

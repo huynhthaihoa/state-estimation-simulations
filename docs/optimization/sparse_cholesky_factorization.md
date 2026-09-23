@@ -90,7 +90,7 @@ Sparse Cholesky tries to preserve and exploit this structure.
 
 ## 2. The basic idea
 
-Suppose:
+Suppose we're at the linear-solve step of Gauss-Newton or LM - [gauss_newton.md](gauss_newton.md)'s $H\approx J^TJ$ (or, weighted, $J^T\Omega J$) and $b := J^Tr$ (weighted: $J^T\Omega r$, with $\Omega$ the information matrix from [factor_graph.md §4](factor_graph.md#4-optimization-means-minimizing-all-those-errors), same quantity as $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty)):
 
 $$H\Delta x = -b$$
 
@@ -372,3 +372,9 @@ And in SLAM:
 > **The factor graph tells you which variables interact; elimination turns those interactions into a sparse factor $L$.**
 
 This is why **variable ordering, fill-in, elimination trees, and sparse matrix structures** become so important in systems such as iSAM, GTSAM, g2o, and Ceres.
+
+---
+
+## 11. References
+
+1. Liu, J. W. H. (1990). *The Role of Elimination Trees in Sparse Factorization*. SIAM Journal on Matrix Analysis and Applications, 11(1), 134-172. https://doi.org/10.1137/0611010 - the elimination-tree/fill-in relationship behind §3-§5 here, covered in full in [`elimination_tree.md`](elimination_tree.md).

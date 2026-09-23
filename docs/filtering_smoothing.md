@@ -340,7 +340,7 @@ This gives us a useful trade-off:
 | Global consistency | Harder                         | Stronger                                   |
 | Typical idea       | EKF-SLAM                       | Pose graph / factor graph / BA             |
 
-**A caveat worth remembering**: "filtering is cheaper, optimization is more expensive" is the right intuition for small, fixed-size problems, but it inverts at scale. EKF-style filtering maintains a *dense* joint covariance over the state, so each update costs roughly $O(n^2)$ in the number of landmarks/poses (Dissanayake et al., 2001). Sparse factor-graph smoothing exploits the sparsity of the underlying graph, so incremental solvers like iSAM2 update in close to $O(1)$ – ${O(\log n)}$ amortized time even as the map grows (Kaess et al., 2012). That gap - not accuracy - is the actual reason large-scale SLAM systems moved from EKF-SLAM toward factor-graph smoothing: dense filtering simply doesn't scale to large maps the way sparse smoothing does.
+**A caveat worth remembering**: "filtering is cheaper, optimization is more expensive" is the right intuition for small, fixed-size problems, but it inverts at scale. EKF-style filtering maintains a *dense* joint covariance over the state, so each update costs roughly $O(n^2)$ in the number of landmarks/poses (Dissanayake et al., 2001), with no way around it - every update touches the whole dense matrix, every time. Sparse factor-graph smoothing exploits the sparsity of the underlying graph instead, so incremental solvers like iSAM2 update *most* new odometry-only measurements cheaply, touching only a small, roughly constant-size affected region of the Bayes tree (Kaess et al., 2012) - but there's no universal $O(1)$-$O(\log n)$ *amortized* bound backing that up the way there is for, say, a balanced-tree data structure: a single loop-closure edge can force re-elimination of a large fraction of the tree in the worst case, exactly the same as EKF-style filtering's every-update cost, not a bounded fraction of it. This repo's own [`bayes_tree_construction.py`](../use_numpy/bayes_tree_construction.py) demonstrates this directly - one loop-closure edge on its 16-node square-loop topology invalidates all 16 of 16 nodes, not a small affected subtree (see [`bayes_tree.md` §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo)). So the real, defensible claim is narrower than a clean complexity bound: *most* updates in a typical SLAM graph (which is mostly odometry, occasionally punctuated by loop closures) are cheap under iSAM2, and that's still the actual reason large-scale SLAM systems moved from EKF-SLAM toward factor-graph smoothing - dense filtering's $O(n^2)$-*every*-update cost has no equivalent "usually cheap" case to lean on the way sparse smoothing does.
 
 ---
 
@@ -348,7 +348,9 @@ This gives us a useful trade-off:
 
 A **factor graph** is an excellent mental bridge between the two worlds.
 
-A factor graph has two kinds of factors. A **landmark factor** ties a pose to a landmark it observed:
+A factor graph has **(at least) three kinds of factors**: 
+
+- A **landmark factor** ties a pose to a landmark it observed:
 
 ```text
       landmark
@@ -358,10 +360,18 @@ A factor graph has two kinds of factors. A **landmark factor** ties a pose to a 
  x₀   ●     ● x₂
 ```
 
-A **pose-to-pose factor** ties two consecutive (or, for a loop closure, non-consecutive) poses together via a relative measurement:
+- A **pose-to-pose factor** ties two consecutive (or, for a loop closure, non-consecutive) poses together via a relative measurement:
 
 ```text
 x₀ ● ── x₁ ● ── x₂ ● ── x₃ ●
+```
+
+- A **unary (prior) factor** constrains a single pose directly, with no other variable involved - typically used to anchor gauge freedom (e.g. fixing $x_0$ to break the "the whole solution can shift/rotate/rescale together" ambiguity, exactly what this repo's own `pose_graph.py` and `bundle_adjustment.py`/`bundle_adjustment_advanced.py` do) or to inject an absolute measurement like GPS:
+
+```text
+prior
+  │
+  x₀ ● ── x₁ ● ── x₂ ●
 ```
 
 Each measurement becomes a **factor** imposing a constraint.
@@ -483,9 +493,7 @@ Examples you'll encounter:
 
 ## 11. And this matters a lot for SLAM + state estimation for resource-constrained robots with discontinuous/hybrid motion
 
-<!-- For your planned work on **SLAM + state estimation for resource-constrained robots with discontinuous/hybrid motion**, this distinction is particularly important. -->
-
-Your robot might experience:
+A robot operating with discontinuous/hybrid motion (bio-inspired locomotion, legged contact events, and similar) might experience:
 
 ```text
 normal motion
@@ -501,19 +509,19 @@ normal motion
 
 A filtering approach naturally asks:
 
-> **"Given my state right now, what happens next?"**
+> **"Given the state right now, what happens next?"**
 
 A smoothing approach can instead ask:
 
 > **"Given the measurements before and after this unusual transition, what was the most consistent trajectory and transition state?"**
 
-That can become very interesting when your motion model is **hybrid/discontinuous**, because future observations may provide strong evidence about what actually happened during an ambiguous transition.
+That can become very interesting when the motion model is **hybrid/discontinuous**, because future observations may provide strong evidence about what actually happened during an ambiguous transition.
 
-So, if you remember only one thing:
+So, if there's only one thing to remember:
 
-> **Filtering is like continuously updating your belief about where you are.**
+> **Filtering is like continuously updating a belief about where the robot is.**
 
-> **Smoothing/optimization is like periodically reopening the entire notebook and rewriting your past trajectory so that everything you've observed fits together as consistently as possible.**
+> **Smoothing/optimization is like periodically reopening the entire notebook and rewriting the past trajectory so that everything observed so far fits together as consistently as possible.**
 
 And that distinction is one of the most useful conceptual foundations for understanding **EKF-SLAM → factor graphs → sliding-window VIO → pose-graph SLAM → incremental smoothing**.
 

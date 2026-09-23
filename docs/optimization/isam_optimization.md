@@ -221,12 +221,16 @@ Bayes tree
 
         X0
         │
-       X1
-      /  \
-    X2    X3
-          │
-          X4
+        X1
+        │
+        X2
+        │
+        X3
+        │
+        X4
 ```
+
+(A straight chain here, not a branch - the underlying factor graph is itself a chain $X_0-X_1-X_2-X_3-X_4$ with no side edges, so eliminating it in order produces a chain elimination/Bayes tree too. Two variables joined by a real edge in the factor graph - like $X_2$ and $X_3$ here - can never end up as siblings with no ancestor/descendant relationship in a correctly-built Bayes tree.)
 
 When a new factor connects X4 to X0:
 
@@ -464,7 +468,7 @@ And **iSAM2** takes this further by using a **Bayes tree** to efficiently identi
 
 ## 14. Where this is implemented in this repo
 
-[`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`) implements exactly §3's mechanism: new odometry edges are absorbed into a running square-root-information matrix via Givens-rotation row insertion (`qr_insert_row` in `utils.py`) instead of rebuilding the linear system from scratch, contrasted directly against a batch baseline that re-solves everything at every new node - reproducing §1/§8's batch-vs-incremental comparison and §6/§9's "loop closure needs a wide update" point empirically (the script always triggers a full relinearization on the loop-closure edge, plus periodically otherwise). **It does not implement §7's Bayes tree or variable reordering** - that's iSAM2-specific machinery genuinely out of scope here; this is iSAM's original QR/square-root-information mechanism (Kaess et al. 2008), not iSAM2. For the Bayes tree itself, see [`bayes_tree.md`](bayes_tree.md); for the full iSAM2 algorithm this repo doesn't implement, see [`isam2_optimization.md`](isam2_optimization.md).
+[`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`) implements exactly §3's mechanism: new odometry edges are absorbed into a running square-root-information matrix via Givens-rotation row insertion (`qr_insert_row` in `utils.py`) instead of rebuilding the linear system from scratch, contrasted directly against a batch baseline that re-solves everything at every new node - reproducing §1/§8's batch-vs-incremental comparison and §6/§9's "loop closure needs a wide update" point empirically (the script always triggers a full relinearization on the loop-closure edge, plus periodically otherwise). **It does not implement §7's Bayes tree, nor any variable reordering at all** - but only the Bayes tree is genuinely iSAM2-specific. Variable reordering (via COLAMD) to bound fill-in is already part of *original* iSAM (Kaess et al. 2008, periodic batch reordering during full relinearization) - what iSAM2 actually adds on top is making that reordering *incremental/fluid* (reordering only as needed, tied to the Bayes tree) instead of a periodic full pass. This script skips variable reordering of either kind - a real simplification relative to even the 2008 original, not just relative to iSAM2. For the Bayes tree itself, see [`bayes_tree.md`](bayes_tree.md); for the full iSAM2 algorithm this repo doesn't implement, see [`isam2_optimization.md`](isam2_optimization.md).
 
 ---
 

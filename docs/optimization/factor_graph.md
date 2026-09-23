@@ -62,22 +62,26 @@ X3 is 1m ahead of X2
 
 But every measurement has error.
 
-Maybe the real motion was:
+If you simply integrate the odometry's own numbers above (each step reported as "1m ahead"):
+
+```text
+estimated position ≈ 3.00 m
+```
+
+Maybe the real motion, though, was:
 
 ```text
 X0  →  X1  →  X2  →  X3
   1.02   0.97    1.05 m
 ```
 
-If you simply integrate these measurements:
-
 ```text
-estimated position ≈ 3.04 m
+real position ≈ 3.04 m
 ```
 
-you accumulate error.
+Integrating noisy per-step measurements never magically cancels their errors, so the estimate (3.00 m) and the real position (3.04 m) diverge - you accumulate error.
 
-> **Note**: each of those per-step measurements (`X1 is 1m ahead of X0`, etc.) is what **odometry** actually provides - an estimate of the robot's *incremental* change in pose between two nearby moments, from onboard motion sensors (wheel encoders, IMU, visual odometry, ...). Chaining ("integrating") a sequence of these incremental measurements to track pose relative to a starting point, the way the `3.04 m` estimate above was computed, is called **dead reckoning**. Since every measurement carries a small error and dead reckoning sums them with no correction, the drift grows unboundedly the longer you integrate - exactly the problem the loop closure below fixes.
+> **Note**: each of those per-step measurements (`X1 is 1m ahead of X0`, etc.) is what **odometry** actually provides - an estimate of the robot's *incremental* change in pose between two nearby moments, from onboard motion sensors (wheel encoders, IMU, visual odometry, ...). Chaining ("integrating") a sequence of these incremental measurements to track pose relative to a starting point, the way the `3.00 m` estimate above was computed, is called **dead reckoning**. Since every measurement carries a small error and dead reckoning sums them with no correction, the drift grows unboundedly the longer you integrate - exactly the problem the loop closure below fixes.
 
 Now imagine that at X3 the camera recognizes a place it saw at X0.
 
@@ -195,7 +199,7 @@ e_k^\top\Omega_k e_k
 }
 $$
 
-where $\Omega_k$ is the **information matrix**.
+where $\Omega_k$ is the **information matrix** - the same quantity [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty) calls $W_i$; both are $\Sigma^{-1}$ for a factor's measurement, this doc's $\Omega$ notation is what everything built on top of it (including [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md)) uses from here on.
 
 > **Note**: $\Omega_k$ is the inverse of that measurement's covariance, $\Omega_k = \Sigma_k^{-1}$ - a precise sensor (small $\Sigma_k$) inverts to a *large* $\Omega_k$, so its error counts more in the sum, while a noisy sensor (large $\Sigma_k$) inverts to a *small* $\Omega_k$ and gets down-weighted. The term $e_k^\top\Omega_k e_k$ is a **Mahalanobis distance** - see [pointcloud_pose_tracking_empirical_note.md Appendix A.3](../filtering/pointcloud_pose_tracking_empirical_note.md#a3-mahalanobis-distance-and-the-information-matrix) for the full derivation and the isotropic special case where it collapses to plain squared error divided by a constant.
 
@@ -349,8 +353,6 @@ So:
 
 ## 8. Where Gauss–Newton enters
 
-This connects directly to what you asked about earlier.
-
 Factor-graph optimization is usually a **nonlinear least-squares problem**.
 
 We have:
@@ -373,7 +375,7 @@ $$X \leftarrow X \oplus\Delta X$$
 
 For poses, that $\oplus$ is often implemented using **[Lie algebra](../foundations/lie_algebra.md) / SE(3)**.
 
-So you can mentally connect everything you've been studying:
+Put together, the pieces above connect like this:
 
 ```text
 Factor graph
@@ -506,28 +508,20 @@ And this gives you a very useful hierarchy:
 
 > **Lie algebra** = convenient way to optimize poses on SE(3)
 
-That is the conceptual bridge connecting essentially all the SLAM topics you've been asking about recently.
+That is the conceptual bridge connecting essentially all the SLAM topics covered in this doc set.
 
 ---
 
 ## 12. References
 
 1. Kschischang, F. R., Frey, B. J., & Loeliger, H.-A. (2001). *Factor Graphs and the Sum-Product Algorithm*. IEEE Transactions on Information Theory, 47(2), 498–519. https://doi.org/10.1109/18.910572 - the original, general (non-robotics) definition of a factor graph as a bipartite graph of variable nodes and factor nodes, behind §1 and §6's variable/factor terminology. This paper does **not** contain the diagram in `images/factor_graph_1.jpg`; see Image sources below - that image's originally-recorded citation was checked against the paper's actual figures and found to be wrong.
-2. Dellaert, F., & Kaess, M. (2017). *Factor Graphs for Robot Perception*. Foundations and Trends in Robotics, 6(1–2), 1–139. https://doi.org/10.1561/2300000043 - the standard robotics-focused reference for factor graphs in SLAM (poses, landmarks, IMU/camera/loop- closure factors), behind §1, §5, §6, and §7's pose-graph-vs-factor-graph distinction.
+2. Dellaert, F., & Kaess, M. (2017). *Factor Graphs for Robot Perception*. Foundations and Trends in Robotics, 6(1–2), 1–139. https://doi.org/10.1561/2300000043 - the standard robotics-focused reference for factor graphs in SLAM (poses, landmarks, IMU/camera/loop-closure factors), behind §1, §5, §6, and §7's pose-graph-vs-factor-graph distinction.
 3. Racinskis, P., Arents, J., & Greitans, M. (2023). *Constructing Maps for Autonomous Robotics: An Introductory Conceptual Overview*. Electronics, 12(13), 2925. https://doi.org/10.3390/electronics12132925 - Figure 1 of this paper is the confirmed source of the diagram in `images/factor_graph_3.jpg` (see Image sources below).
 
 ### Image sources
 
-<!-- 1. `images/factor_graph_1.jpg` - originally cited as https://ieeexplore.ieee.org/document/910572 (IEEE document 910572, i.e., Reference 1 above). **This citation is incorrect.** The paper was downloaded in full and every figure inspected; none of them show robot poses, landmarks, "Odometry measurement"/"Landmark measurement" labels, or the "Bipartite graph with variable nodes and factor nodes" legend seen in this image - the paper's figures are all abstract coding-theory examples ($x_1,\dots,x_5$ with generic factors $f_A,\dots,f_E$), Tanner graphs, trellises, and a scalar Kalman-filter derivation. A plausible alternative family of sources (Dellaert & Kaess's SLAM tutorials, which use this exact "Odometry measurement" / "Landmark measurement" phrasing with toy robot/furniture photos) was checked and did not match either - their version uses photographs, not the abstract $x_0,\dots,x_n$ / $l_1, l_2$ circles seen here. The true source of this image is **unidentified**; do not cite IEEE document 910572 for it. -->
-2. `images/factor_graph_2.jpg` - original cited as https://engcang.github.io/gtsam_tutorial.html. 
-
-<!-- This is a pixel-for-pixel match for the second pose-graph figure on that page (image file `/assets/img/posts/230715_gtsam/graph2.png`), a Korean-language GTSAM tutorial blog post by Eungchang Mason Lee (page title "GTSAM 튜토리얼 | Eungchang Mason Lee"). -->
-3. `images/factor_graph_3.jpg` - originally cited as https://www.mdpi.com/2079-9292/12/13/2925. 
-
-<!-- **Confirmed**: pixel-for-pixel match for Figure 1 of Reference 3 above (downloaded directly from MDPI's own PDF host, since the MDPI article page itself returns HTTP 403 to automated fetches). -->
-4. `images/factor_graph_4.jpg` - originally cited as https://cmsc426.github.io/gtsam/. 
-
-<!-- **Confirmed**: pixel-for-pixel match for the image `/assets/sfm/gtsam9.png` embedded on that page, part of the University of Maryland CMSC426 (Computer Vision) course's "Structure from Motion" lecture notes. -->
-5. `images/factor_graph_5.jpg` - originally cited as https://symforce.org/. 
-
-<!-- **Confirmed**: pixel-for-pixel match for the image `docs/static/images/robot_2d_localization/factor_graph.png` embedded on that page - the diagram from SymForce's (Skydio's symbolic-computation library for robotics) "Robot 2D Localization" example/tutorial, https://symforce.org/examples/robot_2d_localization/README.html. -->
+1. `images/factor_graph_1.jpg` - originally cited as https://ieeexplore.ieee.org/document/910572 (IEEE document 910572, i.e., Reference 1 above). **This citation is incorrect.** The paper was downloaded in full and every figure inspected; none of them show robot poses, landmarks, "Odometry measurement"/"Landmark measurement" labels, or the "Bipartite graph with variable nodes and factor nodes" legend seen in this image - the paper's figures are all abstract coding-theory examples ($x_1,\dots,x_5$ with generic factors $f_A,\dots,f_E$), Tanner graphs, trellises, and a scalar Kalman-filter derivation. A plausible alternative family of sources (Dellaert & Kaess's SLAM tutorials, which use this exact "Odometry measurement" / "Landmark measurement" phrasing with toy robot/furniture photos) was checked and did not match either - their version uses photographs, not the abstract $x_0,\dots,x_n$ / $l_1, l_2$ circles seen here. The true source of this image is **unidentified**; do not cite IEEE document 910572 for it.
+2. `images/factor_graph_2.jpg` - originally cited as https://engcang.github.io/gtsam_tutorial.html. **Confirmed**: pixel-for-pixel match for the second pose-graph figure on that page (image file `/assets/img/posts/230715_gtsam/graph2.png`), a Korean-language GTSAM tutorial blog post by Eungchang Mason Lee (page title "GTSAM 튜토리얼 | Eungchang Mason Lee").
+3. `images/factor_graph_3.jpg` - originally cited as https://www.mdpi.com/2079-9292/12/13/2925. **Confirmed**: pixel-for-pixel match for Figure 1 of Reference 3 above (downloaded directly from MDPI's own PDF host, since the MDPI article page itself returns HTTP 403 to automated fetches).
+4. `images/factor_graph_4.jpg` - originally cited as https://cmsc426.github.io/gtsam/. **Confirmed**: pixel-for-pixel match for the image `/assets/sfm/gtsam9.png` embedded on that page, part of the University of Maryland CMSC426 (Computer Vision) course's "Structure from Motion" lecture notes.
+5. `images/factor_graph_5.jpg` - originally cited as https://symforce.org/. **Confirmed**: pixel-for-pixel match for the image `docs/static/images/robot_2d_localization/factor_graph.png` embedded on that page - the diagram from SymForce's (Skydio's symbolic-computation library for robotics) "Robot 2D Localization" example/tutorial, https://symforce.org/examples/robot_2d_localization/README.html.

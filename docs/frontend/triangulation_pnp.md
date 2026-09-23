@@ -1,6 +1,6 @@
 # Triangulation and PnP: two sides of one geometric problem
 
-Triangulation asks "given known camera poses and a 2D observation in each, where is the 3D point?" PnP asks the exact inverse: "given a known 3D point and its observed 2D pixel, where is the camera?" Both reduce to the same reprojection residual, solved the same way in this repo - a closed-form linear initial guess, then a few Gauss-Newton iterations.
+Triangulation asks "given known camera poses and a 2D observation in each, where is the 3D point?" PnP asks the exact inverse: "given several known 3D points and their observed 2D pixels, where is the camera?" (a single point/pixel pair pins down a ray, not a unique pose - PnP needs at least 3 correspondences (P3P), and this repo's own DLT implementation needs at least 6, per §6 below). Both reduce to the same reprojection residual, solved the same way in this repo - a closed-form linear initial guess, then a few Gauss-Newton iterations.
 
 This builds directly on:
 - The **reprojection error** and **"bundle of rays"** intuition from [bundle_adjustment.md §5](../optimization/bundle_adjustment.md#5-why-is-it-called-bundle-adjustment).
@@ -73,9 +73,9 @@ Neither problem is "solved" by the linear step alone - both need this positive-d
 
 ---
 
-## 5. Where PnP shows up elsewhere in this monorepo
+## 5. Where PnP shows up elsewhere
 
-The exact same problem - known 3D points, known intrinsics, unknown pose - is solved via `cv2.solvePnP` in `camera-calibration/utils.py`, to recover each calibration image's extrinsics from its detected checkerboard corners. That call is a black box (OpenCV's own implementation, not derived), but it's worth noting as a real, working instance of this same math elsewhere in this repo, in a calibration context rather than a SLAM front-end context.
+The exact same problem - known 3D points, known intrinsics, unknown pose - is solved via `cv2.solvePnP` in the author's separate `camera-calibration` project (not part of this repo, so this reference won't resolve if you've only cloned `state-estimation-simulations`), to recover each calibration image's extrinsics from its detected checkerboard corners. That call is a black box (OpenCV's own implementation, not derived), but it's worth noting as a real, working instance of this same math elsewhere, in a calibration context rather than a SLAM front-end context.
 
 ---
 
@@ -87,7 +87,7 @@ The exact same problem - known 3D points, known intrinsics, unknown pose - is so
 
 ## 7. One-sentence summary
 
-> **Triangulation and PnP are the same reprojection problem run in opposite directions - one holds poses fixed to solve for a point, the other holds a point fixed to solve for a pose - and this repo solves both the same way: a closed-form linear guess (ray intersection / DLT) followed by a few Gauss-Newton iterations, guarded against the same sign/reflection ambiguity in both directions.**
+> **Triangulation and PnP are the same reprojection problem run in opposite directions - one holds poses fixed to solve for a point, the other holds several known points fixed to solve for a pose - and this repo solves both the same way: a closed-form linear guess (ray intersection / DLT) followed by a few Gauss-Newton iterations, guarded against the same sign/reflection ambiguity in both directions.**
 
 ---
 

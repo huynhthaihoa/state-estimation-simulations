@@ -443,15 +443,15 @@ Keep these four things separate:
 
 And:
 
-$$\boxed{SO(3) \underset{\log}{\overset{\exp}{\rightleftarrows}} \mathfrak{so}(3)}$$
+$$\boxed{SO(3) \underset{\exp}{\overset{\log}{\rightleftarrows}} \mathfrak{so}(3)}$$
 
-$$\boxed{SE(3) \underset{\log}{\overset{\exp}{\rightleftarrows}} \mathfrak{se}(3)}$$
+$$\boxed{SE(3) \underset{\exp}{\overset{\log}{\rightleftarrows}} \mathfrak{se}(3)}$$
 
 ---
 
 ## 15. The connection to Jacobians
 
-This is particularly important for the SLAM topics you've been asking about.
+This is particularly important for optimization-based SLAM.
 
 When doing optimization, you typically have:
 
@@ -511,3 +511,9 @@ For SLAM, the mental picture I recommend is:
 ```
 
 **Lie algebra is essentially the "local language of motion" for a nonlinear transformation space.**
+
+---
+
+## 17. References
+
+1. Solà, J., Deray, J., & Atchuthan, D. (2018). *A micro Lie theory for state estimation in robotics*. arXiv:1812.01537. https://doi.org/10.48550/arXiv.1812.01537 - the standard modern reference for the $SO(3)$/$SE(3)$ Exp/Log conventions used throughout this doc, written by (among others) the author of the `manif` library this repo's `use_manif/` scripts are built on.

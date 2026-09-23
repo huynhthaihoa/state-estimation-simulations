@@ -17,20 +17,22 @@ Suppose you want to fit a line to measurements:
 
 You have measurements:
 
-$$(x_i,y_i)$$
+$$(t_i,y_i)$$
 
 and assume:
 
-$$y = ax+b$$
+$$y = at+b$$
 
 The unknowns are:
 
 $$x=\begin{bmatrix} a \\ 
 b \end{bmatrix}$$
 
+(Naming the data's independent variable $t$ rather than $x$ is deliberate - $x$ is about to be reused, throughout the rest of this doc and everywhere it's cited elsewhere, for the *unknown parameter vector* being solved for, not a per-measurement input. Keeping the two visually distinct here avoids exactly the collision that would otherwise happen in the next line.)
+
 For each measurement, there is an error:
 
-$$e_i = y_i-(ax_i+b)$$
+$$e_i = y_i-(at_i+b)$$
 
 We don't want to make **one particular error** zero.
 
@@ -76,7 +78,7 @@ Here's the important distinction.
 
 Suppose:
 
-$$e_i = y_i-(ax_i+b)$$
+$$e_i = y_i-(at_i+b)$$
 
 The unknowns $a,b$ appear linearly.
 
@@ -88,11 +90,11 @@ That's a **linear least-squares** problem.
 
 Suppose instead:
 
-$$y = ae^{bx}$$
+$$y = ae^{bt}$$
 
 Then:
 
-$$e_i=y_i-ae^{bx_i}$$
+$$e_i=y_i-ae^{bt_i}$$
 
 Now $b$ appears inside an exponential.
 
@@ -416,7 +418,7 @@ For Gaussian noise:
 
 $$W_i=\Sigma_i^{-1}$$
 
-where $\Sigma_i$ is the covariance.
+where $\Sigma_i$ is the covariance. ($W_i$ here is the same quantity as the **information matrix** $\Omega_k$ used from [factor_graph.md §4](factor_graph.md#4-optimization-means-minimizing-all-those-errors) onward - both are $\Sigma^{-1}$ for a factor's measurement; this doc introduces the idea with $W_i$, factor_graph.md and everything downstream of it (including [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md)) uses $\Omega$.)
 
 So a useful interpretation is:
 
@@ -511,7 +513,7 @@ That is one giant **nonlinear least-squares problem**.
 
 ## 15. Your SLAM mental map
 
-At this point, I'd organize the concepts you've been studying like this:
+At this point, the concepts above organize into a mental map like this:
 
 ```text
                          SLAM
