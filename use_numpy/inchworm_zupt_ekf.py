@@ -487,7 +487,7 @@ def main():
         print(f"  {name:<18s} RMS pos={np.sqrt(np.mean(pos_err**2)):7.4f} m, "
               f"vel={np.sqrt(np.mean(vel_err**2)):7.4f} m/s")
 
-    print(f"\nMonte Carlo NEES (consistent 2-DoF filter should average ~2.0 everywhere):")
+    print("\nMonte Carlo NEES (consistent 2-DoF filter should average ~2.0 everywhere):")
     print("  (anchor-only/cruise-only exclude ramp ticks -- the shared, all-3-variants transition")
     print("  spike that isn't the point here; see true_velocity's docstring)")
     for name, nees_arr in [("never", nees_never), ("always", nees_always), ("phase_conditional", nees_phase)]:

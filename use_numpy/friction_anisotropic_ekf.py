@@ -485,8 +485,8 @@ def main():
                    ("quarter-half turn", (rotation_away >= quarter) & (rotation_away < 2 * quarter)),
                    ("half-3quarter turn", (rotation_away >= 2 * quarter) & (rotation_away < 3 * quarter)),
                    ("3quarter-full turn", rotation_away >= 3 * quarter)]
-    print(f"\nMonte Carlo NEES by rotation away from the reference heading "
-          f"(consistent 3-DoF filter should average ~3.0 everywhere):")
+    print("\nMonte Carlo NEES by rotation away from the reference heading "
+          "(consistent 3-DoF filter should average ~3.0 everywhere):")
     for label, mask in checkpoints:
         if not np.any(mask):
             continue

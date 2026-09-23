@@ -536,7 +536,6 @@ def run_batch_gn(T_init_list, T_prior0, P_init, u_meas, z, body_points, dt, Q_ta
         T_est: list of estimated poses (4,4)
     """
     n_poses = len(T_init_list)
-    n_points = len(body_points)
     dof = 6 * n_poses
 
     Omega_prior = np.linalg.inv(P_init)

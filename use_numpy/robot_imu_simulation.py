@@ -103,7 +103,7 @@ def run_simulation(dt_imu, total_seconds, snapshots_per_second, gn_tol, gn_max_i
                 print(f"  └─ IMU Step {micro_step:02d}: Est Pos = [{T_est[0,3]:.3f}, {T_est[1,3]:.3f}]")
 
         # --- PHASE 2: LOWER FREQUENCY POSITION FILTERING (1 Hz Update) ---
-        print(f"\n[SENSOR TICK] Global Position Measurement Arrived!")
+        print("\n[SENSOR TICK] Global Position Measurement Arrived!")
         # A genuine GPS-style reading: the true position plus per-axis Gaussian
         # noise -- not T_true itself. This is the one measurement T_est ever
         # gets corrected against, and it carries no orientation information.
