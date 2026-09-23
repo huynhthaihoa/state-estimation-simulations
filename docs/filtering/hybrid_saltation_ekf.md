@@ -102,7 +102,7 @@ $$\frac{d}{dp}\big[x(T;p)\big]\Big|_{p=0} = \Phi_{\text{after}}\cdot\frac{dx^{+}
 
 where $\Phi_{\text{after}} = D_1\Phi(x^{+}, T-t^{\*})$ is the ordinary flow Jacobian over the remaining duration (exactly `flow`'s own `Phi` output) and $f_T = f\big(x(T;0)\big)$ is the vector field at the nominal trajectory's own state at $T$. Expanding $\frac{dx^{+}}{dp} = DR\big[f^{-}(x^{-})\frac{dt^{\*}}{dp} + S(t^{\*})\big]$ (same reasoning as $\Xi_{\text{own-time}}$'s derivation) and using the standard flow identity $D_1\Phi(x,s)\cdot f(x) = f\big(\Phi(x,s)\big)$ - an autonomous flow's own linearization always carries its generating vector field forward to the vector field at the flowed-to point, so $\Phi_{\text{after}}\cdot f^{+}(x^{+}) = f_T$ - the $f_T$ terms combine and cancel the part $\Xi_{\text{own-time}}$ already had right, leaving exactly one new term:
 
-$$\frac{d}{dp}\big[x(T;p)\big]\Big|_{p=0} = \Phi_{\text{after}}\left\{DR(x^{-}) + \frac{\big[f^{+}(x^{+}) - DR(x^{-})\,f^{-}(x^{-})\big] \otimes Dg}{Dg \cdot f^{-}(x^{-})}\right\} S(t^{\*}) = \Phi_{\text{after}}\,\Xi(x^{-})\,\Phi_{\text{before}}\,\delta x_0$$
+$$\frac{d}{dp}\big[x(T;p)\big]\Big|_{p=0} = \Phi_{\text{after}}\left\lbrace DR(x^{-}) + \frac{\big[f^{+}(x^{+}) - DR(x^{-})\,f^{-}(x^{-})\big] \otimes Dg}{Dg \cdot f^{-}(x^{-})}\right\rbrace S(t^{\*}) = \Phi_{\text{after}}\,\Xi(x^{-})\,\Phi_{\text{before}}\,\delta x_0$$
 
 where $\Phi_{\text{before}} = D_1\Phi(x_0, t^{\*})$ (so $S(t^{\*})=\Phi_{\text{before}}\,\delta x_0$) and
 
