@@ -4,11 +4,14 @@
 
 ## A. Introduction
 
-A collection of from-scratch simulations exploring **pose/state estimation on manifolds**: 
+A collection of from-scratch simulations exploring **pose/state estimation**, mostly on manifolds: 
  - How **orientation** and **pose** should be integrated and corrected on $SO(3)$ / $SE(3)$ rather than treated as flat vectors
- - How a **prior** (a motion model driven by noisy control/odometry inputs) can be fused with **measurements** either **recursively** (Kalman filtering) or in **batch** (Gauss-Newton optimization).
+ - How a **prior** (a motion model driven by noisy control/odometry inputs) can be fused with **measurements** either **recursively** (Kalman filtering) or in **batch** (Gauss-Newton / Levenberg-Marquardt optimization over factor graphs)
+ - How batch smoothing **scales** to a growing problem: incremental solving (iSAM, Bayes tree), sliding-window marginalization, and Local + Global bundle adjustment
+ - How the **front-end** turns camera observations into poses for the estimator: Perspective-n-Point (PnP) pose recovery, and triangulation inside bundle adjustment
+ - How filtering copes with **non-smooth motion** (ground-contact events, anchor/extend gaits, heading-dependent friction), checked with Monte Carlo NEES consistency tests
 
-Two implementation styles run side by side for the core comparison scripts, split into sibling directories with matching filenames:
+Two implementation styles run side by side for 8 of the 14 simulations (the other 6 are NumPy-only; §C says why for each), split into sibling directories with matching filenames:
 - [use_numpy/](use_numpy/): skew-symmetric matrices, $Exp$ / $Log$ maps, and Jacobians written out by hand (Rodrigues' formula, the $SE(3)$ exponential/logarithm, the analytical inverse right Jacobian), shared across scripts via [use_numpy/lie_utils.py](use_numpy/lie_utils.py).
 - [use_manif/](use_manif/): the same math delegated to the [`manif`](https://github.com/artivis/manif) Lie-theory library's Python bindings (`T.rplus`, `T.rminus`, `T.act`, all with analytical Jacobians returned as out-parameters), so no manifold formula is hand-rolled.
 
@@ -17,10 +20,11 @@ Each `use_manif/<name>.py` is the manifpy counterpart of `use_numpy/<name>.py` o
 ## B. Documentation
 
 [docs/](docs/) has the conceptual write-ups behind these simulations:
-- **Math foundations**: Jacobian, Lie algebra, quaternions
-- The **Kalman-filter** family: KF/EKF/IEKF and variants
+- **Math foundations**: Jacobian, Lie algebra, quaternions, Umeyama alignment
+- The **front-end**: triangulation and PnP, visual-inertial initialization
+- The **Kalman-filter** family: KF/EKF/IEKF, UKF/ESKF/MSCKF and other variants, left- vs. right-invariant errors, an empirical note on the point-cloud tracking results, and non-smooth-motion filters (saltation-matrix EKF, ZUPT, friction-anisotropic process noise)
 - The **factor-graph/smoothing** family: NLS, Gauss-Newton, Levenberg-Marquardt, factor graphs,
-pose-graph optimization, bundle adjustment, iSAM 
+pose-graph optimization, bundle adjustment, sparse Cholesky factorization, IMU preintegration, iSAM/iSAM2, elimination and Bayes trees, marginalization
 
 Start at [docs/README.md](docs/README.md) for the full index, or [docs/frontend_backend.md](docs/frontend_backend.md) / [docs/filtering_smoothing.md](docs/filtering_smoothing.md) for the two entry-point overviews.
 
@@ -57,7 +61,7 @@ timing/peak-memory measurement helper every script's benchmark printout uses).
 - [friction_anisotropic_ekf.py](use_numpy/friction_anisotropic_ekf.py): a crawling unicycle on a friction-anisotropic pad ([docs/filtering/friction_anisotropic_ekf.md](docs/filtering/friction_anisotropic_ekf.md)), comparing `isotropic`/`fixed_anisotropic`/`heading_aware` process-noise policies for the position block of $Q$ as the (exact, noise-free) heading rotates through a full loop. Ordinary EKF throughout (heading itself is exact, so no manifold/linearization question is at stake) - no `use_manif/` counterpart for the same reason.
 - [sliding_window_marginalization.py](use_numpy/sliding_window_marginalization.py): gives [docs/optimization/marginalization.md](docs/optimization/marginalization.md) its accompanying script - streams a pure odometry chain, marginalizes the oldest pose via the Schur complement whenever a `--window-size` cap would be exceeded, and compares the resulting bounded-memory solve against `run_full_batch_growing`'s unbounded re-solve-from-scratch baseline across a sweep of trajectory lengths, reusing `pose_graph.py`/`pose_graph_incremental.py`'s building blocks. No `use_manif/` counterpart - the bounded-vs-unbounded scaling result is backend-agnostic.
 
-### [use_manif/](use_manif/) - Same simulations, on `manifpy`
+### [use_manif/](use_manif/) - `manifpy` counterparts (8 of the 14 simulations)
 
 - [imu_integration_comparison.py](use_manif/imu_integration_comparison.py)
 - [robot_imu_simulation.py](use_manif/robot_imu_simulation.py)
@@ -75,14 +79,18 @@ timing/peak-memory measurement helper every script's benchmark printout uses).
 ## D. Installation
 
 - Install [uv](https://docs.astral.sh/uv/).
-- `uv sync` alone installs everything the [use_numpy/](use_numpy/) scripts need, with no `manifpy`/`../manif` requirement at all.
+- The [use_numpy/](use_numpy/) scripts need no `manifpy`. Without a `../manif` checkout, though, plain `uv sync`/`uv run` fail with "Distribution not found": `uv.lock` records `manifpy`'s local path source, and uv re-checks every source (even the unrequested `manif` extra) before it syncs or runs. Use the committed lockfile as-is to skip that check:
+  ```
+  export UV_FROZEN=1   # or pass --frozen to every uv sync / uv run
+  uv sync
+  ```
 - The [use_manif/](use_manif/) scripts additionally need `manifpy`, which isn't on PyPI: this project's `pyproject.toml` points `uv` at a local sibling checkout (`../manif`) and builds it automatically (requires a working Eigen3 + CMake toolchain) when you request the `manif` extra: `uv sync --extra manif`.
 - Run any script with `uv run` from this repository's root directory, e.g.:
   `uv run python use_numpy/imu_integration_comparison.py`
 
 ### Running the tests
 
-`tests/` has a pytest suite covering `utils.py`, `use_numpy/lie_utils.py`'s Lie-group math (round-trip and Jacobian-identity checks), and the testable functions in every `use_numpy/`/`use_manif/` simulation script (deterministic, fixed-seed regression checks - e.g. optimized error beats an uncorrected baseline, two solvers agree on the same input, a filter matches its own documented exact-agreement claim). `use_manif/` tests skip cleanly (not fail) if you ran plain `uv sync` (no `manif` extra, so `manifpy` isn't installed).
+`tests/` has a pytest suite covering `utils.py`, `use_numpy/lie_utils.py`'s Lie-group math (round-trip and Jacobian-identity checks), and the testable functions in every `use_numpy/`/`use_manif/` simulation script (deterministic, fixed-seed regression checks - e.g. optimized error beats an uncorrected baseline, two solvers agree on the same input, a filter matches its own documented exact-agreement claim). `use_manif/` tests skip cleanly (not fail) if you synced without the `manif` extra (so `manifpy` isn't installed).
 
 ```
 uv run pytest tests/ -v
