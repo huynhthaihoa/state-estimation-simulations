@@ -371,10 +371,161 @@ And in a robotics context, it's worth mentally organizing it as:
 $${ \boxed{ \text{Euler angles} \rightarrow \text{Quaternion} \rightarrow SO(3) \rightarrow \mathfrak{so}(3) \rightarrow \text{Lie-group state estimation} } }
 $$
 
-The really interesting next step is **why quaternion multiplication actually performs rotation**, because that is the part that makes quaternions initially feel like magic.
+The really interesting next step is **why quaternion multiplication actually performs rotation**, because that is the part that makes quaternions initially feel like magic. That's the next section.
 
 ---
 
-## 13. References
+## 13. Why quaternion multiplication actually performs rotation
+
+So far we've treated a quaternion as "axis + angle in disguise." But that raises a fair question:
+
+> "Why does *multiplying* four numbers together rotate a 3D vector?"
+
+It isn't magic. It comes down to four observations.
+
+### Step 1: the multiplication rule hides a dot product and a cross product
+
+Write a quaternion as a scalar part plus a vector part:
+
+$$
+q = (w, \mathbf{v}), \qquad \mathbf{v} = (x, y, z)
+$$
+
+Quaternion multiplication (the Hamilton product, built on the rule $i^2 = j^2 = k^2 = ijk = -1$) then works out to:
+
+$$
+q_1 \otimes q_2 = \left( w_1 w_2 - \mathbf{v}_1 \cdot \mathbf{v}_2,\; w_1 \mathbf{v}_2 + w_2 \mathbf{v}_1 + \mathbf{v}_1 \times \mathbf{v}_2 \right)
+$$
+
+Look at what's inside:
+
+* a **dot product** $\mathbf{v}_1 \cdot \mathbf{v}_2$
+* a **cross product** $\mathbf{v}_1 \times \mathbf{v}_2$
+
+Those are exactly the ingredients of 3D rotation formulas. The cross product also makes the multiplication **order-dependent** ($q_1 \otimes q_2 \neq q_2 \otimes q_1$ in general) - just like the rotations in Section 1.
+
+### Step 2: put the vector inside a quaternion, then "sandwich" it
+
+To rotate a vector $\mathbf{v}$, first turn it into a quaternion with zero scalar part (a **pure quaternion**):
+
+$$
+\mathbf{v} \;\rightarrow\; (0, \mathbf{v})
+$$
+
+Then multiply by $q$ on the left and by its **conjugate** $q^{\ast} = (w, -x, -y, -z)$ on the right:
+
+$$
+\boxed{(0, \mathbf{v}') = q \otimes (0, \mathbf{v}) \otimes q^{\ast}}
+$$
+
+For a unit quaternion, $q \otimes q^{\ast} = (1, 0, 0, 0)$, so $q^{\ast}$ is also the inverse of $q$ - it undoes the rotation.
+
+Why two multiplications? Why not just $q \otimes (0, \mathbf{v})$?
+
+Because multiplying from **one side** usually knocks the vector out of 3D. Take our 90° Z rotation $q = (0.707, 0, 0, 0.707)$ and follow two vectors through, writing every result as $(w, x, y, z)$:
+
+| Input vector | After $q \otimes (0, \mathbf{v})$ | After $q \otimes (0, \mathbf{v}) \otimes q^{\ast}$ |
+| --- | --- | --- |
+| X-axis $(1, 0, 0)$ | $(0, 0.707, 0.707, 0)$ | $(0, 0, 1, 0)$ |
+| Z-axis $(0, 0, 1)$ | $(-0.707, 0, 0, 0.707)$ | $(0, 0, 0, 1)$ |
+
+Two things to notice:
+
+* The **Z-axis** (the rotation axis itself) picks up a nonzero $w = -0.707$ after one multiplication. It is no longer a pure quaternion - it has leaked out of 3D space. The second multiplication by $q^{\ast}$ cancels the leak and returns it exactly to where it started, as a rotation should leave its own axis alone.
+* The **X-axis** lands on $(0.707, 0.707, 0)$ after one multiplication - rotated by only **45°**. The second multiplication adds another 45°, giving $(0, 1, 0)$: the full **90°**.
+
+So each side of the sandwich does **half** of the rotation. That is the real reason for the half angle in Section 2.
+
+### Step 3: why the sandwich rotates by exactly $\theta$
+
+The example generalizes. From here on, a vector inside a product means its pure quaternion, e.g. $\mathbf{v}$ stands for $(0, \mathbf{v})$.
+
+Let $q = \left(\cos\frac{\theta}{2}, \mathbf{u}\sin\frac{\theta}{2}\right)$ and split $\mathbf{v}$ into a part along the axis and a part perpendicular to it:
+
+$$
+\mathbf{v} = \mathbf{v}_{\parallel} + \mathbf{v}_{\perp}
+$$
+
+**Parallel part.** Two pure quaternions along the same direction commute (their cross product is zero). So $q$ commutes with $\mathbf{v}_{\parallel}$ and the sandwich collapses:
+
+$$
+q \otimes \mathbf{v}_{\parallel} \otimes q^{\ast} = \mathbf{v}_{\parallel} \otimes q \otimes q^{\ast} = \mathbf{v}_{\parallel}
+$$
+
+The axis doesn't move - exactly what a rotation around that axis should do.
+
+**Perpendicular part.** Here $\mathbf{u} \cdot \mathbf{v}_{\perp} = 0$, and swapping the order of a cross product flips its sign. Plugging this into the Step 1 rule shows that $\mathbf{u}$ and $\mathbf{v}_{\perp}$ **anticommute**:
+
+$$
+\mathbf{u} \otimes \mathbf{v}_{\perp} = -\,\mathbf{v}_{\perp} \otimes \mathbf{u}
+$$
+
+That sign flip lets $q^{\ast}$ move across $\mathbf{v}_{\perp}$, turning into $q$ on the way:
+
+$$
+\mathbf{v}_{\perp} \otimes q^{\ast} = q \otimes \mathbf{v}_{\perp}
+\quad\Rightarrow\quad
+q \otimes \mathbf{v}_{\perp} \otimes q^{\ast} = q \otimes q \otimes \mathbf{v}_{\perp}
+$$
+
+And multiplying $q$ by itself doubles its angle (Step 1 rule plus the double-angle identities):
+
+$$
+q \otimes q = \left(\cos\theta,\ \mathbf{u}\sin\theta\right)
+$$
+
+Multiplying that into $\mathbf{v}_{\perp}$ with the Step 1 rule (the dot product vanishes because $\mathbf{u} \perp \mathbf{v}_{\perp}$) gives:
+
+$$
+q \otimes \mathbf{v}_{\perp} \otimes q^{\ast} = \cos\theta\,\mathbf{v}_{\perp} + \sin\theta\,(\mathbf{u} \times \mathbf{v}_{\perp})
+$$
+
+That is $\mathbf{v}_{\perp}$ rotated by $\theta$ within the plane perpendicular to $\mathbf{u}$: $\mathbf{v}_{\perp}$ and $\mathbf{u} \times \mathbf{v}_{\perp}$ are perpendicular and the same length, so they act like the $x$ and $y$ axes of that plane.
+
+Putting both parts together:
+
+$$
+\boxed{q \otimes \mathbf{v} \otimes q^{\ast} = \mathbf{v}_{\parallel} + \cos\theta\,\mathbf{v}_{\perp} + \sin\theta\,(\mathbf{u} \times \mathbf{v}_{\perp})}
+$$
+
+This is exactly **Rodrigues' rotation formula** - the same rotation a rotation matrix would produce.
+
+> **Each side of the sandwich turns the perpendicular part by $\theta/2$, so the quaternion stores $\theta/2$ in order to produce a rotation by $\theta$.**
+
+### Step 4: two facts from earlier sections, now explained
+
+**Chaining rotations (Section 6).** The conjugate of a product reverses the order: $(p \otimes q)^{\ast} = q^{\ast} \otimes p^{\ast}$. So rotating by $q$ and then by $p$ gives:
+
+$$
+p \otimes \left(q \otimes \mathbf{v} \otimes q^{\ast}\right) \otimes p^{\ast} = (p \otimes q) \otimes \mathbf{v} \otimes (p \otimes q)^{\ast}
+$$
+
+Two rotations in a row are the single rotation $p \otimes q$. That's why "quaternion multiplication = apply one rotation after another" works. Note that the **rightmost** quaternion acts first, just like the rightmost matrix in $R_k \Delta R$.
+
+**$q$ and $-q$ (Section 10).** Flip the sign of $q$ and the sign appears twice in the sandwich, so it cancels:
+
+$$
+(-q) \otimes \mathbf{v} \otimes (-q)^{\ast} = q \otimes \mathbf{v} \otimes q^{\ast}
+$$
+
+So every rotation has exactly two quaternions, $q$ and $-q$. In angle terms: $\theta$ and $\theta + 360°$ are the same rotation, but the half angles $\theta/2$ and $\theta/2 + 180°$ flip the sign of every component of $q$.
+
+### Why 2D doesn't need a sandwich
+
+Compare with rotation in 2D using complex numbers. Multiplying by $e^{i\theta} = \cos\theta + i\sin\theta$ rotates a point by $\theta$ with **one** multiplication, because multiplying two complex numbers always gives another point in the same plane - nothing can leak out.
+
+In 3D, one quaternion multiplication *can* leak out of 3D space (Step 2), so a second multiplication is needed to cancel the leak, and the rotation angle gets split between the two sides.
+
+|  | 2D: complex numbers | 3D: unit quaternions |
+| --- | --- | --- |
+| Rotate a vector | $e^{i\theta} z$ | $q \otimes \mathbf{v} \otimes q^{\ast}$ |
+| Multiplications | 1 | 2 (one per side) |
+| Angle stored | $\theta$ | $\theta/2$ |
+
+> **A unit quaternion rotates a vector by sandwiching it: each side turns the part perpendicular to the axis by $\theta/2$, the part along the axis is untouched, and the two halves add up to a full rotation by $\theta$.**
+
+---
+
+## 14. References
 
 1. Diebel, J. (2006). *Representing Attitude: Euler Angles, Unit Quaternions, and Rotation Vectors*. Stanford University Technical Report. https://www.astro.rug.nl/software/kapteyn-beta/_downloads/attitude.pdf - a widely-cited technical reference covering the quaternion/Euler-angle/rotation-vector conversions and conventions this doc builds intuition for.
