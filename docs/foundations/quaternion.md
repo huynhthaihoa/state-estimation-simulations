@@ -454,7 +454,7 @@ $$
 
 The axis doesn't move - exactly what a rotation around that axis should do.
 
-**Perpendicular part.** Here $`\mathbf{u} \cdot \mathbf{v}_{\perp} = 0`$, and swapping the order of a cross product flips its sign. Plugging this into the Step 1 rule shows that $`\mathbf{u}$ and $\mathbf{v}_{\perp}`$ **anticommute**:
+**Perpendicular part.** Here $`\mathbf{u} \cdot \mathbf{v}_{\perp} = 0`$, and swapping the order of a cross product flips its sign. Plugging this into the Step 1 rule shows that $`\mathbf{u}`$ and $`\mathbf{v}_{\perp}`$ **anticommute**:
 
 $$
 \mathbf{u} \otimes \mathbf{v}_{\perp} = -\,\mathbf{v}_{\perp} \otimes \mathbf{u}
