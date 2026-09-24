@@ -454,13 +454,13 @@ $$
 
 The axis doesn't move - exactly what a rotation around that axis should do.
 
-**Perpendicular part.** Here $\mathbf{u} \cdot \mathbf{v}_{\perp} = 0$, and swapping the order of a cross product flips its sign. Plugging this into the Step 1 rule shows that $\mathbf{u}$ and $\mathbf{v}_{\perp}$ **anticommute**:
+**Perpendicular part.** Here $`\mathbf{u} \cdot \mathbf{v}_{\perp} = 0`$, and swapping the order of a cross product flips its sign. Plugging this into the Step 1 rule shows that $`\mathbf{u}$ and $\mathbf{v}_{\perp}`$ **anticommute**:
 
 $$
 \mathbf{u} \otimes \mathbf{v}_{\perp} = -\,\mathbf{v}_{\perp} \otimes \mathbf{u}
 $$
 
-That sign flip lets $q^{\ast}$ move across $\mathbf{v}_{\perp}$, turning into $q$ on the way:
+That sign flip lets $q^{\ast}$ move across $`\mathbf{v}_{\perp}`$, turning into $q$ on the way:
 
 $$
 \mathbf{v}_{\perp} \otimes q^{\ast} = q \otimes \mathbf{v}_{\perp}
@@ -474,13 +474,13 @@ $$
 q \otimes q = \left(\cos\theta,\ \mathbf{u}\sin\theta\right)
 $$
 
-Multiplying that into $\mathbf{v}_{\perp}$ with the Step 1 rule (the dot product vanishes because $\mathbf{u} \perp \mathbf{v}_{\perp}$) gives:
+Multiplying that into $`\mathbf{v}_{\perp}`$ with the Step 1 rule (the dot product vanishes because $`\mathbf{u} \perp \mathbf{v}_{\perp}`$) gives:
 
 $$
 q \otimes \mathbf{v}_{\perp} \otimes q^{\ast} = \cos\theta\,\mathbf{v}_{\perp} + \sin\theta\,(\mathbf{u} \times \mathbf{v}_{\perp})
 $$
 
-That is $\mathbf{v}_{\perp}$ rotated by $\theta$ within the plane perpendicular to $\mathbf{u}$: $\mathbf{v}_{\perp}$ and $\mathbf{u} \times \mathbf{v}_{\perp}$ are perpendicular and the same length, so they act like the $x$ and $y$ axes of that plane.
+That is, $`\mathbf{v}_{\perp}`$ rotated by $\theta$ within the plane perpendicular to $`\mathbf{u}`$: $`\mathbf{v}_{\perp}`$ and $`\mathbf{u} \times \mathbf{v}_{\perp}`$ are perpendicular and the same length, so they act like the $x$ and $y$ axes of that plane.
 
 Putting both parts together:
 
@@ -502,7 +502,7 @@ $$
 
 Two rotations in a row are the single rotation $p \otimes q$. That's why "quaternion multiplication = apply one rotation after another" works. Note that the **rightmost** quaternion acts first, just like the rightmost matrix in $R_k \Delta R$.
 
-**$q$ and $-q$ (Section 10).** Flip the sign of $q$ and the sign appears twice in the sandwich, so it cancels:
+**$q$ and $-q$ (Section 10).** Flip the sign of $q$, and the sign appears twice in the sandwich, so it cancels:
 
 $$
 (-q) \otimes \mathbf{v} \otimes (-q)^{\ast} = q \otimes \mathbf{v} \otimes q^{\ast}
