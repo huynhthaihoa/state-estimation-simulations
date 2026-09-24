@@ -12,7 +12,7 @@ This builds directly on:
 
 ## 1. The bootstrapping problem
 
-Every other doc in this repo assumes a decent initial guess already exists: `pose_graph.py`'s optimizer starts from dead-reckoning, `bundle_adjustment_advanced.py`'s GN starts from a triangulated point, `pnp_estimation.py`'s GN starts from a linear DLT solve ([triangulation_pnp.md](triangulation_pnp.md)). Visual-inertial initialization is the one place in this doc set where *no* such starting point exists yet, and three specific unknowns have to be pinned down before anything else can proceed:
+Every other doc in this repo assumes a decent initial guess already exists: `pose_graph.py`'s optimizer starts from [dead-reckoning](../optimization/factor_graph.md#2-why-do-we-need-it), `bundle_adjustment_advanced.py`'s GN starts from a triangulated point, `pnp_estimation.py`'s GN starts from a linear DLT solve ([triangulation_pnp.md](triangulation_pnp.md)). Visual-inertial initialization is the one place in this doc set where *no* such starting point exists yet, and three specific unknowns have to be pinned down before anything else can proceed:
 
 - **Scale**: a single monocular camera can recover structure and motion only up to an unknown positive scale factor - "this camera moved some distance $d$" could mean 1 meter or 100, and vision alone can never tell you which.
 - **Gravity direction**: preintegration's $\Delta v$ accumulates the effect of true acceleration *and* gravity together; separating them requires knowing which way gravity points in whatever frame the estimator is working in.
