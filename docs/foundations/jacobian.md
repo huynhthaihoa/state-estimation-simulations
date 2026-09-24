@@ -407,7 +407,7 @@ $$J_l(\varphi) = I + \frac{1-\cos\theta}{\theta^2}[\varphi]_\times + \frac{\thet
 
 $$J_r(\varphi) = I - \frac{1-\cos\theta}{\theta^2}[\varphi]_\times + \frac{\theta-\sin\theta}{\theta^3}[\varphi]_\times^2$$
 
-Useful identities (all follow from $[\varphi]_\times^2$ being symmetric and $[\varphi]_\times$ being antisymmetric):
+Useful identities (all follow from $`[\varphi]_\times^2`$ being symmetric and $`[\varphi]_\times`$ being antisymmetric):
 
 $$J_r(\varphi) = J_l(-\varphi) \qquad J_r(\varphi) = J_l(\varphi)^\top \qquad J_l(\varphi) = R(\varphi)\,J_r(\varphi)$$
 
@@ -428,7 +428,7 @@ Notice $J_r = J_l^\top$, exactly as the identity predicts. If you instead plug i
 ### 11.6 Where this actually matters
 
 * **IMU preintegration**: the effect of a small change in gyroscope bias is naturally expressed in the sensor's own (body) frame, so bias-correction Jacobians in preintegration use $J_r$ - worked out end-to-end in [imu_preintegration.md](../optimization/imu_preintegration.md).
-* **Covariance/uncertainty propagation on the manifold**: a rotation's uncertainty is stored as a covariance on the tangent vector $\delta\varphi$, but whether that $\delta\varphi$ is defined via $R\,\text{Exp}(\delta\varphi)$ (right) or $\text{Exp}(\delta\varphi)\, R$ (left) changes what the covariance numerically means. Converting between the two conventions is exactly a multiplication by $R$ itself (the adjoint) - as the identity two lines up shows, $J_l = R\,J_r$ - a change of frame, not a change of the underlying uncertainty.
+* **Covariance/uncertainty propagation on the manifold**: a rotation's uncertainty is stored as a covariance on the tangent vector $\delta\varphi$, but whether that $\delta\varphi$ is defined via $R\,\text{Exp}(\delta\varphi)$ (right) or $\text{Exp}(\delta\varphi)\, R$ (left) changes what the covariance numerically means. Converting between the two conventions is exactly a multiplication by $R$ itself (the adjoint) - as the identity two lines up shows, $J_l = R\, J_r$ - a change of frame, not a change of the underlying uncertainty.
 * **Factor graphs/bundle adjustment on $SE(3)$**: residual Jacobians w.r.t. a pose depend on which perturbation convention (left vs. right) the library uses; using the wrong one silently biases the optimization even though the code runs without error.
 
 ### 11.7 One-sentence intuition
@@ -439,4 +439,4 @@ Notice $J_r = J_l^\top$, exactly as the identity predicts. If you instead plug i
 
 ## 12. References
 
-1. Solà, J., Deray, J., & Atchuthan, D. (2018). *A micro Lie theory for state estimation in robotics*. arXiv:1812.01537. https://doi.org/10.48550/arXiv.1812.01537 - the standard modern reference for $J_l$ / $J_r$ and the left/right perturbation conventions behind §11, written by (among others) the author of the `manif` library this repo's `use_manif/` scripts are built on.
+1. Solà, J., Deray, J., & Atchuthan, D. (2018). *A micro Lie theory for state estimation in robotics*. arXiv:1812.01537. https://doi.org/10.48550/arXiv.1812.01537 - the standard modern reference for $J_l$ / $J_r$ and the left/right perturbation conventions behind §11, written by (among others) the author of the `manif` library that this repo's `use_manif/` scripts are built on.
