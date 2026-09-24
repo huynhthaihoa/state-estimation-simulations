@@ -10,7 +10,7 @@ Suppose a robot moves through a room:
 
 **$t_0 \to t_1 \to t_2 \to t_3 \to t_4$**
 
-At every time, it gets:
+At every time step, it gets:
 
 * IMU measurements
 * camera/LiDAR observations
@@ -338,9 +338,9 @@ This gives us a useful trade-off:
 | Memory             | Lower                          | Higher                                     |
 | Online operation   | Excellent                      | Possible, but needs management             |
 | Global consistency | Harder                         | Stronger                                   |
-| Typical idea       | EKF-SLAM                       | Pose graph / factor graph / BA             |
+| Typical idea       | EKF-SLAM                       | Pose graph/factor graph / BA             |
 
-**A caveat worth remembering**: "filtering is cheaper, optimization is more expensive" is the right intuition for small, fixed-size problems, but it inverts at scale. EKF-style filtering maintains a *dense* joint covariance over the state, so each update costs roughly $O(n^2)$ in the number of landmarks/poses (Dissanayake et al., 2001), with no way around it - every update touches the whole dense matrix, every time. Sparse factor-graph smoothing exploits the sparsity of the underlying graph instead, so incremental solvers like iSAM2 update *most* new odometry-only measurements cheaply, touching only a small, roughly constant-size affected region of the Bayes tree (Kaess et al., 2012) - but there's no universal $O(1)$-$O(\log n)$ *amortized* bound backing that up the way there is for, say, a balanced-tree data structure: a single loop-closure edge can force re-elimination of a large fraction of the tree in the worst case, exactly the same as EKF-style filtering's every-update cost, not a bounded fraction of it. This repo's own [`bayes_tree_construction.py`](../use_numpy/bayes_tree_construction.py) demonstrates this directly - one loop-closure edge on its 16-node square-loop topology invalidates all 16 of 16 nodes, not a small affected subtree (see [`bayes_tree.md` §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo)). So the real, defensible claim is narrower than a clean complexity bound: *most* updates in a typical SLAM graph (which is mostly odometry, occasionally punctuated by loop closures) are cheap under iSAM2, and that's still the actual reason large-scale SLAM systems moved from EKF-SLAM toward factor-graph smoothing - dense filtering's $O(n^2)$-*every*-update cost has no equivalent "usually cheap" case to lean on the way sparse smoothing does.
+**A caveat worth remembering**: "filtering is cheaper, optimization is more expensive" is the right intuition for small, fixed-size problems, but it inverts at scale. EKF-style filtering maintains a *dense* joint covariance over the state, so each update costs roughly $O(n^2)$ in the number of landmarks/poses (Dissanayake et al., 2001), with no way around it - every update touches the whole dense matrix, every time. Sparse factor-graph smoothing exploits the sparsity of the underlying graph instead, so incremental solvers like iSAM2 update *most* new odometry-only measurements cheaply, touching only a small, roughly constant-size affected region of the Bayes tree (Kaess et al., 2012) - but there's no universal $O(1)$ - $O(\log n)$ *amortized* bound backing that up the way there is for, say, a balanced-tree data structure: a single loop-closure edge can force re-elimination of a large fraction of the tree in the worst case, exactly the same as EKF-style filtering's every-update cost, not a bounded fraction of it. This repo's own [`bayes_tree_construction.py`](../use_numpy/bayes_tree_construction.py) demonstrates this directly - one loop-closure edge on its 16-node square-loop topology invalidates all 16 of 16 nodes, not a small affected subtree (see [`bayes_tree.md` §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo)). So the real, defensible claim is narrower than a clean complexity bound: *most* updates in a typical SLAM graph (which is mostly odometry, occasionally punctuated by loop closures) are cheap under iSAM2, and that's still the actual reason large-scale SLAM systems moved from EKF-SLAM toward factor-graph smoothing - dense filtering's $O(n^2)$-*every*-update cost has no equivalent "usually cheap" case to lean on the way sparse smoothing does.
 
 ---
 
@@ -366,7 +366,7 @@ A factor graph has **(at least) three kinds of factors**:
 x₀ ● ── x₁ ● ── x₂ ● ── x₃ ●
 ```
 
-- A **unary (prior) factor** constrains a single pose directly, with no other variable involved - typically used to anchor gauge freedom (e.g. fixing $x_0$ to break the "the whole solution can shift/rotate/rescale together" ambiguity, exactly what this repo's own `pose_graph.py` and `bundle_adjustment.py`/`bundle_adjustment_advanced.py` do) or to inject an absolute measurement like GPS:
+- A **unary (prior) factor** constrains a single pose directly, with no other variable involved - typically used to anchor gauge freedom (e.g., fixing $x_0$ to break the "the whole solution can shift/rotate/rescale together" ambiguity, exactly what this repo's own `pose_graph.py` and `bundle_adjustment.py`/`bundle_adjustment_advanced.py` do) or to inject an absolute measurement like GPS:
 
 ```text
 prior
@@ -500,7 +500,7 @@ normal motion
      ↓
 contact
      ↓
-jump / climb / discrete transition
+jump/climb/discrete transition
      ↓
 new contact
      ↓
