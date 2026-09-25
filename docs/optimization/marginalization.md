@@ -65,6 +65,8 @@ $$
 \Lambda_b' = \Lambda_{bb} - \Lambda_{ba}\Lambda_{aa}^{-1}\Lambda_{ab}, \qquad \eta_b' = \eta_b - \Lambda_{ba}\Lambda_{aa}^{-1}\eta_a
 $$
 
+One precision point: here $\Lambda$ and $\eta$ are built only from the factors that touch $x_a$. Factors among the $x_b$ variables alone stay in the graph unchanged, so if their contribution to $\Lambda_{bb}$ were also folded into the prior, it would be counted twice. §8.1 shows how the script does this.
+
 $(\Lambda_b', \eta_b')$ is a brand-new **prior factor** over exactly the variables $x_a$ used to connect to - nothing else. It gets inserted into the graph like any other factor:
 
 ```text
@@ -142,11 +144,61 @@ This is precisely what `filtering_smoothing.md §10`'s "fixed-lag smoothing" box
 
 ## 8. What this repo implements
 
-[`sliding_window_marginalization.py`](../../use_numpy/sliding_window_marginalization.py) implements exactly the follow-up this section used to say was missing: it streams a chain of odometry edges one node at a time, keeps at most `window_size` poses live in memory, and marginalizes the oldest one out via §4's Schur complement whenever a new node would exceed that. The marginal is represented as a genuine prior factor - a frozen reference pose plus an information matrix, re-linearized against the *current* estimate every solve, exactly like an ordinary edge - rather than a frozen linear term, which is the only representation that stays correct as the surviving poses keep moving across later windows.
+[`sliding_window_marginalization.py`](../../use_numpy/sliding_window_marginalization.py) implements exactly the follow-up this section used to say was missing: it streams a chain of odometry edges one node at a time, keeps at most `window_size` poses live in memory, and marginalizes the oldest one out via §4's Schur complement whenever a new node would exceed that. The marginal is represented as a genuine prior factor - a frozen reference pose plus an information matrix, re-linearized against the *current* estimate every solve, exactly like an ordinary edge - rather than a frozen linear term, which is the only representation that stays correct as the surviving poses keep moving across later windows. That representation keeps §4's $\Lambda_b'$ as the prior's information matrix, but it does not store $\eta_b'$. Instead, the prior is anchored at a frozen reference pose, so its linear term is zero at the moment it is created. That is exact only when $\eta_b' = 0$, and it is here: see §8.1.
 
 Two deliberate scope choices, both flagged directly in the script:
 - **Pure odometry chain, no loop closures.** The oldest pose in a chain window is connected to exactly one surviving neighbor, so marginalizing it produces a *provably unary* prior - verified directly by a test that checks the Schur-complement correction term is exactly zero everywhere outside that one block. §5's fill-in problem (a real cost once a marginalized node had *multiple* neighbors - a landmark, an IMU-bias variable, or a loop closure) is a genuinely different problem, already covered by [`bayes_tree.md`](bayes_tree.md)/[`isam2_optimization.md`](isam2_optimization.md) and by `pose_graph_incremental.py`'s own loop-closure handling; this script isolates the memory-*bounding* property alone.
 - **No First-Estimate Jacobians (§6).** Every pose's Jacobian, including the prior factor's own, is re-evaluated at its newest estimate on every solve - the textbook source of the mild overconfidence FEJ exists to fix. Not implemented here, the same way `pose_graph_incremental.py` explicitly flags what it doesn't implement relative to iSAM2.
+
+### 8.1 The math, concretely
+
+Poses $X_k$ are $4 \times 4$ SE(3) matrices, and tangent vectors follow the repo's `[vx, vy, vz, wx, wy, wz]` order. Every window is solved by plain Gauss-Newton over two factor types. Both are linearized at the current estimate on every iteration, and there are no First-Estimate Jacobians.
+
+**Odometry edge** (`linearize_edge`, reused from `pose_graph_incremental.py`). Here $\mathcal{J}_r^{-1}$ is the inverse right Jacobian of SE(3) (`compute_se3_inv_right_jacobian`) and $\mathrm{Ad}$ is the adjoint:
+
+$$
+e_{ij} = \mathrm{Log}\big((X_i Z_{ij})^{-1} X_j\big), \qquad
+J_j = \mathcal{J}_r^{-1}(e_{ij}), \qquad
+J_i = -\mathcal{J}_r^{-1}(-e_{ij})\,\mathrm{Ad}(Z_{ij}^{-1})
+$$
+
+**Prior on the oldest window pose** (`assemble_window_system`). $X_{\text{ref}}$ is a frozen reference pose and $\Omega_p$ is the prior's information matrix:
+
+$$
+e_p = \mathrm{Log}(X_{\text{ref}}^{-1} X_0), \qquad J_p = \mathcal{J}_r^{-1}(e_p)
+$$
+
+The first prior is the gauge anchor, with $X_{\text{ref}}$ equal to the ground-truth first pose and $\Omega_p = 10^6 I$ (`--anchor-weight`). Every later prior comes from marginalization (below).
+
+**Gauss-Newton step** (`assemble_window_system`, `solve_to_convergence`). Each edge uses the information matrix $\Omega = I_6$. The script accumulates
+
+$$
+H = \sum J^\top \Omega\, J, \qquad g = -\sum J^\top \Omega\, e, \qquad H\delta = g, \qquad X_k \leftarrow X_k \exp(\delta_k)
+$$
+
+It stops when $\lVert\delta\rVert$ < `gn_tol` ($10^{-6}$) or after `gn_max_iters` (10) iterations. With $W$ poses in the window, $H$ is $6W \times 6W$.
+
+**Marginalizing the oldest pose** (`marginalize_oldest`). The window has already converged. Let $a$ be the oldest pose, `x_window[0]`, and $b$ the next one, `x_window[1]`. In a pure chain, $a$ touches exactly two factors: its prior and the single a–b edge. The script asserts that there is exactly one such edge. It takes $\Lambda_{aa}$, $\Lambda_{ab}$ and $\Lambda_{ba}$ from the full window $H$; those blocks only ever involve factors touching $a$. It builds $\Lambda_{bb}^{(ab)}$ from a separate system containing only the a–b edge:
+
+$$
+\Omega_p' = \Lambda_{bb}^{(ab)} - \Lambda_{ba}\Lambda_{aa}^{-1}\Lambda_{ab}, \qquad X_{\text{ref}}' = X_b \text{ (current estimate, frozen)}
+$$
+
+Taking $\Lambda_{bb}$ from the full $H$ instead would also include the b–c edge. That edge stays in the window, so it would be counted twice. $\Omega_p'$ equals §4's Schur complement of the system built from $a$'s prior plus the a–b edge.
+
+**Why storing no $\eta_b'$ is exact here.** Because $X_{\text{ref}}' = X_b$, the new prior's residual is zero when it is created, so its linear term is zero too. §4's $\eta_b'$ really is zero in this setting. The chain has a single anchor and no loop closures, so every factor can be satisfied exactly. Each new pose also starts at $X_{\text{last}} Z_{ij}$, which already zeroes its edge residual. So at the optimum, every residual, and therefore every gradient term, is zero. This depends on the pure-chain scope. With a loop closure or a shared landmark, residuals would not vanish, and dropping $\eta_b'$ would lose information.
+
+**Ordering** (`run_sliding_window_pose_graph`). For each new node, the script:
+
+1. Marginalizes the oldest pose first, if the window already holds `window_size` poses, using the linearization point from the previous solve.
+2. Appends the new pose, initialized as $X_{\text{last}} Z_{ij}$, together with its edge.
+3. Solves the window to convergence.
+
+The solve therefore never exceeds `window_size` poses, so `max_dof` is capped at 6 × `window_size`. A marginalized pose keeps the estimate it had when it was dropped.
+
+**Baseline** (`run_full_batch_growing`). For $k = 1 \dots n$, the baseline re-solves the whole graph of the first $k$ poses from scratch. It uses `pose_graph.run_pose_graph_optimization` with `damping=0.0`, starting from dead reckoning from the first ground-truth pose, with node 0 anchored by $10^6 I$ inside that function. Its `max_dof` is $6n$.
+
+**Defaults:** `--window-size 10`; `--nodes-per-side-sweep 2 4 8 16 32 64` (8 to 256 poses); `--side-length 2.0` m; `--pos-noise-std 0.05` m; `--rot-noise-std 0.01` rad; `--anchor-weight 1e6`; `--gn-tol 1e-6`; `--gn-max-iters 10`; `--seed 0`.
 
 ## 9. Empirical verification: bounded vs. unbounded, for real
 
@@ -161,7 +213,7 @@ Two deliberate scope choices, both flagged directly in the script:
 | 128 | 768 | 4,718,592 | 60 | 28,800 |
 | 256 | 1536 | 18,874,368 | 60 | 28,800 |
 
-Full-batch's system size grows linearly with trajectory length (so its dense-matrix memory grows *quadratically* - visible directly in the table, roughly $4\times$ per doubling of length) and never stops; sliding-window's caps at exactly $`6 \times \text{window\_size}`$ the moment the window first fills, and never moves again, confirmed identically across multiple seeds (`max_dof` depends only on trajectory length and `window_size`, not on the noise realization). Average per-step wall-clock time tells the same story less starkly (full-batch: $1.5\,\text{ms} \to 61\,\text{ms}$ as length grows $8 \to 256$; sliding-window: $1.6\,\text{ms} \to 7.0\,\text{ms}$, most of that rise happening only *before* the window first fills - once trajectories exceed `window_size`, its per-step time is nearly flat).
+Full-batch's system size grows linearly with trajectory length (so its dense-matrix memory grows *quadratically* - visible directly in the table, roughly $4\times$ per doubling of length) and never stops; sliding-window's caps at exactly $`6 \times \text{window\_size}`$ the moment the window first fills, and never moves again, confirmed identically across multiple seeds (`max_dof` depends only on trajectory length and `window_size`, not on the noise realization). Average per-step wall-clock time tells the same story less starkly, and its absolute values depend on the machine and its load. One run gave full-batch 1.5 ms → 61 ms as length grows 8 → 256, and sliding-window 1.6 ms → 7.0 ms. A later run on a different machine state gave full-batch 2.4 ms → 317 ms and sliding-window 0.78 ms → 3.8 ms. In both runs, sliding-window time flattens once trajectories exceed `window_size`, while full-batch time keeps growing. Only the `max_dof` column above is deterministic.
 
 **Accuracy is not sacrificed to get this bound - but the reason why is specific to this setup, not a general property of marginalization.** Final RMS position error is *identical* (to displayed precision, every trajectory length, every seed tried) between full-batch and sliding-window. This isn't a coincidence and isn't the general case: with no loop closures anywhere in this chain, no future edge ever reaches back to inform an already-marginalized pose, so there is nothing later solving could have taught an earlier pose that marginalization threw away - the two approaches are solving genuinely equivalent problems. This is exactly why §6's FEJ subtlety matters in general and is silent here: FEJ protects against *inconsistency* that only shows up once a later loop closure or shared landmark reconnects to something already marginalized, which this script's pure-chain scope never triggers. A loop-closure-carrying version of this same script would be expected to show both §5's fill-in cost and a real (if likely small) accuracy gap from skipping FEJ - a natural further extension, not implemented here.
 

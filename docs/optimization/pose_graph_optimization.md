@@ -622,7 +622,7 @@ $$
 J_i = \frac{\partial r_{ij}}{\partial \pmb{\xi}_i}
 $$
 
-and ${J_j = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_j}}$ are derived using the **Right Inverse Baker-Campbell-Hausdorff (BCH) approximation**:
+and ${J_j = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_j}}$ are the exact right Jacobians of $\mathrm{Log}$. They are not a truncated approximation. `use_numpy/` computes ${J_r^{-1}}$ as the matrix inverse of a series (see [§15.7](#157-the-solver-concretely)), and `use_manif/` uses manif's closed-form Jacobians. For small residuals the two agree to machine precision. The series' truncation error grows with the residual's size, and is about $10^{-12}$ at a 1.6 rad rotation:
 
 $${J_j = J_r^{-1}(r_{ij})}$$
 
@@ -656,11 +656,17 @@ Each pass is just row-by-row substitution — no matrix inversion needed.
 
 **Why "sparse" matters:** most pose pairs never share a constraint, so most of $H$'s off-diagonal blocks are exactly zero. Sparse Cholesky exploits that known zero pattern instead of doing dense arithmetic on entries it already knows are zero. One subtlety: eliminating a variable can turn some of those zeros into nonzeros — called **fill-in**. For example, eliminating $x_2$ out of a chain $x_1 - x_2 - x_3$ creates a new dependency between $x_1$ and $x_3$ even though they were never directly measured. Which order variables are eliminated in controls how much fill-in accumulates; see [`elimination_tree.md`](elimination_tree.md) for a worked elimination example, and [`isam2_optimization.md` §7](isam2_optimization.md#7-bayes-tree--the-most-important-intuition) for why iSAM2 cares about this at all.
 
-In practice a pure Gauss-Newton step can overshoot or diverge far from the solution, so a **Levenberg-Marquardt** damping term $\lambda$ is added to the Hessian's diagonal before solving:
+In practice a pure Gauss-Newton step can overshoot or diverge far from the solution, so a **Levenberg-Marquardt** damping term $\lambda$ is added to the Hessian's diagonal before solving. Both `pose_graph.py` implementations (`use_numpy/` and `use_manif/`) use the Marquardt-scaled form, which scales $\lambda$ by $H$'s own diagonal instead of adding $\lambda I$:
 
-$${(H + \lambda I) \, \boldsymbol{\delta}^* = -b}$$
+$${\big(H + \lambda \, \mathrm{diag}(H)\big) \, \boldsymbol{\delta}^* = -b}$$
 
-Larger $\lambda$ shrinks the step toward gradient descent (safer, slower) while ${\lambda \to 0}$ recovers pure Gauss-Newton (faster near convergence). Both `pose_graph.py` implementations (`use_numpy/` and `use_manif/`) use this damped form with a fixed `damping` coefficient (`H += np.eye(dof) * damping`) rather than pure, undamped Gauss-Newton.
+Larger $\lambda$ shrinks the step toward (diagonally scaled) gradient descent: safer, but slower. ${\lambda \to 0}$ recovers pure Gauss-Newton, which is faster near convergence. In both scripts $\lambda$ is **adaptive**, not fixed, and the two implementations are identical here:
+
+1. Entries of $\mathrm{diag}(H)$ below $10^{-12}$ are clamped to $10^{-12}$.
+2. A trial step is accepted only if it lowers the total cost $F$. On acceptance, $\lambda \leftarrow \max(0.5\lambda,\ 10^{-7})$.
+3. On rejection, $\lambda \leftarrow \max(2\lambda,\ 10^{-6})$ and the solve is retried. Each iteration tries at most 10 values of $\lambda$ in total. If all 10 are rejected, the solver stops.
+
+`--damping` (default 0.01) is only the starting $\lambda$.
 
 ### 15.6 Retraction / State Update
 
@@ -668,7 +674,61 @@ Once the increment vector ${\boldsymbol{\delta}^*}$ is computed, the system upda
 
 $${T_i^{(k+1)} = T_i^{(k)} \cdot \mathrm{Exp}\left(\boldsymbol{\xi}_i^*\right), \quad \forall i \in \{1, \dots, N\}}$$
 
-This iteration repeats until convergence (${\Vert{}\boldsymbol{\delta}^*\Vert{} < \epsilon}$ or ${\Vert{}\Delta F\Vert{} < \epsilon}$).
+This iteration repeats until the accepted step is small, ${\Vert{}\boldsymbol{\delta}^*\Vert{} < \epsilon}$ (`--gn-tol`, default $10^{-6}$). It also stops after `--gn-max-iters` accepted iterations (default 10), or when every damping retry is rejected. The scripts have no separate test on the change in cost ${\Delta F}$.
+
+### 15.7 The solver, concretely
+
+The whole solver is `run_pose_graph_optimization` in [`use_numpy/pose_graph.py`](../../use_numpy/pose_graph.py). It works on $4 \times 4$ pose matrices $X_k$. Tangent vectors are ordered translation first, $`\boldsymbol{\xi} = [\mathbf{v}^\top \;\; \boldsymbol{\omega}^\top]^\top`$, the same order as §15.4's $`[\boldsymbol{\rho}^\top \;\; \boldsymbol{\phi}^\top]^\top`$. The code numbers nodes from 0, while §15.1 numbers them from 1. Below, $X$ is §15's $T$ and $Z_{ij}$ is §15's ${\tilde{T}_{ij}}$.
+
+**Measurements** (`simulate_noisy_edges`): each edge is the true relative pose with right-multiplied noise. The loop-closure edge scales both std-devs by `--loop-noise-scale` (default 0.5):
+
+$$Z_{ij} = \left(X_i^{\text{true}}\right)^{-1} X_j^{\text{true}} \, \mathrm{Exp}(\mathbf{n}), \qquad \mathbf{n} \sim \mathcal{N}\!\left(\mathbf{0},\ \mathrm{diag}(\sigma_p^2 I_3,\ \sigma_r^2 I_3)\right)$$
+
+The defaults are ${\sigma_p = 0.05}$ m (`--pos-noise-std`) and ${\sigma_r = 0.01}$ rad (`--rot-noise-std`). The initial guess is the dead-reckoned chain $X_{k+1} = X_k Z_{k,k+1}$ (`run_dead_reckoning`), which never uses the loop-closure edge.
+
+**Residual** (the edge loop and `cost`): the code first predicts node $j$ from node $i$, then compares:
+
+$$\hat{X}_j = X_i Z_{ij}, \qquad e_{ij} = \mathrm{Log}\big(\hat{X}_j^{-1} X_j\big) = \mathrm{Log}\big(Z_{ij}^{-1} X_i^{-1} X_j\big)$$
+
+This is §15.2's $r_{ij}$. In code, $\hat{X}_j$ is `T_pred`.
+
+**Jacobians** (the edge loop): the chain rule through `T_pred`, with right perturbations $`X \leftarrow X \, \mathrm{Exp}(\boldsymbol{\xi})`$:
+
+$$J_c = \mathrm{Ad}\big(Z_{ij}^{-1}\big), \qquad J_a = J_r^{-1}(e_{ij}), \qquad J_b = -J_r^{-1}(-e_{ij})$$
+
+$$J_i = J_b \, J_c, \qquad J_j = J_a$$
+
+These are `Jc_self` ($\partial \hat{X}_j / \partial X_i$), `Ja` ($\partial e_{ij} / \partial X_j$) and `Jb` ($\partial e_{ij} / \partial \hat{X}_j$). `use_manif/` gets the same three matrices from `Xi.compose(Z_ij, Jc_self)` and `Xj.rminus(T_pred, Ja, Jb)`. The product equals §15.4's closed form:
+
+$$-J_r^{-1}(-e_{ij}) \, \mathrm{Ad}\big(Z_{ij}^{-1}\big) = -J_r^{-1}(e_{ij}) \, \mathrm{Ad}\big(X_j^{-1} X_i\big)$$
+
+This holds because $`J_r(-e) = J_l(e) = \mathrm{Ad}(\mathrm{Exp}(e)) \, J_r(e)`$ and ${\mathrm{Exp}(e_{ij})^{-1} = X_j^{-1} X_i Z_{ij}}$.
+
+**Right Jacobian** (`se3_right_jacobian`, `compute_se3_inv_right_jacobian` in `use_numpy/lie_utils.py`): an 18-term series in the little adjoint (`se3_ad`), then a plain matrix inverse:
+
+$$J_r(\boldsymbol{\xi}) = \sum_{n=0}^{17} \frac{\left(-\mathrm{ad}_{\boldsymbol{\xi}}\right)^n}{(n+1)!}, \qquad \mathrm{ad}_{\boldsymbol{\xi}} = \begin{bmatrix} \boldsymbol{\omega}^\wedge & \mathbf{v}^\wedge \\ 
+\mathbf{0} & \boldsymbol{\omega}^\wedge \end{bmatrix}, \qquad J_r^{-1} = \big(J_r\big)^{-1}$$
+
+The series needs no small-angle branch. `se3_adjoint` builds $\mathrm{Ad}$ exactly as in §15.4.
+
+**Assembly** (the edge loop): each edge adds four blocks to $H$ and two to $g$, with $\Omega$ = `info_matrix`:
+
+$$H_{ii} \mathrel{+}= J_i^\top \Omega J_i, \quad H_{jj} \mathrel{+}= J_j^\top \Omega J_j, \quad H_{ij} \mathrel{+}= J_i^\top \Omega J_j, \quad H_{ji} \mathrel{+}= J_j^\top \Omega J_i$$
+
+$$g_i \mathrel{-}= J_i^\top \Omega \, e_{ij}, \qquad g_j \mathrel{-}= J_j^\top \Omega \, e_{ij}$$
+
+So $g = -b$ in §15.5's notation, and the code solves $`(H + \lambda \, \mathrm{diag}(H)) \boldsymbol{\delta} = g`$. `main` sets $\Omega = I_6$ for every edge, including the loop closure.
+
+**Anchor** (gauge fix): before the edges are added, ${H_{00} \mathrel{+}= 10^6 I_6}$, and nothing is added to $g$. This is a prior that pulls node 0's step ${\boldsymbol{\delta}_0}$ toward zero. It is centered on node 0's current estimate, not on a fixed pose. Two side effects are easy to miss:
+
+- The anchor is not part of `cost`, so the accept/reject test ignores it.
+- Because it sits in $\mathrm{diag}(H)$, the Marquardt term damps node 0 far more than the other nodes.
+
+**Cost** (`cost`): $`F = \sum e_{ij}^\top \Omega \, e_{ij}`$, with no $\frac{1}{2}$ factor. It is the value printed as "total chi-squared error" and the value the accept test compares.
+
+**Retraction**: every node, node 0 included, is updated as $`X_k \leftarrow X_k \, \mathrm{Exp}(\boldsymbol{\delta}_k)`$ (`se3_exp`). `use_manif/` writes the same update as `T + manif.SE3Tangent(delta_k)`.
+
+**Defaults**: `--damping 0.01` (initial $\lambda$), `--gn-tol 1e-6`, `--gn-max-iters 10`, `--side-length 2.0`, one node per square corner (4 nodes, 3 odometry edges and 1 loop closure). With `--seed 0` the default run converges in 5 iterations.
 
 ---
 

@@ -470,6 +470,57 @@ And **iSAM2** takes this further by using a **Bayes tree** to efficiently identi
 
 [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`) implements exactly §3's mechanism: new odometry edges are absorbed into a running square-root-information matrix via Givens-rotation row insertion (`qr_insert_row` in `utils.py`) instead of rebuilding the linear system from scratch, contrasted directly against a batch baseline that re-solves everything at every new node - reproducing §1/§8's batch-vs-incremental comparison and §6/§9's "loop closure needs a wide update" point empirically (the script always triggers a full relinearization on the loop-closure edge, plus periodically otherwise). **It does not implement §7's Bayes tree, nor any variable reordering at all** - but only the Bayes tree is genuinely iSAM2-specific. Variable reordering (via COLAMD) to bound fill-in is already part of *original* iSAM (Kaess et al. 2008, periodic batch reordering during full relinearization) - what iSAM2 actually adds on top is making that reordering *incremental/fluid* (reordering only as needed, tied to the Bayes tree) instead of a periodic full pass. This script skips variable reordering of either kind - a real simplification relative to even the 2008 original, not just relative to iSAM2. For the Bayes tree itself, see [`bayes_tree.md`](bayes_tree.md); for the full iSAM2 algorithm this repo doesn't implement, see [`isam2_optimization.md`](isam2_optimization.md).
 
+### 14.1 The incremental math, concretely
+
+The script solves the same pose graph as `pose_graph.py`. `linearize_edge` returns that script's residual ${e_{ij} = \mathrm{Log}(Z_{ij}^{-1} X_i^{-1} X_j)}$ and Jacobians $J_i$, $J_j$ (see [pose_graph_optimization.md §15.7](pose_graph_optimization.md#157-the-solver-concretely)). The difference is how the linear system is stored and updated. Instead of $H$ and $g$, the script keeps an upper-triangular square-root-information matrix $R$ and a right-hand side $d$. The step is always ${\boldsymbol{\delta} = R^{-1} d}$, computed by back substitution (`solve_triangular`).
+
+**Whitened rows** (`edge_whitened_block`): each edge becomes 6 rows of a least-squares system ${A \boldsymbol{\delta} \approx b}$. With $S$ the upper-triangular square root of the edge information matrix $\Omega$ (`sqrt_info`):
+
+$$S = \mathrm{chol}(\Omega)^\top, \quad S^\top S = \Omega, \qquad A_{ij} = S \begin{bmatrix} \cdots & J_i & \cdots & J_j & \cdots \end{bmatrix}, \qquad b_{ij} = -S \, e_{ij}$$
+
+Then $`\lVert A_{ij}\boldsymbol{\delta} - b_{ij} \rVert^2 = (e_{ij} + J\boldsymbol{\delta})^\top \Omega \, (e_{ij} + J\boldsymbol{\delta})`$, the linearized edge cost. `main` sets $\Omega = I_6$, so $S = I_6$ in the default run.
+
+**Anchor rows** (`full_relinearize`): node 0 gets 6 extra rows $`\sqrt{w} \, I_6`$ with right-hand side 0, where $w$ = `--anchor-weight` (default $10^6$). These add ${w I_6}$ to node 0's block of ${A^\top A}$, which is the same gauge fix as `pose_graph.py`'s ${H_{00} \mathrel{+}= 10^6 I_6}$. Like that one, it pulls node 0's step toward zero around its current estimate.
+
+**Full rebuild** (`full_relinearize`): stack the anchor rows and every edge seen so far, all linearized at the current linearization point ${\bar{X}}$ (`x_lin`), then factorize once:
+
+$$A = QR \quad (\texttt{np.linalg.qr}), \qquad d = Q^\top b$$
+
+This gives ${R^\top R = A^\top A = H}$ and ${R^\top d = A^\top b = g}$, the same normal equations as `pose_graph.py` without damping.
+
+**Relinearization loop** (`relinearize_to_convergence`): plain Gauss-Newton on the QR system, with no Levenberg-Marquardt damping and no accept/reject test:
+
+$$\boldsymbol{\delta} = R^{-1} d, \qquad \bar{X}_k \leftarrow \bar{X}_k \, \mathrm{Exp}(\boldsymbol{\delta}_k), \qquad \text{rebuild } R, d \text{ at the new } \bar{X}$$
+
+It stops when ${\lVert \boldsymbol{\delta} \rVert <}$ `--gn-tol` (default $10^{-6}$), or after `--gn-max-iters` steps (default 10). $R$ and $d$ are rebuilt before each convergence check, so the returned $R$ and $d$ always belong to the returned ${\bar{X}}$.
+
+**Givens row insertion** (`qr_insert_row` in `utils.py`): this absorbs one new whitened row ${(\mathbf{a}, \beta)}$ into ${(R, d)}$ without refactorizing. For each column $c$ where ${\lvert a_c \rvert \ge 10^{-14}}$, a plane rotation mixes row $c$ of the system with the new row so that $a_c$ becomes 0:
+
+$$\rho = \sqrt{R_{cc}^2 + a_c^2}, \qquad \gamma = \frac{R_{cc}}{\rho}, \qquad \sigma = \frac{a_c}{\rho}$$
+
+$$\begin{bmatrix} R_{c,\,c:} & d_c \\ 
+\mathbf{a}_{c:} & \beta \end{bmatrix} \leftarrow \begin{bmatrix} \gamma & \sigma \\ 
+-\sigma & \gamma \end{bmatrix} \begin{bmatrix} R_{c,\,c:} & d_c \\ 
+\mathbf{a}_{c:} & \beta \end{bmatrix}$$
+
+Each rotation is orthogonal, so after the sweep ${R^\top R}$ has gained exactly ${\mathbf{a}\mathbf{a}^\top}$ and ${R^\top d}$ has gained $`\beta \, \mathbf{a}`$. $R$ stays upper triangular, and the leftover $\beta$ is discarded. Two details are easy to miss:
+
+- The rotation also works when $R_{cc} = 0$. Then $\gamma = 0$ and $\sigma = \pm 1$, so the rotation just swaps the new row into row $c$. This is what happens at a new node's still-empty diagonal block.
+- The docstring's "O(m)" is the cost of one rotation, not of one row. A row whose first nonzero is at column $c_0$ can trigger up to ${m - c_0}$ rotations, so the worst case is ${O(m^2)}$ per row. An odometry edge into node $k$ starts at ${c_0 = 6(k-1)}$, so each of its rows needs at most 12 rotations, each at most 12 columns wide, no matter how long the trajectory is. The loop still scans the leading zero columns, which is O(m) per row.
+
+**Streaming a new node** (`run_incremental_pose_graph`): for node $k$ with odometry edge ${Z_{k-1,k}}$:
+
+1. Dead-reckon its linearization point from the previous one: ${\bar{X}_k = \bar{X}_{k-1} Z_{k-1,k}}$.
+2. Pad $R$ and $d$ with 6 zero rows and columns.
+3. Insert the edge's 6 whitened rows one at a time with `qr_insert_row`.
+4. Read out the estimate (`read_out`): ${\boldsymbol{\delta} = R^{-1} d}$, then $`X_k = \bar{X}_k \, \mathrm{Exp}(\boldsymbol{\delta}_k)`$ for every node.
+
+Between rebuilds, the linearization points ${\bar{X}}$ of old nodes never move. Only $\boldsymbol{\delta}$ changes, so old rows keep the Jacobians they were built with.
+
+**Relinearization triggers**: a full `relinearize_to_convergence` runs once at the start (node 0 only), then whenever ${k \bmod r = 0}$ with $r$ = `--relinearize-every` (default 8), and at the last node when a loop-closure edge exists. It starts from the read-out estimate $X$, not from ${\bar{X}}$. The loop-closure edge is never inserted with Givens rotations. It enters $R$ only through that final full rebuild. The module docstring gives the reason: a loop closure affects many old poses, so it would touch nearly every column of $R$ anyway. Here the edge connects the last node to node 0, so a Givens sweep would start at column 0.
+
+**Defaults**: `--nodes-per-side 16` gives 64 nodes, which stream in as ${k = 1, \ldots, 63}$. That makes 9 full relinearizations: the initial one, 7 periodic ones (${k = 8, 16, \ldots, 56}$) and the loop-closure one at ${k = 63}$. The `run_batch_streaming` baseline instead runs `pose_graph.py`'s damped solver from scratch 63 times, starting at `--damping 0.01`. With `--seed 0`, both solvers finish at the same final pose error (0.0334 m). The `use_manif/` twin has the same flow, triggers and defaults. It retracts with `x_lin[k] + manif.SE3Tangent(delta_k)`.
+
 ---
 
 ## 15. References

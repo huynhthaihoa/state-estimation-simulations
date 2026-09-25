@@ -35,28 +35,32 @@ i.e., the least-squares best-fit similarity transform mapping the estimated poin
 
 This repo's implementation, [`umeyama_alignment`](../../utils.py) in `utils.py`, is the textbook closed-form solution end-to-end:
 
-1. **Center both point sets** on their own centroids:
-   $$\mu_{\text{est}} = \frac{1}{n}\sum x_i \qquad \mu_{\text{true}} = \frac{1}{n}\sum y_i \qquad X = x_i - \mu_{\text{est}} \qquad Y = y_i - \mu_{\text{true}}$$
-   Centering removes translation from the problem; it's handled separately in step 4.
+**Step 1. Center both point sets** on their own centroids, and stack the centered points as the rows of two $n\times3$ matrices $X$ and $Y$:
 
-2. **Cross-covariance and its SVD:**
-   $$\Sigma = \frac{1}{n} Y^\top X = U D V^\top$$
+$$\mu_{\text{est}} = \frac{1}{n}\sum x_i \qquad \mu_{\text{true}} = \frac{1}{n}\sum y_i \qquad X_i = x_i - \mu_{\text{est}} \qquad Y_i = y_i - \mu_{\text{true}}$$
 
-3. **Rotation, with a reflection guard:**
- 
+Centering removes translation from the problem; it's handled separately in step 4.
+
+**Step 2. Cross-covariance and its SVD:**
+
+$$\Sigma = \frac{1}{n} Y^\top X = U D V^\top$$
+
+**Step 3. Rotation, with a reflection guard:**
+
 $${R = U S V^\top}$$
-   
+
 $$
 S = \begin{cases} 
 I & \text{if } \det(U)\det(V^\top) \ge 0 \\ 
 \text{diag}(1,1,-1) & \text{if } \det(U)\det(V^\top) < 0 
 \end{cases}
 $$
-   
-Plain $UV^\top$ is the best-fit *orthogonal* matrix, but "orthogonal" includes reflections ($\det = -1$) as well as rotations ($\det = +1$). Since $R$ must be an actual rotation, $S$ flips the sign of the smallest-variance axis whenever the unconstrained best fit would have been a reflection - see the worked example in §4 for why this matters and what it costs.
 
-5. **Scale and translation:**
-   $$s = \frac{\text{tr}(DS)}{\text{var}(X)}, \qquad \text{var}(X) = \frac{1}{n}\sum \|X_i\|^2, \qquad t = \mu_{\text{true}} - s R \mu_{\text{est}}$$
+Plain $UV^\top$ is the best-fit *orthogonal* matrix, but "orthogonal" includes reflections ($\det = -1$) as well as rotations ($\det = +1$). Since $R$ must be an actual rotation, $S$ flips the sign of the axis paired with $\Sigma$'s smallest singular value (the last one, since `np.linalg.svd` sorts them in descending order) whenever the unconstrained best fit would have been a reflection - see the worked example in §4 for why this matters and what it costs.
+
+**Step 4. Scale and translation:**
+
+$$s = \frac{\text{tr}(DS)}{\text{var}(X)}, \qquad \text{var}(X) = \frac{1}{n}\sum \|X_i\|^2, \qquad t = \mu_{\text{true}} - s R \mu_{\text{est}}$$
 
 That's exactly the four steps `umeyama_alignment` runs, in order.
 
@@ -64,10 +68,10 @@ That's exactly the four steps `umeyama_alignment` runs, in order.
 
 ## 4. Why the reflection guard matters
 
-Without step 3's correction, the fit can silently return a **mirror image** instead of a rotation whenever the point geometry allows it. Concretely, take a small tetrahedron and its true mirror image across one plane (a genuine reflection, $\det = -1$ relative to the original - not something *any* rotation can reproduce exactly):
+Without step 3's correction, the fit can silently return a **mirror image** instead of a rotation whenever the point geometry allows it. Concretely, take the unit tetrahedron with corners $(0,0,0)$, $(1,0,0)$, $(0,1,0)$, $(0,0,1)$ (the same points as §5) and its true mirror image across the $z=0$ plane, made by negating each point's $z$ coordinate (a genuine reflection, $\det = -1$ relative to the original - not something *any* rotation can reproduce exactly):
 
 - **Uncorrected** ($R = UV^\top$): fits **perfectly** (residual $\approx 0$), but $\det(R) \approx -1$ - not a valid rotation, and physically meaningless as a camera/robot pose.
-- **Corrected** ($R = USV^\top$): $\det(R) = +1$, a valid rotation, but can now only *approximate* the mirrored points - in this example the best achievable fit has a max residual of about $0.44$ (scale also drops from the uncorrected $1.0$ to $s \approx 0.78$ to partially compensate).
+- **Corrected** ($R = USV^\top$): $\det(R) = +1$, a valid rotation, but can now only *approximate* the mirrored points - in this example the best achievable fit has a max per-point residual of about $0.77$ (at the origin point; the other three are off by about $0.31$), and scale drops from the uncorrected $1.0$ to $s = 7/9 \approx 0.78$ to partially compensate.
 
 So the guard is a deliberate trade: it always returns a physically valid rotation, at the cost of no longer being able to claim a perfect fit on point sets that are actually mirror-related. For the well-conditioned, non-degenerate point sets this repo's scripts generate (cameras spread around a 3D landmark cluster), the reflection case essentially never triggers in practice - it matters most for near-coplanar or otherwise degenerate configurations.
 

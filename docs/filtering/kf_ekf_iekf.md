@@ -77,7 +77,7 @@ Think of the standard KF as:
 
 It's elegant and mathematically clean, but it doesn't work directly for things like rotations, camera poses, or nonlinear robot dynamics.
 
-**A concrete data point**: this repo's own `run_vanilla_kf` (same point-cloud pose-tracking benchmark referenced in [§7](#7-the-subtle-but-important-point)) is exactly this - a standard linear KF applied directly to a pose, via a redundant ambient `[vec(R), t]` state rather than the minimal SE(3) tangent every other method there uses. It works, but only by bolting on a first-order truncation of the motion model and a post-hoc SVD re-projection to keep the rotation valid - see [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) for the measured cost of skipping the manifold structure altogether.
+**A concrete data point**: this repo's own `run_vanilla_kf` (same point-cloud pose-tracking benchmark referenced in [§7](#7-the-subtle-but-important-point)) is exactly this - a standard linear KF applied directly to a pose, via a redundant ambient `[vec(R), t]` state (`vec` taken row-major, as `R.flatten()` does) rather than the minimal SE(3) tangent every other method there uses. It works, but only by bolting on a first-order truncation of the motion model and a post-hoc SVD re-projection to keep the rotation valid - see [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) for the measured cost of skipping the manifold structure altogether.
 
 ---
 
@@ -288,14 +288,14 @@ That's a much more natural representation for robot motion.
 
 $$\hat T_k^- = \hat T_{k-1}\exp(u_{k-1}\Delta t) \qquad P_k^- = J_{\text{self}}\,P_{k-1}\,J_{\text{self}}^\top + J_\tau\,Q\,J_\tau^\top$$
 
-($J_{\text{self}}$, $J_\tau$ are closed-form $SE(3)$ Jacobians of that composition - this repo's `se3_adjoint`/`se3_right_jacobian` - not linearizations of an approximate model.)
+Here $`J_{\text{self}} = \mathrm{Ad}_{\exp(-u_{k-1}\Delta t)}`$ (`se3_adjoint`) and $J_\tau = J_r(u_{k-1}\Delta t)$ (`se3_right_jacobian`). Both are closed-form $SE(3)$ Jacobians of that composition, not linearizations of an approximate model. $`Q = \Delta t^2\,\mathrm{diag}(\sigma_v^2 I_3, \sigma_\omega^2 I_3)`$ is the covariance of the twist increment $u\Delta t$. The full per-function math, including the UKF, vanilla KF and batch GN, is in [pointcloud_pose_tracking_empirical_note.md §1.1](pointcloud_pose_tracking_empirical_note.md#11-the-filter-math-concretely).
 
 **Update - this is where they diverge.**
 
 | | EKF (world-frame residual) | IEKF (body-frame residual) |
 | --- | --- | --- |
-| Residual | $r_k = z_k - \big(R_{\text{pred}}\,p_i + t_{\text{pred}}\big)$ | $r_k = \big(R_{\text{pred}}^\top(z_k - t_{\text{pred}})\big) - p_i$ |
-| Jacobian $H$ | $\left[R_{\text{pred}} \;\; -R_{\text{pred}}\,p_i^\wedge\right]$ | $\left[I \;\; -p_i^\wedge\right]$ |
+| Residual (point $i$, stacked over all $i$) | $`r_{k,i} = z_{k,i} - \big(R_{\text{pred}}\,p_i + t_{\text{pred}}\big)`$ | $`r_{k,i} = R_{\text{pred}}^\top(z_{k,i} - t_{\text{pred}}) - p_i`$ |
+| Jacobian $H_i$ | $`\left[R_{\text{pred}} \;\; -R_{\text{pred}}\,p_i^\wedge\right]`$ | $`\left[I \;\; -p_i^\wedge\right]`$ |
 | Depends on current estimate? | Yes - $R_{\text{pred}}$ appears in $H$ itself | **No** - only the fixed, known $p_i$ appears |
 
 Both then finish identically:
@@ -343,7 +343,7 @@ It's better to think:
 
 In fact, an IEKF can sometimes have **better convergence and consistency properties** than a conventional EKF because the linearization is aligned with the system's inherent symmetries.
 
-**A concrete data point**: in this repo's own point-cloud pose-tracking benchmark ([use_numpy/pointcloud_pose_tracking.py](../../use_numpy/pointcloud_pose_tracking.py), [use_manif/pointcloud_pose_tracking.py](../../use_manif/pointcloud_pose_tracking.py)), EKF and IEKF were verified to produce **exactly identical** corrections under [isotropic](pointcloud_pose_tracking_empirical_note.md#a1-isotropic-and-anisotropic-noise) point-noise covariance - proven algebraically (the body-frame and world-frame residual/Jacobian pairs differ only by a per-point rotation that cancels exactly out of the Kalman gain) and confirmed numerically to ~1e-14 precision. IEKF's real, measured advantage there wasn't accuracy - both filters converged to the same estimate - it was **speed**: IEKF's fixed Jacobian made it ~35% faster per step than EKF, at identical memory. That's a good concrete reminder that "geometry-aware" doesn't always mean "more accurate" - sometimes it means "cheaper to compute the same answer," and the accuracy gap only opens up once the noise model or system structure breaks the symmetry that made them equivalent here.
+**A concrete data point**: in this repo's own point-cloud pose-tracking benchmark ([use_numpy/pointcloud_pose_tracking.py](../../use_numpy/pointcloud_pose_tracking.py), [use_manif/pointcloud_pose_tracking.py](../../use_manif/pointcloud_pose_tracking.py)), EKF and IEKF were verified to produce **exactly identical** corrections under [isotropic](pointcloud_pose_tracking_empirical_note.md#a1-isotropic-and-anisotropic-noise) point-noise covariance - proven algebraically (the body-frame and world-frame residual/Jacobian pairs differ only by a per-point rotation that cancels exactly out of the Kalman gain) and confirmed numerically to ~1e-14 precision. IEKF's real, measured advantage there wasn't accuracy - both filters converged to the same estimate - it was **speed**: IEKF's fixed Jacobian made it about 30% faster per step than EKF, at identical memory. That figure is from [the empirical note's §2.4](pointcloud_pose_tracking_empirical_note.md#24-what-actually-differs-between-them-speed-not-accuracy) measurement of 260 vs. 369 µs/step. Timings depend on the machine, and later re-runs gave a 27-40% speed-up. That's a good concrete reminder that "geometry-aware" doesn't always mean "more accurate" - sometimes it means "cheaper to compute the same answer," and the accuracy gap only opens up once the noise model or system structure breaks the symmetry that made them equivalent here.
 
 ---
 

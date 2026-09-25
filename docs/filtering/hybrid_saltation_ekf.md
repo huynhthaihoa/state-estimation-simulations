@@ -32,11 +32,72 @@ Every filter in [kf_ekf_iekf.md](kf_ekf_iekf.md) and [extra_kf_variants.md](extr
 A **hybrid dynamical system** alternates **continuous flow** with **instantaneous discrete jumps**, triggered by a **guard condition** and applied via a **reset map**:
 
 - **State**: $x = (p, v) \in \mathbb{R}^6$ with $p, v \in \mathbb{R}^3$ - a point mass's position and velocity, plain $\mathbb{R}^6$ (no rotation, unlike most scripts in this repo).
-- **Flow**: $`\dot x = f(x) = \begin{bmatrix} v \\ (0,0,-g) \end{bmatrix}`$ - ordinary free-fall, exactly linear in $x$.
+- **Flow**: $`\dot x = f(x) = \begin{bmatrix} v \\ (0,0,-g) \end{bmatrix}`$ - ordinary free-fall, affine in $x$ (linear plus a constant gravity term), so it can be integrated exactly.
 - **Guard**: $g(x) = p_z$. The system jumps whenever a falling trajectory reaches $g(x) = 0$ (touches the ground). Its gradient $Dg = \partial g/\partial x$ - which shows up throughout this doc, starting in §2 - is the constant row vector $(0,0,1,0,0,0)$ here: it just picks out the $p_z$ component.
 - **Reset map**: $R(x)$, applied at the guard - here, $v_z \mapsto -e\,v_z$ (an inelastic bounce with restitution $e$), position and horizontal velocity untouched. Throughout this doc, a superscript $-$/$`+`$ on a state or vector field (e.g. $x^{-}$, $f^{-}$, $x^{+}$, $f^{+}$) means "evaluated just before/after the reset."
 
 This is the textbook canonical example (the word "saltation" is Latin for "leaping"), and it is the simplest possible analog of a foot-strike/ground-contact impact - a discrete velocity reset at a discrete contact event - without $SE(3)$'s rotational complexity layered on top.
+
+### 1.1 The filter math, concretely
+
+Both EKF variants run over $x = (p, v) \in \mathbb{R}^6$. Each tick of length $\Delta t$ is one **hybrid predict step** (`step_hybrid`) followed by one **position update** (`measurement_update`), both driven by `run_ekf`. The only difference between the variants is the `use_saltation` flag, which picks the matrix used on the covariance at a bounce.
+
+**Free-fall flow** (`flow`). Between bounces the dynamics are integrated in closed form over any interval $h$, with $a = (0, 0, -g)$:
+
+$$
+p' = p + v\,h + \tfrac12 a\,h^2, \qquad v' = v + a\,h, \qquad
+\Phi(h) = \frac{\partial x'}{\partial x} = \begin{bmatrix} I_3 & h\,I_3 \\ 0 & I_3 \end{bmatrix}
+$$
+
+This is exact, not a linearization, because the flow is affine in $x$. So between bounces the mean and covariance propagate with no approximation at all.
+
+**Process noise** (`process_noise_covariance`). For an interval $h$ and acceleration-disturbance std-dev $\sigma_a$:
+
+$$
+Q(h) = \begin{bmatrix} \left(\tfrac12 \sigma_a h^2\right)^2 I_3 & 0 \\ 0 & (\sigma_a h)^2 I_3 \end{bmatrix}
+$$
+
+This is a simple diagonal heuristic. It is not the textbook continuous white-noise-acceleration $Q$, which would also have position-velocity cross-terms. The default is $`\sigma_a = 0.3\ \text{m/s}^2`$ (`--process-noise-std`).
+
+**Crossing time** (`crossing_time`). Solve $`p_{z0} + v_{z0}\,t - \tfrac12 g t^2 = 0`$ in closed form. Keep only roots with $t > 10^{-12}$ that are *descending* ($`v_{z0} - g\,t < 0`$), and return the smallest one. If there is no such root (including a negative discriminant), return `None`. The descending-only rule is the §8 fix: a point mass that starts just below the ground and is moving up does not count its way back out as an impact.
+
+**Hybrid predict** (`step_hybrid`). Starting with `remaining` $= \Delta t$, the step loops up to `max_bounces` $= 20$ times:
+
+1. Compute $\tau$ with `crossing_time`. If there is none, or $\tau \ge$ `remaining`, flow the rest of the tick, set $P \leftarrow \Phi P \Phi^\top + Q(\text{remaining})$, and stop.
+2. Otherwise flow to the detected crossing time $\tau_{\text{detect}}$ (equal to $\tau$ unless the §8 detection parameters are set), and set $P \leftarrow \Phi P \Phi^\top + Q(\tau_{\text{detect}})$.
+3. If the vertical speed there is below `min_bounce_speed` $= 10^{-3}$ m/s, set $v_z = 0$, and use `flow_resting` (below) for the rest of this tick.
+4. Otherwise apply the bounce (equations below) and go back to step 1 with the time that is left.
+
+At each bounce, with $M = \Xi(x^{-})$ (`saltation_matrix`, §4) if `use_saltation` is true and $M = DR$ (`reset_jacobian`) if not:
+
+$$
+x^{+} = R(x^{-}), \qquad P^{+} = M\,P^{-}\,M^\top + \sigma_{\text{imp}}^2\,I_6
+$$
+
+Two things are easy to miss here. First, $Q$ is added once per sub-interval, not once per tick. Because $Q(h)$ grows like $h^2$ and $h^4$, a tick split at a bounce gets less total process noise than an unsplit tick. Second, the impact floor $\sigma_{\text{imp}}^2 I_6$ (`--impact-noise-std`, default $0.005$) is added to all six diagonal entries, velocity included, in both variants. §5 and §7 explain why it is a modeling choice rather than a numerical necessity.
+
+**Resting fallback** (`flow_resting`). Once the mass is treated as at rest, only horizontal position moves: $`p_{x,y} \leftarrow p_{x,y} + v_{x,y}\,h`$, with $p_z$, $v_z$ and the rest of the state held fixed. Its $\Phi$ is the identity plus $h$ at the $(p_x, v_x)$ and $(p_y, v_y)$ entries. This is a deliberately simple guard against the Zeno pathology (§7), not a contact model.
+
+**Position update** (`measurement_update`). A direct noisy position reading, $z = p + n$:
+
+$$
+H = \begin{bmatrix} I_3 & 0_3 \end{bmatrix}, \qquad R = \sigma_z^2\,I_3, \qquad
+S = H P^{-} H^\top + R, \qquad K = P^{-} H^\top S^{-1}
+$$
+
+$$
+x^{+} = x^{-} + K\,(z - H x^{-}), \qquad P^{+} = (I - K H)\,P^{-}
+$$
+
+The covariance uses the plain $(I - KH)P^{-}$ form, not the Joseph form. The default is $\sigma_z = 0.03$ m (`--pos-noise-std`).
+
+**Ground truth and Monte Carlo setup.** The true trajectory (`generate_ground_truth_and_data`) is `step_hybrid` itself with zero process noise and zero covariance, so it follows the same bounce and resting rules as the filters. The dead-reckoning baseline (`run_dead_reckoning`) runs the same noise-free propagation from the perturbed initial guess, with no updates. `run_monte_carlo_consistency` draws, in each trial, a fresh initial guess $`x_0 = x_{\text{true},0} + \text{diag}(\sigma_0)\,n`$ with $n \sim \mathcal{N}(0, I_6)$ and fresh measurement noise. It starts both filters from
+
+$$
+P_0 = \text{diag}\big(\sigma_{p0}^2 I_3,\ \sigma_{v0}^2 I_3\big), \qquad \sigma_{p0} = 0.1\ \text{m}, \quad \sigma_{v0} = 0.2\ \text{m/s}
+$$
+
+and averages NEES per tick over 500 trials. §6's post-bounce window finds each bounce tick with `detect_bounce_ticks`: a local minimum of true height below $0.2$ m. It then averages the next 5 ticks, excluding the bounce tick itself. The other defaults are $\Delta t = 0.02$ s, $e = 0.85$, $g = 9.81$, a $5$ m drop, initial horizontal velocity $(1.0, 0.5)$ m/s, and a $5$ s duration.
 
 ## 2. Why the reset map's own Jacobian is not enough
 
@@ -150,6 +211,8 @@ This is not a reason to prefer the naive update - the two filters are close both
 $$\tau_{\text{detect}} = \text{clip}\big(\tau + b_{\text{detect}} + \mathcal{N}(0,\,\sigma_{\text{detect}}^2)\,,\ 0,\ \tau_{\text{remain}}\big)$$
 
 instead of the true geometric $\tau$, so early detection resets the mean while still above ground and late detection resets it after the free-fall model has carried it slightly below $p_z = 0$ - both real artifacts of a delayed or jittery contact detector (IMU spike, force threshold - Čížek et al. 2018), not numerical noise.
+
+This also means that under detection jitter, `saltation_matrix` is evaluated at an $x^{-}$ that is off the guard ($p_z \neq 0$). That is outside its own stated assumption (its docstring says $x^{-}$ already satisfies $p_z = 0$). The code does not correct for this. It just uses the current $v_z$, since nothing in the formula depends on $p_z$.
 
 **A correctness subtlety this surfaced**: once a reset can land off-guard, `crossing_time` needs to reject *ascending* roots (the point mass rising back out of a below-ground detection artifact crosses $p_z = 0$ again almost immediately, which is not a real impact) and keep only the next *descending* one. Every crossing this script computed before `detect_time_*` existed was already descending by construction, so this is a latent-bug fix with zero effect on any result above - but skipping it turns on nonsense: NEES and RMS position error explode by 4-5 orders of magnitude the instant any detection jitter is introduced, from a cascade of spurious re-bounces within a single step, not from the phenomenon actually being modeled. See `crossing_time`'s docstring for the concrete numbers that exposed it.
 

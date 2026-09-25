@@ -38,6 +38,35 @@ Camera 1               Camera 2
 
 `refine_landmark_gn` then runs a few Gauss-Newton iterations against the *true* nonlinear reprojection error, seeded from that closed-form guess - the same "linear guess, then GN polish" pattern used everywhere in this repo. Finally, `passes_cheirality` checks that the resulting point has positive depth in every observing camera: because `pixel = f*x/z` is invariant to negating a camera-frame point's $x,y,z$ together, a weakly-constrained point (few observers, little parallax) can converge to a *reflection* behind a camera that still fits every pixel almost exactly. A point failing this check is never committed to the map (see the [`bundle_adjustment_advanced.py` README description](../../README.md#7-local--global-bundle-adjustment-bounded-windows-vs-whole-map-re-solves)) - it's left pending until another observation gives it more parallax to resolve with.
 
+**The triangulation math, concretely.** Poses are camera-to-world: observer $k$ has rotation $R_k$ and camera center $o_k$ (its translation). `triangulate_landmark` rotates each pixel's calibrated ray into the world frame and normalizes it:
+
+$$
+\tilde d_k = \begin{bmatrix} (u_k - c_x)/f_x \\ (v_k - c_y)/f_y \\ 1 \end{bmatrix}, \qquad
+d_k = \frac{R_k \tilde d_k}{\left\| R_k \tilde d_k \right\|}
+$$
+
+$$
+A = \sum_k \left(I - d_k d_k^\top\right), \qquad
+b = \sum_k \left(I - d_k d_k^\top\right) o_k, \qquad
+P_0 = \left(A + 10^{-9} I\right)^{-1} b
+$$
+
+The tiny $10^{-9} I$ keeps the solve defined when all rays are parallel. `refine_landmark_gn` then runs Gauss-Newton on the point alone, with $J_{\text{point}}$ from [bundle_adjustment.md Section 6.1](../optimization/bundle_adjustment.md#61-the-ba-math-concretely):
+
+$$
+\left(\sum_k J_{\text{point},k}^\top J_{\text{point},k} + 10^{-9} I\right)\delta = \sum_k J_{\text{point},k}^\top r_k, \qquad
+r_k = z_k - \pi\left(R_k^\top (P - o_k)\right), \qquad
+P \leftarrow P + \delta
+$$
+
+It stops when the step norm drops below `gn_tol`. `passes_cheirality` then requires a strictly positive depth in every observer, using `point_depth`:
+
+$$
+\left[R_k^\top (P - o_k)\right]_z > 0 \quad \text{for every observer } k
+$$
+
+In `bundle_adjustment_advanced.py` a landmark is triangulated once it has `min_observations` = 3 observers (the default), with that script's `gn_tol` = $10^{-6}$ and `gn_max_iters` = 15.
+
 ---
 
 ## 3. PnP as the inverse problem
@@ -50,7 +79,34 @@ This is **linear and homogeneous** in the 12 flattened entries of $[R_{cw} \mid 
 
 > **Note**: SVD (Singular Value Decomposition) factors any matrix as $A=U\Sigma V^\top$, with $U,V$ orthogonal and $\Sigma$ diagonal (the singular values, ranking how much each orthogonal direction contributes to $A$). Taking the smallest right-singular vector of $A$ - the column of $V$ paired with the smallest singular value - gives the least-squares null-space solution `linear_pnp_dlt` uses above; taking $UV^\top$ from a matrix's own SVD gives the nearest true rotation, which is exactly what the orthogonalization step below does.
 
-The recovered $3\times3$ block is only a *scaled, possibly reflected* rotation - not yet a valid element of $SO(3)$ - so `linear_pnp_dlt` projects it onto the nearest true rotation via SVD orthogonalization ($R_{cw} = UV^\top$ from $R_{raw}=U\Sigma V^\top$), recovers scale from the singular values, and fixes the sign using a positive-depth check (§4). `refine_pose_gn` then runs Gauss-Newton on the true reprojection error, updating the pose via a right-multiplicative correction $T \leftarrow T\cdot\mathrm{Exp}(\delta)$ - mirroring `refine_landmark_gn`'s loop exactly, just solving a $6\times6$ system for the pose instead of a $3\times3$ system for the point.
+Concretely, each correspondence adds two rows to $A$: the first two rows of the cross-product matrix $[d_i]_\times$, times a $3\times12$ matrix that maps $x$ to $R_{cw}P_i + t_{cw}$. Here $r_1, r_2, r_3$ are the rows of $R_{cw}$:
+
+$$
+A_i = \left([d_i]_\times\right)_{\text{rows }1,2}
+\begin{bmatrix} P_i^\top & 0 & 0 & 1 & 0 & 0 \\ 0 & P_i^\top & 0 & 0 & 1 & 0 \\ 0 & 0 & P_i^\top & 0 & 0 & 1 \end{bmatrix}, \qquad
+x = \begin{bmatrix} r_1 & r_2 & r_3 & t_{cw}^\top \end{bmatrix}^\top
+$$
+
+The third row is dropped because it is a combination of the first two (the third entry of $d_i$ is always 1). $A$ is $2n\times12$ and needs rank 11 for a one-dimensional null space. That is why §6 asks for at least 6 points.
+
+The recovered $3\times3$ block is only a *scaled, possibly reflected* rotation - not yet a valid element of $SO(3)$. `linear_pnp_dlt` turns $x$ into a pose in this order:
+
+1. **Unpack.** $x$ is the last row of $V^\top$. Its first 9 entries, row-major, give $R_{\text{raw}}$. The last 3 give $t_{\text{raw}}$.
+2. **Fix the sign.** $x$ and $-x$ both solve $Ax = 0$. If the median over all points of the raw depth $(R_{\text{raw}}P_i + t_{\text{raw}})_z$ is negative, both $R_{\text{raw}}$ and $t_{\text{raw}}$ are negated (§4). This runs *before* orthogonalization.
+3. **Orthogonalize.** With $R_{\text{raw}} = U\Sigma V^\top$, set $R_{cw} = UV^\top$. If $\det(R_{cw}) < 0$, the last row of $V^\top$ is negated and $R_{cw}$ is recomputed, so the result is a proper rotation.
+4. **Recover scale.** $s = (\sigma_1 + \sigma_2 + \sigma_3)/3$, the mean of the singular values of $R_{\text{raw}}$. Then $t_{cw} = t_{\text{raw}}/s$.
+5. **Invert.** The function returns the camera-to-world pose, with rotation $R_{cw}^\top$ and translation $-R_{cw}^\top t_{cw}$.
+
+With noise-free pixels this recovers the true pose to floating-point precision.
+
+`refine_pose_gn` then runs Gauss-Newton on the true reprojection error, updating the pose via a right-multiplicative correction $T \leftarrow T\cdot\mathrm{Exp}(\delta)$ - mirroring `refine_landmark_gn`'s loop exactly, just solving a $6\times6$ system for the pose instead of a $3\times3$ system for the point. It uses the same $J_{\text{pose}}$ as bundle adjustment ([bundle_adjustment.md Section 6.1](../optimization/bundle_adjustment.md#61-the-ba-math-concretely)), for $\delta = [\delta v, \delta\omega]$:
+
+$$
+\left(\sum_i J_{\text{pose},i}^\top J_{\text{pose},i} + 10^{-9} I_6\right)\delta = \sum_i J_{\text{pose},i}^\top r_i, \qquad
+r_i = z_i - \pi\left(T^{-1} P_i\right)
+$$
+
+It stops when the step norm drops below `gn_tol`. Script defaults: 20 points, sampled at camera-frame depth 3 to 8 m, $f_x = f_y = 800$ px on a 640×480 image, pixel noise $\sigma = 1$ px, `gn_tol` = $10^{-8}$, at most 20 iterations.
 
 ```text
 Known point P                 Unknown pose?

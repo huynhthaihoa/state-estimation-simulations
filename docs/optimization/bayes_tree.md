@@ -135,6 +135,30 @@ This structure tells us:
 
 That is essentially what the **Bayes tree** captures.
 
+### 4.1 The elimination game, concretely
+
+`bayes_tree_construction.py` builds this structure with `symbolic_eliminate` in `utils.py`. The function is purely symbolic: it only looks at which variables share a factor, never at numeric values. Variables are integers `0..n-1`, and `order` is the elimination order (`order[0]` goes first, `order[-1]` becomes the root). For each variable $v$ in `order`:
+
+1. **Separator.** $S(v)$ is the set of $v$'s neighbors at the moment it is eliminated. Only variables still in the graph count, because each eliminated variable has already been removed from its neighbors' lists.
+2. **Fill-in.** Every pair of variables in $S(v)$ gets connected, then $v$ is removed from the graph. This is the "summarized information" arrow of §3: the new constraint links all of $v$'s remaining neighbors.
+3. **Parent.** $\text{parent}(v)$ is the member of $S(v)$ that comes earliest in `order`, i.e. the next of them to be eliminated. If $S(v)$ is empty, $v$ is the root.
+
+The node $`\{v\} \cup S(v)`$ is what the docstring calls a clique. The script keeps one node per variable and never merges nodes with nested separators into larger cliques (§13), so strictly it builds the elimination tree.
+
+**Worked example: a 5-node ring.** Take odometry edges 0–1, 1–2, 2–3, 3–4 plus a loop-closure edge 4–0, eliminated oldest-first (`order = [0, 1, 2, 3, 4]`, as the script does):
+
+| Eliminate | Neighbors left ($S(v)$) | Fill-in added | Parent |
+| --- | --- | --- | --- |
+| 0 | {1, 4} | 1–4 | 1 |
+| 1 | {2, 4} | 2–4 | 2 |
+| 2 | {3, 4} | none (3–4 already exists) | 3 |
+| 3 | {4} | none | 4 |
+| 4 | {} | none | root |
+
+The result is a straight chain `0 → 1 → 2 → 3 → 4`. Each separator holds at most 2 variables, because the loop edge keeps dragging node 4 along. The script's 16-node ring gives the same shape, and it prints "Largest separator: 2".
+
+**Affected-path query** (`bayes_tree_affected_path`). Given the variables a new factor touches, walk `parent` pointers from each one up to the root and return the union of all nodes visited. A walk stops early when it reaches a node that is already in the set. In the ring above, the odometry edge (3, 4) affects {3, 4}. The loop-closure edge (4, 0) starts from the deepest leaf, 0, so it affects all five nodes. This is §8's worst case.
+
 ---
 
 ## 5. But there's an important difference from an ordinary tree
@@ -253,7 +277,7 @@ Conceptually:
        x5    ← affected
 ```
 
-`x1` is affected too, not just `x2`-`x5`: the new factor touches `x1` directly, and `x1` is also the deepest leaf under this chain's elimination order, so it must be re-eliminated along with everything above it on the path to `x5`. (The repo's own `bayes_tree_construction.py` demonstrates exactly this on its square-loop topology: a single loop-closure edge affects all 16/16 variables, including the one at the very bottom of the chain.)
+`x1` is affected too, not just `x2`-`x5`: the new factor touches `x1` directly, and `x1` is also the deepest leaf under this chain's elimination order, so it must be re-eliminated along with everything above it on the path to `x5`. (The repo's own `bayes_tree_construction.py` demonstrates exactly this on its square-loop topology: with the default 16 nodes, a single loop-closure edge affects all 16/16 *variables*, including the one at the very bottom of the chain. The script counts elimination-tree nodes, one per variable, not merged cliques; see §4.1 and §15.)
 
 The affected section is removed/re-eliminated and then reinserted into the Bayes tree.
 
@@ -432,7 +456,7 @@ So:
 
 ## 15. Where this is implemented in this repo
 
-Partially. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds an actual Bayes tree from this repo's pose-graph topology - `symbolic_eliminate`/`bayes_tree_affected_path` in `utils.py` run the elimination-game construction from §3-§4 and the root-ward affected-path query from §7-§9 - and plots the "small vs. large affected region" contrast this doc argues for in prose (§7 vs. §8) using a real, computed example instead of an ASCII sketch. It fixes the elimination order (oldest node first) rather than choosing one dynamically, so **COLAMD-style variable reordering is still not implemented** - worth noting since, under that fixed order, this repo's loop-closure edge happens to produce the worst possible case (it invalidates the *entire* tree, not just a subtree), which is exactly the scenario dynamic reordering exists to avoid. There is also still no numeric fluid-relinearization solve integrated with this tree - [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`) separately implements the older [iSAM v1](isam_optimization.md) algorithm (incremental QR row insertion, no Bayes tree at all); see [`isam_optimization.md` §14](isam_optimization.md#14-where-this-is-implemented-in-this-repo) and [`isam2_optimization.md` §19](isam2_optimization.md#19-where-this-is-implemented-in-this-repo) for exactly where that numeric-solve line is drawn.
+Partially. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds the *elimination tree* of this repo's pose-graph topology - one node per variable, without merging nodes into the cliques of §13, so it is the structure a Bayes tree is built from rather than a full Bayes tree. `symbolic_eliminate`/`bayes_tree_affected_path` in `utils.py` run the elimination-game construction from §3-§4 (spelled out in §4.1) and the root-ward affected-path query from §7-§9. Every "N/16 affected" count is a count of variables, not cliques. The tree is built once from all edges, the loop-closure edge included, and then queried for each scenario's edge; for this topology, building it without the loop edge gives the same chain and the same affected sets. Defaults: `--nodes-per-side 4`, so 16 nodes; the newest odometry edge (14, 15) affects 2/16 variables and the loop-closure edge (15, 0) affects 16/16. The script plots the "small vs. large affected region" contrast this doc argues for in prose (§7 vs. §8) using a real, computed example instead of an ASCII sketch. It fixes the elimination order (oldest node first) rather than choosing one dynamically, so **COLAMD-style variable reordering is still not implemented** - worth noting since, under that fixed order, this repo's loop-closure edge happens to produce the worst possible case (it invalidates the *entire* tree, not just a subtree), which is exactly the scenario dynamic reordering exists to avoid. There is also still no numeric fluid-relinearization solve integrated with this tree - [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`) separately implements the older [iSAM v1](isam_optimization.md) algorithm (incremental QR row insertion, no Bayes tree at all); see [`isam_optimization.md` §14](isam_optimization.md#14-where-this-is-implemented-in-this-repo) and [`isam2_optimization.md` §19](isam2_optimization.md#19-where-this-is-implemented-in-this-repo) for exactly where that numeric-solve line is drawn.
 
 So this page's data structure now has a real, runnable counterpart - but the rest of [iSAM2](isam2_optimization.md) (dynamic reordering, fluid relinearization integrated with an actual solve) still exists only conceptually here.
 
