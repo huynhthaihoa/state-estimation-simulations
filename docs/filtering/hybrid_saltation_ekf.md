@@ -211,7 +211,7 @@ Read this as: *starting 5cm higher behaves, to first order, like starting at the
 
 $$\Xi_{\text{own-time}}\text{ change} = -e\times(-0.04854) \approx +0.02427\ \text{m/s}$$
 
-matching the true (own-crossing-time) answer to within second-order error, same as before. This scalar shortcut doesn't extend to $\Xi$ (§4's boxed formula, what `saltation_matrix` actually computes): the extra $f^{+}$ term and the subsequent composition with $\Phi_{\text{before}}$/$\Phi_{\text{after}}$ genuinely need matrices, which is why §3 computes its numbers from code rather than by hand.
+matching the true (own-crossing-time) answer to within second-order error, same as before. This scalar shortcut doesn't extend to $\Xi$ (§4's boxed formula, what `saltation_matrix` actually computes): the extra $f^{+}$ term and the subsequent composition with $\Phi_{\text{before}}$/$`\Phi_{\text{after}}`$ genuinely need matrices, which is why §3 computes its numbers from code rather than by hand.
 
 ---
 
