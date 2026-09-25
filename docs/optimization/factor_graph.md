@@ -64,9 +64,7 @@ But every measurement has error.
 
 If you simply integrate the odometry's own numbers above (each step reported as "1m ahead"):
 
-```text
-estimated position ≈ 3.00 m
-```
+$$\text{estimated position} \approx 3.00\ \text{m}$$
 
 Maybe the real motion, though, was:
 
@@ -75,9 +73,7 @@ X0  →  X1  →  X2  →  X3
   1.02   0.97    1.05 m
 ```
 
-```text
-real position ≈ 3.04 m
-```
+$$\text{real position} \approx 3.04\ \text{m}$$
 
 Integrating noisy per-step measurements never magically cancels their errors, so the estimate (3.00 m) and the real position (3.04 m) diverge - you accumulate error.
 
@@ -262,12 +258,10 @@ This is worth memorizing.
 
 Something you're trying to estimate:
 
-```text
-X0 = robot pose
-X1 = robot pose
-L0 = landmark position
-b = IMU bias
-```
+* $X_0$ = robot pose
+* $X_1$ = robot pose
+* $L_0$ = landmark position
+* $b$ = IMU bias
 
 ### Factor
 

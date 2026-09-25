@@ -273,9 +273,7 @@ This one drops the Gaussian assumption that every other variant in this list rel
 
 Instead of a mean and covariance, your belief is a swarm of weighted samples ("particles"), each one a full hypothesis for the state:
 
-```text
-belief ≈ {(x⁽¹⁾, w⁽¹⁾), (x⁽²⁾, w⁽²⁾), ..., (x⁽ᴺ⁾, w⁽ᴺ⁾)}
-```
+$$\text{belief} \approx \lbrace (x^{(1)}, w^{(1)}), (x^{(2)}, w^{(2)}), \dots, (x^{(N)}, w^{(N)}) \rbrace$$
 
 Each particle is propagated through the (possibly highly nonlinear) motion model, reweighted by how well it explains the latest measurement, and periodically resampled so particles that poorly explain the data get replaced by copies of the better ones:
 

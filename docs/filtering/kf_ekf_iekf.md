@@ -18,9 +18,9 @@ Imagine you're tracking a car.
 
 You have:
 
-* a previous estimate: `car is at x = 10 m, moving at 5 m/s`
-* a motion model: `after 1 second, it should be around x = 15 m`
-* a sensor measurement: `GPS says x = 14 m`
+* a previous estimate: "car is at $x = 10$ m, moving at 5 m/s"
+* a motion model: "after 1 second, it should be around $x = 15$ m"
+* a sensor measurement: "GPS says $x = 14$ m"
 
 The Kalman Filter asks:
 

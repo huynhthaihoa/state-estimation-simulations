@@ -144,15 +144,11 @@ We have:
 
 ### Odometry says:
 
-```text
-x₀ → x₁ → x₂ → x₃ → x₄
-```
+$$x_0 \to x_1 \to x_2 \to x_3 \to x_4$$
 
 ### Loop closure says:
 
-```text
-x₄ → x₀
-```
+$$x_4 \to x_0$$
 
 The measurements aren't perfectly consistent because they're noisy.
 
