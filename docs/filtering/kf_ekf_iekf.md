@@ -7,7 +7,7 @@ The most intuitive way to understand them is to start with one idea:
 The three filters differ mainly in **what kind of system they assume** and **how they deal with nonlinear motion**.
 
 This builds directly on:
-- **Lie groups and $SO(3)$ / $SE(3)$** from [lie_algebra.md](../foundations/lie_algebra.md) - the geometric structure §3-§5's IEKF discussion is built around.
+- **Lie groups and $SO(3)$/$`SE(3)`$** from [lie_algebra.md](../foundations/lie_algebra.md) - the geometric structure §3-§5's IEKF discussion is built around.
 - The **right Jacobian / exp map** from [jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space) - the $\exp(\delta\theta^\wedge)$ notation used in §5.
 
 ---
@@ -53,7 +53,7 @@ where:
 * $w$: process noise (everything the motion model $F$ doesn't capture, like unmodeled dynamics, wind gusts, wheel slip, IMU bias drift, etc.), with covariance $Q = \mathrm{Cov}(w)$
 * $v$: measurement noise (sensor imperfections like GPS jitter, camera pixel noise, IMU noise, etc.), with covariance $R = \mathrm{Cov}(v)$
 
-$Q$ and $R$ - not $w$ and $v$ themselves - are what the filter actually needs as inputs: since the individual noise values are unknown at each step, the filter works with their statistics (how large and correlated the noise typically is) instead. This is the same $Q$ / $R$ notation [extra_kf_variants.md §8](extra_kf_variants.md#8-adaptive-kalman-filter) (Adaptive KF) and [§12](extra_kf_variants.md#12-which-ones-should-you-prioritize-learning)'s checklist refer to.
+$Q$ and $R$ - not $w$ and $v$ themselves - are what the filter actually needs as inputs: since the individual noise values are unknown at each step, the filter works with their statistics (how large and correlated the noise typically is) instead. This is the same $Q$/$`R`$ notation [extra_kf_variants.md §8](extra_kf_variants.md#8-adaptive-kalman-filter) (Adaptive KF) and [§12](extra_kf_variants.md#12-which-ones-should-you-prioritize-learning)'s checklist refer to.
 
 Every KF cycle alternates two steps, each carrying its own uncertainty as a **covariance matrix** $P$ (how spread-out/correlated the filter's belief about $x$ currently is):
 
@@ -144,7 +144,7 @@ $$\hat x_k^- = f(\hat x_{k-1}, u_{k-1}) \qquad F_k = \frac{\partial f}{\partial 
 $$H_k = \frac{\partial h}{\partial x}\Big|_{\hat x_k^-} \qquad K_k = P_k^-H_k^\top(H_kP_k^-H_k^\top+R)^{-1}$$
 $$\hat x_k = \hat x_k^- + K_k\big(z_k-h(\hat x_k^-)\big) \qquad P_k = (I-K_kH_k)P_k^-$$
 
-So the only two changes from §1's linear KF are: (a) the mean propagates through the true nonlinear $f$ / $h$ instead of a fixed linear $F$ / $H$, and (b) $F_k$ / $H_k$ are **re-linearized at the current estimate every single step**, rather than being fixed matrices computed once. That second point is exactly the "Jacobians evaluated at the drifting state estimate" issue the next subsection digs into.
+So the only two changes from §1's linear KF are: (a) the mean propagates through the true nonlinear $f$/$`h`$ instead of a fixed linear $F$/$`H`$, and (b) $F_k$/$`H_k`$ are **re-linearized at the current estimate every single step**, rather than being fixed matrices computed once. That second point is exactly the "Jacobians evaluated at the drifting state estimate" issue the next subsection digs into.
 
 ### Intuition
 

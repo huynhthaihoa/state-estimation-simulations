@@ -439,4 +439,4 @@ Notice $J_r = J_l^\top$, exactly as the identity predicts. If you instead plug i
 
 ## 12. References
 
-1. Solà, J., Deray, J., & Atchuthan, D. (2018). *A micro Lie theory for state estimation in robotics*. arXiv:1812.01537. https://doi.org/10.48550/arXiv.1812.01537 - the standard modern reference for $J_l$ / $J_r$ and the left/right perturbation conventions behind §11, written by (among others) the author of the `manif` library that this repo's `use_manif/` scripts are built on.
+1. Solà, J., Deray, J., & Atchuthan, D. (2018). *A micro Lie theory for state estimation in robotics*. arXiv:1812.01537. https://doi.org/10.48550/arXiv.1812.01537 - the standard modern reference for $J_l$/$`J_r`$ and the left/right perturbation conventions behind §11, written by (among others) the author of the `manif` library that this repo's `use_manif/` scripts are built on.
