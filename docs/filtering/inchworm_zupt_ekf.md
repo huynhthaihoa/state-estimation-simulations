@@ -43,6 +43,70 @@ Three ways of using a zero-velocity pseudo-measurement (ZUPT) are compared, shar
 | `always` | Every tick, regardless of true phase - the schedule-unaware mistake |
 | `phase_conditional` | Only on ticks the known schedule marks as anchor - the correct policy |
 
+### 1.1 The filter math, concretely
+
+All three variants run the same Kalman filter over $x = [p, v]^\top$. The script calls it an EKF to match the rest of this repo, but every model here is exactly linear, so there is no linearization error and it is really a plain KF. Each tick runs up to three steps, in this order: predict, position update, then (depending on the variant) a ZUPT update (`run_ekf`).
+
+- **Predict** (`predict`): a constant-velocity model, identical for all variants and both gait phases. The filter doesn't know the commanded velocity, only that it's roughly constant between ticks:
+
+  $$
+  \Phi = \begin{bmatrix} 1 & \Delta t \\ 0 & 1 \end{bmatrix}, \qquad
+  Q = \begin{bmatrix} \left(\tfrac{1}{2}\sigma_{\text{process}}\Delta t^2\right)^2 & 0 \\ 0 & \left(\sigma_{\text{process}}\Delta t\right)^2 \end{bmatrix}
+  $$
+
+  $$
+  x^{-} = \Phi\,x, \qquad P^{-} = \Phi\,P\,\Phi^\top + Q
+  $$
+
+  $Q$ is a simple diagonal heuristic, the same one `saltation_matrix_ekf.py` uses. It is not the textbook continuous white-noise-acceleration $Q$, which would also have off-diagonal terms.
+
+- **Measurement updates** (`_kf_update`): both updates go through the same standard linear-Gaussian update and differ only in $z$, $H$ and $R$:
+
+  $$
+  r = z - H x^{-}, \qquad S = H P^{-} H^\top + R, \qquad K = P^{-} H^\top S^{-1}
+  $$
+
+  $$
+  x^{+} = x^{-} + K r, \qquad P^{+} = (I - K H)\,P^{-}
+  $$
+
+  | Update | Function | $z$ | $H$ | $R$ | Runs |
+  | --- | --- | --- | --- | --- | --- |
+  | Position | `measurement_update_position` | noisy position reading | $\begin{bmatrix} 1 & 0 \end{bmatrix}$ | $\sigma_{\text{pos}}^2$ | every tick |
+  | ZUPT | `measurement_update_zupt` | $0$ (pseudo-measurement) | $\begin{bmatrix} 0 & 1 \end{bmatrix}$ | $\sigma_{\text{zupt}}^2$ | depends on the variant |
+
+ZUPT is a *pseudo*-measurement: no sensor produces that $z = 0$. The filter is simply told "velocity is zero, give or take $\sigma_{\text{zupt}}$", which is only true if the robot really is stationary. The script's defaults are $\sigma_{\text{pos}} = 0.02$ m and $\sigma_{\text{zupt}} = 0.01$ m/s. Because the two measurement noises are independent, running the ZUPT update right after the position update in the same tick gives the same result as one joint update with both rows of $H$ stacked.
+
+**The ZUPT update, written out.** With $H = \begin{bmatrix} 0 & 1 \end{bmatrix}$ everything reduces to scalars. Write the predicted covariance as
+
+$$
+P^{-} = \begin{bmatrix} P_{pp} & P_{pv} \\ P_{pv} & P_{vv} \end{bmatrix}
+\quad\Longrightarrow\quad
+S = P_{vv} + R_{\text{zupt}}, \qquad
+K = \frac{1}{P_{vv} + R_{\text{zupt}}} \begin{bmatrix} P_{pv} \\ P_{vv} \end{bmatrix}, \qquad
+r = 0 - v^{-} = -v^{-}
+$$
+
+Substituting into the update above:
+
+$$
+v^{+} = \frac{R_{\text{zupt}}}{P_{vv} + R_{\text{zupt}}}\,v^{-}, \qquad
+p^{+} = p^{-} - \frac{P_{pv}}{P_{vv} + R_{\text{zupt}}}\,v^{-}
+$$
+
+$$
+P_{vv}^{+} = \frac{P_{vv}\,R_{\text{zupt}}}{P_{vv} + R_{\text{zupt}}}, \qquad
+P_{pp}^{+} = P_{pp} - \frac{P_{pv}^2}{P_{vv} + R_{\text{zupt}}}
+$$
+
+Three things follow directly from these formulas:
+
+- **It shrinks velocity toward zero.** The velocity estimate is multiplied by a factor between 0 and 1. The more the filter already trusts its velocity estimate (small $P_{vv}$) relative to the pseudo-measurement, the less it moves; the more uncertain it is, the harder it is pulled to $0$.
+
+- **It corrects position too, through the cross-covariance.** $P_{pv}$ is how the filter has learned that position and velocity errors move together. If the velocity estimate turns out too high, the position estimate has probably drifted ahead too, so $p$ gets pulled back as well. This is how a velocity-only pseudo-measurement also affects position.
+
+- **It always makes the filter more confident, whether or not the claim is true.** $P_{vv}^{+}$ is always smaller than both $P_{vv}$ and $R_{\text{zupt}}$. Nothing in the update looks at whether the robot is actually stationary. So when `always` applies it during extend, the filter reports a velocity standard deviation of at most 0.01 m/s while the true velocity is up to $v_{\text{extend}} = 0.1$ m/s away from the zero it was just told. That built-in overconfidence is what drives the large NEES values for `always` in §3.
+
 ## 2. A calibration trap: an instantaneous velocity jump swamps the comparison
 
 The first version of this toy used a hard step for `true_velocity` - $0$ during anchor, $v_{\text{extend}}$ the instant extend began. That produced nonsense: $\text{NEES}$ in the hundreds to thousands for *all three* filter variants, dominated by a shared spike at every phase transition that had nothing to do with ZUPT policy. The reason: an instantaneous jump is an effectively-infinite acceleration, and the predict step's constant-velocity assumption (with a finite process-noise budget) has no way to represent that, regardless of which measurements get fused afterward.
