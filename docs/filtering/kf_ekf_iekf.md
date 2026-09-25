@@ -77,7 +77,7 @@ Think of the standard KF as:
 
 It's elegant and mathematically clean, but it doesn't work directly for things like rotations, camera poses, or nonlinear robot dynamics.
 
-**A concrete data point**: this repo's own `run_vanilla_kf` (same point-cloud pose-tracking benchmark referenced in [§7](#7-the-subtle-but-important-point)) is exactly this - a standard linear KF applied directly to a pose, via a redundant ambient `[vec(R), t]` state (`vec` taken row-major, as `R.flatten()` does) rather than the minimal SE(3) tangent every other method there uses. It works, but only by bolting on a first-order truncation of the motion model and a post-hoc SVD re-projection to keep the rotation valid - see [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) for the measured cost of skipping the manifold structure altogether.
+**A concrete data point**: this repo's own `run_vanilla_kf` (same point-cloud pose-tracking benchmark referenced in [§7](#7-the-subtle-but-important-point)) is exactly this - a standard linear KF applied directly to a pose, via a redundant ambient `[vec(R), t]` state (`vec` taken row-major, as `R.flatten()` does) rather than the minimal $SE(3)$ tangent every other method there uses. It works, but only by bolting on a first-order truncation of the motion model and a post-hoc SVD re-projection to keep the rotation valid - see [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) for the measured cost of skipping the manifold structure altogether.
 
 ---
 
