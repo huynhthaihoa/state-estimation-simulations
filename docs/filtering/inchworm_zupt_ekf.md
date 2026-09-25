@@ -45,7 +45,7 @@ Three ways of using a zero-velocity pseudo-measurement (ZUPT) are compared, shar
 
 ### 1.1 The filter math, concretely
 
-All three variants run the same Kalman filter over $x = [p, v]^\top$. The script calls it an EKF to match the rest of this repo, but every model here is exactly linear, so there is no linearization error and it is really a plain KF. Each tick runs up to three steps, in this order: predict, position update, then (depending on the variant) a ZUPT update (`run_ekf`).
+All three variants run the same Kalman filter over $x = [p, v]^\top$. The script calls it an EKF to match the rest of this repo, but every model here is exactly linear, so there is no linearization error and it is really a plain KF. Each tick runs up to three steps, in this order: **predict**, **position update**, then (depending on the variant) a **ZUPT update** (`run_ekf`).
 
 **Predict** (`predict`): a constant-velocity model, identical for all variants and both gait phases. The filter doesn't know the commanded velocity, only that it's roughly constant between ticks:
 

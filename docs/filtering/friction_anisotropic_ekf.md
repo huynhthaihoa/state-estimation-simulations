@@ -49,7 +49,7 @@ Three ways of building the position block of the filter's process-noise covarian
 
 ### 1.1 The filter math, concretely
 
-All three variants run the same EKF over $x = [p_x, p_y, \theta]^\top$. Each tick is one predict step followed by one position update (`run_ekf`). The only difference between the variants is how the position block of $Q$ is built inside the predict step.
+All three variants run the same EKF over $x = [p_x, p_y, \theta]^\top$. Each tick is one **predict step** followed by one **position update** (`run_ekf`). The only difference between the variants is how the position block of $Q$ is built inside the **predict step**.
 
 **Predict, mean and Jacobian** (`exact_arc_step`). With constant commanded speed $v$ and turn rate $\omega$, the robot moves along an exact circular arc of radius $r = v/\omega$:
 
