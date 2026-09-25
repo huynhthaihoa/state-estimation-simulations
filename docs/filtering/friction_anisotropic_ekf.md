@@ -47,6 +47,87 @@ Three ways of building the position block of the filter's process-noise covarian
 | `fixed_anisotropic` | Correctly anisotropic | Fixed to the heading at $t=0$, never updated - the mistake of knowing the pad is anisotropic without re-deriving $Q$ as the robot turns |
 | `heading_aware` | Correctly anisotropic | Re-oriented every predict step using the filter's own current heading estimate - the correct policy |
 
+### 1.1 The filter math, concretely
+
+All three variants run the same EKF over $x = [p_x, p_y, \theta]^\top$. Each tick is one predict step followed by one position update (`run_ekf`). The only difference between the variants is how the position block of $Q$ is built inside the predict step.
+
+**Predict, mean and Jacobian** (`exact_arc_step`). With constant commanded speed $v$ and turn rate $\omega$, the robot moves along an exact circular arc of radius $r = v/\omega$:
+
+$$
+\theta^{-} = \theta + \omega\,\Delta t, \qquad
+p_x^{-} = p_x + r\left(\sin\theta^{-} - \sin\theta\right), \qquad
+p_y^{-} = p_y - r\left(\cos\theta^{-} - \cos\theta\right)
+$$
+
+$$
+F = \frac{\partial x^{-}}{\partial x} =
+\begin{bmatrix}
+1 & 0 & r\left(\cos\theta^{-} - \cos\theta\right) \\
+0 & 1 & r\left(\sin\theta^{-} - \sin\theta\right) \\
+0 & 0 & 1
+\end{bmatrix}
+$$
+
+The mean is propagated exactly, with no linearization. $F$ is still needed because heading enters the position update nonlinearly: its third column says how an error in $\theta$ turns into a position error over one step. When $|\omega| < 10^{-9}$ the code switches to the straight-line limit, $`p^{-} = p + v\,\Delta t\,(\cos\theta, \sin\theta)`$, to avoid dividing by $\omega$.
+
+**Predict, covariance** (`predict`):
+
+$$
+P^{-} = F\,P\,F^\top + Q, \qquad
+Q = \begin{bmatrix} Q_{\text{pos}} & 0 \\ 0 & (\sigma_\theta\,\Delta t)^2 \end{bmatrix}
+$$
+
+$Q_{\text{pos}}$ is the 2×2 position block, and it is the only thing that changes between variants. The anisotropic version (`anisotropic_Q_pos`) starts from an ellipse in the pad's own body frame (small variance along the grip/forward axis, large variance along the slip/lateral axis) and rotates it into the world frame by some heading $\theta_Q$:
+
+$$
+Q_{\text{pos}}^{\text{aniso}}(\theta_Q) = R(\theta_Q)
+\begin{bmatrix} \sigma_{\text{grip}}^2 & 0 \\ 0 & \sigma_{\text{slip}}^2 \end{bmatrix}
+R(\theta_Q)^\top \Delta t^2,
+\qquad
+R(\theta_Q) = \begin{bmatrix} \cos\theta_Q & -\sin\theta_Q \\ \sin\theta_Q & \cos\theta_Q \end{bmatrix}
+$$
+
+The $\Delta t^2$ converts a slip-velocity standard deviation (m/s) into a per-tick position variance (m²). Written out, with $a = \sigma_{\text{grip}}^2 \Delta t^2$, $b = \sigma_{\text{slip}}^2 \Delta t^2$, $c = \cos\theta_Q$ and $s = \sin\theta_Q$:
+
+$$
+Q_{\text{pos}}^{\text{aniso}}(\theta_Q) =
+\begin{bmatrix}
+a c^2 + b s^2 & (a - b)\,c s \\
+(a - b)\,c s & a s^2 + b c^2
+\end{bmatrix}
+$$
+
+The three variants differ only in which $Q_{\text{pos}}$ they use:
+
+| `q_policy` | $Q_{\text{pos}}$ | Heading used to orient it |
+| --- | --- | --- |
+| `isotropic` | $`\sigma_{\text{iso}}^2\,\Delta t^2\,I`$ | none (a circle) |
+| `fixed_anisotropic` | $`Q_{\text{pos}}^{\text{aniso}}(\theta_{\text{ref}})`$ | $\theta_{\text{ref}}$, the true heading at $t = 0$, never updated |
+| `heading_aware` | $`Q_{\text{pos}}^{\text{aniso}}(\hat\theta)`$ | $\hat\theta$, the filter's own heading estimate at the start of the step |
+
+This mirrors how the simulator generates the truth (`generate_ground_truth_and_data`): each tick it draws slip in the body frame with standard deviations $\sigma_{\text{grip}}$ and $\sigma_{\text{slip}}$ (scaled by $\Delta t$) and rotates it by the *true* heading. `heading_aware` is the only variant whose noise model has the same shape and orientation as that process, apart from its own heading-estimate error.
+
+**Position update** (`measurement_update`). Only position is measured:
+
+$$
+H = \begin{bmatrix} 1 & 0 & 0 \\ 0 & 1 & 0 \end{bmatrix}, \qquad R = \sigma_{\text{pos}}^2 I
+$$
+
+$$
+r = z - H x^{-}, \qquad S = H P^{-} H^\top + R, \qquad K = P^{-} H^\top S^{-1}, \qquad
+x^{+} = x^{-} + K r, \qquad P^{+} = (I - K H)\,P^{-}
+$$
+
+Heading is never measured directly. It gets corrected only through the position-heading cross-covariance that $F$'s third column builds up in $P^{-}$. That is where `heading_aware`'s $\hat\theta$ comes from.
+
+Script defaults: $\sigma_{\text{grip}} = 0.02$ m/s, $\sigma_{\text{slip}} = 0.1$ m/s, $\sigma_\theta = 0.01$ rad/s, $\sigma_{\text{pos}} = 0.02$ m, $v = 0.2$ m/s, $\Delta t = 0.05$ s. The true heading is noise-free, so the small $\sigma_\theta$ term only keeps the filter's heading covariance from collapsing to zero.
+
+Three things follow directly from these formulas:
+
+- **All three variants carry the same total noise.** Rotation doesn't change a matrix's trace, so $Q_{\text{pos}}^{\text{aniso}}$ always has trace $(\sigma_{\text{grip}}^2 + \sigma_{\text{slip}}^2)\Delta t^2$. That is exactly $2\sigma_{\text{iso}}^2 \Delta t^2$, the trace of the isotropic version. The variants differ only in *direction*, not in how much noise they assume overall.
+- **The off-diagonal term is what points the ellipse.** It is zero only when $\theta_Q$ is a multiple of 90°. With the defaults, the slip variance is 25 times the grip variance (a 5:1 ratio in standard deviation), so pointing the ellipse the wrong way matters a lot. When `fixed_anisotropic`'s ellipse is misaligned, the filter assumes little noise in a direction where the real slip is large. It becomes overconfident in exactly that direction, which drives the NEES gap in §2.
+- **A 180° error costs nothing.** Replacing $\theta_Q$ with $\theta_Q + \pi$ flips the sign of both $c$ and $s$, which leaves $c^2$, $s^2$ and $cs$ unchanged. So $Q_{\text{pos}}^{\text{aniso}}$ repeats every 180°, which is the periodicity §3 builds on.
+
 ## 2. The dominant finding: `fixed_anisotropic` is dramatically worse, everywhere
 
 Monte Carlo NEES (500 trials, seed 0, $dt = 0.05\,\text{s}$ - the script's own default, verified to reproduce the table below to two significant figures - one full loop over $20\,\text{s}$), binned by how far the true heading has rotated away from `fixed_anisotropic`'s fixed reference heading:
