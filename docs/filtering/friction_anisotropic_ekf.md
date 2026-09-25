@@ -77,7 +77,19 @@ P^{-} = F\,P\,F^\top + Q, \qquad
 Q = \begin{bmatrix} Q_{\text{pos}} & 0 \\ 0 & (\sigma_\theta\,\Delta t)^2 \end{bmatrix}
 $$
 
-$Q_{\text{pos}}$ is the 2×2 position block, and it is the only thing that changes between variants. The anisotropic version (`anisotropic_Q_pos`) starts from an ellipse in the pad's own body frame (small variance along the grip/forward axis, large variance along the slip/lateral axis) and rotates it into the world frame by some heading $\theta_Q$:
+$Q_{\text{pos}}$ is the 2×2 position block, and it is the only thing that changes between variants. Two functions build it: `isotropic_Q_pos` (a circle) and `anisotropic_Q_pos` (a rotated ellipse). The three variants are then defined by which function they call and, for the ellipse, which heading they pass in.
+
+**Isotropic block** (`isotropic_Q_pos`). The same variance in every direction:
+
+$$
+Q_{\text{pos}}^{\text{iso}} = \sigma_{\text{iso}}^2\,\Delta t^2\,I_2,
+\qquad
+\sigma_{\text{iso}}^2 = \frac{\sigma_{\text{grip}}^2 + \sigma_{\text{slip}}^2}{2}
+$$
+
+$\sigma_{\text{iso}}^2$ is the average of the two body-frame slip variances. That choice gives the circle the same total variance (trace) as the ellipse below, so the isotropic variant isn't handicapped by assuming more or less noise overall - it only lacks direction. Because a circle looks the same at every rotation, this block needs no heading at all.
+
+**Anisotropic block** (`anisotropic_Q_pos`). It starts from an ellipse in the pad's own body frame (small variance along the grip/forward axis, large variance along the slip/lateral axis) and rotates it into the world frame by some heading $\theta_Q$:
 
 $$
 Q_{\text{pos}}^{\text{aniso}}(\theta_Q) = R(\theta_Q)
@@ -97,13 +109,21 @@ a c^2 + b s^2 & (a - b)\,c s \\
 \end{bmatrix}
 $$
 
-The three variants differ only in which $Q_{\text{pos}}$ they use:
+This function doesn't decide which heading to use - the caller does. That choice is what separates the two anisotropic variants.
+
+**The three variants.** At predict step $k$ (propagating from tick $k-1$ to tick $k$):
+
+- **`isotropic`**: uses $Q_{\text{pos}}^{\text{iso}}$ every step. It ignores the pad's anisotropy entirely.
+- **`fixed_anisotropic`**: uses $Q_{\text{pos}}^{\text{aniso}}(\theta_{\text{ref}})$ every step, where $\theta_{\text{ref}}$ is the true heading at $t = 0$ (`x_true[0, 2]`, which is $0$ in the default run). $\theta_{\text{ref}}$ never changes, so the ellipse keeps pointing in its initial direction while the robot turns underneath it.
+- **`heading_aware`**: uses $Q_{\text{pos}}^{\text{aniso}}(\hat\theta_{k-1})$, where $\hat\theta_{k-1}$ is the filter's own heading estimate after the previous tick's update (`x[2]` before this step's propagation). The ellipse is re-oriented every step to follow the estimated heading. It uses the estimate, not the true heading, because a real filter has no access to the truth. It also uses the heading at the *start* of the step rather than the propagated $\theta^{-}$; with the defaults the heading changes by only $\omega\Delta t \approx 0.9°$ per step, so this makes no practical difference.
+
+In code, all three are a single branch in `predict` on `q_policy`:
 
 | `q_policy` | $Q_{\text{pos}}$ | Heading used to orient it |
 | --- | --- | --- |
-| `isotropic` | $`\sigma_{\text{iso}}^2\,\Delta t^2\,I`$ | none (a circle) |
+| `isotropic` | $`Q_{\text{pos}}^{\text{iso}}`$ | none (a circle) |
 | `fixed_anisotropic` | $`Q_{\text{pos}}^{\text{aniso}}(\theta_{\text{ref}})`$ | $\theta_{\text{ref}}$, the true heading at $t = 0$, never updated |
-| `heading_aware` | $`Q_{\text{pos}}^{\text{aniso}}(\hat\theta)`$ | $\hat\theta$, the filter's own heading estimate at the start of the step |
+| `heading_aware` | $`Q_{\text{pos}}^{\text{aniso}}(\hat\theta_{k-1})`$ | $\hat\theta_{k-1}$, the filter's own heading estimate at the start of the step |
 
 This mirrors how the simulator generates the truth (`generate_ground_truth_and_data`): each tick it draws slip in the body frame with standard deviations $\sigma_{\text{grip}}$ and $\sigma_{\text{slip}}$ (scaled by $\Delta t$) and rotates it by the *true* heading. `heading_aware` is the only variant whose noise model has the same shape and orientation as that process, apart from its own heading-estimate error.
 
@@ -118,7 +138,7 @@ r = z - H x^{-}, \qquad S = H P^{-} H^\top + R, \qquad K = P^{-} H^\top S^{-1}, 
 x^{+} = x^{-} + K r, \qquad P^{+} = (I - K H)\,P^{-}
 $$
 
-Heading is never measured directly. It gets corrected only through the position-heading cross-covariance that $F$'s third column builds up in $P^{-}$. That is where `heading_aware`'s $\hat\theta$ comes from.
+Heading is never measured directly. It gets corrected only through the position-heading cross-covariance that $F$'s third column builds up in $P^{-}$. That is where `heading_aware`'s $\hat\theta_{k-1}$ comes from.
 
 Script defaults: $\sigma_{\text{grip}} = 0.02$ m/s, $\sigma_{\text{slip}} = 0.1$ m/s, $\sigma_\theta = 0.01$ rad/s, $\sigma_{\text{pos}} = 0.02$ m, $v = 0.2$ m/s, $\Delta t = 0.05$ s. The true heading is noise-free, so the small $\sigma_\theta$ term only keeps the filter's heading covariance from collapsing to zero.
 
