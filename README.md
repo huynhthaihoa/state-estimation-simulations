@@ -102,7 +102,7 @@ uv run pytest tests/ -v
 
 #### Purpose
 
-Integrates the same noisy gyro + body-velocity stream two ways: attitude kept as a **flat Euler-angle vector** (`euler += omega*dt`) vs. attitude kept on **$SO(3)$ and updated via the exponential map** - to isolate the error the flat vector-space approximation introduces on its own. Ground truth is the exp-map integration of the noise-free rates. Plots rotation and position error (log scale) over time.
+Integrates the same noisy gyro + body-velocity stream two ways: attitude kept as a **flat Euler-angle vector** (`euler += omega*dt`) vs. attitude kept on **$SO(3)$ and updated via the exponential map** - to isolate the error the flat vector-space approximation introduces on its own. Each method is scored against its own noise-free ground truth (the noise-free rates integrated with that method's own update rule), not a shared exp-map one. Plots rotation and position error (log scale) over time.
 
 #### Scripts
 
