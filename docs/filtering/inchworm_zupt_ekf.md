@@ -47,33 +47,33 @@ Three ways of using a zero-velocity pseudo-measurement (ZUPT) are compared, shar
 
 All three variants run the same Kalman filter over $x = [p, v]^\top$. The script calls it an EKF to match the rest of this repo, but every model here is exactly linear, so there is no linearization error and it is really a plain KF. Each tick runs up to three steps, in this order: predict, position update, then (depending on the variant) a ZUPT update (`run_ekf`).
 
-- **Predict** (`predict`): a constant-velocity model, identical for all variants and both gait phases. The filter doesn't know the commanded velocity, only that it's roughly constant between ticks:
+**Predict** (`predict`): a constant-velocity model, identical for all variants and both gait phases. The filter doesn't know the commanded velocity, only that it's roughly constant between ticks:
 
-  $$
-  \Phi = \begin{bmatrix} 1 & \Delta t \\ 0 & 1 \end{bmatrix}, \qquad
-  Q = \begin{bmatrix} \left(\tfrac{1}{2}\sigma_{\text{process}}\Delta t^2\right)^2 & 0 \\ 0 & \left(\sigma_{\text{process}}\Delta t\right)^2 \end{bmatrix}
-  $$
+$$
+\Phi = \begin{bmatrix} 1 & \Delta t \\ 0 & 1 \end{bmatrix}, \qquad
+Q = \begin{bmatrix} \left(\tfrac{1}{2}\sigma_{\text{process}}\Delta t^2\right)^2 & 0 \\ 0 & \left(\sigma_{\text{process}}\Delta t\right)^2 \end{bmatrix}
+$$
 
-  $$
-  x^{-} = \Phi\,x, \qquad P^{-} = \Phi\,P\,\Phi^\top + Q
-  $$
+$$
+x^{-} = \Phi\,x, \qquad P^{-} = \Phi\,P\,\Phi^\top + Q
+$$
 
-  $Q$ is a simple diagonal heuristic, the same one `saltation_matrix_ekf.py` uses. It is not the textbook continuous white-noise-acceleration $Q$, which would also have off-diagonal terms.
+$Q$ is a simple diagonal heuristic, the same one `saltation_matrix_ekf.py` uses. It is not the textbook continuous white-noise-acceleration $Q$, which would also have off-diagonal terms.
 
-- **Measurement updates** (`_kf_update`): both updates go through the same standard linear-Gaussian update and differ only in $z$, $H$ and $R$:
+**Measurement updates** (`_kf_update`): both updates go through the same standard linear-Gaussian update and differ only in $z$, $H$ and $R$:
 
-  $$
-  r = z - H x^{-}, \qquad S = H P^{-} H^\top + R, \qquad K = P^{-} H^\top S^{-1}
-  $$
+$$
+r = z - H x^{-}, \qquad S = H P^{-} H^\top + R, \qquad K = P^{-} H^\top S^{-1}
+$$
 
-  $$
-  x^{+} = x^{-} + K r, \qquad P^{+} = (I - K H)\,P^{-}
-  $$
+$$
+x^{+} = x^{-} + K r, \qquad P^{+} = (I - K H)\,P^{-}
+$$
 
-  | Update | Function | $z$ | $H$ | $R$ | Runs |
-  | --- | --- | --- | --- | --- | --- |
-  | Position | `measurement_update_position` | noisy position reading | $\begin{bmatrix} 1 & 0 \end{bmatrix}$ | $\sigma_{\text{pos}}^2$ | every tick |
-  | ZUPT | `measurement_update_zupt` | $0$ (pseudo-measurement) | $\begin{bmatrix} 0 & 1 \end{bmatrix}$ | $\sigma_{\text{zupt}}^2$ | depends on the variant |
+| Update | Function | $z$ | $H$ | $R$ | Runs |
+| --- | --- | --- | --- | --- | --- |
+| Position | `measurement_update_position` | noisy position reading | $\begin{bmatrix} 1 & 0 \end{bmatrix}$ | $\sigma_{\text{pos}}^2$ | every tick |
+| ZUPT | `measurement_update_zupt` | $0$ (pseudo-measurement) | $\begin{bmatrix} 0 & 1 \end{bmatrix}$ | $\sigma_{\text{zupt}}^2$ | depends on the variant |
 
 ZUPT is a *pseudo*-measurement: no sensor produces that $z = 0$. The filter is simply told "velocity is zero, give or take $\sigma_{\text{zupt}}$", which is only true if the robot really is stationary. The script's defaults are $\sigma_{\text{pos}} = 0.02$ m and $\sigma_{\text{zupt}} = 0.01$ m/s. Because the two measurement noises are independent, running the ZUPT update right after the position update in the same tick gives the same result as one joint update with both rows of $H$ stacked.
 
