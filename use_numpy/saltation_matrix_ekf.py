@@ -720,12 +720,13 @@ def main():
     parser.add_argument("--process-noise-std", type=float, default=0.3,
                          help="Assumed acceleration-disturbance noise std-dev (m/s^2)")
     parser.add_argument("--impact-noise-std", type=float, default=0.005,
-                         help="Std-dev of the regularizing floor added to P at each bounce, both EKF "
-                              "variants (m-scale; needed because the exact saltation projection drives "
-                              "the guard-normal direction's variance to exactly zero -- see step_hybrid). "
-                              "This value is not just a numerical-stability knob: which filter's "
-                              "post-bounce NEES comes out higher is sensitive to it -- see the module "
-                              "docstring and docs/filtering/hybrid_saltation_ekf.md")
+                         help="Std-dev of the isotropic floor (impact_noise_std**2 * I) added to P at "
+                              "each bounce, both EKF variants. Not needed for numerical stability "
+                              "(saltation_matrix scales the guard-normal row by -e rather than "
+                              "zeroing it -- see step_hybrid); it stands in for the impact-timing/model "
+                              "uncertainty a real contact-aided filter would carry. It shifts both "
+                              "filters' NEES level together but does not flip which one is higher -- "
+                              "see docs/filtering/hybrid_saltation_ekf.md §5 and §7")
     parser.add_argument("--init-pos-noise-std", type=float, default=0.1,
                          help="Std-dev used to perturb the initial position guess (m)")
     parser.add_argument("--init-vel-noise-std", type=float, default=0.2,

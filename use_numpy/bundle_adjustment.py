@@ -10,9 +10,8 @@ camera sees every landmark; a camera's field of view controls which pairs
 land in O).
 
 Poses T_i are (4,4) camera-to-world transforms, consistent with every other
-script in this codebase (T.act(p) convention); the doc's own p=pi(TP)
-shorthand omits the inverse, which is fine for an intro-level page but not
-literally what's implemented here.
+script in this codebase (T.act(p) convention), so projection is
+p = pi(T^-1 P), matching the doc.
 
 Three solvers make the doc's central "jointly" thesis (Section 4) concrete:
 
@@ -432,7 +431,8 @@ def pose_errors(T_true_list, T_est_list):
 def reprojection_rms(T_list, P_list, observations, K):
     """RMS pixel reprojection error over every observed (camera, landmark)
     pair -- directly implements docs/optimization/bundle_adjustment.md's own
-    sum_{(i,j) in O} ||z_ij - pi(T_i P_j)||^2 objective.
+    sum_{(i,j) in O} ||z_ij - pi(T_i^-1 P_j)||^2 objective (T_i is
+    camera-to-world, so T_i^-1 P_j is the point in camera i's frame).
     Arguments:
         T_list: list of camera poses (4,4)
         P_list: (n_landmarks, 3) array of landmark positions
