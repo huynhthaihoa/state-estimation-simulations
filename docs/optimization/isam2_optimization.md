@@ -128,7 +128,7 @@ This is where **iSAM** and then **iSAM2** come in.
 
 iSAM stands for:
 
-> **incremental Smoothing And Mapping**
+> **incremental Smoothing and Mapping**
 
 Instead of repeatedly solving:
 

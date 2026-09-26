@@ -1,6 +1,6 @@
 # Docs index
 
-Conceptual/pedagogical notes on the state-estimation and SLAM ideas behind the code in[`use_numpy/`](../use_numpy/) and [`use_manif/`](../use_manif/). Grouped by role below; within each group, docs are listed in a sensible reading order (later ones lean on earlier ones).
+Conceptual/pedagogical notes on the state-estimation and SLAM ideas behind the code in [`use_numpy/`](../use_numpy/) and [`use_manif/`](../use_manif/). Grouped by role below; within each group, docs are listed in a sensible reading order (later ones lean on earlier ones).
 
 ## Start here
 

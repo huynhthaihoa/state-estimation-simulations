@@ -229,7 +229,7 @@ So we use an iterative strategy.
 
 ## 7. The key trick: make the nonlinear problem locally linear
 
-This is where **Jacobian** enters.
+This is where the **Jacobian** enters.
 
 Suppose we're currently at:
 
@@ -334,8 +334,6 @@ This distinction is important.
 
 ## 10. Where [Levenberg–Marquardt](levenberg_marquardt.md) fits
 
-You just asked about LM.
-
 Now its role becomes much clearer.
 
 NLS gives us:
@@ -418,7 +416,7 @@ For Gaussian noise:
 
 $$W_i=\Sigma_i^{-1}$$
 
-where $\Sigma_i$ is the covariance. ($W_i$ here is the same quantity as the **information matrix** $\Omega_k$ used from [factor_graph.md §4](factor_graph.md#4-optimization-means-minimizing-all-those-errors) onward - both are $\Sigma^{-1}$ for a factor's measurement; this doc introduces the idea with $W_i$, factor_graph.md and everything downstream of it (including [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md)) uses $\Omega$.)
+where $\Sigma_i$ is the covariance. ($W_i$ here is the same quantity as the **information matrix** $\Omega_k$ used from [factor_graph.md §4](factor_graph.md#4-optimization-means-minimizing-all-those-errors) onward - both are $\Sigma^{-1}$ for a factor's measurement; this doc introduces the idea with $W_i$, factor_graph.md and everything downstream of it (including [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md)) use $\Omega$.)
 
 So a useful interpretation is:
 

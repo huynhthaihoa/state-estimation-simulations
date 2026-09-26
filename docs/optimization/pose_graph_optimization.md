@@ -536,7 +536,7 @@ There's also a particularly important connection worth making explicit: **PGO is
 
 ## 15. Mathematical breakdown of the error formulation and Lie algebra operations
 
-Pose-Graph Optimization (PGO) formulates loop closure and drift correction as a non-linear least squares problem on the Special Euclidean Group $\mathrm{SE}(3)$ (or $\mathrm{SE}(2)$ for 2D). Because $\mathrm{SE}(3)$ is a non-Euclidean Lie group rather than a vector space, standard calculus operations like addition and subtraction do not apply directly. Instead, optimization is performed locally on its Lie algebra $\mathfrak{se}(3)$ using tangent spaces.
+Pose-Graph Optimization (PGO) formulates loop closure and drift correction as a nonlinear least squares problem on the Special Euclidean Group $\mathrm{SE}(3)$ (or $\mathrm{SE}(2)$ for 2D). Because $\mathrm{SE}(3)$ is a non-Euclidean Lie group rather than a vector space, standard calculus operations like addition and subtraction do not apply directly. Instead, optimization is performed locally on its Lie algebra $\mathfrak{se}(3)$ using tangent spaces.
 
 ### 15.1 State Representation and Constraints
 
@@ -616,7 +616,7 @@ Linearizing the residual $r_{ij}$ with respect to local perturbations ${\boldsym
 
 $$r_{ij}(X \oplus \boldsymbol{\delta}) \approx r_{ij}(X) + J_i \, \boldsymbol{\xi}_i + J_j \, \boldsymbol{\xi}_j$$
 
-Where the Jacobians
+Here the Jacobians
 
 $$
 J_i = \frac{\partial r_{ij}}{\partial \pmb{\xi}_i}
@@ -734,7 +734,7 @@ So $g = -b$ in §15.5's notation, and the code solves $`(H + \lambda \, \mathrm{
 
 ## 16. Robust loss functions used to handle false loop closures
 
-In Pose-Graph Optimization (PGO), standard non-linear least squares relies on an $L_2$ squared-error norm ${F(x) = \sum r_{ij}^\top \Omega_{ij} r_{ij}}$. Under an $L_2$ loss, a single false loop closure (a severe outlier) produces a massive residual $r_{ij}$ whose squared weight pulls the entire trajectory out of shape to satisfy the invalid edge.
+In Pose-Graph Optimization (PGO), standard nonlinear least squares relies on an $L_2$ squared-error norm ${F(x) = \sum r_{ij}^\top \Omega_{ij} r_{ij}}$. Under an $L_2$ loss, a single false loop closure (a severe outlier) produces a massive residual $r_{ij}$ whose squared weight pulls the entire trajectory out of shape to satisfy the invalid edge.
 
 Robust cost functions replace or reweight the standard $L_2$ norm to cap or reduce the influence of large residuals.
 

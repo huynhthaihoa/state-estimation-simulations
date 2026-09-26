@@ -231,7 +231,7 @@ So:
 
 $$\lambda \downarrow$$
 
-Next iteration behaves more like Gauss–Newton.
+The next iteration behaves more like Gauss–Newton.
 
 ---
 
@@ -497,6 +497,8 @@ Incremental optimization
        │
        └── iSAM / iSAM2
 ```
+
+---
 
 ## 14. The one-sentence intuition
 

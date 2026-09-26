@@ -13,7 +13,7 @@ It's not a SLAM algorithm by itself - it's the evaluation tool you reach for *af
 A monocular camera looking at a static scene can recover the *shape* of the scene and the *relative* motion of the cameras, but it cannot recover:
 
 - **absolute position/orientation**: the whole reconstruction could be picked up and rigidly moved anywhere, and every reprojection error would stay identical, and
-- **absolute scale**: shrinking the entire scene and every camera-to-point distance by the same factor, while doubling nothing else, leaves every projected pixel exactly where it was.
+- **absolute scale**: shrinking the entire scene and every camera-to-point distance by the same factor, while changing nothing else, leaves every projected pixel exactly where it was.
 
 Together, that's a **7-parameter similarity ambiguity**: 3 translation + 3 rotation + 1 scale. This is the same **gauge freedom** idea as in [pose_graph_optimization.md](../optimization/pose_graph_optimization.md)'s "one subtlety this formula hides" note - a direction the optimizer's cost function is completely blind to - except pose graphs only have the 6-DoF rigid version (their edges are *relative rigid* constraints, so scale is never in question), while monocular bundle adjustment's edges are *projective*, so scale is unobservable too.
 

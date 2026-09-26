@@ -88,4 +88,4 @@ The biggest single payoff script in the repo lives here.
 
 ---
 
-**Why this order:** each phase's docs are exactly the prerequisite the next script needs and nothing more, complexity ramps monotonically (flat-vs-manifold → single-pose filtering → multi-pose graphs → joint pose+landmark → incremental/scalable), and the conceptual-only docs without their own script (`vi_initialization.md`, `isam2_optimization.md`) land right where their ideas are most load-bearing even so.
+**Why this order:** each phase's docs are exactly the prerequisites the next script needs and nothing more, complexity ramps monotonically (flat-vs-manifold → single-pose filtering → multi-pose graphs → joint pose+landmark → incremental/scalable), and the conceptual-only docs without their own script (`vi_initialization.md`, `isam2_optimization.md`) land right where their ideas are most load-bearing even so.

@@ -1,6 +1,6 @@
 # Triangulation and PnP: two sides of one geometric problem
 
-Triangulation asks "given known camera poses and a 2D observation in each, where is the 3D point?" PnP asks the exact inverse: "given several known 3D points and their observed 2D pixels, where is the camera?" (a single point/pixel pair pins down a ray, not a unique pose - PnP needs at least 3 correspondences (P3P), and this repo's own DLT implementation needs at least 6, per §6 below). Both reduce to the same reprojection residual, solved the same way in this repo - a closed-form linear initial guess, then a few Gauss-Newton iterations.
+Triangulation asks "given known camera poses and a 2D observation in each, where is the 3D point?" PnP asks the exact inverse: "given several known 3D points and their observed 2D pixels, where is the camera?" (a single point/pixel pair pins down a ray, not a unique pose - PnP needs at least 3 correspondences (P3P), and this repo's own DLT implementation needs at least 6, per §5 below). Both reduce to the same reprojection residual, solved the same way in this repo - a closed-form linear initial guess, then a few Gauss-Newton iterations.
 
 This builds directly on:
 - The **reprojection error** and **"bundle of rays"** intuition from [bundle_adjustment.md §5](../optimization/bundle_adjustment.md#5-why-is-it-called-bundle-adjustment).
@@ -87,7 +87,7 @@ A_i = \left([d_i]_\times\right)_{\text{rows }1,2}
 x = \begin{bmatrix} r_1 & r_2 & r_3 & t_{cw}^\top \end{bmatrix}^\top
 $$
 
-The third row is dropped because it is a combination of the first two (the third entry of $d_i$ is always 1). $A$ is $2n\times12$ and needs rank 11 for a one-dimensional null space. That is why §6 asks for at least 6 points.
+The third row is dropped because it is a combination of the first two (the third entry of $d_i$ is always 1). $A$ is $2n\times12$ and needs rank 11 for a one-dimensional null space. That is why §5 asks for at least 6 points.
 
 The recovered $3\times3$ block is only a *scaled, possibly reflected* rotation - not yet a valid element of $SO(3)$. `linear_pnp_dlt` turns $x$ into a pose in this order:
 
@@ -144,5 +144,5 @@ Neither problem is "solved" by the linear step alone - both need this positive-d
 ## 7. References
 
 1. Hartley, R., & Zisserman, A. (2004). *Multiple View Geometry in Computer Vision* (2nd ed.). Cambridge University Press. - the standard reference for DLT camera resectioning behind §3's derivation.
-2. Lepetit, V., Moreno-Noguer, F., & Fua, P. (2009). *EPnP: An Accurate O(n) Solution to the PnP Problem*. International Journal of Computer Vision, 81(2), 155-166. https://doi.org/10.1007/s11263-008-0152-6 - the production-grade PnP algorithm named as a contrast in §6.
+2. Lepetit, V., Moreno-Noguer, F., & Fua, P. (2009). *EPnP: An Accurate O(n) Solution to the PnP Problem*. International Journal of Computer Vision, 81(2), 155-166. https://doi.org/10.1007/s11263-008-0152-6 - the production-grade PnP algorithm named as a contrast in §5.
 3. Triggs, B., McLauchlan, P. F., Hartley, R. I., & Fitzgibbon, A. W. (2000). *Bundle Adjustment - A Modern Synthesis*. In Vision Algorithms: Theory and Practice (pp. 298-372). Springer. - already cited in [bundle_adjustment.md](../optimization/bundle_adjustment.md), covering the triangulation-within-BA context behind §2.

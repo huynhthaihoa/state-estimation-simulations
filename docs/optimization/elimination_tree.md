@@ -507,7 +507,7 @@ Elimination structure
 
 ### The simplest mental model
 
-If you remember three things:
+If you remember only three things:
 
 **Factor graph:**
 

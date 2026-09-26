@@ -1,6 +1,6 @@
 # Left-invariant vs. Right-invariant errors in IEKF
 
-An intuitive explanation of the difference between "left invariant" and "right invariant" error formulations in the **Invariant EKF**, building on the IEKF section of [extra_kf_variants.md](extra_kf_variants.md).
+An intuitive explanation of the difference between "left-invariant" and "right-invariant" error formulations in the **Invariant EKF**, building on the IEKF section of [extra_kf_variants.md](extra_kf_variants.md).
 
 ---
 

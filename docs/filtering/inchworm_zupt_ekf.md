@@ -16,7 +16,7 @@ ANCHOR                    EXTEND                     ANCHOR
 - **Anchor**: one end is planted on the ground - the robot is, by construction, perfectly stationary ($v = 0$). No ambiguity, no noise - it's known ground truth.
 - **Extend**: the anchor releases, the body extends/pushes forward at some commanded speed, then the new end plants and grips.
 
-The idea this doc explores: during anchor, "velocity = 0" is a *free, trustworthy measurement* (a ZUPT - Zero Velocity Potential Update) you can feed into the filter - but only during anchor. Feed it in during extend (when the robot is actually moving) and you're telling the filter a lie with high confidence, which is exactly the failure mode the `always` variant below demonstrates.
+The idea this doc explores: during anchor, "velocity = 0" is a *free, trustworthy measurement* (a ZUPT - Zero-Velocity Update) you can feed into the filter - but only during anchor. Feed it in during extend (when the robot is actually moving) and you're telling the filter a lie with high confidence, which is exactly the failure mode the `always` variant below demonstrates.
 
 Consider an observation specific to inchworm-like locomotion as below:
 
@@ -24,11 +24,11 @@ Consider an observation specific to inchworm-like locomotion as below:
 
 This doc works through the simplest concrete version of that idea, using [`inchworm_zupt_ekf.py`](../../use_numpy/inchworm_zupt_ekf.py)'s 1D crawling point mass as the toy problem.
 
-**Scope, stated up front**: this is deliberately a small slice of the real idea. It models translation only - zero-velocity updates (ZUPT), not the full zero-angular-rate/orientation story (ZARU) [`hybrid_saltation_ekf.md`](hybrid_saltation_ekf.md) mentions as a Stretch item - since that needs an orientation state this toy doesn't carry. It also assumes the gait schedule (when anchor/extend happen) is *known*, not detected. That second question - what happens once the schedule itself is uncertain - is exactly the subject of [`hybrid_saltation_ekf.md` §8](hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter), which this doc leans on rather than repeating.
+**Scope, stated up front**: this is deliberately a small slice of the real idea. It models translation only - zero-velocity updates (ZUPT), not the full zero-angular-rate/orientation story (ZARU) - since that needs an orientation state this toy doesn't carry. It also assumes the gait schedule (when anchor/extend happen) is *known*, not detected. That second question - what happens once the schedule itself is uncertain - is exactly the subject of [`hybrid_saltation_ekf.md` §8](hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter), which this doc leans on rather than repeating.
 
 ## 1. Why this isn't a hybrid-reset problem
 
-Unlike the bouncing point mass in `hybrid_saltation_ekf.md`, nothing here needs a guard, a reset map, or a saltation matrix. Velocity is externally commanded per phase - an ordinary **switched-linear system**, not a discontinuous *state* jump the filter's covariance has to be linearized through. The entire interesting question sits on the **measurement** side: does the filter correctly exploit (or wrongly misuse) the free zero-velocity information the anchor phase provides.
+Unlike the bouncing point mass in `hybrid_saltation_ekf.md`, nothing here needs a guard, a reset map, or a saltation matrix. Velocity is externally commanded per phase - an ordinary **switched-linear system**, not a discontinuous *state* jump the filter's covariance has to be linearized through. The entire interesting question sits on the **measurement** side: does the filter correctly exploit (or wrongly misuse) the free zero-velocity information the anchor phase provides?
 
 State is $x = [p, v]$ (1D). The gait cycle alternates:
 

@@ -96,7 +96,7 @@ See `run_ukf` in [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/point
 
 This is one of the most important variants to know for SLAM/VIO work.
 
-An ESKF doesn't estimate the entire state error directly.
+An ESKF doesn't estimate the entire state directly.
 
 Instead, it separates:
 
@@ -161,7 +161,7 @@ before spending too much time on UKF.
 
 ## 4. Invariant EKF (IEKF)
 
-We already discussed this one, but it's worth putting it into the broader family.
+[kf_ekf_iekf.md](kf_ekf_iekf.md) covers this one in depth, but it's worth putting it into the broader family.
 
 The important idea is:
 

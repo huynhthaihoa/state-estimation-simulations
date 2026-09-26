@@ -2,7 +2,7 @@
 
 ## Intuition
 
-"Anisotropic friction" means grips well in one direction, slides easily in the other - the canonical image is a snake's belly scales, or a ratchet:
+"Anisotropic friction" means a surface grips well in one direction and slides easily in the other - the canonical image is a snake's belly scales, or a ratchet:
 
 ```
         low-friction (slide) axis
@@ -165,7 +165,7 @@ This part is robust: verified across seeds 0-3, `fixed_anisotropic` is worse tha
 
 ## 3. A secondary finding, and where it stops being clean
 
-The *worst* of `fixed_anisotropic`'s own four checkpoints is the 90-135° bin in three of the four seeds tried (0, 1, 3), not the largest possible mismatch (135-180°) - seed 2 is the exception (§ below). The reason isn't an accident: a covariance ellipse $R(\theta)\,\mathrm{diag}(a,b)\,R(\theta)^\top$ has period $\pi$ in $\theta$, not $2\pi$ - rotating it by 180° gives back the identical ellipse. So a heading mismatch of 180° is, for the *orientation of the noise ellipse specifically*, no mismatch at all; the worst possible ellipse-orientation mismatch is at 90°, exactly where the empirical peak sits for those three seeds.
+The *worst* of `fixed_anisotropic`'s own four checkpoints is the 90-135° bin in three of the four seeds tried (0, 1, 3), not the largest possible mismatch (135-180°) - seed 2 is the exception (see below). The reason isn't an accident: a covariance ellipse $R(\theta)\,\mathrm{diag}(a,b)\,R(\theta)^\top$ has period $\pi$ in $\theta$, not $2\pi$ - rotating it by 180° gives back the identical ellipse. So a heading mismatch of 180° is, for the *orientation of the noise ellipse specifically*, no mismatch at all; the worst possible ellipse-orientation mismatch is at 90°, exactly where the empirical peak sits for those three seeds.
 
 What happens **beyond** that peak, heading back out toward a full 180° difference, is *not* a clean story, and this doc says so rather than overselling one: in seeds 0, 1, and 3, `fixed_anisotropic`'s NEES does partially recover in the 135-180° bin (matching the ellipse-symmetry prediction); in seed 2, it keeps climbing all the way through. The most likely explanation is that the pure instantaneous-orientation-mismatch effect (which the ellipse-symmetry argument correctly predicts) is competing with a second, accumulated-trajectory-drift effect that grows with elapsed time/distance regardless of instantaneous heading - and depending on the particular noise realization, either one can dominate by the time a full loop has been driven. The NEES-vs-time plot shows this concretely: `fixed_anisotropic` (red) has repeated, roughly periodic bumps over the $20\,\text{s}$ loop rather than one clean single-peaked hump, consistent with a real periodic effect that isn't the *only* thing going on.
 

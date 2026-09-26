@@ -15,7 +15,7 @@ IMU preintegration is where both ideas get used together for a real sensor.
 
 ## 1. The problem
 
-An IMU reports raw angular rate and acceleration at 100-1000 Hz. Camera keyframes or loop closures, which is what a pose graph or bundle-adjustment back-end actually optimizes over, arrive far more slowly - often 1-10 Hz. That mismatch creates two separate problems:
+An IMU reports raw angular rate and acceleration at 100-1000 Hz. Camera keyframes or loop closures, which are what a pose graph or bundle-adjustment back-end actually optimizes over, arrive far more slowly - often 1-10 Hz. That mismatch creates two separate problems:
 
 - **Problem A - too many samples**: If every raw IMU sample became its own node in the graph, a single second of motion would add 100+ nodes and edges. The graph would be enormous, and most of that detail is irrelevant to the back-end, which only cares about the *net* relative motion between two keyframes.
 
@@ -119,9 +119,11 @@ $$\tilde\omega = \omega + n_\omega,\quad n_\omega \sim \mathcal N(0, \sigma_g^2 
 
 Defaults: $\sigma_g = 0.02$ rad/s, $\sigma_v = 0.05$ m/s, $dt = 0.005$ s, 20 s, seed 0.
 
-**Naive update.** Attitude is kept as a ZYX Euler vector $\theta_{rpy}$ and rebuilt with `euler_to_R`, which returns $R_z(\text{yaw}) R_y(\text{pitch}) R_x(\text{roll})$:
+**Naive update.** Attitude is kept as a ZYX Euler vector $\theta_{rpy}$ and rebuilt with `euler_to_R`, which returns $`R_z(\text{yaw}) R_y(\text{pitch}) R_x(\text{roll})`$:
 
-$$`\theta_{rpy} \leftarrow \theta_{rpy} + \tilde\omega\,dt, \qquad R \leftarrow \texttt{euler\_to\_R}(\theta_{rpy}), \qquad p \leftarrow p + R\,\tilde v\,dt`$$
+$$
+\theta_{rpy} \leftarrow \theta_{rpy} + \tilde\omega\,dt, \qquad R \leftarrow \texttt{euler\_to\_R}(\theta_{rpy}), \qquad p \leftarrow p + R\,\tilde v\,dt
+$$
 
 **Exp-map update.**
 
@@ -141,7 +143,7 @@ The 0.02 noise is hard-coded. `se3_exp` builds $\text{Exp}(\xi)$ with rotation $
 
 $$V = I + \frac{1-\cos\theta}{\theta^2}[\omega]_\times + \frac{\theta-\sin\theta}{\theta^3}[\omega]_\times^2$$
 
-falling back to $`I + [\omega]_\times$ and $V = I + \tfrac{1}{2}[\omega]_\times`$ below $\theta < 10^{-6}$.
+falling back to $`I + [\omega]_\times`$ and $`V = I + \tfrac{1}{2}[\omega]_\times`$ below $\theta < 10^{-6}$.
 
 **Position fix.** Once per second: $z = t_{true} + n_z$ with $n_z \sim \mathcal N(0, \sigma_{pos}^2 I)$, $\sigma_{pos} = 0.05$ m by default. It measures translation only, never orientation.
 
