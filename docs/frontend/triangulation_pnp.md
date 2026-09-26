@@ -129,25 +129,19 @@ Neither problem is "solved" by the linear step alone - both need this positive-d
 
 ---
 
-## 5. Where PnP shows up elsewhere
-
-The exact same problem - known 3D points, known intrinsics, unknown pose - is solved via `cv2.solvePnP` in the author's separate `camera-calibration` project (not part of this repo, so this reference won't resolve if you've only cloned `state-estimation-simulations`), to recover each calibration image's extrinsics from its detected checkerboard corners. That call is a black box (OpenCV's own implementation, not derived), but it's worth noting as a real, working instance of this same math elsewhere, in a calibration context rather than a SLAM front-end context.
-
----
-
-## 6. What the accompanying scripts do (and don't)
+## 5. What the accompanying scripts do (and don't)
 
 `linear_pnp_dlt` is the simplest *correct* version of linear PnP, not a production algorithm - it needs $n\geq 6$ well-conditioned correspondences to be numerically stable (rank-3+ data), and its accuracy degrades faster than purpose-built solvers as $n$ grows or points become near-coplanar. Production systems (OpenCV's own `solvePnP`, ORB-SLAM, COLMAP) typically use **EPnP** (Lepetit, Moreno-Noguer & Fua, 2009 - see References), an $O(n)$ algorithm that expresses every 3D point as a weighted combination of four virtual control points, turning the problem into recovering just those four points' camera-frame coordinates - more accurate and much cheaper at scale than a general DLT null-space solve. This repo implements the simpler DLT version for pedagogical clarity, matching `triangulate_landmark`'s own choice of a simple closed-form linear solve over a more sophisticated one.
 
 ---
 
-## 7. One-sentence summary
+## 6. One-sentence summary
 
 > **Triangulation and PnP are the same reprojection problem run in opposite directions - one holds poses fixed to solve for a point, the other holds several known points fixed to solve for a pose - and this repo solves both the same way: a closed-form linear guess (ray intersection / DLT) followed by a few Gauss-Newton iterations, guarded against the same sign/reflection ambiguity in both directions.**
 
 ---
 
-## 8. References
+## 7. References
 
 1. Hartley, R., & Zisserman, A. (2004). *Multiple View Geometry in Computer Vision* (2nd ed.). Cambridge University Press. - the standard reference for DLT camera resectioning behind §3's derivation.
 2. Lepetit, V., Moreno-Noguer, F., & Fua, P. (2009). *EPnP: An Accurate O(n) Solution to the PnP Problem*. International Journal of Computer Vision, 81(2), 155-166. https://doi.org/10.1007/s11263-008-0152-6 - the production-grade PnP algorithm named as a contrast in §6.
