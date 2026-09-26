@@ -121,9 +121,9 @@ Defaults: $\sigma_g = 0.02$ rad/s, $\sigma_v = 0.05$ m/s, $dt = 0.005$ s, 20 s, 
 
 **Naive update.** Attitude is kept as a ZYX Euler vector $\theta_{rpy}$ and rebuilt with `euler_to_R`, which returns $`R_z(\text{yaw}) R_y(\text{pitch}) R_x(\text{roll})`$:
 
-$$
+```math
 \theta_{rpy} \leftarrow \theta_{rpy} + \tilde\omega\,dt, \qquad R \leftarrow \texttt{euler\_to\_R}(\theta_{rpy}), \qquad p \leftarrow p + R\,\tilde v\,dt
-$$
+```
 
 **Exp-map update.**
 
