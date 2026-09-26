@@ -510,7 +510,7 @@ Each rotation is orthogonal, so after the sweep ${R^\top R}$ has gained exactly 
 
 **Streaming a new node** (`run_incremental_pose_graph`): for node $k$ with odometry edge ${Z_{k-1,k}}$:
 
-1. Dead-reckon its linearization point from the previous one: ${\bar{X}_k = \bar{X}_{k-1} Z_{k-1,k}}$.
+1. Dead-reckon its linearization point from the previous one: $`\bar{X}_k = \bar{X}_{k-1} Z_{k-1,k}`$.
 2. Pad $R$ and $d$ with 6 zero rows and columns.
 3. Insert the edge's 6 whitened rows one at a time with `qr_insert_row`.
 4. Read out the estimate (`read_out`): ${\boldsymbol{\delta} = R^{-1} d}$, then $`X_k = \bar{X}_k \, \mathrm{Exp}(\boldsymbol{\delta}_k)`$ for every node.
