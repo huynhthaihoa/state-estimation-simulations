@@ -5,7 +5,7 @@ IMU preintegration compresses thousands of raw, sensor-rate IMU samples between 
 This builds directly on two things you've already seen:
 - The **node/edge language** from [pose_graph_optimization.md](pose_graph_optimization.md#2-where-do-the-edges-come-from) ("an edge is a relative-motion constraint between two nodes")
 
-- The **right Jacobian** from [jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space) ($\text{Exp}(\varphi+\delta\varphi) \approx \text{Exp}(\varphi)\cdot\text{Exp}\big(J_r(\varphi)\,\delta\varphi\big)$ - the extra rotation composed on the *right*, i.e. expressed in the object's own body frame).
+- The **right Jacobian** from [jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space) ($`\text{Exp}(\varphi+\delta\varphi) \approx \text{Exp}(\varphi)\cdot\text{Exp}\big(J_r(\varphi)\,\delta\varphi\big)`$ - the extra rotation composed on the *right*, i.e. expressed in the object's own body frame).
 
 IMU preintegration is where both ideas get used together for a real sensor.
 
@@ -43,11 +43,17 @@ $\Delta R, \Delta v, \Delta p$ are the trip summary. $J_{R,b_g}, J_{v,b_g}, J_{v
 
 At every raw IMU sample, [`use_numpy/imu_preintegration.py`](../../use_numpy/imu_preintegration.py)'s `PreintegratedIMUBundle.integrate_measurement` folds one micro-step into three running quantities, all expressed relative to the body frame at the *start* of the integration window. The order below matters and matches the code exactly (`imu_preintegration.py:60-62`) - every quantity on the right-hand side is the value from *before* this step, never a value already updated earlier in the same step, which is why $\Delta p$ is updated first (it depends on the old $\Delta v$ and old $\Delta R$), then $\Delta v$ (depends on the old $\Delta R$), and $\Delta R$ last (depends on neither):
 
-$$\Delta p \leftarrow \Delta p + \Delta v\,dt + \tfrac{1}{2}\Delta R\,(\tilde v - b_a)\,dt^2$$
+```math
+\Delta p \leftarrow \Delta p + \Delta v\,dt + \tfrac{1}{2}\Delta R\,(\tilde v - b_a)\,dt^2
+```
 
-$$\Delta v \leftarrow \Delta v + \Delta R\,(\tilde v - b_a)\,dt$$
+```math
+\Delta v \leftarrow \Delta v + \Delta R\,(\tilde v - b_a)\,dt
+```
 
-$$\Delta R \leftarrow \Delta R \cdot \text{Exp}\big((\tilde\omega - b_g)\,dt\big)$$
+```math
+\Delta R \leftarrow \Delta R \cdot \text{Exp}\big((\tilde\omega - b_g)\,dt\big)
+```
 
 where $\tilde\omega, \tilde v$ are the raw sensor readings and $b_g, b_a$ are the bias estimates *in effect when this bundle started*. (An earlier version of this doc listed $\Delta R$ first, $\Delta v$ second, $\Delta p$ last - which reads, taken as literal sequential assignment, as using the *already-updated* $\Delta R$/$`\Delta v`$ a step early, giving each a $1.5\times$ contribution instead of $1\times$ from that step's rotation/velocity increment. The code never does this - it saves `R_prev` before touching `self.delta_R`, and updates `delta_p`/`delta_v` from that saved old value first - and the order above now matches it.) (The script's own comment flags a simplification worth knowing: a real IMU's second channel measures raw *acceleration*, which would need one more integration to reach velocity; this demo integrates a commanded *velocity* channel directly instead, purely to keep the manifold bookkeeping legible. The $\Delta R$ recursion - the part this doc is actually about - is unaffected either way.)
 
@@ -63,11 +69,17 @@ $$J_{R,b_g} = \frac{\partial \Delta R}{\partial b_g} \qquad J_{v,b_g} = \frac{\p
 
 These are exactly the "sensitivity map" idea from [jacobian.md §3](../foundations/jacobian.md#3-think-of-it-as-a-sensitivity-map) - "if I nudge the input a little, how much does the output move?" - just tracked incrementally, one micro-step at a time, instead of computed once from a closed-form function. Each step updates them using the *current* micro-step's rotation $dR = \text{Exp}((\tilde\omega-b_g)dt)$ and its right Jacobian $J_r = J_r\big((\tilde\omega-b_g)dt\big)$ - and, matching §3's point above, in the same "everything on the right is the old value" order the code uses (`imu_preintegration.py:66-72`): the $p$-Jacobians first (they depend on the old $J_{v,\cdot}$, old $\Delta R$, and old $J_{R,b_g}$), then the $v$-Jacobians (depend on the old $\Delta R$ and old $J_{R,b_g}$), then $J_{R,b_g}$ itself last (depends on neither):
 
-$$J_{p,b_g} \leftarrow J_{p,b_g} + J_{v,b_g}\,dt - \tfrac{1}{2}\Delta R\,[\tilde v-b_a]_\times J_{R,b_g}\,dt^2 \qquad J_{p,b_a} \leftarrow J_{p,b_a} + J_{v,b_a}\,dt - \tfrac{1}{2}\Delta R\,dt^2$$
+```math
+J_{p,b_g} \leftarrow J_{p,b_g} + J_{v,b_g}\,dt - \tfrac{1}{2}\Delta R\,[\tilde v-b_a]_\times J_{R,b_g}\,dt^2 \qquad J_{p,b_a} \leftarrow J_{p,b_a} + J_{v,b_a}\,dt - \tfrac{1}{2}\Delta R\,dt^2
+```
 
-$$J_{v,b_g} \leftarrow J_{v,b_g} - \Delta R\,[\tilde v-b_a]_\times J_{R,b_g}\,dt \qquad J_{v,b_a} \leftarrow J_{v,b_a} - \Delta R\,dt$$
+```math
+J_{v,b_g} \leftarrow J_{v,b_g} - \Delta R\,[\tilde v-b_a]_\times J_{R,b_g}\,dt \qquad J_{v,b_a} \leftarrow J_{v,b_a} - \Delta R\,dt
+```
 
-$$J_{R,b_g} \leftarrow dR^\top J_{R,b_g} - J_r\,dt$$
+```math
+J_{R,b_g} \leftarrow dR^\top J_{R,b_g} - J_r\,dt
+```
 
 **Implementation notes.** Both helpers in `lie_utils.py` switch to first-order forms when $\theta = \lVert(\tilde\omega-b_g)dt\rVert < 10^{-6}$: `so3_exp` returns $`I + [\phi]_\times`$ and `so3_right_jacobian` returns $`I - \tfrac{1}{2}[\phi]_\times`$. Otherwise, they use the closed forms (Rodrigues and the $J_r$ formula from [jacobian.md §11.4](../foundations/jacobian.md#114-closed-form-for-so3)). The demo also leaves out two things a real preintegrated factor needs. There is no gravity term; a real accelerometer's specific force must have gravity removed, usually in the residual. And there is no preintegrated noise covariance: the script propagates the bias Jacobians but not Forster et al.'s $\Sigma$ recursion, so the bundle carries no uncertainty. Finally, the demo builds its raw readings as the commanded twist plus the *estimated* bias, so $`\tilde v - b_a`$ and $`\tilde\omega - b_g`$ equal the commanded values exactly.
 
@@ -79,7 +91,9 @@ The one worth staring at is $J_{R,b_g}$, because it's a direct instance of [jaco
 
 Once the bundle has absorbed, say, 100 raw samples, suppose the graph optimizer updates its bias estimate from $b_g \to b_g'$ (a small change $\delta b_g = b_g' - b_g$, since bias only drifts slowly between optimizer iterations - exactly the "small change" regime a Jacobian is built for, per [jacobian.md §8](../foundations/jacobian.md#8-one-subtle-point-jacobian-is-local)). `get_corrected_measurement` applies the first-order Taylor correction directly, no raw samples touched:
 
-$$\Delta R' \approx \Delta R\cdot\text{Exp}\big(J_{R,b_g}\,\delta b_g\big) \qquad \Delta v' \approx \Delta v + J_{v,b_g}\,\delta b_g + J_{v,b_a}\,\delta b_a \qquad \Delta p' \approx \Delta p + J_{p,b_g}\,\delta b_g + J_{p,b_a}\,\delta b_a$$
+```math
+\Delta R' \approx \Delta R\cdot\text{Exp}\big(J_{R,b_g}\,\delta b_g\big) \qquad \Delta v' \approx \Delta v + J_{v,b_g}\,\delta b_g + J_{v,b_a}\,\delta b_a \qquad \Delta p' \approx \Delta p + J_{p,b_g}\,\delta b_g + J_{p,b_a}\,\delta b_a
+```
 
 Notice the asymmetry: $\Delta v'$ and $\Delta p'$ are corrected by plain addition, because velocity and position are ordinary vectors - but $\Delta R'$ has to go back through $\text{Exp}(\cdot)$ and get *composed* onto $\Delta R$, because rotations aren't. That's the same distinction [jacobian.md §11.1](../foundations/jacobian.md#111-why-plain-addition-breaks) opened with, showing up again here as a concrete asymmetry inside one function.
 
@@ -127,17 +141,23 @@ Defaults: $\sigma_g = 0.02$ rad/s, $\sigma_v = 0.05$ m/s, $dt = 0.005$ s, 20 s, 
 
 **Exp-map update.**
 
-$$R \leftarrow R\,\text{Exp}(\tilde\omega\,dt), \qquad p \leftarrow p + R\,\tilde v\,dt$$
+```math
+R \leftarrow R\,\text{Exp}(\tilde\omega\,dt), \qquad p \leftarrow p + R\,\tilde v\,dt
+```
 
 In both, the position step uses the rotation *after* this step's update. That is the opposite of the preintegration order in §3, which uses the old $\Delta R$.
 
 **Ground truths.** There are two, one per estimator, each built from the noise-free rates with that estimator's own composition rule: $`R^{gt}_{\text{naive}} \leftarrow R^{gt}_{\text{naive}}\,\texttt{euler\_to\_R}(\omega\,dt)`$ and $`R^{gt}_{\text{exp}} \leftarrow R^{gt}_{\text{exp}}\,\text{Exp}(\omega\,dt)`$, with positions integrated as above. Rotation error is the geodesic angle (`rotation_geodesic_error`), plotted in degrees; position error is the Euclidean norm:
 
-$$e_R = \arccos\!\left(\frac{\mathrm{tr}(R_{gt}^\top R_{est}) - 1}{2}\right),\qquad e_p = \lVert p_{gt} - p_{est}\rVert$$
+```math
+e_R = \arccos\!\left(\frac{\mathrm{tr}(R_{gt}^\top R_{est}) - 1}{2}\right),\qquad e_p = \lVert p_{gt} - p_{est}\rVert
+```
 
 **`robot_imu_simulation.py`, propagation** (`run_simulation`). The true twist $\xi = [v, \omega]$ (translation first) is drawn once, uniformly per axis from $\pm 1.0$ m/s and $\pm 0.5$ rad/s. Each IMU step ($dt = 0.01$ s, 100 steps per second):
 
-$$T_{true} \leftarrow T_{true}\,\text{Exp}(\xi\,dt), \qquad T_{est} \leftarrow T_{est}\,\text{Exp}\big((\xi + n)\,dt\big),\quad n \sim \mathcal{N}(0, 0.02^2 I_6)$$
+```math
+T_{true} \leftarrow T_{true}\,\text{Exp}(\xi\,dt), \qquad T_{est} \leftarrow T_{est}\,\text{Exp}\big((\xi + n)\,dt\big),\quad n \sim \mathcal{N}(0, 0.02^2 I_6)
+```
 
 The 0.02 noise is hard-coded. `se3_exp` builds $\text{Exp}(\xi)$ with rotation $\text{Exp}(\omega)$ and translation $V v$, where
 
@@ -153,7 +173,9 @@ $$r = z - t_{est}, \qquad J = \frac{\partial t}{\partial \delta\xi} = \begin{bma
 
 **Solve and retract.** With $\Omega = I/\sigma_{pos}^2$ (built in `__main__` as `pos_info`):
 
-$$\left(J^\top \Omega J + 10^{-4} I_6\right)\delta\xi = J^\top \Omega\, r, \qquad T_{est} \leftarrow T_{est}\,\text{Exp}(\delta\xi)$$
+```math
+\left(J^\top \Omega J + 10^{-4} I_6\right)\delta\xi = J^\top \Omega\, r, \qquad T_{est} \leftarrow T_{est}\,\text{Exp}(\delta\xi)
+```
 
 The loop stops when $\lVert\delta\xi\rVert$ drops below `gn_tol` ($10^{-6}$) or after `gn_max_iters` (10) iterations. With the defaults, it converges in 2 iterations each second.
 
