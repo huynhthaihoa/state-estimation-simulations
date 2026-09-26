@@ -104,7 +104,7 @@ A full VIO (Visual-Inertial Odometry)/VI-SLAM back-end (GTSAM's `CombinedImuFact
 ## 7. What the accompanying scripts actually do (and don't)
 
 - **`imu_preintegration.py`** (both [`use_numpy/`](../../use_numpy/imu_preintegration.py) and [`use_manif/`](../../use_manif/imu_preintegration.py)) implements exactly §3-§5 above: compress raw samples into a bundle, track the bias Jacobians, then apply the $O(1)$ correction. The two versions are line-for-line equivalent - `use_manif`'s docstring spells out the exact correspondence (its `rplus()` call returns the same `dR`/right-Jacobian pair the numpy version computes by hand). **Neither script builds the graph residual described in §6** - both stop at demonstrating the compression + correction, which is the specific mechanism this doc covers.
-- **`robot_imu_simulation.py`** is a related but different script: it [dead-reckons](factor_graph.md#2-why-do-we-need-it) noisy body-twist readings directly on $SE(3)$ every micro-step (chaining `se3_exp`, no bundle, no bias Jacobians at all). Its "IMU" reports a 6-D velocity twist, so there is no accelerometer, no bias and no gravity. It then periodically runs a small damped Gauss-Newton correction against a separate GPS-like position fix. It's about *twist dead-reckoning + periodic on-manifold correction*, not preintegration.
+- **`robot_imu_simulation.py`** is a related but different script: it [dead-reckons](factor_graph.md#2-why-do-we-need-it) noisy body-twist readings directly on $SE(3)$ every micro-step (chaining `se3_exp`, no bundle, no bias Jacobians at all). Its "IMU" reports a 6-D velocity twist, so there is no accelerometer, no bias, and no gravity. It then periodically runs a small damped Gauss-Newton correction against a separate GPS-like position fix. It's about *twist dead-reckoning + periodic on-manifold correction*, not preintegration.
 - **`imu_integration_comparison.py`** is also related but different: like [pointcloud_pose_tracking_empirical_note.md](../filtering/pointcloud_pose_tracking_empirical_note.md), it's an empirical comparison note rather than a concept explainer - it plots naive Euler-angle (vector-space) integration against proper $SO(3)$ Exp-map integration. The Exp-map estimate still drifts from gyro noise, just far less: with the defaults it ends at about 0.47° rotation error vs. about 70.8° for naive. Each method is scored against its own noise-free ground truth (§7.1). No bias correction involved.
 
 ### 7.1 The comparison and correction math, concretely
@@ -121,7 +121,7 @@ Defaults: $\sigma_g = 0.02$ rad/s, $\sigma_v = 0.05$ m/s, $dt = 0.005$ s, 20 s, 
 
 **Naive update.** Attitude is kept as a ZYX Euler vector $\theta_{rpy}$ and rebuilt with `euler_to_R`, which returns $R_z(\text{yaw}) R_y(\text{pitch}) R_x(\text{roll})$:
 
-$$\theta_{rpy} \leftarrow \theta_{rpy} + \tilde\omega\,dt, \qquad R \leftarrow \texttt{euler\_to\_R}(\theta_{rpy}), \qquad p \leftarrow p + R\,\tilde v\,dt$$
+$$`\theta_{rpy} \leftarrow \theta_{rpy} + \tilde\omega\,dt, \qquad R \leftarrow \texttt{euler\_to\_R}(\theta_{rpy}), \qquad p \leftarrow p + R\,\tilde v\,dt`$$
 
 **Exp-map update.**
 
@@ -131,17 +131,17 @@ In both, the position step uses the rotation *after* this step's update. That is
 
 **Ground truths.** There are two, one per estimator, each built from the noise-free rates with that estimator's own composition rule: $`R^{gt}_{\text{naive}} \leftarrow R^{gt}_{\text{naive}}\,\texttt{euler\_to\_R}(\omega\,dt)`$ and $`R^{gt}_{\text{exp}} \leftarrow R^{gt}_{\text{exp}}\,\text{Exp}(\omega\,dt)`$, with positions integrated as above. Rotation error is the geodesic angle (`rotation_geodesic_error`), plotted in degrees; position error is the Euclidean norm:
 
-$$e_R = \arccos\!\left(\frac{\operatorname{tr}(R_{gt}^\top R_{est}) - 1}{2}\right), \qquad e_p = \lVert p_{gt} - p_{est}\rVert$$
+$$e_R = \arccos\!\left(\frac{\mathrm{tr}(R_{gt}^\top R_{est}) - 1}{2}\right),\qquad e_p = \lVert p_{gt} - p_{est}\rVert$$
 
 **`robot_imu_simulation.py`, propagation** (`run_simulation`). The true twist $\xi = [v, \omega]$ (translation first) is drawn once, uniformly per axis from $\pm 1.0$ m/s and $\pm 0.5$ rad/s. Each IMU step ($dt = 0.01$ s, 100 steps per second):
 
-$$T_{true} \leftarrow T_{true}\,\text{Exp}(\xi\,dt), \qquad T_{est} \leftarrow T_{est}\,\text{Exp}\big((\xi + n)\,dt\big),\quad n \sim \mathcal N(0, 0.02^2 I_6)$$
+$$T_{true} \leftarrow T_{true}\,\text{Exp}(\xi\,dt), \qquad T_{est} \leftarrow T_{est}\,\text{Exp}\big((\xi + n)\,dt\big),\quad n \sim \mathcal{N}(0, 0.02^2 I_6)$$
 
 The 0.02 noise is hard-coded. `se3_exp` builds $\text{Exp}(\xi)$ with rotation $\text{Exp}(\omega)$ and translation $V v$, where
 
 $$V = I + \frac{1-\cos\theta}{\theta^2}[\omega]_\times + \frac{\theta-\sin\theta}{\theta^3}[\omega]_\times^2$$
 
-falling back to $I + [\omega]_\times$ and $V = I + \tfrac{1}{2}[\omega]_\times$ below $\theta < 10^{-6}$.
+falling back to $`I + [\omega]_\times$ and $V = I + \tfrac{1}{2}[\omega]_\times`$ below $\theta < 10^{-6}$.
 
 **Position fix.** Once per second: $z = t_{true} + n_z$ with $n_z \sim \mathcal N(0, \sigma_{pos}^2 I)$, $\sigma_{pos} = 0.05$ m by default. It measures translation only, never orientation.
 
@@ -153,7 +153,7 @@ $$r = z - t_{est}, \qquad J = \frac{\partial t}{\partial \delta\xi} = \begin{bma
 
 $$\left(J^\top \Omega J + 10^{-4} I_6\right)\delta\xi = J^\top \Omega\, r, \qquad T_{est} \leftarrow T_{est}\,\text{Exp}(\delta\xi)$$
 
-The loop stops when $\lVert\delta\xi\rVert$ drops below `gn_tol` ($10^{-6}$) or after `gn_max_iters` (10) iterations. With the defaults it converges in 2 iterations each second.
+The loop stops when $\lVert\delta\xi\rVert$ drops below `gn_tol` ($10^{-6}$) or after `gn_max_iters` (10) iterations. With the defaults, it converges in 2 iterations each second.
 
 The $10^{-4} I$ damping is required, not cosmetic. $J$'s angular block is zero, so $J^\top \Omega J$ has rank 3 and plain Gauss-Newton's normal matrix would be singular. The damping makes it solvable and leaves the rotational part of $\delta\xi$ at exactly zero. Orientation is therefore never corrected; only the IMU dead-reckoning sets it. Because $\Omega = 400 I$ dwarfs the damping, each solve moves $t_{est}$ essentially all the way onto the noisy $z$. So the post-correction error is about the size of the fix noise, and can be larger than the pre-correction error (seed 0, second 1: 0.0050 m before, 0.0785 m after).
 
