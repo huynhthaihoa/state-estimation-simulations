@@ -81,7 +81,7 @@ and observations such as:
 
 $$x_1^0,\ x_2^1,\ x_3^2,\ldots$$
 
-(following the same pairing as $T_{01}, T_{12}, T_{23}$ above, each $x_n^{\,n-1}$ reads as *the observation made at frame ${n}$, expressed relative to frame ${n-1}$* - the doc doesn't spell this out explicitly, but the indexing pattern matches.)
+(following the same pairing as $T_{01}, T_{12}, T_{23}$ above, each $`x_n^{\,n-1}`$ reads as *the observation made at frame ${n}$, expressed relative to frame ${n-1}$* - the doc doesn't spell this out explicitly, but the indexing pattern matches.)
 
 The back-end asks:
 
@@ -91,7 +91,9 @@ This is usually formulated as an optimization problem.
 
 For example:
 
-$$\min_{\mathbf{x}} \frac12\sum_i \|r_i(\mathbf{x})\|^2$$
+```math
+\min_{\mathbf{x}} \frac12\sum_i \|r_i(\mathbf{x})\|^2
+```
 
 where $r_i$ is the error associated with a measurement.
 

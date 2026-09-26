@@ -30,7 +30,9 @@ The factor graph represents **constraints**:
 
 The goal is still:
 
-$$X^* = \arg\min_X \sum_i \|r_i(X)\|^2$$
+```math
+X^* = \arg\min_X \sum_i \|r_i(X)\|^2
+```
 
 ---
 

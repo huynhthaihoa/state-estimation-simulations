@@ -90,8 +90,8 @@ Its state might be: $x = [x,y,\theta]$
 where $\theta$ is its orientation.
 
 The motion might look like:
- - $x_{k+1}=x_k+v\cos\theta\,\Delta t$
- - $y_{k+1}=y_k+v\sin\theta\,\Delta t$
+ - $`x_{k+1}=x_k+v\cos\theta\,\Delta t`$
+ - $`y_{k+1}=y_k+v\sin\theta\,\Delta t`$
 
 This is **nonlinear** because of the $\cos\theta$ and $\sin\theta$.
 
@@ -177,7 +177,9 @@ In 2D, composing rotations is easy: rotating by 90° and then another 90° just 
 
 In 3D, it's not that simple. Rotate an object 90° about the x-axis, then 90° about the y-axis, and you get a different orientation than doing it in the reverse order:
 
-$$R_x(90^\circ)\,R_y(90^\circ) \neq R_y(90^\circ)\,R_x(90^\circ)$$
+```math
+R_x(90^\circ)\,R_y(90^\circ) \neq R_y(90^\circ)\,R_x(90^\circ)
+```
 
 3D rotations don't commute, and there's no simple "add the numbers" operation the way there is for positions on a line. That's the sense in which rotations aren't ordinary vectors.
 
@@ -282,11 +284,13 @@ That's a much more natural representation for robot motion.
 
 §2 wrote down the EKF's predict/update cycle for an ordinary vector state; the subsections above explained *why* IEKF defines its error differently, but never wrote its equations down. This subsection does both, on the same concrete example §1 and §7 already use: tracking a pose $T\in SE(3)$ against a known point cloud (`run_ekf`/`run_iekf` in [pointcloud_pose_tracking.py](../../use_numpy/pointcloud_pose_tracking.py)). The point isn't just to see more formulas - it's to see the *one* line where EKF and IEKF actually diverge, since every other line is identical.
 
-**Shared setup.** State $T$ (a pose, not a vector) with 6x6 tangent covariance $P$; a per-step body-frame twist input $u$; a point cloud $\{p_i\}$ known in the object's own body frame, observed as noisy world-frame points $z_i$.
+**Shared setup.** State $T$ (a pose, not a vector) with 6x6 tangent covariance $P$; a per-step body-frame twist input $u$; a point cloud $`\{p_i\}`$ known in the object's own body frame, observed as noisy world-frame points $z_i$.
 
 **Predict - identical for both filters.** Composing poses with the group operation (not addition) is *exact* here, so this step isn't even an approximation:
 
-$$\hat T_k^- = \hat T_{k-1}\exp(u_{k-1}\Delta t) \qquad P_k^- = J_{\text{self}}\,P_{k-1}\,J_{\text{self}}^\top + J_\tau\,Q\,J_\tau^\top$$
+```math
+\hat T_k^- = \hat T_{k-1}\exp(u_{k-1}\Delta t) \qquad P_k^- = J_{\text{self}}\,P_{k-1}\,J_{\text{self}}^\top + J_\tau\,Q\,J_\tau^\top
+```
 
 Here $`J_{\text{self}} = \mathrm{Ad}_{\exp(-u_{k-1}\Delta t)}`$ (`se3_adjoint`) and $J_\tau = J_r(u_{k-1}\Delta t)$ (`se3_right_jacobian`). Both are closed-form $SE(3)$ Jacobians of that composition, not linearizations of an approximate model. $`Q = \Delta t^2\,\mathrm{diag}(\sigma_v^2 I_3, \sigma_\omega^2 I_3)`$ is the covariance of the twist increment $u\Delta t$. The full per-function math, including the UKF, vanilla KF and batch GN, is in [pointcloud_pose_tracking_empirical_note.md §1.1](pointcloud_pose_tracking_empirical_note.md#11-the-filter-math-concretely).
 

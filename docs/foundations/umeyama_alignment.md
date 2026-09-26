@@ -23,9 +23,11 @@ You can't compute a meaningful "position error in meters" against ground truth w
 
 ## 2. What it actually computes
 
-Given $n$ corresponding point pairs $\{(x_i, y_i)\}$ - here, $x_i$ from the estimated reconstruction and $y_i$ the ground truth - Umeyama's method (1991) finds the scale $s \in \mathbb{R}$, rotation $R \in SO(3)$, and translation $t \in \mathbb{R}^3$ that solve:
+Given $n$ corresponding point pairs $`\{(x_i, y_i)\}`$ - here, $x_i$ from the estimated reconstruction and $y_i$ the ground truth - Umeyama's method (1991) finds the scale $s \in \mathbb{R}$, rotation $R \in SO(3)$, and translation $t \in \mathbb{R}^3$ that solve:
 
-$$\boxed{\min_{s,R,t} \sum_{i=1}^{n} \left\| s R x_i + t - y_i \right\|^2}$$
+```math
+\boxed{\min_{s,R,t} \sum_{i=1}^{n} \left\| s R x_i + t - y_i \right\|^2}
+```
 
 i.e., the least-squares best-fit similarity transform mapping the estimated points onto the ground-truth points. Unlike a generic nonlinear least-squares problem, this one has a **closed-form solution** via SVD - no Gauss-Newton iteration needed.
 
@@ -49,18 +51,20 @@ $$\Sigma = \frac{1}{n} Y^\top X = U D V^\top$$
 
 $${R = U S V^\top}$$
 
-$$
+```math
 S = \begin{cases} 
 I & \text{if } \det(U)\det(V^\top) \ge 0 \\ 
 \text{diag}(1,1,-1) & \text{if } \det(U)\det(V^\top) < 0 
 \end{cases}
-$$
+```
 
 Plain $UV^\top$ is the best-fit *orthogonal* matrix, but "orthogonal" includes reflections ($\det = -1$) as well as rotations ($\det = +1$). Since $R$ must be an actual rotation, $S$ flips the sign of the axis paired with $\Sigma$'s smallest singular value (the last one, since `np.linalg.svd` sorts them in descending order) whenever the unconstrained best fit would have been a reflection - see the worked example in §4 for why this matters and what it costs.
 
 **Step 4. Scale and translation:**
 
-$$s = \frac{\text{tr}(DS)}{\text{var}(X)}, \qquad \text{var}(X) = \frac{1}{n}\sum \|X_i\|^2, \qquad t = \mu_{\text{true}} - s R \mu_{\text{est}}$$
+```math
+s = \frac{\text{tr}(DS)}{\text{var}(X)}, \qquad \text{var}(X) = \frac{1}{n}\sum \|X_i\|^2, \qquad t = \mu_{\text{true}} - s R \mu_{\text{est}}
+```
 
 That's exactly the four steps `umeyama_alignment` runs, in order.
 
@@ -81,16 +85,22 @@ So the guard is a deliberate trade: it always returns a physically valid rotatio
 
 Take four non-coplanar points and a known similarity transform - scale $s=2$, a $90°$ yaw about $z$, translation $t=(1,2,3)$:
 
-$$X = \begin{bmatrix} 0 & 0 & 0\\
+```math
+X = \begin{bmatrix} 0 & 0 & 0\\
 1 & 0 & 0\\
 0 & 1 & 0\\
-0 & 0 & 1 \end{bmatrix}$$
+0 & 0 & 1 \end{bmatrix}
+```
 
-$$\qquad R_{\text{true}} = \begin{bmatrix} 0 & -1 & 0\\
+```math
+\qquad R_{\text{true}} = \begin{bmatrix} 0 & -1 & 0\\
 1 & 0 & 0\\
-0 & 0 & 1 \end{bmatrix}$$
+0 & 0 & 1 \end{bmatrix}
+```
 
-$$\qquad Y = s\,(R_{\text{true}} X^\top)^\top + t$$
+```math
+\qquad Y = s\,(R_{\text{true}} X^\top)^\top + t
+```
 
 Running `umeyama_alignment(X, Y)` recovers $\hat{s} = 2.0$, $\hat{R} = R_{\text{true}}$, and $\hat{t} = (1, 2, 3)$ back out - to floating-point precision ($< 10^{-15}$ max error), since 4 well-spread non-coplanar points exactly determine a similarity transform with no noise to average out. With real (noisy) data from more than 4 points, the same four steps instead return the *least-squares best* $s, R, t$, exactly like fitting a line through noisy points.
 

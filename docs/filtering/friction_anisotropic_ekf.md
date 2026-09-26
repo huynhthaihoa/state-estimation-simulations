@@ -53,61 +53,61 @@ All three variants run the same EKF over $x = [p_x, p_y, \theta]^\top$. Each tic
 
 **Predict, mean and Jacobian** (`exact_arc_step`). With constant commanded speed $v$ and turn rate $\omega$, the robot moves along an exact circular arc of radius $r = v/\omega$:
 
-$$
+```math
 \theta^{-} = \theta + \omega\,\Delta t, \qquad
 p_x^{-} = p_x + r\left(\sin\theta^{-} - \sin\theta\right), \qquad
 p_y^{-} = p_y - r\left(\cos\theta^{-} - \cos\theta\right)
-$$
+```
 
-$$
+```math
 F = \frac{\partial x^{-}}{\partial x} =
 \begin{bmatrix}
 1 & 0 & r\left(\cos\theta^{-} - \cos\theta\right) \\
 0 & 1 & r\left(\sin\theta^{-} - \sin\theta\right) \\
 0 & 0 & 1
 \end{bmatrix}
-$$
+```
 
 The mean is propagated exactly, with no linearization. $F$ is still needed because heading enters the position update nonlinearly: its third column says how an error in $\theta$ turns into a position error over one step. When $|\omega| < 10^{-9}$ the code switches to the straight-line limit, $`p^{-} = p + v\,\Delta t\,(\cos\theta, \sin\theta)`$, to avoid dividing by $\omega$.
 
 **Predict, covariance** (`predict`):
 
-$$
+```math
 P^{-} = F\,P\,F^\top + Q, \qquad
 Q = \begin{bmatrix} Q_{\text{pos}} & 0 \\ 0 & (\sigma_\theta\,\Delta t)^2 \end{bmatrix}
-$$
+```
 
 $Q_{\text{pos}}$ is the 2×2 position block, and it is the only thing that changes between variants. Two functions build it: `isotropic_Q_pos` (a circle) and `anisotropic_Q_pos` (a rotated ellipse). The three variants are then defined by which function they call and, for the ellipse, which heading they pass in.
 
 **Isotropic block** (`isotropic_Q_pos`). The same variance in every direction:
 
-$$
+```math
 Q_{\text{pos}}^{\text{iso}} = \sigma_{\text{iso}}^2\,\Delta t^2\,I_2,
 \qquad
 \sigma_{\text{iso}}^2 = \frac{\sigma_{\text{grip}}^2 + \sigma_{\text{slip}}^2}{2}
-$$
+```
 
 $\sigma_{\text{iso}}^2$ is the average of the two body-frame slip variances. That choice gives the circle the same total variance (trace) as the ellipse below, so the isotropic variant isn't handicapped by assuming more or less noise overall - it only lacks direction. Because a circle looks the same at every rotation, this block needs no heading at all.
 
 **Anisotropic block** (`anisotropic_Q_pos`). It starts from an ellipse in the pad's own body frame (small variance along the grip/forward axis, large variance along the slip/lateral axis) and rotates it into the world frame by some heading $\theta_Q$:
 
-$$
+```math
 Q_{\text{pos}}^{\text{aniso}}(\theta_Q) = R(\theta_Q)
 \begin{bmatrix} \sigma_{\text{grip}}^2 & 0 \\ 0 & \sigma_{\text{slip}}^2 \end{bmatrix}
 R(\theta_Q)^\top \Delta t^2,
 \qquad
 R(\theta_Q) = \begin{bmatrix} \cos\theta_Q & -\sin\theta_Q \\ \sin\theta_Q & \cos\theta_Q \end{bmatrix}
-$$
+```
 
 The $\Delta t^2$ converts a slip-velocity standard deviation (m/s) into a per-tick position variance (m²). Written out, with $a = \sigma_{\text{grip}}^2 \Delta t^2$, $b = \sigma_{\text{slip}}^2 \Delta t^2$, $c = \cos\theta_Q$ and $s = \sin\theta_Q$:
 
-$$
+```math
 Q_{\text{pos}}^{\text{aniso}}(\theta_Q) =
 \begin{bmatrix}
 a c^2 + b s^2 & (a - b)\,c s \\
 (a - b)\,c s & a s^2 + b c^2
 \end{bmatrix}
-$$
+```
 
 This function doesn't decide which heading to use - the caller does. That choice is what separates the two anisotropic variants.
 
@@ -129,14 +129,14 @@ This mirrors how the simulator generates the truth (`generate_ground_truth_and_d
 
 **Position update** (`measurement_update`). Only position is measured:
 
-$$
+```math
 H = \begin{bmatrix} 1 & 0 & 0 \\ 0 & 1 & 0 \end{bmatrix}, \qquad R = \sigma_{\text{pos}}^2 I
-$$
+```
 
-$$
+```math
 r = z - H x^{-}, \qquad S = H P^{-} H^\top + R, \qquad K = P^{-} H^\top S^{-1}, \qquad
 x^{+} = x^{-} + K r, \qquad P^{+} = (I - K H)\,P^{-}
-$$
+```
 
 Heading is never measured directly. It gets corrected only through the position-heading cross-covariance that $F$'s third column builds up in $P^{-}$. That is where `heading_aware`'s $\hat\theta_{k-1}$ comes from.
 
@@ -150,7 +150,7 @@ Three things follow directly from these formulas:
 
 ## 2. The dominant finding: `fixed_anisotropic` is dramatically worse, everywhere
 
-Monte Carlo NEES (500 trials, seed 0, $dt = 0.05\,\text{s}$ - the script's own default, verified to reproduce the table below to two significant figures - one full loop over $20\,\text{s}$), binned by how far the true heading has rotated away from `fixed_anisotropic`'s fixed reference heading:
+Monte Carlo NEES (500 trials, seed 0, $`dt = 0.05\,\text{s}`$ - the script's own default, verified to reproduce the table below to two significant figures - one full loop over $`20\,\text{s}`$), binned by how far the true heading has rotated away from `fixed_anisotropic`'s fixed reference heading:
 
 | Rotation away from reference | `isotropic` | `fixed_anisotropic` | `heading_aware` |
 | --- | --- | --- | --- |
@@ -165,9 +165,9 @@ This part is robust: verified across seeds 0-3, `fixed_anisotropic` is worse tha
 
 ## 3. A secondary finding, and where it stops being clean
 
-The *worst* of `fixed_anisotropic`'s own four checkpoints is the 90-135° bin in three of the four seeds tried (0, 1, 3), not the largest possible mismatch (135-180°) - seed 2 is the exception (see below). The reason isn't an accident: a covariance ellipse $R(\theta)\,\mathrm{diag}(a,b)\,R(\theta)^\top$ has period $\pi$ in $\theta$, not $2\pi$ - rotating it by 180° gives back the identical ellipse. So a heading mismatch of 180° is, for the *orientation of the noise ellipse specifically*, no mismatch at all; the worst possible ellipse-orientation mismatch is at 90°, exactly where the empirical peak sits for those three seeds.
+The *worst* of `fixed_anisotropic`'s own four checkpoints is the 90-135° bin in three of the four seeds tried (0, 1, 3), not the largest possible mismatch (135-180°) - seed 2 is the exception (see below). The reason isn't an accident: a covariance ellipse $`R(\theta)\,\mathrm{diag}(a,b)\,R(\theta)^\top`$ has period $\pi$ in $\theta$, not $2\pi$ - rotating it by 180° gives back the identical ellipse. So a heading mismatch of 180° is, for the *orientation of the noise ellipse specifically*, no mismatch at all; the worst possible ellipse-orientation mismatch is at 90°, exactly where the empirical peak sits for those three seeds.
 
-What happens **beyond** that peak, heading back out toward a full 180° difference, is *not* a clean story, and this doc says so rather than overselling one: in seeds 0, 1, and 3, `fixed_anisotropic`'s NEES does partially recover in the 135-180° bin (matching the ellipse-symmetry prediction); in seed 2, it keeps climbing all the way through. The most likely explanation is that the pure instantaneous-orientation-mismatch effect (which the ellipse-symmetry argument correctly predicts) is competing with a second, accumulated-trajectory-drift effect that grows with elapsed time/distance regardless of instantaneous heading - and depending on the particular noise realization, either one can dominate by the time a full loop has been driven. The NEES-vs-time plot shows this concretely: `fixed_anisotropic` (red) has repeated, roughly periodic bumps over the $20\,\text{s}$ loop rather than one clean single-peaked hump, consistent with a real periodic effect that isn't the *only* thing going on.
+What happens **beyond** that peak, heading back out toward a full 180° difference, is *not* a clean story, and this doc says so rather than overselling one: in seeds 0, 1, and 3, `fixed_anisotropic`'s NEES does partially recover in the 135-180° bin (matching the ellipse-symmetry prediction); in seed 2, it keeps climbing all the way through. The most likely explanation is that the pure instantaneous-orientation-mismatch effect (which the ellipse-symmetry argument correctly predicts) is competing with a second, accumulated-trajectory-drift effect that grows with elapsed time/distance regardless of instantaneous heading - and depending on the particular noise realization, either one can dominate by the time a full loop has been driven. The NEES-vs-time plot shows this concretely: `fixed_anisotropic` (red) has repeated, roughly periodic bumps over the $`20\,\text{s}`$ loop rather than one clean single-peaked hump, consistent with a real periodic effect that isn't the *only* thing going on.
 
 ## 4. Takeaway for a real friction-anisotropic contact model
 

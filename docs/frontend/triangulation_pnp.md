@@ -40,10 +40,10 @@ Camera 1               Camera 2
 
 **The triangulation math, concretely.** Poses are camera-to-world: observer $k$ has rotation $R_k$ and camera center $o_k$ (its translation). `triangulate_landmark` rotates each pixel's calibrated ray into the world frame and normalizes it:
 
-$$
+```math
 \tilde d_k = \begin{bmatrix} (u_k - c_x)/f_x \\ (v_k - c_y)/f_y \\ 1 \end{bmatrix}, \qquad
 d_k = \frac{R_k \tilde d_k}{\left\| R_k \tilde d_k \right\|}
-$$
+```
 
 $$
 A = \sum_k \left(I - d_k d_k^\top\right), \qquad
@@ -81,11 +81,11 @@ This is **linear and homogeneous** in the 12 flattened entries of $[R_{cw} \mid 
 
 Concretely, each correspondence adds two rows to $A$: the first two rows of the cross-product matrix $[d_i]_\times$, times a $3\times12$ matrix that maps $x$ to $R_{cw}P_i + t_{cw}$. Here $r_1, r_2, r_3$ are the rows of $R_{cw}$:
 
-$$
+```math
 A_i = \left([d_i]_\times\right)_{\text{rows }1,2}
 \begin{bmatrix} P_i^\top & 0 & 0 & 1 & 0 & 0 \\ 0 & P_i^\top & 0 & 0 & 1 & 0 \\ 0 & 0 & P_i^\top & 0 & 0 & 1 \end{bmatrix}, \qquad
 x = \begin{bmatrix} r_1 & r_2 & r_3 & t_{cw}^\top \end{bmatrix}^\top
-$$
+```
 
 The third row is dropped because it is a combination of the first two (the third entry of $d_i$ is always 1). $A$ is $2n\times12$ and needs rank 11 for a one-dimensional null space. That is why §5 asks for at least 6 points.
 

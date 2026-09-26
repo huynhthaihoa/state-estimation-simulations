@@ -55,9 +55,11 @@ Simply adding numbers to a rotation matrix will generally destroy these properti
 
 For example, you could accidentally obtain something like:
 
-$$\begin{bmatrix}1.01 & 0 & 0\\ 
+```math
+\begin{bmatrix}1.01 & 0 & 0\\ 
 0 & 1.02 & 0\\ 
-0 & 0 & 1\end{bmatrix}$$
+0 & 0 & 1\end{bmatrix}
+```
 
 which isn't a valid rotation.
 
@@ -69,15 +71,19 @@ which isn't a valid rotation.
 
 Suppose your robot position is
 
-$$p =\begin{bmatrix}x\\ 
+```math
+p =\begin{bmatrix}x\\ 
 y\\ 
-z\end{bmatrix}$$
+z\end{bmatrix}
+```
 
 A small movement is simply:
 
-$$\delta p = \begin{bmatrix}\delta x\\ 
+```math
+\delta p = \begin{bmatrix}\delta x\\ 
 \delta y\\ 
-\delta z\end{bmatrix}$$
+\delta z\end{bmatrix}
+```
 
 and we can update:
 
@@ -162,9 +168,11 @@ Instead of thinking about **all possible rotations**, zoom in around $R$.
 
 Locally, small rotations behave approximately like ordinary vectors:
 
-$$\delta\theta =\begin{bmatrix}\delta\theta_x\\ 
+```math
+\delta\theta =\begin{bmatrix}\delta\theta_x\\ 
 \delta\theta_y\\ 
-\delta\theta_z \end{bmatrix}$$
+\delta\theta_z \end{bmatrix}
+```
 
 This is the Lie algebra:
 
@@ -184,9 +192,11 @@ That's probably the single most useful intuition.
 
 You might encounter:
 
-$$\delta\theta^\wedge = \begin{bmatrix} 0 & -\delta\theta_z & \delta\theta_y\\
+```math
+\delta\theta^\wedge = \begin{bmatrix} 0 & -\delta\theta_z & \delta\theta_y\\
 \delta\theta_z & 0 & -\delta\theta_x\\ 
--\delta\theta_y & \delta\theta_x & 0 \end{bmatrix}$$
+-\delta\theta_y & \delta\theta_x & 0 \end{bmatrix}
+```
 
 This is called the **hat operator**:
 
@@ -258,7 +268,7 @@ This converts a group element back into a Lie-algebra element - undoing the expo
 
 $$\log(\exp(\delta\theta^\wedge)) = \delta\theta^\wedge$$
 
-(This holds as long as $\|\delta\theta\| < \pi$. The exponential map is periodic per rotation axis, so beyond that range multiple $\delta\theta$'s map to the same $R$, and $\log$ can only recover the one on its principal branch.)
+(This holds as long as $`\|\delta\theta\| < \pi`$. The exponential map is periodic per rotation axis, so beyond that range multiple $\delta\theta$'s map to the same $R$, and $\log$ can only recover the one on its principal branch.)
 
 Conceptually:
 
@@ -325,8 +335,10 @@ A robot pose consists of:
 
 We represent it as:
 
-$$T = \begin{bmatrix}R & t\\ 
-0 & 1 \end{bmatrix}$$
+```math
+T = \begin{bmatrix}R & t\\ 
+0 & 1 \end{bmatrix}
+```
 
 where:
 
@@ -340,8 +352,10 @@ $$\mathfrak{se}(3)$$
 
 and a small pose perturbation can be represented as:
 
-$$\xi = \begin{bmatrix} \rho\\ 
-\phi \end{bmatrix} \in \mathbb{R}^6$$
+```math
+\xi = \begin{bmatrix} \rho\\ 
+\phi \end{bmatrix} \in \mathbb{R}^6
+```
 
 where:
 
@@ -360,15 +374,19 @@ So one 6D vector represents a tiny change in the entire robot pose:
 
 Just like $\mathfrak{so}(3)$ had a hat operator turning a 3-vector into a skew-symmetric matrix (section 7), $\mathfrak{se}(3)$ has its own hat operator turning the 6-vector $\xi$ into a $4\times4$ matrix:
 
-$$\xi^\wedge = \begin{bmatrix} \phi^\wedge & \rho\\ 
-0 & 0 \end{bmatrix}$$
+```math
+\xi^\wedge = \begin{bmatrix} \phi^\wedge & \rho\\ 
+0 & 0 \end{bmatrix}
+```
 
 where $\phi^\wedge$ is that same $3\times3$ skew-symmetric block from before.
 
 Here's the part that's easy to get wrong: **$\exp(\xi^\wedge)$ is *not* "exponentiate the rotation part and copy the translation part over unchanged."** Rotation and translation are coupled - sweeping a small rotation while translating traces a curve, not a straight line. The closed form is:
 
-$$\exp(\xi^\wedge) = \begin{bmatrix} \exp(\phi^\wedge) & V\rho\\ 
-0 & 1 \end{bmatrix}$$
+```math
+\exp(\xi^\wedge) = \begin{bmatrix} \exp(\phi^\wedge) & V\rho\\ 
+0 & 1 \end{bmatrix}
+```
 
 where $V$ is a $3\times3$ matrix (built purely from $\phi$) that "bends" the raw translation $\rho$ to account for that coupling. The exact formula for $V$ isn't the point here - what matters is: **you can't just glue the $SO(3)$ exponential and the raw translation together; $SE(3)$'s exponential map genuinely mixes rotation and translation.** (The log map has the mirror-image subtlety: recovering $\rho$ from a pose requires $V^{-1}$, not just reading the translation column off directly.)
 
@@ -394,12 +412,14 @@ Now someone tells you:
 
 That's essentially a **Lie algebra vector**:
 
-$$\xi = \begin{bmatrix} 2\,\text{cm}\\ 
+```math
+\xi = \begin{bmatrix} 2\,\text{cm}\\ 
 -1\,\text{cm}\\ 
 0\\ 
 0.5^\circ\\ 
 0\\ 
-0.2^\circ \end{bmatrix}$$
+0.2^\circ \end{bmatrix}
+```
 
 It describes a **small motion**, not a complete pose. (In cm/degrees purely for intuition - plugging into the actual $\exp(\xi^\wedge)$ formula requires consistent units, i.e. meters and radians.)
 

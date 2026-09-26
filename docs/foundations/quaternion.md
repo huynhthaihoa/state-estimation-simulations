@@ -258,15 +258,17 @@ You might reasonably ask:
 
 A rotation matrix:
 
-$$R= \begin{bmatrix} r_{11} & r_{12} & r_{13}\\
+```math
+R= \begin{bmatrix} r_{11} & r_{12} & r_{13}\\
 r_{21} & r_{22} & r_{23}\\
-r_{31} & r_{32} & r_{33} \end{bmatrix}$$
+r_{31} & r_{32} & r_{33} \end{bmatrix}
+```
 
 has **9 elements**, even though a rotation has only 3 degrees of freedom.
 
 And those 9 numbers must satisfy several constraints: $R^\top R = I$ and $\det(R) = 1$.
 
-Quaternions have only four numbers and one simple normalization constraint: $\|q\| = 1$.
+Quaternions have only four numbers and one simple normalization constraint: $`\|q\| = 1`$.
 
 So they're generally:
 
@@ -302,9 +304,11 @@ $${(roll,pitch,yaw)=(0,0,90^\circ)}$$
 
 - **Rotation matrix**
 
-$$R= \begin{bmatrix} 0 & -1 & 0\\
+```math
+R= \begin{bmatrix} 0 & -1 & 0\\
 1 & 0 & 0\\
-0 & 0 & 1 \end{bmatrix}$$
+0 & 0 & 1 \end{bmatrix}
+```
 
 - **Quaternion**
 
@@ -330,11 +334,13 @@ This is actually where quaternions become especially relevant.
 
 In an EKF, you might have a state like
 
-$${\mathbf{x}= \begin{bmatrix} p\\ 
+```math
+{\mathbf{x}= \begin{bmatrix} p\\ 
 v\\ 
 q\\ 
 b_g\\ 
-b_a \end{bmatrix}}$$
+b_a \end{bmatrix}}
+```
 
 where:
 
@@ -393,9 +399,9 @@ $$
 
 Quaternion multiplication (the Hamilton product, built on the rule $i^2 = j^2 = k^2 = ijk = -1$) then works out to:
 
-$$
+```math
 q_1 \otimes q_2 = \left( w_1 w_2 - \mathbf{v}_1 \cdot \mathbf{v}_2,\; w_1 \mathbf{v}_2 + w_2 \mathbf{v}_1 + \mathbf{v}_1 \times \mathbf{v}_2 \right)
-$$
+```
 
 Look at what's inside:
 
@@ -408,9 +414,9 @@ Those are exactly the ingredients of 3D rotation formulas. The cross product als
 
 To rotate a vector $\mathbf{v}$, first turn it into a quaternion with zero scalar part (a **pure quaternion**):
 
-$$
+```math
 \mathbf{v} \;\rightarrow\; (0, \mathbf{v})
-$$
+```
 
 Then multiply by $q$ on the left and by its **conjugate** $q^{\ast} = (w, -x, -y, -z)$ on the right:
 
@@ -456,9 +462,9 @@ The axis doesn't move - exactly what a rotation around that axis should do.
 
 **Perpendicular part.** Here $`\mathbf{u} \cdot \mathbf{v}_{\perp} = 0`$, and swapping the order of a cross product flips its sign. Plugging this into the Step 1 rule shows that $`\mathbf{u}`$ and $`\mathbf{v}_{\perp}`$ **anticommute**:
 
-$$
+```math
 \mathbf{u} \otimes \mathbf{v}_{\perp} = -\,\mathbf{v}_{\perp} \otimes \mathbf{u}
-$$
+```
 
 That sign flip lets $q^{\ast}$ move across $`\mathbf{v}_{\perp}`$, turning into $q$ on the way:
 
@@ -476,17 +482,17 @@ $$
 
 Multiplying that into $`\mathbf{v}_{\perp}`$ with the Step 1 rule (the dot product vanishes because $`\mathbf{u} \perp \mathbf{v}_{\perp}`$) gives:
 
-$$
+```math
 q \otimes \mathbf{v}_{\perp} \otimes q^{\ast} = \cos\theta\,\mathbf{v}_{\perp} + \sin\theta\,(\mathbf{u} \times \mathbf{v}_{\perp})
-$$
+```
 
 That is, $`\mathbf{v}_{\perp}`$ rotated by $\theta$ within the plane perpendicular to $`\mathbf{u}`$: $`\mathbf{v}_{\perp}`$ and $`\mathbf{u} \times \mathbf{v}_{\perp}`$ are perpendicular and the same length, so they act like the $x$ and $y$ axes of that plane.
 
 Putting both parts together:
 
-$$
+```math
 \boxed{q \otimes \mathbf{v} \otimes q^{\ast} = \mathbf{v}_{\parallel} + \cos\theta\,\mathbf{v}_{\perp} + \sin\theta\,(\mathbf{u} \times \mathbf{v}_{\perp})}
-$$
+```
 
 This is exactly **Rodrigues' rotation formula** - the same rotation a rotation matrix would produce.
 

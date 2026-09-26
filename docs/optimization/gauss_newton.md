@@ -18,7 +18,9 @@ $$r(x) = \text{prediction}(x) - \text{measurement}$$
 
 and want to minimize the total squared error:
 
-$$\min_x \frac12 \|r(x)\|^2$$
+```math
+\min_x \frac12 \|r(x)\|^2
+```
 
 The problem is that $r(x)$ is usually **nonlinear**.
 
@@ -92,11 +94,15 @@ we ask:
 
 Originally:
 
-$$\min_x \frac12\|r(x)\|^2$$
+```math
+\min_x \frac12\|r(x)\|^2
+```
 
 After linearization:
 
-$$\min_{\Delta x} \frac12 \|r + J\Delta x\|^2$$
+```math
+\min_{\Delta x} \frac12 \|r + J\Delta x\|^2
+```
 
 Now this is a **linear least-squares problem**.
 
@@ -255,10 +261,10 @@ $$r = h(T_i,p_j)-z$$
 
 Your SLAM problem becomes:
 
-$$
+```math
 {\min_{\{T_i\},\{p_j\}}
 \sum_{i,j}\|r_{ij}\|^2}
-$$
+```
 
 That's a huge nonlinear optimization problem.
 

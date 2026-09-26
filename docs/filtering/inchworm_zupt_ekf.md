@@ -49,14 +49,14 @@ All three variants run the same Kalman filter over $x = [p, v]^\top$. The script
 
 **Predict** (`predict`): a constant-velocity model, identical for all variants and both gait phases. The filter doesn't know the commanded velocity, only that it's roughly constant between ticks:
 
-$$
+```math
 \Phi = \begin{bmatrix} 1 & \Delta t \\ 0 & 1 \end{bmatrix}, \qquad
 Q = \begin{bmatrix} \left(\tfrac{1}{2}\sigma_{\text{process}}\Delta t^2\right)^2 & 0 \\ 0 & \left(\sigma_{\text{process}}\Delta t\right)^2 \end{bmatrix}
-$$
+```
 
-$$
+```math
 x^{-} = \Phi\,x, \qquad P^{-} = \Phi\,P\,\Phi^\top + Q
-$$
+```
 
 $Q$ is a simple diagonal heuristic, the same one `saltation_matrix_ekf.py` uses. It is not the textbook continuous white-noise-acceleration $Q$, which would also have off-diagonal terms.
 
@@ -66,9 +66,9 @@ $$
 r = z - H x^{-}, \qquad S = H P^{-} H^\top + R, \qquad K = P^{-} H^\top S^{-1}
 $$
 
-$$
+```math
 x^{+} = x^{-} + K r, \qquad P^{+} = (I - K H)\,P^{-}
-$$
+```
 
 | Update | Function | $z$ | $H$ | $R$ | Runs |
 | --- | --- | --- | --- | --- | --- |
@@ -79,25 +79,25 @@ ZUPT is a *pseudo*-measurement: no sensor produces that $z = 0$. The filter is s
 
 **The ZUPT update, written out.** With $`H = \begin{bmatrix} 0 & 1 \end{bmatrix}`$ everything reduces to scalars. Write the predicted covariance as
 
-$$
+```math
 P^{-} = \begin{bmatrix} P_{pp} & P_{pv} \\ P_{pv} & P_{vv} \end{bmatrix}
 \quad\Longrightarrow\quad
 S = P_{vv} + R_{\text{zupt}}, \qquad
 K = \frac{1}{P_{vv} + R_{\text{zupt}}} \begin{bmatrix} P_{pv} \\ P_{vv} \end{bmatrix}, \qquad
 r = 0 - v^{-} = -v^{-}
-$$
+```
 
 Substituting into the update above:
 
-$$
+```math
 v^{+} = \frac{R_{\text{zupt}}}{P_{vv} + R_{\text{zupt}}}\,v^{-}, \qquad
 p^{+} = p^{-} - \frac{P_{pv}}{P_{vv} + R_{\text{zupt}}}\,v^{-}
-$$
+```
 
-$$
+```math
 P_{vv}^{+} = \frac{P_{vv}\,R_{\text{zupt}}}{P_{vv} + R_{\text{zupt}}}, \qquad
 P_{pp}^{+} = P_{pp} - \frac{P_{pv}^2}{P_{vv} + R_{\text{zupt}}}
-$$
+```
 
 Three things follow directly from these formulas:
 
@@ -111,7 +111,7 @@ Three things follow directly from these formulas:
 
 The first version of this toy used a hard step for `true_velocity` - $0$ during anchor, $v_{\text{extend}}$ the instant extend began. That produced nonsense: $\text{NEES}$ in the hundreds to thousands for *all three* filter variants, dominated by a shared spike at every phase transition that had nothing to do with ZUPT policy. The reason: an instantaneous jump is an effectively-infinite acceleration, and the predict step's constant-velocity assumption (with a finite process-noise budget) has no way to represent that, regardless of which measurements get fused afterward.
 
-The fix was physical, not numerical: `true_velocity` now ramps linearly over a $t_{\text{ramp}}$ window at each end of the extend phase, so velocity is continuous everywhere. But *even a short ramp* isn't automatically enough - the true ramp acceleration ($v_{\text{extend}} / t_{\text{ramp}}$) still has to be checked against $\sigma_{\text{process}}$ (the filter's assumed acceleration disturbance), or the same swamping happens on a smaller scale. A first ramped attempt ($t_{\text{ramp}} = 0.1\,\text{s}$, $v_{\text{extend}} = 0.2\,\text{m/s}$, $\sigma_{\text{process}} = 0.05\,\text{m/s}^2$) implied a true/assumed acceleration ratio of $40\times$ - still enough to produce $\text{NEES}$ in the hundreds throughout an entire 6-tick cruise window, never converging. The defaults were recalibrated ($t_{\text{ramp}} = 0.2\,\text{s}$, $v_{\text{extend}} = 0.1\,\text{m/s}$, $\sigma_{\text{process}} = 0.15\,\text{m/s}^2$, $t_{\text{extend}} = 1.0\,\text{s}$) to bring that ratio down to a modest $\sim 3\times$ and give the cruise/anchor windows enough ticks (12 and 20 respectively) to actually settle before being measured. This is the same lesson as `saltation_matrix_ekf.py`'s Zeno-regime pitfall: pick simulation parameters with real margin under a hard failure mode, not by trial and error against the first numbers that come out.
+The fix was physical, not numerical: `true_velocity` now ramps linearly over a $t_{\text{ramp}}$ window at each end of the extend phase, so velocity is continuous everywhere. But *even a short ramp* isn't automatically enough - the true ramp acceleration ($v_{\text{extend}} / t_{\text{ramp}}$) still has to be checked against $\sigma_{\text{process}}$ (the filter's assumed acceleration disturbance), or the same swamping happens on a smaller scale. A first ramped attempt ($`t_{\text{ramp}} = 0.1\,\text{s}`$, $`v_{\text{extend}} = 0.2\,\text{m/s}`$, $`\sigma_{\text{process}} = 0.05\,\text{m/s}^2`$) implied a true/assumed acceleration ratio of $40\times$ - still enough to produce $\text{NEES}$ in the hundreds throughout an entire 6-tick cruise window, never converging. The defaults were recalibrated ($`t_{\text{ramp}} = 0.2\,\text{s}`$, $`v_{\text{extend}} = 0.1\,\text{m/s}`$, $`\sigma_{\text{process}} = 0.15\,\text{m/s}^2`$, $`t_{\text{extend}} = 1.0\,\text{s}`$) to bring that ratio down to a modest $\sim 3\times$ and give the cruise/anchor windows enough ticks (12 and 20 respectively) to actually settle before being measured. This is the same lesson as `saltation_matrix_ekf.py`'s Zeno-regime pitfall: pick simulation parameters with real margin under a hard failure mode, not by trial and error against the first numbers that come out.
 
 The headline NEES comparison below also excludes the ramp ticks themselves (`is_cruise` explicitly excludes them, matching `is_anchor`'s own definition) - they're a shared transition cost all three variants pay alike, not the phenomenon being measured, the same convention `hybrid_saltation_ekf.md` uses for its own shared bounce-tick spike.
 

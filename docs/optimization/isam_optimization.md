@@ -476,7 +476,9 @@ The script solves the same pose graph as `pose_graph.py`. `linearize_edge` retur
 
 **Whitened rows** (`edge_whitened_block`): each edge becomes 6 rows of a least-squares system ${A \boldsymbol{\delta} \approx b}$. With $S$ the upper-triangular square root of the edge information matrix $\Omega$ (`sqrt_info`):
 
-$$S = \mathrm{chol}(\Omega)^\top, \quad S^\top S = \Omega, \qquad A_{ij} = S \begin{bmatrix} \cdots & J_i & \cdots & J_j & \cdots \end{bmatrix}, \qquad b_{ij} = -S \, e_{ij}$$
+```math
+S = \mathrm{chol}(\Omega)^\top, \quad S^\top S = \Omega, \qquad A_{ij} = S \begin{bmatrix} \cdots & J_i & \cdots & J_j & \cdots \end{bmatrix}, \qquad b_{ij} = -S \, e_{ij}
+```
 
 Then $`\lVert A_{ij}\boldsymbol{\delta} - b_{ij} \rVert^2 = (e_{ij} + J\boldsymbol{\delta})^\top \Omega \, (e_{ij} + J\boldsymbol{\delta})`$, the linearized edge cost. `main` sets $\Omega = I_6$, so $S = I_6$ in the default run.
 
@@ -490,7 +492,9 @@ This gives ${R^\top R = A^\top A = H}$ and ${R^\top d = A^\top b = g}$, the same
 
 **Relinearization loop** (`relinearize_to_convergence`): plain Gauss-Newton on the QR system, with no Levenberg-Marquardt damping and no accept/reject test:
 
-$$\boldsymbol{\delta} = R^{-1} d, \qquad \bar{X}_k \leftarrow \bar{X}_k \, \mathrm{Exp}(\boldsymbol{\delta}_k), \qquad \text{rebuild } R, d \text{ at the new } \bar{X}$$
+```math
+\boldsymbol{\delta} = R^{-1} d, \qquad \bar{X}_k \leftarrow \bar{X}_k \, \mathrm{Exp}(\boldsymbol{\delta}_k), \qquad \text{rebuild } R, d \text{ at the new } \bar{X}
+```
 
 It stops when ${\lVert \boldsymbol{\delta} \rVert <}$ `--gn-tol` (default $10^{-6}$), or after `--gn-max-iters` steps (default 10). $R$ and $d$ are rebuilt before each convergence check, so the returned $R$ and $d$ always belong to the returned ${\bar{X}}$.
 
@@ -498,10 +502,12 @@ It stops when ${\lVert \boldsymbol{\delta} \rVert <}$ `--gn-tol` (default $10^{-
 
 $$\rho = \sqrt{R_{cc}^2 + a_c^2}, \qquad \gamma = \frac{R_{cc}}{\rho}, \qquad \sigma = \frac{a_c}{\rho}$$
 
-$$\begin{bmatrix} R_{c,\,c:} & d_c \\ 
+```math
+\begin{bmatrix} R_{c,\,c:} & d_c \\ 
 \mathbf{a}_{c:} & \beta \end{bmatrix} \leftarrow \begin{bmatrix} \gamma & \sigma \\ 
 -\sigma & \gamma \end{bmatrix} \begin{bmatrix} R_{c,\,c:} & d_c \\ 
-\mathbf{a}_{c:} & \beta \end{bmatrix}$$
+\mathbf{a}_{c:} & \beta \end{bmatrix}
+```
 
 Each rotation is orthogonal, so after the sweep ${R^\top R}$ has gained exactly ${\mathbf{a}\mathbf{a}^\top}$ and ${R^\top d}$ has gained $`\beta \, \mathbf{a}`$. $R$ stays upper triangular, and the leftover $\beta$ is discarded. Two details are easy to miss:
 

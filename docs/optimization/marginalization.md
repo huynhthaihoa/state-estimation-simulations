@@ -55,9 +55,10 @@ The math (§4) is the same Schur-complement elimination in all three rows. What 
 
 Suppose the current window has poses $x_a$ (the oldest, about to be dropped) and $x_b$ (everything still connected to it - odometry neighbors, and any landmark/IMU-bias variables it shares factors with). After linearization, the joint Gaussian is described by an information matrix $\Lambda$ and information vector $\eta$, partitioned to match:
 
-$$
+```math
 \Lambda = \begin{bmatrix} \Lambda_{aa} & \Lambda_{ab} \\ \Lambda_{ba} & \Lambda_{bb} \end{bmatrix}, \qquad \eta = \begin{bmatrix} \eta_a \\ 
-\eta_b \end{bmatrix}$$
+\eta_b \end{bmatrix}
+```
 
 Marginalizing out $x_a$ means integrating it out of the joint distribution, which has a closed form - the same Schur complement `bundle_adjustment.md §12` uses on the point block, just kept in information form here instead of being back-substituted afterward:
 
@@ -156,11 +157,11 @@ Poses $X_k$ are $4 \times 4$ SE(3) matrices, and tangent vectors follow the repo
 
 **Odometry edge** (`linearize_edge`, reused from `pose_graph_incremental.py`). Here $\mathcal{J}_r^{-1}$ is the inverse right Jacobian of SE(3) (`compute_se3_inv_right_jacobian`) and $\mathrm{Ad}$ is the adjoint:
 
-$$
+```math
 e_{ij} = \mathrm{Log}\big((X_i Z_{ij})^{-1} X_j\big), \qquad
 J_j = \mathcal{J}_r^{-1}(e_{ij}), \qquad
 J_i = -\mathcal{J}_r^{-1}(-e_{ij})\,\mathrm{Ad}(Z_{ij}^{-1})
-$$
+```
 
 **Prior on the oldest window pose** (`assemble_window_system`). $X_{\text{ref}}$ is a frozen reference pose and $\Omega_p$ is the prior's information matrix:
 
@@ -172,9 +173,9 @@ The first prior is the gauge anchor, with $X_{\text{ref}}$ equal to the ground-t
 
 **Gauss-Newton step** (`assemble_window_system`, `solve_to_convergence`). Each edge uses the information matrix $\Omega = I_6$. The script accumulates
 
-$$
+```math
 H = \sum J^\top \Omega\, J, \qquad g = -\sum J^\top \Omega\, e, \qquad H\delta = g, \qquad X_k \leftarrow X_k \exp(\delta_k)
-$$
+```
 
 It stops when $\lVert\delta\rVert$ < `gn_tol` ($10^{-6}$) or after `gn_max_iters` (10) iterations. With $W$ poses in the window, $H$ is $6W \times 6W$.
 

@@ -25,8 +25,10 @@ $$y = at+b$$
 
 The unknowns are:
 
-$$x=\begin{bmatrix} a \\ 
-b \end{bmatrix}$$
+```math
+x=\begin{bmatrix} a \\ 
+b \end{bmatrix}
+```
 
 (Naming the data's independent variable $t$ rather than $x$ is deliberate - $x$ is about to be reused, throughout the rest of this doc and everywhere it's cited elsewhere, for the *unknown parameter vector* being solved for, not a per-measurement input. Keeping the two visually distinct here avoids exactly the collision that would otherwise happen in the next line.)
 
@@ -120,18 +122,24 @@ $$\boxed{\text{Nonlinear least squares}}$$
 
 The standard NLS problem is:
 
-$$\boxed{\min_x \frac12\sum_i \|e_i(x)\|^2}$$
+```math
+\boxed{\min_x \frac12\sum_i \|e_i(x)\|^2}
+```
 
 or, stacking all residuals:
 
-$$\boxed{\min_x \frac12\|e(x)\|^2}$$
+```math
+\boxed{\min_x \frac12\|e(x)\|^2}
+```
 
 where:
 
-$$x =\begin{bmatrix} x_1\\ 
+```math
+x =\begin{bmatrix} x_1\\ 
 x_2\\ 
 \vdots\\ 
-x_n \end{bmatrix}$$
+x_n \end{bmatrix}
+```
 
 contains the unknowns.
 
@@ -187,7 +195,9 @@ $$\boxed{e(T,X)=z-\pi(TX)}$$
 
 And we want:
 
-$$\boxed{\min_{T,X}\|z-\pi(TX)\|^2}$$
+```math
+\boxed{\min_{T,X}\|z-\pi(TX)\|^2}
+```
 
 This is nonlinear because of:
 
@@ -217,11 +227,15 @@ where $f(x)$ is nonlinear.
 
 For example:
 
-$$f(x)=\begin{bmatrix} \sin x\\ e^x\\ x^2 \end{bmatrix}$$
+```math
+f(x)=\begin{bmatrix} \sin x\\ e^x\\ x^2 \end{bmatrix}
+```
 
 There's generally no simple closed-form solution for:
 
-$$\min_x\|e(x)\|^2$$
+```math
+\min_x\|e(x)\|^2
+```
 
 So we use an iterative strategy.
 
@@ -278,11 +292,15 @@ We're saying:
 
 Originally:
 
-$$\min_x\|e(x)\|^2$$
+```math
+\min_x\|e(x)\|^2
+```
 
 After linearization:
 
-$$\min_{\Delta x}\|e+J\Delta x\|^2$$
+```math
+\min_{\Delta x}\|e+J\Delta x\|^2
+```
 
 Now this is a **linear least-squares problem**.
 
@@ -338,7 +356,9 @@ Now its role becomes much clearer.
 
 NLS gives us:
 
-$$\min_x\|e(x)\|^2$$
+```math
+\min_x\|e(x)\|^2
+```
 
 Gauss–Newton gives:
 
@@ -382,7 +402,9 @@ $$e_1(x),e_2(x),e_3(x),...$$
 
 The entire problem becomes:
 
-$$\boxed{\min_x \sum_i \|e_i(x)\|^2}$$
+```math
+\boxed{\min_x \sum_i \|e_i(x)\|^2}
+```
 
 That's **nonlinear least squares**.
 
@@ -492,7 +514,7 @@ $$e_{loop}(X_i,X_j)$$
 
 Put everything together:
 
-$$
+```math
 \boxed{
 \min_x
 \left(
@@ -503,7 +525,7 @@ $$
 \|e_{loop}\|^2
 \right)
 }
-$$
+```
 
 That is one giant **nonlinear least-squares problem**.
 

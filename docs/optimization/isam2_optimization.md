@@ -57,7 +57,9 @@ x1 ─── x2 ─── x3 ─── x4
 
 You want to find the poses that best explain all measurements:
 
-$$X^*=\arg\min_X \sum_i \|r_i(X)\|^2$$
+```math
+X^*=\arg\min_X \sum_i \|r_i(X)\|^2
+```
 
 For example:
 

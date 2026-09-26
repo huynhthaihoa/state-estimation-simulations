@@ -254,7 +254,9 @@ estimated relationship
 
 Then PGO minimizes the total error over every edge in the graph (odometry edges plus loop-closure edges):
 
-$${\boxed{\min_{T_0,\ldots,T_n}\sum_{(i,j) \in \mathcal{E}}\|e_{ij}\|^2}}$$
+```math
+{\boxed{\min_{T_0,\ldots,T_n}\sum_{(i,j) \in \mathcal{E}}\|e_{ij}\|^2}}
+```
 
 So in plain English:
 
@@ -544,10 +546,12 @@ Pose-Graph Optimization (PGO) formulates loop closure and drift correction as a 
 
 A 3D pose consists of a rotation $R \in \mathrm{SO}(3)$ and a translation $p \in \mathbb{R}^3$, represented as a $4 \times 4$ matrix $T_i \in \mathrm{SE}(3)$:
 
-$$T_i = \begin{bmatrix} R_i & p_i \\ 
-\mathbf{0}^\top & 1 \end{bmatrix} \in \mathrm{SE}(3)$$
+```math
+T_i = \begin{bmatrix} R_i & p_i \\ 
+\mathbf{0}^\top & 1 \end{bmatrix} \in \mathrm{SE}(3)
+```
 
-The full state vector containing all $N$ pose keyframes is $X = \{T_1, T_2, \dots, T_N\}$.
+The full state vector containing all $N$ pose keyframes is $`X = \{T_1, T_2, \dots, T_N\}`$.
 
 #### Relative Edge Measurements
 
@@ -589,7 +593,9 @@ $${\theta_{ij}}$$
 
 The global optimization minimizes the sum of squared Mahalanobis distances over all edges ${\mathcal{E}}$ in the graph:
 
-$${F(X) = \sum_{(i,j) \in \mathcal{E}} r_{ij}(X)^\top \Omega_{ij} \, r_{ij}(X)}$$
+```math
+{F(X) = \sum_{(i,j) \in \mathcal{E}} r_{ij}(X)^\top \Omega_{ij} \, r_{ij}(X)}
+```
 
 > **Note**: Mahalanobis distance measures how far a point is from the center (mean) of a distribution, accounting for the correlations and variances between variables. Here the "point" is the residual ${r_{ij}(X)}$, the "distribution" is the measurement noise model (mean $\mathbf{0}$, covariance ${\Sigma_{ij} = \Omega_{ij}^{-1}}$), and ${\Omega_{ij}}$ is exactly the inverse-covariance weighting that turns a plain squared-error sum into a squared Mahalanobis-distance sum. See the tilestats.com video and amit's Medium explainer cited in [§17](#17-references), and [the isotropic special case](../filtering/pointcloud_pose_tracking_empirical_note.md#a3-mahalanobis-distance-and-the-information-matrix), where this weighting collapses to a uniform scale factor.
 
@@ -599,22 +605,26 @@ Standard vector updates ${T_i \leftarrow T_i + \Delta x_i}$ break the matrix con
 
 #### Local Perturbation Model (Left / Right Multiplication)
 
-Applying a local perturbation ${\boldsymbol{\xi}_i = \left[ \boldsymbol{\rho}^\top \;\; \boldsymbol{\phi}^\top \right]^\top \in \mathbb{R}^6}$ to state $T_i$:
+Applying a local perturbation $`{\boldsymbol{\xi}_i = \left[ \boldsymbol{\rho}^\top \;\; \boldsymbol{\phi}^\top \right]^\top \in \mathbb{R}^6}`$ to state $T_i$:
 
 $${T_i \oplus \boldsymbol{\xi}_i = T_i \cdot \mathrm{Exp}(\boldsymbol{\xi}_i)}$$
 
 where ${\mathrm{Exp}(\boldsymbol{\xi}) = \exp(\boldsymbol{\xi}^\wedge) \in \mathrm{SE}(3)}$, and ${(\cdot)^\wedge}$ maps a 6D vector to a ${4 \times 4}$ Lie algebra element ${\mathfrak{se}(3)}$:
 
-$${\boldsymbol{\xi}^\wedge = \begin{bmatrix} \boldsymbol{\phi}^\wedge & \boldsymbol{\rho} \\ 
+```math
+{\boldsymbol{\xi}^\wedge = \begin{bmatrix} \boldsymbol{\phi}^\wedge & \boldsymbol{\rho} \\ 
 \mathbf{0}^\top & 0 \end{bmatrix}, \quad \text{with } \boldsymbol{\phi}^\wedge = \begin{bmatrix} 0 & -\phi_z & \phi_y \\ 
 \phi_z & 0 & -\phi_x \\ 
--\phi_y & \phi_x & 0 \end{bmatrix} \in \mathfrak{so}(3)}$$
+-\phi_y & \phi_x & 0 \end{bmatrix} \in \mathfrak{so}(3)}
+```
 
 #### First-Order Taylor Expansion
 
 Linearizing the residual $r_{ij}$ with respect to local perturbations ${\boldsymbol{\xi}_i}$ and ${\boldsymbol{\xi}_j}$:
 
-$$r_{ij}(X \oplus \boldsymbol{\delta}) \approx r_{ij}(X) + J_i \, \boldsymbol{\xi}_i + J_j \, \boldsymbol{\xi}_j$$
+```math
+r_{ij}(X \oplus \boldsymbol{\delta}) \approx r_{ij}(X) + J_i \, \boldsymbol{\xi}_i + J_j \, \boldsymbol{\xi}_j
+```
 
 Here the Jacobians
 
@@ -626,13 +636,17 @@ and ${J_j = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_j}}$ are the exact 
 
 $${J_j = J_r^{-1}(r_{ij})}$$
 
-$${J_i = - J_r^{-1}(r_{ij}) \, \mathrm{Ad}\left( T_j^{-1} T_i \right)}$$
+```math
+{J_i = - J_r^{-1}(r_{ij}) \, \mathrm{Ad}\left( T_j^{-1} T_i \right)}
+```
 
 Here, ${\mathrm{Ad}(T) \in \mathbb{R}^{6 \times 6}}$ is the **Adjoint transformation matrix** of ${\mathrm{SE}(3)}$, which transforms velocity/tangent vectors between frame coordinate systems:
 
-$${\mathrm{Ad}\left(\begin{bmatrix} R & p \\ 
+```math
+{\mathrm{Ad}\left(\begin{bmatrix} R & p \\ 
 \mathbf{0}^\top & 1 \end{bmatrix}\right) = \begin{bmatrix} R & p^\wedge R \\ 
-\mathbf{0} & R \end{bmatrix}}$$
+\mathbf{0} & R \end{bmatrix}}
+```
 
 and ${J_r^{-1}(\cdot)}$ is the inverse right Jacobian of ${\mathrm{SE}(3)}$.
 
@@ -640,11 +654,13 @@ and ${J_r^{-1}(\cdot)}$ is the inverse right Jacobian of ${\mathrm{SE}(3)}$.
 
 Stacking all residuals into a global residual vector $R(X)$ and Jacobians into a sparse Jacobian matrix $J$, the linearization takes the standard form:
 
-$${H \, \boldsymbol{\delta}^* = -b}$$
+```math
+{H \, \boldsymbol{\delta}^* = -b}
+```
 
 * **Hessian Matrix:** ${H = J^\top \Omega J = \sum_{(i,j) \in \mathcal{E}} J_{ij}^\top \Omega_{ij} J_{ij} \in \mathbb{R}^{6N \times 6N}}$
 * **Gradient Vector:** ${b = J^\top \Omega R(X) \in \mathbb{R}^{6N}}$
-* **Update Vector:** ${\boldsymbol{\delta}^* = \left[ \boldsymbol{\xi}_1^\top \;\; \boldsymbol{\xi}_2^\top \;\; \dots \;\; \boldsymbol{\xi}_N^\top \right]^\top}$
+* **Update Vector:** $`{\boldsymbol{\delta}^* = \left[ \boldsymbol{\xi}_1^\top \;\; \boldsymbol{\xi}_2^\top \;\; \dots \;\; \boldsymbol{\xi}_N^\top \right]^\top}`$
 
 Because edges only connect adjacent or loop-closing keyframes, $H$ is extremely **sparse** and block-structured. It is typically solved using Sparse Cholesky Factorization (${\mathrm{LL}^\top}$ or ${\mathrm{LDL}^\top}$) or Conjugate Gradients in solvers like GTSAM or g2o — see [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) for the full derivation.
 
@@ -658,7 +674,9 @@ Each pass is just row-by-row substitution — no matrix inversion needed.
 
 In practice a pure Gauss-Newton step can overshoot or diverge far from the solution, so a **Levenberg-Marquardt** damping term $\lambda$ is added to the Hessian's diagonal before solving. Both `pose_graph.py` implementations (`use_numpy/` and `use_manif/`) use the Marquardt-scaled form, which scales $\lambda$ by $H$'s own diagonal instead of adding $\lambda I$:
 
-$${\big(H + \lambda \, \mathrm{diag}(H)\big) \, \boldsymbol{\delta}^* = -b}$$
+```math
+{\big(H + \lambda \, \mathrm{diag}(H)\big) \, \boldsymbol{\delta}^* = -b}
+```
 
 Larger $\lambda$ shrinks the step toward (diagonally scaled) gradient descent: safer, but slower. ${\lambda \to 0}$ recovers pure Gauss-Newton, which is faster near convergence. In both scripts $\lambda$ is **adaptive**, not fixed, and the two implementations are identical here:
 
@@ -672,7 +690,9 @@ Larger $\lambda$ shrinks the step toward (diagonally scaled) gradient descent: s
 
 Once the increment vector ${\boldsymbol{\delta}^*}$ is computed, the system updates the trajectory states on the ${\mathrm{SE}(3)}$ manifold:
 
-$${T_i^{(k+1)} = T_i^{(k)} \cdot \mathrm{Exp}\left(\boldsymbol{\xi}_i^*\right), \quad \forall i \in \{1, \dots, N\}}$$
+```math
+{T_i^{(k+1)} = T_i^{(k)} \cdot \mathrm{Exp}\left(\boldsymbol{\xi}_i^*\right), \quad \forall i \in \{1, \dots, N\}}
+```
 
 This iteration repeats until the accepted step is small, ${\Vert{}\boldsymbol{\delta}^*\Vert{} < \epsilon}$ (`--gn-tol`, default $10^{-6}$). It also stops after `--gn-max-iters` accepted iterations (default 10), or when every damping retry is rejected. The scripts have no separate test on the change in cost ${\Delta F}$.
 
@@ -682,7 +702,9 @@ The whole solver is `run_pose_graph_optimization` in [`use_numpy/pose_graph.py`]
 
 **Measurements** (`simulate_noisy_edges`): each edge is the true relative pose with right-multiplied noise. The loop-closure edge scales both std-devs by `--loop-noise-scale` (default 0.5):
 
-$$Z_{ij} = \left(X_i^{\text{true}}\right)^{-1} X_j^{\text{true}} \, \mathrm{Exp}(\mathbf{n}), \qquad \mathbf{n} \sim \mathcal{N}\!\left(\mathbf{0},\ \mathrm{diag}(\sigma_p^2 I_3,\ \sigma_r^2 I_3)\right)$$
+```math
+Z_{ij} = \left(X_i^{\text{true}}\right)^{-1} X_j^{\text{true}} \, \mathrm{Exp}(\mathbf{n}), \qquad \mathbf{n} \sim \mathcal{N}\!\left(\mathbf{0},\ \mathrm{diag}(\sigma_p^2 I_3,\ \sigma_r^2 I_3)\right)
+```
 
 The defaults are ${\sigma_p = 0.05}$ m (`--pos-noise-std`) and ${\sigma_r = 0.01}$ rad (`--rot-noise-std`). The initial guess is the dead-reckoned chain $X_{k+1} = X_k Z_{k,k+1}$ (`run_dead_reckoning`), which never uses the loop-closure edge.
 
@@ -696,18 +718,24 @@ This is §15.2's $r_{ij}$. In code, $\hat{X}_j$ is `T_pred`.
 
 $$J_c = \mathrm{Ad}\big(Z_{ij}^{-1}\big), \qquad J_a = J_r^{-1}(e_{ij}), \qquad J_b = -J_r^{-1}(-e_{ij})$$
 
-$$J_i = J_b \, J_c, \qquad J_j = J_a$$
+```math
+J_i = J_b \, J_c, \qquad J_j = J_a
+```
 
 These are `Jc_self` ($\partial \hat{X}_j / \partial X_i$), `Ja` ($\partial e_{ij} / \partial X_j$) and `Jb` ($\partial e_{ij} / \partial \hat{X}_j$). `use_manif/` gets the same three matrices from `Xi.compose(Z_ij, Jc_self)` and `Xj.rminus(T_pred, Ja, Jb)`. The product equals §15.4's closed form:
 
-$$-J_r^{-1}(-e_{ij}) \, \mathrm{Ad}\big(Z_{ij}^{-1}\big) = -J_r^{-1}(e_{ij}) \, \mathrm{Ad}\big(X_j^{-1} X_i\big)$$
+```math
+-J_r^{-1}(-e_{ij}) \, \mathrm{Ad}\big(Z_{ij}^{-1}\big) = -J_r^{-1}(e_{ij}) \, \mathrm{Ad}\big(X_j^{-1} X_i\big)
+```
 
 This holds because $`J_r(-e) = J_l(e) = \mathrm{Ad}(\mathrm{Exp}(e)) \, J_r(e)`$ and ${\mathrm{Exp}(e_{ij})^{-1} = X_j^{-1} X_i Z_{ij}}$.
 
 **Right Jacobian** (`se3_right_jacobian`, `compute_se3_inv_right_jacobian` in `use_numpy/lie_utils.py`): an 18-term series in the little adjoint (`se3_ad`), then a plain matrix inverse:
 
-$$J_r(\boldsymbol{\xi}) = \sum_{n=0}^{17} \frac{\left(-\mathrm{ad}_{\boldsymbol{\xi}}\right)^n}{(n+1)!}, \qquad \mathrm{ad}_{\boldsymbol{\xi}} = \begin{bmatrix} \boldsymbol{\omega}^\wedge & \mathbf{v}^\wedge \\ 
-\mathbf{0} & \boldsymbol{\omega}^\wedge \end{bmatrix}, \qquad J_r^{-1} = \big(J_r\big)^{-1}$$
+```math
+J_r(\boldsymbol{\xi}) = \sum_{n=0}^{17} \frac{\left(-\mathrm{ad}_{\boldsymbol{\xi}}\right)^n}{(n+1)!}, \qquad \mathrm{ad}_{\boldsymbol{\xi}} = \begin{bmatrix} \boldsymbol{\omega}^\wedge & \mathbf{v}^\wedge \\ 
+\mathbf{0} & \boldsymbol{\omega}^\wedge \end{bmatrix}, \qquad J_r^{-1} = \big(J_r\big)^{-1}
+```
 
 The series needs no small-angle branch. `se3_adjoint` builds $\mathrm{Ad}$ exactly as in §15.4.
 
@@ -715,7 +743,9 @@ The series needs no small-angle branch. `se3_adjoint` builds $\mathrm{Ad}$ exact
 
 $$H_{ii} \mathrel{+}= J_i^\top \Omega J_i, \quad H_{jj} \mathrel{+}= J_j^\top \Omega J_j, \quad H_{ij} \mathrel{+}= J_i^\top \Omega J_j, \quad H_{ji} \mathrel{+}= J_j^\top \Omega J_i$$
 
-$$g_i \mathrel{-}= J_i^\top \Omega \, e_{ij}, \qquad g_j \mathrel{-}= J_j^\top \Omega \, e_{ij}$$
+```math
+g_i \mathrel{-}= J_i^\top \Omega \, e_{ij}, \qquad g_j \mathrel{-}= J_j^\top \Omega \, e_{ij}
+```
 
 So $g = -b$ in §15.5's notation, and the code solves $`(H + \lambda \, \mathrm{diag}(H)) \boldsymbol{\delta} = g`$. `main` sets $\Omega = I_6$ for every edge, including the loop closure.
 
@@ -742,7 +772,9 @@ Robust cost functions replace or reweight the standard $L_2$ norm to cap or redu
 
 Instead of minimizing $\frac{1}{2} e^2$ (where $e = \sqrt{r^\top \Omega r}$ is the normalized residual scalar), M-estimators minimize a robust kernel $\rho(e)$:
 
-$$\min_{X} \sum_{(i,j) \in \mathcal{E}} \rho\left( \sqrt{r_{ij}(X)^\top \Omega_{ij} \, r_{ij}(X)} \right)$$
+```math
+\min_{X} \sum_{(i,j) \in \mathcal{E}} \rho\left( \sqrt{r_{ij}(X)^\top \Omega_{ij} \, r_{ij}(X)} \right)
+```
 
 To integrate this into standard Gauss-Newton or Levenberg-Marquardt solvers without modifying the core linear algebra solver, robust kernels use **Iteratively Reweighted Least Squares (IRLS)**. The robust cost is converted into a modified information matrix $\Omega_{ij}^\text{robust} = w(e) \cdot \Omega_{ij}$, where the weight function $w(e)$ is:
 
@@ -754,9 +786,11 @@ $$w(e) = \frac{1}{e} \frac{\partial \rho(e)}{\partial e}$$
 
 Huber acts as quadratic ($L_2$) for small residuals (inliers) and linear ($L_1$) for residuals exceeding a threshold $\delta$:
 
-$$\rho(e) = \begin{cases} \frac{1}{2} e^2 & \text{if } \vert{}e\vert{} \le \delta \\ 
+```math
+\rho(e) = \begin{cases} \frac{1}{2} e^2 & \text{if } \vert{}e\vert{} \le \delta \\ 
 \delta \left( \vert{}e\vert{} - \frac{1}{2} \delta \right) & \text{if } \vert{}e\vert{} > \delta \end{cases}, \quad w(e) = \begin{cases} 1 & \text{if } \vert{}e\vert{} \le \delta \\ 
-\frac{\delta}{\vert{}e\vert{}} & \text{if } \vert{}e\vert{} > \delta \end{cases}$$
+\frac{\delta}{\vert{}e\vert{}} & \text{if } \vert{}e\vert{} > \delta \end{cases}
+```
 
 * **Behavior:** Because $w(e) \propto \frac{1}{\vert{}e\vert{}}$, the gradient magnitude becomes constant ($\delta$) for outliers rather than growing infinitely.
 * **Limitation in SLAM:** A linear error cost still grows indefinitely as $e \to \infty$. If a false loop closure has a massive initial error, Huber will still pull the graph significantly toward the false measurement.
@@ -775,11 +809,15 @@ Dynamic Covariance Scaling (Agarwal et al., 2013) is specifically designed for p
 
 DCS adds a dynamic scaling parameter $s_{ij} \in (0, 1]$ directly to the information matrix $\Omega_{ij}$:
 
-$$\Omega_{ij}^\text{DCS} = s_{ij}^2 \, \Omega_{ij}$$
+```math
+\Omega_{ij}^\text{DCS} = s_{ij}^2 \, \Omega_{ij}
+```
 
 The scaling factor $s_{ij}$ is calculated in closed form at each iteration using the current error $e_{ij}^2 = r_{ij}^\top \Omega_{ij} r_{ij}$ and an upper-bound parameter $\Phi$:
 
-$$s_{ij} = \min\left(1, \; \frac{2 \Phi}{\Phi + e_{ij}^2}\right)$$
+```math
+s_{ij} = \min\left(1, \; \frac{2 \Phi}{\Phi + e_{ij}^2}\right)
+```
 
 ```
                        DCS Scaling Factor (s_ij)

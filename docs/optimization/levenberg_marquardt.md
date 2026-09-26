@@ -10,7 +10,9 @@
 
 In SLAM / [bundle adjustment](bundle_adjustment.md) / [factor graphs](factor_graph.md), we usually have:
 
-$$\min_x \sum_i \|e_i(x)\|^2$$
+```math
+\min_x \sum_i \|e_i(x)\|^2
+```
 
 where:
 
@@ -161,8 +163,10 @@ larger, faster steps
 
 Therefore:
 
-$$\boxed{\text{LM} \approx \begin{cases} \text{Gradient Descent}, & \lambda\text{ large}\\ 
-\text{Gauss–Newton}, & \lambda\text{ small}\end{cases}}$$
+```math
+\boxed{\text{LM} \approx \begin{cases} \text{Gradient Descent}, & \lambda\text{ large}\\ 
+\text{Gauss–Newton}, & \lambda\text{ small}\end{cases}}
+```
 
 That's the most important intuition.
 
@@ -336,7 +340,9 @@ $$e = z-\pi(TX)$$
 
 and we optimize:
 
-$$\min_{T,X}\|z-\pi(TX)\|^2$$
+```math
+\min_{T,X}\|z-\pi(TX)\|^2
+```
 
 This is nonlinear.
 
@@ -372,7 +378,9 @@ $$e_1(x), e_2(x), e_3(x), ...$$
 
 Together:
 
-$$E(x)=\sum_i\|e_i(x)\|^2$$
+```math
+E(x)=\sum_i\|e_i(x)\|^2
+```
 
 Linearize:
 

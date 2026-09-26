@@ -178,12 +178,12 @@ $$
 
 The optimizer tries to find poses that minimize:
 
-$$
+```math
 \boxed{
 \min_{X_0,X_1,X_2}
 \sum_k \|e_k\|^2
 }
-$$
+```
 
 More realistically, each measurement has different reliability:
 
@@ -351,7 +351,9 @@ Factor-graph optimization is usually a **nonlinear least-squares problem**.
 
 We have:
 
-$$\min_X \sum_i \|e_i(X)\|^2$$
+```math
+\min_X \sum_i \|e_i(X)\|^2
+```
 
 But the errors are nonlinear because poses involve rotations and transformations.
 

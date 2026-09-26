@@ -38,9 +38,11 @@ For a function with **one input and one output**, we call this a derivative.
 
 Suppose:
 
-$$\begin{bmatrix} y_1 \\ 
+```math
+\begin{bmatrix} y_1 \\ 
 y_2 \end{bmatrix}=f\left(\begin{bmatrix} x_1 \\ 
-x_2 \end{bmatrix}\right)$$
+x_2 \end{bmatrix}\right)
+```
 
 Now we have:
 
@@ -71,9 +73,11 @@ $${\frac{\partial y_1}{\partial x_1} = 1 \qquad \frac{\partial y_1}{\partial x_2
 
 So we put all those derivatives into a matrix:
 
-$${J =\begin{bmatrix} \frac{\partial y_1}{\partial x_1} & \frac{\partial y_1}{\partial x_2} \\ 
+```math
+{J =\begin{bmatrix} \frac{\partial y_1}{\partial x_1} & \frac{\partial y_1}{\partial x_2} \\ 
 \frac{\partial y_2}{\partial x_1} & \frac{\partial y_2}{\partial x_2} \end{bmatrix} = \begin{bmatrix} 1 & 2x_2 \\ 
-x_2 & x_1 \end{bmatrix}}$$
+x_2 & x_1 \end{bmatrix}}
+```
 
 That's the **Jacobian**. Notice the convention: each **row** is one output ($y_i$), each **column** is one input ($x_j$) - $J_{ij} = \partial y_i/\partial x_j$.
 
@@ -85,19 +89,25 @@ This is probably the most useful intuition.
 
 Suppose your robot's state is:
 
-$$p = \begin{bmatrix} x \\ 
+```math
+p = \begin{bmatrix} x \\ 
 y \\ 
-\theta \end{bmatrix}$$
+\theta \end{bmatrix}
+```
 
 and your camera produces some measurement:
 
-$${z = \begin{bmatrix} u \\ 
-v \end{bmatrix}}$$
+```math
+{z = \begin{bmatrix} u \\ 
+v \end{bmatrix}}
+```
 
 The Jacobian might look like:
 
-$$H = \begin{bmatrix} \frac{\partial u}{\partial x} & \frac{\partial u}{\partial y} & \frac{\partial u}{\partial \theta} \\
-\frac{\partial v}{\partial x} & \frac{\partial v}{\partial y} & \frac{\partial v}{\partial \theta} \end{bmatrix}$$
+```math
+H = \begin{bmatrix} \frac{\partial u}{\partial x} & \frac{\partial u}{\partial y} & \frac{\partial u}{\partial \theta} \\
+\frac{\partial v}{\partial x} & \frac{\partial v}{\partial y} & \frac{\partial v}{\partial \theta} \end{bmatrix}
+```
 
 This tells you:
 
@@ -149,9 +159,11 @@ Meaning:
 
 Putting every partial derivative together gives the full Jacobian:
 
-$${J = \begin{bmatrix} \frac{\partial u}{\partial X} & \frac{\partial u}{\partial Y} & \frac{\partial u}{\partial Z} \\ 
+```math
+{J = \begin{bmatrix} \frac{\partial u}{\partial X} & \frac{\partial u}{\partial Y} & \frac{\partial u}{\partial Z} \\ 
 \frac{\partial v}{\partial X} & \frac{\partial v}{\partial Y} & \frac{\partial v}{\partial Z} \end{bmatrix} =\begin{bmatrix} f/Z & 0 & -fX/Z^2 \\ 
-0 & f/Z & -fY/Z^2 \end{bmatrix}}$$
+0 & f/Z & -fY/Z^2 \end{bmatrix}}
+```
 
 Notice the zeros: $\partial u/\partial Y = 0$ and $\partial v/\partial X = 0$, because horizontal image position ($u$) doesn't depend on vertical 3D position ($Y$) at all, and vice versa for $v$ and $X$. This is the actual Jacobian a visual-SLAM or bundle-adjustment system would compute at every reprojected point.
 
@@ -378,7 +390,9 @@ Everywhere above, perturbing an input meant simple addition: $x \to x + \delta x
 
 A rotation $R \in SO(3)$ does not. There is no such thing as $R + \delta R$ - the result generally isn't even a valid rotation. Instead, a small perturbation $\delta\varphi \in \mathbb{R}^3$ is turned into a rotation via the exponential map, $\text{Exp}(\delta\varphi)$, and then **composed** (matrix-multiplied) with $R$:
 
-$$R' = \text{Exp}(\delta\varphi)\,R \qquad \text{or} \qquad R' = R\,\text{Exp}(\delta\varphi)$$
+```math
+R' = \text{Exp}(\delta\varphi)\,R \qquad \text{or} \qquad R' = R\,\text{Exp}(\delta\varphi)
+```
 
 Both are valid ways to perturb $R$ - but they are *not* the same $R'$ in general, because matrix multiplication doesn't commute. That single fact - no commutativity - is the entire reason left and right Jacobians exist. On a vector space this distinction never comes up, because addition always commutes.
 
@@ -386,9 +400,13 @@ Both are valid ways to perturb $R$ - but they are *not* the same $R'$ in general
 
 Suppose you already have a rotation built from $\varphi$, i.e. $\text{Exp}(\varphi)$, and you want to nudge the *argument*: $\text{Exp}(\varphi + \delta\varphi)$. Because $\text{Exp}$ is a curved, nonlinear map (just like $u = fX/Z$ was curved in Section 4), you cannot simply distribute the addition. What you *can* do is ask the same sensitivity question as always - "how does the output change?" - and express the answer as a small rotation composed onto $\text{Exp}(\varphi)$, either on the left or on the right:
 
-$$\text{Exp}(\varphi+\delta\varphi)\;\approx\;\text{Exp}\big(J_l(\varphi)\,\delta\varphi\big)\cdot\text{Exp}(\varphi) \qquad\text{(left)}$$
+```math
+\text{Exp}(\varphi+\delta\varphi)\;\approx\;\text{Exp}\big(J_l(\varphi)\,\delta\varphi\big)\cdot\text{Exp}(\varphi) \qquad\text{(left)}
+```
 
-$$\text{Exp}(\varphi+\delta\varphi)\;\approx\;\text{Exp}(\varphi)\cdot\text{Exp}\big(J_r(\varphi)\,\delta\varphi\big) \qquad\text{(right)}$$
+```math
+\text{Exp}(\varphi+\delta\varphi)\;\approx\;\text{Exp}(\varphi)\cdot\text{Exp}\big(J_r(\varphi)\,\delta\varphi\big) \qquad\text{(right)}
+```
 
 So $J_l$ and $J_r$ are still exactly what Section 10 says a Jacobian always is - a local sensitivity map, "small change in input → small change in output" - just applied to the exponential map instead of to a vector-valued function, and reported as *which side* the resulting perturbation attaches to.
 
@@ -409,7 +427,9 @@ $$J_r(\varphi) = I - \frac{1-\cos\theta}{\theta^2}[\varphi]_\times + \frac{\thet
 
 Useful identities (all follow from $`[\varphi]_\times^2`$ being symmetric and $`[\varphi]_\times`$ being antisymmetric):
 
-$$J_r(\varphi) = J_l(-\varphi) \qquad J_r(\varphi) = J_l(\varphi)^\top \qquad J_l(\varphi) = R(\varphi)\,J_r(\varphi)$$
+```math
+J_r(\varphi) = J_l(-\varphi) \qquad J_r(\varphi) = J_l(\varphi)^\top \qquad J_l(\varphi) = R(\varphi)\,J_r(\varphi)
+```
 
 The last one is the frame-conversion identity: $R(\varphi)$ is exactly what turns a body-frame perturbation into a world-frame one, so it's the bridge between $J_r$ and $J_l$ - consistent with the compass/steering-wheel picture above.
 
@@ -417,18 +437,20 @@ The last one is the frame-conversion identity: $R(\varphi)$ is exactly what turn
 
 Take $\varphi = (0, 0, \theta)$, a pure rotation about $z$, with $\theta = \pi/2$. For a single-axis rotation, $[\varphi]_\times^2 = \theta^2(kk^\top - I) = \text{diag}(-\theta^2, -\theta^2, 0)$ with $k=(0,0,1)$, which keeps the algebra clean. Plugging $\theta=\pi/2$ ($\cos\theta=0$, $\sin\theta=1$) into the formulas above gives:
 
-$$J_l \approx \begin{bmatrix} 0.637 & -0.637 & 0\\ 
+```math
+J_l \approx \begin{bmatrix} 0.637 & -0.637 & 0\\ 
 0.637 & 0.637 & 0\\ 
 0 & 0 & 1\end{bmatrix} \qquad J_r \approx \begin{bmatrix} 0.637 & 0.637 & 0\\ 
 -0.637 & 0.637 & 0\\ 
-0 & 0 & 1 \end{bmatrix}$$
+0 & 0 & 1 \end{bmatrix}
+```
 
 Notice $J_r = J_l^\top$, exactly as the identity predicts. If you instead plug in $\theta \to 0$ in the same formulas, both matrices collapse to $I$, confirming Section 11.3's claim about the identity.
 
 ### 11.6 Where this actually matters
 
 * **IMU preintegration**: the effect of a small change in gyroscope bias is naturally expressed in the sensor's own (body) frame, so bias-correction Jacobians in preintegration use $J_r$ - worked out end-to-end in [imu_preintegration.md](../optimization/imu_preintegration.md).
-* **Covariance/uncertainty propagation on the manifold**: a rotation's uncertainty is stored as a covariance on the tangent vector $\delta\varphi$, but whether that $\delta\varphi$ is defined via $R\,\text{Exp}(\delta\varphi)$ (right) or $\text{Exp}(\delta\varphi)\, R$ (left) changes what the covariance numerically means. Converting between the two conventions is exactly a multiplication by $R$ itself (the adjoint) - as the §11.4 identity shows, $J_l = R\, J_r$ - a change of frame, not a change of the underlying uncertainty.
+* **Covariance/uncertainty propagation on the manifold**: a rotation's uncertainty is stored as a covariance on the tangent vector $\delta\varphi$, but whether that $\delta\varphi$ is defined via $`R\,\text{Exp}(\delta\varphi)`$ (right) or $`\text{Exp}(\delta\varphi)\, R`$ (left) changes what the covariance numerically means. Converting between the two conventions is exactly a multiplication by $R$ itself (the adjoint) - as the §11.4 identity shows, $`J_l = R\, J_r`$ - a change of frame, not a change of the underlying uncertainty.
 * **Factor graphs/bundle adjustment on $SE(3)$**: residual Jacobians w.r.t. a pose depend on which perturbation convention (left vs. right) the library uses; using the wrong one silently biases the optimization even though the code runs without error.
 
 ### 11.7 One-sentence intuition
