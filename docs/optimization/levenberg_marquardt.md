@@ -86,53 +86,15 @@ Gradient descent says:
 
 > "Just move in the direction that decreases the error."
 
-### The update rule
+For $f = \tfrac12\|e\|^2$ the gradient is $\nabla f = J^\top e$, and the step goes straight downhill:
 
-Write the cost as $f(x) = \tfrac12\|e(x)\|^2$ (the $\tfrac12$ doesn't change the minimizer; it just cancels a factor of 2). Its **gradient** is
+$$\boxed{\Delta x = -\alpha J^\top e}$$
 
-$$\nabla f = J^\top e$$
+where $\alpha$ is the **step size**. It uses only the **slope**, with no $J^\top J$ (curvature) term.
 
-because differentiating $\tfrac12 e^\top e$ gives $(\partial e/\partial x)^\top e$, and $\partial e/\partial x$ is exactly the Jacobian $J$.
+**Safer:** to first order a step changes the cost by $-\alpha\|\nabla f\|^2 < 0$, so a small enough $\alpha$ always lowers it, and there's no matrix to invert.
 
-The gradient points in the direction where the cost rises fastest, so $-\nabla f$ is the steepest way **downhill**. Gradient descent simply takes a step that way:
-
-$$\boxed{\Delta x = -\alpha\nabla f = -\alpha J^\top e}$$
-
-where $\alpha > 0$ is the **step size** (the "learning rate" in machine learning).
-
-Notice what's missing compared with §2: there is no $J^\top J$. Gradient descent uses only the **slope** of the cost, not its **curvature**.
-
-### Why it's safer
-
-It tends to be safer:
-
-```text
-        ★
-      ↗
-    ↗
-  ●
-```
-
-For a small step, the cost changes by approximately
-
-$$f(x+\Delta x) \approx f(x) + \nabla f^\top\Delta x = f(x) - \alpha\|\nabla f\|^2$$
-
-which is a decrease whenever $\nabla f \neq 0$. So with a small enough $\alpha$, every step lowers the cost, and there is no matrix to invert, so a singular $J^\top J$ is not a problem.
-
-It is not unconditionally safe: an $\alpha$ that is too large can still overshoot, as the example below shows.
-
-### Why it's slow
-
-But it can be painfully slow:
-
-```text
-● → → → → → → → ★
-```
-
-There are two reasons:
-
-1. **The step shrinks with the slope.** Near the minimum $\nabla f \to 0$, so the steps get shorter and shorter just when you want to finish.
-2. **Different scales in different directions.** In a long, narrow valley the cost is steep across the valley and flat along it. $\alpha$ must be small enough not to overshoot in the steep direction, and that same small $\alpha$ makes progress in the flat direction crawl. The steps bounce from wall to wall:
+**Slow:** $\alpha$ must stay small enough not to overshoot in the steepest direction, so in a long, narrow valley the steps zigzag across it and crawl along it:
 
 ```text
         ●
@@ -142,21 +104,13 @@ There are two reasons:
    ↕ steep across the valley, → flat along it
 ```
 
-### The same story in numbers
+For example, $f = \tfrac12(x^2 + 100y^2)$ is 100× steeper in $y$, so $\alpha$ must stay below $2/100 = 0.02$. Starting from $(10, 1)$:
 
-Take $f(x,y) = \tfrac12(x^2 + 100y^2)$, a valley 100 times steeper in $y$ than in $x$, and start at $(10, 1)$. Here $\nabla f = (x,\ 100y)$, so one gradient-descent step is
+- $\alpha = 0.019$ needs **361 steps** to get within $0.01$ of the minimum.
+- $\alpha = 0.021$ **diverges**.
+- Gauss-Newton gets there in **one step**, because $J^\top J$ rescales each direction by its own curvature.
 
-$$x \leftarrow (1-\alpha)\,x, \qquad y \leftarrow (1-100\alpha)\,y$$
-
-- $y$ only shrinks if $|1-100\alpha| < 1$, i.e. $\alpha < 0.02$.
-- With $\alpha = 0.019$, $y$ flips sign every step ($-0.9,\ 0.81,\ -0.73,\ \dots$), which is the zigzag above. Meanwhile $x$ shrinks by only 1.9% per step, so it takes **361 steps** to get within $0.01$ of the minimum.
-- With $\alpha = 0.021$, just over the limit, $y$ grows every step ($-1.1,\ 1.21,\ -1.33,\ \dots$) and the method **diverges**.
-
-Gauss-Newton solves this problem in **one step**. With $e = (x,\ 10y)$ and $J = \text{diag}(1, 10)$, the step $\Delta x = -(J^\top J)^{-1}J^\top e = -(x,\ y)$ lands exactly on $(0, 0)$, because the curvature in $J^\top J$ rescales each direction for you.
-
-The same happens on [gauss_newton.md §6](gauss_newton.md#6-tiny-numerical-example)'s example $r(x) = x^2 - 4$ from $x = 3$. Gradient descent with $\alpha = 0.01$ goes $2.7 \to 2.52 \to 2.40 \to 2.32 \to 2.25$ in five steps. Gauss-Newton reaches $2.167$ in one.
-
-So gradient descent is **reliable but slow**, while Gauss-Newton is **fast but can be unreliable**. LM is built to combine them: §5 shows that a large $\lambda$ turns LM into exactly this gradient-descent step with $\alpha = 1/\lambda$, and §12 shows how Marquardt's scaling fixes the different-scales problem. With $D = \text{diag}(J^\top J) = \text{diag}(1, 100)$ in the example above, the large-$\lambda$ step becomes $-\tfrac{1}{\lambda}(x,\ y)$, so both directions shrink at the same rate.
+§5 shows that LM with a large $\lambda$ becomes exactly this step with $\alpha = 1/\lambda$, and §12 shows how Marquardt's scaling removes the valley problem.
 
 ---
 
