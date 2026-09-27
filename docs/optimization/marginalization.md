@@ -97,9 +97,9 @@ $\Lambda_{ba}\Lambda_{aa}^{-1}\Lambda_{ab}$ is a dense (or denser) block wheneve
 Before:                  After eliminating x_a:
 
      x_a                       x1 ─── x2
-    /  |  \                     \    /
-   x1  x2  x3                    \  /
-                                   x3
+    / | \                       \    /
+   x1 x2 x3                      \  /
+                                  x3
 
 (x1,x2,x3 only connect        (x1,x2,x3 now all
  through x_a)                  directly connected)

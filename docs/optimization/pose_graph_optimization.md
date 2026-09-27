@@ -82,11 +82,11 @@ Suppose the robot actually walks in a square:
 
 ```text
       x₃ ───── x₄
-      │         │
-      │         │
-      x₂         x₅
-      │         │
-      │         │
+      │        │
+      │        │
+      x₂       x₅
+      │        │
+      │        │
       x₁ ───── x₀
 ```
 
@@ -100,8 +100,8 @@ x₀ ───── x₁
            x₂
             \
              x₃
-               \
-                x₄
+              \
+               x₄
 ```
 
 After enough motion, small errors accumulate.

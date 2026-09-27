@@ -226,7 +226,7 @@ Adding landmarks:
            ●
           / \
          /   \
-X0 ●────●─────● X1
+X0  ●───●─────● X1
      \        /
       \      /
        ●────●
@@ -236,12 +236,13 @@ X0 ●────●─────● X1
 Adding IMU:
 
 ```text
-X0 ●────────● X1────────● X2
-    \ IMU     \ IMU
-     \          \
-      camera     camera
-       \          \
-        L0         L1
+X0          X1          X2
+●────IMU────●────IMU────●
+ \           \
+  camera      camera
+   \           \
+    ●           ●
+    L0          L1
 ```
 
 Every measurement becomes a **factor connecting the variables it depends on**.
@@ -304,8 +305,8 @@ A **[pose graph](pose_graph_optimization.md)** might look like:
 
 ```text
 X0 ── X1 ── X2 ── X3
-│                │
-└────────────────┘
+│                 │
+└─────────────────┘
 ```
 
 Usually:
@@ -321,11 +322,11 @@ A **factor graph** is more general:
          / \
         /   \
 X0 ●───●─────● X1
-  │             │
-  │             │
- IMU           Camera
-  │             │
-X2 ●───────────●
+   │         │
+   │         │
+  IMU      Camera
+   │         │
+X2 ●─────────●
 ```
 
 It can represent:

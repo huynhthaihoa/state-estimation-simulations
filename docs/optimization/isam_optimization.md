@@ -219,15 +219,15 @@ Eliminate variables
      ↓
 Bayes tree
 
-        X0
-        │
-        X1
-        │
-        X2
-        │
-        X3
-        │
-        X4
+     X0
+     │
+     X1
+     │
+     X2
+     │
+     X3
+     │
+     X4
 ```
 
 (A straight chain here, not a branch - the underlying factor graph is itself a chain $X_0-X_1-X_2-X_3-X_4$ with no side edges, so eliminating it in order produces a chain elimination/Bayes tree too. Two variables joined by a real edge in the factor graph - like $X_2$ and $X_3$ here - can never end up as siblings with no ancestor/descendant relationship in a correctly-built Bayes tree.)
@@ -352,7 +352,7 @@ Conceptually:
 
 ```text
 X0 → X1 → X2 → X3 → X4
-                 ↑
+                    ↑
             current state
 ```
 
