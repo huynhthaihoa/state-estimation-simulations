@@ -29,13 +29,13 @@ For example:
 
 ```text
         landmark L1
-           ●
-          / \
+             ●
+            / \
        camera observations
-        /     \
-       /       \
-Pose X0 ●──────● X1 ──────● X2
-          odometry
+          /     \
+         /       \
+Pose X0 ●─────────● X1 ──────● X2
+         odometry
 ```
 
 The circles are **variables**.
@@ -455,8 +455,8 @@ X0 ●──●──●──●──●
 After loop closure:
 
 X0 ●──────────────● X5
- │                │
- └──●──●──●──●────┘
+   │              │
+   └──●──●──●──●──┘
 ```
 
 the optimizer can distribute the accumulated error across the entire trajectory.
