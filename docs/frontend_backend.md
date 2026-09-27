@@ -18,6 +18,8 @@ A simple way to think about them is:
 
 *These four diagrams are illustrative sketches - they don't fully agree with each other, or with the sections below, on exactly which stage owns loop-closure detection vs. correction, or on the online/offline framing. See §3 and §5 for that nuance.*
 
+---
+
 ## 1. SLAM Front-end - extracting constraints
 
 The **front-end processes raw sensor data** and turns it into useful geometric information.
@@ -40,13 +42,13 @@ Measurements / constraints
 
 Typical front-end tasks:
 
-* **Feature extraction** - ORB, FAST, SIFT, etc.
-* **Feature tracking / matching**
-* **Data association** - determining that a feature in frame $k$ is the same physical point seen in frame $k+1$
-* **Visual odometry**
-* **Depth estimation / triangulation** - see [frontend/triangulation_pnp.md](frontend/triangulation_pnp.md) for the actual math, plus its inverse problem, Perspective-n-Point (PnP)
-* **Keyframe selection**
-* **Loop-closure detection**
+- **Feature extraction** - ORB, FAST, SIFT, etc.
+- **Feature tracking / matching**
+- **Data association** - determining that a feature in frame $k$ is the same physical point seen in frame $k+1$
+- **Visual odometry**
+- **Depth estimation / triangulation** - see [frontend/triangulation_pnp.md](frontend/triangulation_pnp.md) for the actual math, plus its inverse problem, Perspective-n-Point (PnP)
+- **Keyframe selection**
+- **Loop-closure detection**
 
 For example, suppose the camera sees:
 
@@ -99,13 +101,13 @@ where $r_i$ is the error associated with a measurement.
 
 Common back-end techniques include:
 
-* **[Bundle Adjustment](optimization/bundle_adjustment.md)**
-* **[Pose-graph optimization](optimization/pose_graph_optimization.md)**
-* **[Factor-graph optimization](optimization/factor_graph.md)**
-* **[Nonlinear least squares](optimization/nonlinear_least_square.md)**
-* **[Gauss-Newton](optimization/gauss_newton.md)**
-* **[Levenberg-Marquardt](optimization/levenberg_marquardt.md)**
-* **[iSAM / incremental optimization](optimization/isam_optimization.md)**
+- **[Bundle Adjustment](optimization/bundle_adjustment.md)**
+- **[Pose-graph optimization](optimization/pose_graph_optimization.md)**
+- **[Factor-graph optimization](optimization/factor_graph.md)**
+- **[Nonlinear least squares](optimization/nonlinear_least_square.md)**
+- **[Gauss-Newton](optimization/gauss_newton.md)**
+- **[Levenberg-Marquardt](optimization/levenberg_marquardt.md)**
+- **[iSAM / incremental optimization](optimization/isam_optimization.md)**
 
 ---
 
@@ -167,6 +169,8 @@ That's why you can think of:
 | Typical algorithms | Feature tracking, VO, matching                   | BA, pose graph, factor graph            |
 | Focus              | Local / sequential                               | Global / accumulated                    |
 | Question           | "What happened?"                                 | "What is the best overall explanation?" |
+
+---
 
 ## 5. One important distinction
 

@@ -22,6 +22,8 @@ and want to minimize the **total squared error**:
 \min_x \frac12 \|r(x)\|^2
 ```
 
+We'll call this cost $f(x) = \tfrac12\|r(x)\|^2$.
+
 The problem is that $r(x)$ is usually **nonlinear**.
 
 Gauss-Newton says:
@@ -74,7 +76,7 @@ This is extremely important.
 
 The nonlinear function:
 
-$$r(x)$$
+$$r(x+\Delta x)$$
 
 gets replaced locally by the linear approximation:
 
@@ -110,9 +112,11 @@ We can solve it analytically.
 
 Taking the derivative and setting it to zero gives:
 
-$$J^T J\Delta x = -J^T r$$
+$$J^\top J\Delta x = -J^\top r$$
 
 This is the famous **Gauss-Newton equation**.
+
+> **Note**: solving it needs $J^\top J$ to be invertible, i.e. $J$ must have full column rank. In SLAM it isn't by default: shifting or rotating the whole trajectory and map together changes no residual (a **gauge freedom**), so $J^\top J$ stays singular until something pins the solution down - typically a strong prior anchoring the first pose, which is what this repo's scripts do (e.g. `pose_graph.py` "heavily anchoring node 0"). Levenberg-Marquardt's damping (§11) also keeps the system solvable.
 
 Then:
 
@@ -182,7 +186,7 @@ $$J=6$$
 
 Gauss-Newton solves:
 
-$$J^TJ\Delta x=-J^Tr$$
+$$J^\top J\Delta x=-J^\top r$$
 
 Since everything is scalar:
 
@@ -190,11 +194,11 @@ $$6^2\Delta x=-6(5)$$
 
 $$36\Delta x=-30$$
 
-$$\Delta x=-0.833$$
+$$\Delta x=-\tfrac{5}{6}\approx-0.833$$
 
 Therefore:
 
-$$x_{\text{new}}=3-0.833=2.167$$
+$$x_{\text{new}}=3-\tfrac{5}{6}\approx2.167$$
 
 We're already much closer to $2$.
 
@@ -210,7 +214,7 @@ Newton's method uses the **second derivative** (the Hessian) $H$.
 
 For nonlinear least squares, the exact Hessian decomposes as:
 
-$$H=J^TJ + \sum_i r_i \nabla^2 r_i$$
+$$H=J^\top J + \sum_i r_i \nabla^2 r_i$$
 
 Gauss-Newton says:
 
@@ -218,7 +222,7 @@ Gauss-Newton says:
 
 So:
 
-$$H \approx J^TJ$$
+$$H \approx J^\top J$$
 
 and therefore instead of solving
 
@@ -226,9 +230,13 @@ $$H\Delta x=-\nabla f$$
 
 we solve
 
-$$J^TJ\Delta x=-J^Tr$$
+$$J^\top J\Delta x=-J^\top r$$
+
+The right-hand sides are the same thing: the gradient of $f(x) = \tfrac12\|r(x)\|^2$ is exactly $\nabla f = J^\top r$. Gauss-Newton only changes the left-hand side.
 
 This makes Gauss-Newton **cheaper and particularly well suited to least-squares problems**.
+
+> **Note**: dropping $\sum_i r_i \nabla^2 r_i$ is a good approximation when the residuals are small at the solution (the measurements fit well) or $r$ is only mildly nonlinear. With large residuals or strong nonlinearity, the Gauss-Newton step can overshoot and even increase the cost - exactly what Levenberg-Marquardt's damping (§11) guards against.
 
 ---
 
@@ -245,26 +253,30 @@ and observes a landmark.
 Your prediction might be something like:
 
 $$
-\hat z = h(T_i,p_j)
+\hat z_{ij} = h(T_i,p_j)
 $$
 
 where:
 
-* $T_i$ = robot pose
-* $p_j$ = landmark
-* $h(\cdot)$ = camera/measurement model
-* $z$ = actual measurement
+- $T_i$ = robot pose
+- $p_j$ = landmark
+- $h(\cdot)$ = camera/measurement model
+- $z_{ij}$ = actual measurement of landmark $j$ from pose $i$
 
 Residual:
 
-$$r = h(T_i,p_j)-z$$
+$$r_{ij} = h(T_i,p_j)-z_{ij}$$
 
 Your SLAM problem becomes:
 
 ```math
 {\min_{\{T_i\},\{p_j\}}
-\sum_{i,j}\|r_{ij}\|^2}
+\sum_{(i,j)\in\mathcal{O}}\|r_{ij}\|^2}
 ```
+
+where $\mathcal{O}$ is the set of pose-landmark pairs that were actually observed (not every landmark is seen from every pose).
+
+> **Note**: real systems also weight each residual by its measurement's information matrix, $r_{ij}^\top\Omega_{ij}\,r_{ij}$ instead of $\|r_{ij}\|^2$, so precise sensors count more - left out here for readability. See [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty) and [factor_graph.md](factor_graph.md).
 
 That's a huge nonlinear optimization problem.
 
@@ -274,12 +286,12 @@ Gauss-Newton says:
 
 So:
 
-$$r_{ij}(\Delta x) \approx r_{ij}+J_{ij}\Delta x$$
+$$r_{ij}(x+\Delta x) \approx r_{ij}(x)+J_{ij}\Delta x$$
 
 Then all measurements contribute to a large system:
 
 $$
-J^TJ\Delta x=-J^Tr
+J^\top J\Delta x=-J^\top r
 $$
 
 Solve it → update all poses and landmarks → repeat.
@@ -292,51 +304,42 @@ That's essentially the core optimization mechanism behind many **[bundle adjustm
 
 ## 9. A very useful mental picture
 
-Think of the real nonlinear function as a complicated curved road:
+Picture §6's example: the residual $r(x) = x^2 - 4$ is a curve, and we're looking for where it hits zero.
 
-```text
-        Real nonlinear function
-             __
-           /    \__
-        __/        \___
-     __/                \__
-___/                       \____
-              ↑
-         current point
-```
-
-Gauss-Newton doesn't try to understand the whole road.
+Gauss-Newton doesn't try to understand the whole curve.
 
 It says:
 
-> "Near where I am, this road looks approximately like this."
+> "Near where I am, this curve looks approximately like a straight line."
+
+That straight line is the tangent at the current guess - exactly the linearization $r(x) + J\Delta x$ from §3:
 
 ```text
-             /
-            /
-           /
-----------●----------
-       local approximation
+  r(x)
+  ↑
+  │                                 ●  current guess (r > 0)
+  │                                /
+  │                            . /
+  │                         .  /
+  │    real curve r(x) → .   /        ← tangent line: r(x) + J·Δx
+  │                   .    /
+  │                .     /
+  │             .      /
+  ┼───────────●──────○────────────────────────→ x
+              ↑      ↑
+            root next guess
+                 (where the tangent hits zero)
 ```
 
-Then it finds the best direction to move.
+Then it moves to where that line says the residual is zero: from $x = 3$ to $x \approx 2.167$. The real curve bends, so that isn't the true root ($x = 2$) - but it's much closer.
 
-After moving:
-
-```text
-             /
-            /
-           /
-----------●----------
-          ↓
-     new position
-```
-
-Then it builds **another local approximation**.
+From there it builds **another local approximation** (a new tangent at $x \approx 2.167$), and the next jump lands even closer.
 
 So the key idea is:
 
 > **Linearize → solve → move → linearize again.**
+
+(With many residuals, $J\Delta x$ usually can't make every residual exactly zero at once; Gauss-Newton then moves to where the linearized residuals are *as small as possible* in the least-squares sense - the bottom of §2's bowl. The one-residual picture above is the special case where that minimum is exactly zero.)
 
 ---
 
@@ -364,11 +367,11 @@ Gauss-Newton asks:
 
 > **"Given the local shape of the least-squares problem, what step should I take to approximately reach the minimum?"**
 
-$$J^TJ\Delta x=-J^Tr$$
+$$J^\top J\Delta x=-J^\top r$$
 
 So Gauss-Newton uses much more information about the local geometry.
 
-That's why it can converge much faster near the solution.
+That's why it can converge much faster near the solution - quadratically for zero-residual problems like §6's, where the term Gauss-Newton drops (§7) vanishes at the solution.
 
 ---
 

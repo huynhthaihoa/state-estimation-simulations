@@ -106,9 +106,9 @@ $$e_i = z_i-\pi(TX_i)$$
 
 where:
 
-* $T$ = camera pose
-* $X_i$ = 3D landmark
-* $\pi$ = camera projection
+- $T$ = camera pose
+- $X_i$ = 3D landmark
+- $\pi$ = camera projection
 
 The relationship between the unknowns and measurements is nonlinear.
 
@@ -201,9 +201,9 @@ And we want:
 
 This is nonlinear because of:
 
-* camera projection $\pi(\cdot)$
-* rotation inside $T$
-* multiplication between pose and landmark
+- camera projection $\pi(\cdot)$
+- rotation inside $T$
+- multiplication between pose and landmark
 
 This is exactly the kind of problem encountered in **[bundle adjustment](bundle_adjustment.md)**.
 
@@ -306,7 +306,7 @@ Now this is a **linear least-squares problem**.
 
 We can solve it using the normal equations:
 
-$$\boxed{J^TJ\Delta x=-J^Te}$$
+$$\boxed{J^\top J\Delta x=-J^\top e}$$
 
 Then update:
 
@@ -362,13 +362,13 @@ NLS gives us:
 
 Gauss–Newton gives:
 
-$$J^TJ\Delta x=-J^Te$$
+$$J^\top J\Delta x=-J^\top e$$
 
 But GN can sometimes take bad steps.
 
 LM modifies it:
 
-$$\boxed{(J^TJ+\lambda I)\Delta x=-J^Te}$$
+$$\boxed{(J^\top J+\lambda I)\Delta x=-J^\top e}$$
 
 So:
 
@@ -430,7 +430,7 @@ GPS measurement    → very reliable
 
 We can weight their residuals:
 
-$$\boxed{\min_x \sum_i e_i(x)^T W_i e_i(x)}$$
+$$\boxed{\min_x \sum_i e_i(x)^\top W_i e_i(x)}$$
 
 where $W_i$ represents how much we trust measurement $i$.
 
@@ -594,13 +594,13 @@ $$
 
 Then:
 
-* **[Jacobian](../foundations/jacobian.md)** → tells you how residuals change when variables move.
-* **[Gauss–Newton](gauss_newton.md)** → linearizes NLS and solves for a step.
-* **[Levenberg–Marquardt](levenberg_marquardt.md)** → GN + damping for safer steps.
-* **[Factor graph](factor_graph.md)** → organizes variables and residuals.
-* **[iSAM/iSAM2](isam_optimization.md)** → solves/updates the factor-graph NLS problem incrementally.
+- **[Jacobian](../foundations/jacobian.md)** → tells you how residuals change when variables move.
+- **[Gauss–Newton](gauss_newton.md)** → linearizes NLS and solves for a step.
+- **[Levenberg–Marquardt](levenberg_marquardt.md)** → GN + damping for safer steps.
+- **[Factor graph](factor_graph.md)** → organizes variables and residuals.
+- **[iSAM/iSAM2](isam_optimization.md)** → solves/updates the factor-graph NLS problem incrementally.
 
-That distinction—**problem formulation vs optimization algorithm**—is one of the most useful things to keep straight when learning SLAM.
+That distinction - **problem formulation vs optimization algorithm** - is one of the most useful things to keep straight when learning SLAM.
 
 ---
 

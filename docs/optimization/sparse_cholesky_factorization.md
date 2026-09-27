@@ -1,10 +1,10 @@
-# Sparse Cholesky Factorization — intuitive explanation
+# Sparse Cholesky Factorization - intuitive explanation
 
 Sparse Cholesky factorization is essentially **Cholesky factorization designed to avoid doing unnecessary work on zeros**.
 
 For a symmetric positive-definite matrix $A$, ordinary Cholesky decomposes:
 
-$$A = LL^T$$
+$$A = LL^\top$$
 
 where $L$ is lower triangular. Column by column, its entries are:
 
@@ -40,8 +40,8 @@ Suppose we have 1,000 robot poses and 5,000 landmarks.
 
 Each measurement usually connects only:
 
-* one pose
-* one landmark
+- one pose
+- one landmark
 
 So the Hessian/information matrix might look conceptually like:
 
@@ -61,7 +61,7 @@ Most variables don't directly interact.
 
 Therefore the Hessian
 
-$$H = J^T WJ$$
+$$H = J^\top WJ$$
 
 is **sparse**.
 
@@ -94,7 +94,7 @@ Sparse Cholesky tries to preserve and exploit this structure.
 
 ## 2. The basic idea
 
-Suppose we're at the linear-solve step of Gauss-Newton or LM - [gauss_newton.md](gauss_newton.md)'s $H\approx J^TJ$ (or, weighted, $J^T\Omega J$) and $b := J^Tr$ (weighted: $J^T\Omega r$, with $\Omega$ the information matrix from [factor_graph.md §4](factor_graph.md#4-optimization-means-minimizing-all-those-errors), same quantity as $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty)):
+Suppose we're at the linear-solve step of Gauss-Newton or LM - [gauss_newton.md](gauss_newton.md)'s $H\approx J^\top J$ (or, weighted, $J^\top\Omega J$) and $b := J^\top r$ (weighted: $J^\top\Omega r$, with $\Omega$ the information matrix from [factor_graph.md §4](factor_graph.md#4-optimization-means-minimizing-all-those-errors), same quantity as $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty)):
 
 $$H\Delta x = -b$$
 
@@ -102,7 +102,7 @@ and $H$ is symmetric positive definite.
 
 We factor:
 
-$$H = LL^T$$
+$$H = LL^\top$$
 
 Then solving becomes two triangular solves:
 
@@ -110,7 +110,7 @@ $$Ly=-b$$
 
 followed by
 
-$$L^T\Delta x=y$$
+$$L^\top\Delta x=y$$
 
 The important difference is:
 
@@ -136,7 +136,7 @@ H=\begin{bmatrix} [*] & * & * \\
 
 There is no connection between variable 2 and variable 3.
 
-But eliminating variable 1 first — the standard order — creates a new nonzero:
+But eliminating variable 1 first - the standard order - creates a new nonzero:
 
 $$L_{32}\neq0$$
 
@@ -232,10 +232,10 @@ So the **order in which variables are eliminated** dramatically affects the amou
 
 This is why SLAM systems use algorithms such as:
 
-* AMD — Approximate Minimum Degree
-* COLAMD
-* nested dissection
-* specialized SLAM variable orderings
+- AMD - Approximate Minimum Degree
+- COLAMD
+- nested dissection
+- specialized SLAM variable orderings
 
 ---
 
@@ -268,11 +268,11 @@ $$J\Delta x \approx -e$$
 
 and solving the normal equations gives:
 
-$$J^TWJ\Delta x=-J^TWe$$
+$$J^\top WJ\Delta x=-J^\top We$$
 
 Define:
 
-$$H=J^TWJ$$
+$$H=J^\top WJ$$
 
 so:
 
@@ -280,7 +280,7 @@ $$H\Delta x=-b$$
 
 Now factor:
 
-$$H=LL^T$$
+$$H=LL^\top$$
 
 This is where sparse Cholesky can be used.
 
@@ -341,7 +341,7 @@ is sparse because each measurement depends on only a few variables.
 
 ### Sparse Hessian
 
-$$H=J^TWJ$$
+$$H=J^\top WJ$$
 
 is also sparse, but its sparsity pattern represents **variable interactions**.
 

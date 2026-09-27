@@ -18,9 +18,9 @@ Imagine you're tracking a car.
 
 You have:
 
-* a previous estimate: "car is at $x = 10$ m, moving at 5 m/s"
-* a motion model: "after 1 second, it should be around $x = 15$ m"
-* a sensor measurement: "GPS says $x = 14$ m"
+- a previous estimate: "car is at $x = 10$ m, moving at 5 m/s"
+- a motion model: "after 1 second, it should be around $x = 15$ m"
+- a sensor measurement: "GPS says $x = 14$ m"
 
 The Kalman Filter asks:
 
@@ -46,12 +46,12 @@ $$z_k = Hx_k + v$$
 
 where:
 
-* $x$: state
-* $z$: measurement
-* $F$: linear motion model
-* $H$: linear measurement model
-* $w$: process noise (everything the motion model $F$ doesn't capture, like unmodeled dynamics, wind gusts, wheel slip, IMU bias drift, etc.), with covariance $Q = \mathrm{Cov}(w)$
-* $v$: measurement noise (sensor imperfections like GPS jitter, camera pixel noise, IMU noise, etc.), with covariance $R = \mathrm{Cov}(v)$
+- $x$: state
+- $z$: measurement
+- $F$: linear motion model
+- $H$: linear measurement model
+- $w$: process noise (everything the motion model $F$ doesn't capture, like unmodeled dynamics, wind gusts, wheel slip, IMU bias drift, etc.), with covariance $Q = \mathrm{Cov}(w)$
+- $v$: measurement noise (sensor imperfections like GPS jitter, camera pixel noise, IMU noise, etc.), with covariance $R = \mathrm{Cov}(v)$
 
 $Q$ and $R$ - not $w$ and $v$ themselves - are what the filter actually needs as inputs: since the individual noise values are unknown at each step, the filter works with their statistics (how large and correlated the noise typically is) instead. This is the same $Q$/$`R`$ notation [extra_kf_variants.md §8](extra_kf_variants.md#8-adaptive-kalman-filter) (Adaptive KF) and [§12](extra_kf_variants.md#12-which-ones-should-you-prioritize-learning)'s checklist refer to.
 
@@ -168,8 +168,8 @@ Suppose your robot has a pose: $X=(R,p)$
 
 where:
 
-* $R$: rotation
-* $p$: position
+- $R$: rotation
+- $p$: position
 
 Rotations are not ordinary vectors.
 
@@ -319,11 +319,11 @@ $${X = \begin{bmatrix} R & p & v & b_g & b_a \end{bmatrix} }$$
 
 where:
 
-* $R$: orientation
-* $p$: position
-* $v$: velocity
-* $b_g$: gyroscope bias
-* $b_a$: accelerometer bias
+- $R$: orientation
+- $p$: position
+- $v$: velocity
+- $b_g$: gyroscope bias
+- $b_a$: accelerometer bias
 
 An ordinary EKF has to repeatedly calculate Jacobians around the current estimate. But the system has important **geometric symmetries**. For example, changing the **global reference frame** shouldn't fundamentally change the **robot's physical behavior**. The IEKF tries to construct the **estimation error** so that these symmetries are handled naturally. That can give you much better behavior when the system is highly nonlinear.
 

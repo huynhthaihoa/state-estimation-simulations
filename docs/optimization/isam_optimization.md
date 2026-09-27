@@ -458,6 +458,8 @@ And when you recognize a place you've visited before:
 
 That's **iSAM**.
 
+---
+
 ## 13. One-sentence summary
 
 > **iSAM is an incremental factor-graph smoothing algorithm that continuously updates the SLAM solution as new measurements arrive, reusing previous computations instead of repeatedly solving the entire problem from scratch.**

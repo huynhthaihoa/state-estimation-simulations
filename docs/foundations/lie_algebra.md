@@ -10,10 +10,10 @@ The easiest way to think about **Lie groups and Lie algebras** is:
 
 For robotics:
 
-* Rotation matrix → an actual orientation
-* Quaternion → an actual orientation
-* $SE(3)$ transformation → an actual robot pose
-* Lie algebra → a convenient way to describe **tiny changes** to those poses
+- Rotation matrix → an actual orientation
+- Quaternion → an actual orientation
+- $SE(3)$ transformation → an actual robot pose
+- Lie algebra → a convenient way to describe **tiny changes** to those poses
 
 A useful analogy:
 
@@ -330,8 +330,8 @@ while the resulting rotation remains a valid rotation.
 
 A robot pose consists of:
 
-* translation
-* rotation
+- translation
+- rotation
 
 We represent it as:
 
@@ -359,8 +359,8 @@ and a small pose perturbation can be represented as:
 
 where:
 
-* $\rho$: tiny translation
-* $\phi$: tiny rotation
+- $\rho$: tiny translation
+- $\phi$: tiny rotation
 
 So one 6D vector represents a tiny change in the entire robot pose:
 
@@ -441,10 +441,10 @@ You might ask:
 
 You can, but Euler angles have problems:
 
-* singularities / gimbal lock
-* awkward composition
-* coordinate-dependent behavior
-* derivatives can become problematic
+- singularities / gimbal lock
+- awkward composition
+- coordinate-dependent behavior
+- derivatives can become problematic
 
 Lie algebra gives you a **local minimal representation** of the perturbation while the actual state remains on the correct manifold.
 

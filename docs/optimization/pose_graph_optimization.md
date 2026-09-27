@@ -24,8 +24,8 @@ $${T_i \in SE(3)}$$
 
 which contains:
 
-* 3D position
-* 3D orientation
+- 3D position
+- 3D orientation
 
 Imagine the robot traveling:
 
@@ -334,10 +334,10 @@ Imagine you are reconstructing someone's journey.
 
 You have:
 
-* odometry
-* GPS
-* landmarks
-* loop closures
+- odometry
+- GPS
+- landmarks
+- loop closures
 
 Your odometry says:
 
@@ -530,7 +530,7 @@ And the three questions become:
 
 If you remember only one thing:
 
-> **Pose-graph optimization is like taking a trajectory made of slightly inaccurate pieces, connecting those pieces with constraints—including loop closures—and then moving the poses around until the entire graph becomes as geometrically consistent as possible.**
+> **Pose-graph optimization is like taking a trajectory made of slightly inaccurate pieces, connecting those pieces with constraints - including loop closures - and then moving the poses around until the entire graph becomes as geometrically consistent as possible.**
 
 There's also a particularly important connection worth making explicit: **PGO is essentially a sparse nonlinear least-squares problem over poses on $SE(2)$ or $SE(3)$**. Once you understand that, the next natural step is understanding **why we need Lie groups / Lie algebra and how Gauss–Newton or Levenberg–Marquardt actually moves the poses during optimization**.
 
@@ -658,19 +658,19 @@ Stacking all residuals into a global residual vector $R(X)$ and Jacobians into a
 {H \, \boldsymbol{\delta}^* = -b}
 ```
 
-* **Hessian Matrix:** ${H = J^\top \Omega J = \sum_{(i,j) \in \mathcal{E}} J_{ij}^\top \Omega_{ij} J_{ij} \in \mathbb{R}^{6N \times 6N}}$
-* **Gradient Vector:** ${b = J^\top \Omega R(X) \in \mathbb{R}^{6N}}$
-* **Update Vector:** $`{\boldsymbol{\delta}^* = \left[ \boldsymbol{\xi}_1^\top \;\; \boldsymbol{\xi}_2^\top \;\; \dots \;\; \boldsymbol{\xi}_N^\top \right]^\top}`$
+- **Hessian Matrix:** ${H = J^\top \Omega J = \sum_{(i,j) \in \mathcal{E}} J_{ij}^\top \Omega_{ij} J_{ij} \in \mathbb{R}^{6N \times 6N}}$
+- **Gradient Vector:** ${b = J^\top \Omega R(X) \in \mathbb{R}^{6N}}$
+- **Update Vector:** $`{\boldsymbol{\delta}^* = \left[ \boldsymbol{\xi}_1^\top \;\; \boldsymbol{\xi}_2^\top \;\; \dots \;\; \boldsymbol{\xi}_N^\top \right]^\top}`$
 
-Because edges only connect adjacent or loop-closing keyframes, $H$ is extremely **sparse** and block-structured. It is typically solved using Sparse Cholesky Factorization (${\mathrm{LL}^\top}$ or ${\mathrm{LDL}^\top}$) or Conjugate Gradients in solvers like GTSAM or g2o — see [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) for the full derivation.
+Because edges only connect adjacent or loop-closing keyframes, $H$ is extremely **sparse** and block-structured. It is typically solved using Sparse Cholesky Factorization (${\mathrm{LL}^\top}$ or ${\mathrm{LDL}^\top}$) or Conjugate Gradients in solvers like GTSAM or g2o - see [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) for the full derivation.
 
 **What that factorization is doing:** $H$ is symmetric positive-definite, and Cholesky factorization writes it as $H = LL^\top$ with $L$ lower-triangular. Solving $H\boldsymbol{\delta}^* = -b$ then becomes two cheap triangular solves instead of one general one:
 
 $$Ly = -b \quad\text{(forward substitution)}, \qquad L^\top \boldsymbol{\delta}^* = y \quad\text{(back substitution)}$$
 
-Each pass is just row-by-row substitution — no matrix inversion needed.
+Each pass is just row-by-row substitution - no matrix inversion needed.
 
-**Why "sparse" matters:** most pose pairs never share a constraint, so most of $H$'s off-diagonal blocks are exactly zero. Sparse Cholesky exploits that known zero pattern instead of doing dense arithmetic on entries it already knows are zero. One subtlety: eliminating a variable can turn some of those zeros into nonzeros — called **fill-in**. For example, eliminating $x_2$ out of a chain $x_1 - x_2 - x_3$ creates a new dependency between $x_1$ and $x_3$ even though they were never directly measured. Which order variables are eliminated in controls how much fill-in accumulates; see [`elimination_tree.md`](elimination_tree.md) for a worked elimination example, and [`isam2_optimization.md` §7](isam2_optimization.md#7-bayes-tree--the-most-important-intuition) for why iSAM2 cares about this at all.
+**Why "sparse" matters:** most pose pairs never share a constraint, so most of $H$'s off-diagonal blocks are exactly zero. Sparse Cholesky exploits that known zero pattern instead of doing dense arithmetic on entries it already knows are zero. One subtlety: eliminating a variable can turn some of those zeros into nonzeros - called **fill-in**. For example, eliminating $x_2$ out of a chain $x_1 - x_2 - x_3$ creates a new dependency between $x_1$ and $x_3$ even though they were never directly measured. Which order variables are eliminated in controls how much fill-in accumulates; see [`elimination_tree.md`](elimination_tree.md) for a worked elimination example, and [`isam2_optimization.md` §7](isam2_optimization.md#7-bayes-tree---the-most-important-intuition) for why iSAM2 cares about this at all.
 
 In practice a pure Gauss-Newton step can overshoot or diverge far from the solution, so a **Levenberg-Marquardt** damping term $\lambda$ is added to the Hessian's diagonal before solving. Both `pose_graph.py` implementations (`use_numpy/` and `use_manif/`) use the Marquardt-scaled form, which scales $\lambda$ by $H$'s own diagonal instead of adding $\lambda I$:
 
@@ -792,8 +792,8 @@ Huber acts as quadratic ($L_2$) for small residuals (inliers) and linear ($L_1$)
 \frac{\delta}{\vert{}e\vert{}} & \text{if } \vert{}e\vert{} > \delta \end{cases}
 ```
 
-* **Behavior:** Because $w(e) \propto \frac{1}{\vert{}e\vert{}}$, the gradient magnitude becomes constant ($\delta$) for outliers rather than growing infinitely.
-* **Limitation in SLAM:** A linear error cost still grows indefinitely as $e \to \infty$. If a false loop closure has a massive initial error, Huber will still pull the graph significantly toward the false measurement.
+- **Behavior:** Because $w(e) \propto \frac{1}{\vert{}e\vert{}}$, the gradient magnitude becomes constant ($\delta$) for outliers rather than growing infinitely.
+- **Limitation in SLAM:** A linear error cost still grows indefinitely as $e \to \infty$. If a false loop closure has a massive initial error, Huber will still pull the graph significantly toward the false measurement.
 
 #### Cauchy Loss
 
@@ -801,7 +801,7 @@ Cauchy uses a logarithmic tail that flattens out faster than Huber:
 
 $$\rho(e) = \frac{k^2}{2} \ln\left(1 + \frac{e^2}{k^2}\right), \quad w(e) = \frac{1}{1 + \left(\frac{e}{k}\right)^2}$$
 
-* **Behavior:** The weight falls off quadratically ($w(e) \propto \frac{1}{e^2}$), heavily suppressing high-residual edges.
+- **Behavior:** The weight falls off quadratically ($w(e) \propto \frac{1}{e^2}$), heavily suppressing high-residual edges.
 
 ### 16.3 Dynamic Covariance Scaling (DCS)
 
@@ -819,7 +819,7 @@ The scaling factor $s_{ij}$ is calculated in closed form at each iteration using
 s_{ij} = \min\left(1, \; \frac{2 \Phi}{\Phi + e_{ij}^2}\right)
 ```
 
-```
+```text
                        DCS Scaling Factor (s_ij)
           1.0 |────────────┐
               |             \

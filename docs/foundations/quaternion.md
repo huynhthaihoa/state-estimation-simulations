@@ -2,13 +2,15 @@
 
 For **SLAM, state estimation, and robotics**, the most useful way to understand a quaternion is as a clever mathematical way to represent **3D orientation** without some of the problems of Euler angles.
 
+---
+
 ## 1. First: what problem is a quaternion solving?
 
 Imagine a robot:
 
-* It can point **left/right** → yaw
-* It can tilt **up/down** → pitch
-* It can roll sideways → roll
+- It can point **left/right** → yaw
+- It can tilt **up/down** → pitch
+- It can roll sideways → roll
 
 So we need to describe its orientation in 3D.
 
@@ -36,8 +38,8 @@ That's actually enough information to define an orientation change.
 
 We have:
 
-* **Axis:** $(0, 0, 1)$
-* **Angle:** $90°$
+- **Axis:** $(0, 0, 1)$
+- **Angle:** $90°$
 
 A quaternion essentially packages these two things into four numbers:
 
@@ -272,11 +274,11 @@ Quaternions have only four numbers and one simple normalization constraint: $`\|
 
 So they're generally:
 
-* more compact
-* numerically convenient
-* efficient for composing rotations
-* excellent for interpolation
-* free of gimbal lock
+- more compact
+- numerically convenient
+- efficient for composing rotations
+- excellent for interpolation
+- free of gimbal lock
 
 ---
 
@@ -344,11 +346,11 @@ b_a \end{bmatrix}}
 
 where:
 
-* $p$ = position
-* $v$ = velocity
-* $q$ = orientation quaternion
-* $b_g$ = gyro bias
-* $b_a$ = accelerometer bias
+- $p$ = position
+- $v$ = velocity
+- $q$ = orientation quaternion
+- $b_g$ = gyro bias
+- $b_a$ = accelerometer bias
 
 The tricky part is:
 
@@ -405,8 +407,8 @@ q_1 \otimes q_2 = \left( w_1 w_2 - \mathbf{v}_1 \cdot \mathbf{v}_2,\; w_1 \mathb
 
 Look at what's inside:
 
-* a **dot product** $\mathbf{v}_1 \cdot \mathbf{v}_2$
-* a **cross product** $\mathbf{v}_1 \times \mathbf{v}_2$
+- a **dot product** $\mathbf{v}_1 \cdot \mathbf{v}_2$
+- a **cross product** $\mathbf{v}_1 \times \mathbf{v}_2$
 
 Those are exactly the ingredients of 3D rotation formulas. The cross product also makes the multiplication **order-dependent** ($q_1 \otimes q_2 \neq q_2 \otimes q_1$ in general) - just like the rotations in Section 1.
 
@@ -437,8 +439,8 @@ Because multiplying from **one side** usually knocks the vector out of 3D. Take 
 
 Two things to notice:
 
-* The **Z-axis** (the rotation axis itself) picks up a nonzero $w = -0.707$ after one multiplication. It is no longer a pure quaternion - it has leaked out of 3D space. The second multiplication by $q^{\ast}$ cancels the leak and returns it exactly to where it started, as a rotation should leave its own axis alone.
-* The **X-axis** lands on $(0.707, 0.707, 0)$ after one multiplication - rotated by only **45°**. The second multiplication adds another 45°, giving $(0, 1, 0)$: the full **90°**.
+- The **Z-axis** (the rotation axis itself) picks up a nonzero $w = -0.707$ after one multiplication. It is no longer a pure quaternion - it has leaked out of 3D space. The second multiplication by $q^{\ast}$ cancels the leak and returns it exactly to where it started, as a rotation should leave its own axis alone.
+- The **X-axis** lands on $(0.707, 0.707, 0)$ after one multiplication - rotated by only **45°**. The second multiplication adds another 45°, giving $(0, 1, 0)$: the full **90°**.
 
 So each side of the sandwich does **half** of the rotation. That is the real reason for the half angle in Section 2.
 

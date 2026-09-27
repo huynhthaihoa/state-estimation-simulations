@@ -201,6 +201,8 @@ The solve therefore never exceeds `window_size` poses, so `max_dof` is capped at
 
 **Defaults:** `--window-size 10`; `--nodes-per-side-sweep 2 4 8 16 32 64` (8 to 256 poses); `--side-length 2.0` m; `--pos-noise-std 0.05` m; `--rot-noise-std 0.01` rad; `--anchor-weight 1e6`; `--gn-tol 1e-6`; `--gn-max-iters 10`; `--seed 0`.
 
+---
+
 ## 9. Empirical verification: bounded vs. unbounded, for real
 
 `sliding_window_marginalization.py` compares this bounded approach against `run_full_batch_growing` - the unbounded baseline that re-solves the entire graph from scratch at every new node, exactly the strategy §1 opens with. Since output bookkeeping (final pose estimates for every node, kept only for this script's own error reporting) is unavoidably $O(n)$ for *both* approaches alike, the metric that actually isolates the algorithmic claim is the size of the largest dense information matrix either one ever assembles and solves - reported here as `max_dof`, with an approximate byte count for holding that matrix densely ($`\text{max\_dof}^2 \times 8`$ bytes, float64):

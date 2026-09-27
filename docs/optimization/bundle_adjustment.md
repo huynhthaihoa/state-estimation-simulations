@@ -35,9 +35,9 @@ The 3D point $P$ gets projected onto the camera image:
 
 If we know:
 
-* camera pose
-* camera intrinsics
-* 3D point position
+- camera pose
+- camera intrinsics
+- 3D point position
 
 we can predict where $P$ should appear in the image.
 
@@ -47,10 +47,10 @@ $${p = \pi(T^{-1}P)}$$
 
 where:
 
-* $P$ = 3D point, in world coordinates
-* $T$ = camera pose, camera-to-world (it maps camera-frame points into the world), so $T^{-1}P$ is the point expressed in the camera frame
-* $\pi$ = camera projection function
-* $p$ = predicted 2D pixel location
+- $P$ = 3D point, in world coordinates
+- $T$ = camera pose, camera-to-world (it maps camera-frame points into the world), so $T^{-1}P$ is the point expressed in the camera frame
+- $\pi$ = camera projection function
+- $p$ = predicted 2D pixel location
 
 ---
 
@@ -108,10 +108,10 @@ Camera 3 → p₃
 
 We want to find:
 
-* Camera 1 pose
-* Camera 2 pose
-* Camera 3 pose
-* 3D position of P
+- Camera 1 pose
+- Camera 2 pose
+- Camera 3 pose
+- 3D position of P
 
 such that **all projections agree with the observations**.
 
@@ -253,11 +253,11 @@ BA solves:
 
 where:
 
-* $T_i$ = pose of camera `i`, camera-to-world (as in Section 1)
-* $P_j$ = 3D landmark `j`, in world coordinates
-* $z_{ij}$ = observed pixel
-* $\pi(T_i^{-1}P_j)$ = predicted pixel
-* $\mathcal{O}$ = the set of (camera, landmark) pairs that were actually observed - not every camera sees every landmark, so the sum only runs over real observations, not all $i,j$ combinations
+- $T_i$ = pose of camera `i`, camera-to-world (as in Section 1)
+- $P_j$ = 3D landmark `j`, in world coordinates
+- $z_{ij}$ = observed pixel
+- $\pi(T_i^{-1}P_j)$ = predicted pixel
+- $\mathcal{O}$ = the set of (camera, landmark) pairs that were actually observed - not every camera sees every landmark, so the sum only runs over real observations, not all $i,j$ combinations
 
 In plain English:
 
@@ -466,9 +466,9 @@ So a useful mental distinction is:
 
 Imagine:
 
-* 1,000 camera poses
-* 100,000 landmarks
-* millions of image observations
+- 1,000 camera poses
+- 100,000 landmarks
+- millions of image observations
 
 Then you're optimizing a huge number of variables.
 
@@ -513,10 +513,10 @@ If not, something is wrong.
 
 Maybe:
 
-* camera 1 is slightly misplaced
-* camera 2 is rotated incorrectly
-* landmark 1 is too far away
-* landmark 2 is too high
+- camera 1 is slightly misplaced
+- camera 2 is rotated incorrectly
+- landmark 1 is too far away
+- landmark 2 is too high
 
 So you continuously adjust:
 
@@ -596,9 +596,9 @@ Re-optimizing the entire map on every camera move is impossible in real time, so
  [Active Keyframe] < optimizes > [Active Map Point]
 ```
 
-* **Active keyframes**: the new keyframe plus its neighbors in the **covisibility graph** (keyframes sharing many observed points).
-* **Active points**: every 3D point observed by an active keyframe.
-* **Fixed keyframes**: other keyframes that also see an active point, held fixed as rigid anchors so the local window can't drift the map's global frame.
+- **Active keyframes**: the new keyframe plus its neighbors in the **covisibility graph** (keyframes sharing many observed points).
+- **Active points**: every 3D point observed by an active keyframe.
+- **Fixed keyframes**: other keyframes that also see an active point, held fixed as rigid anchors so the local window can't drift the map's global frame.
 
 Because a covisibility neighborhood's size stays roughly constant regardless of total map size, Local BA runs in bounded, real-time-friendly time - at the cost of letting small errors accumulate into global drift over a long trajectory. SLAM systems correct that separately, via loop closure + pose-graph optimization ([pose_graph_optimization.md](pose_graph_optimization.md)) or an occasional Global BA pass.
 

@@ -8,6 +8,8 @@ Applies to both [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/pointc
 
 This doc keeps these three claims separate and explains the mechanism behind each.
 
+---
+
 ## 1. The setup
 
 - **State**: a single rigid pose $T \in SE(3)$.
@@ -270,7 +272,7 @@ Both effects shrink as the per-step rotation increment shrinks (smaller $\Delta 
 
 Direct numerical diff of the full trajectory (`use_numpy`, duration 5.0, seed 0, 51 poses, default UKF tuning $\alpha = 1.0,\ \beta = 2.0,\ \kappa = -3.0$):
 
-```
+```text
 EKF  vs IEKF: max pos diff = 1.031e-14 m, max rot diff = 1.708e-06 deg
 EKF  vs UKF : max pos diff = 1.445e-03 m, max rot diff = 6.298e-02 deg
 IEKF vs UKF : max pos diff = 1.445e-03 m, max rot diff = 6.298e-02 deg
@@ -282,7 +284,7 @@ The EKF-vs-UKF gap is about **11 orders of magnitude larger** than the EKF-vs-IE
 
 Since both mechanisms in §3.2 scale with the per-step rotation increment, the EKF/UKF gap should *grow* under conditions that make that increment larger, e.g. a bigger $\Delta t$ (fewer, larger steps covering the same `true_body_rates` profile). This is directly checkable - re-running the numerical diff (§3.3) at a sweep of $\Delta t$ values, same seed and duration:
 
-```
+```text
 dt=0.001 n_steps=5000  max pos diff=7.221e-04 m  max rot diff=4.915e-02 deg
 dt=0.002 n_steps=2500  max pos diff=1.105e-03 m  max rot diff=8.060e-02 deg
 dt=0.005 n_steps=1000  max pos diff=6.067e-04 m  max rot diff=2.533e-02 deg
@@ -325,7 +327,7 @@ Only mechanism 1 is a genuine small-angle approximation that should shrink as th
 
 Direct numerical diff of the full trajectory (`use_numpy`, duration 5.0, seed 0, 51 poses, default args), same protocol as §3.3:
 
-```
+```text
 EKF  vs IEKF: max pos diff = 1.494e-14 m, max rot diff = 2.091e-06 deg
 EKF  vs UKF : max pos diff = 1.445e-03 m, max rot diff = 6.298e-02 deg
 EKF  vs VKF : max pos diff = 1.349e-02 m, max rot diff = 1.441e-01 deg
@@ -339,7 +341,7 @@ The script's own printed "Final / RMS errors" table shows exactly how easy this 
 
 Sweeping $\Delta t$ the same way as §3.4, plus a smaller-$`\Delta t`$ extension (0.005, 0.01) to check whether the gap shrinks toward zero the way UKF's does over its own cleanly-predicted large-$`\Delta t`$ range (§3.4):
 
-```
+```text
 dt=0.005  n_steps=1000  max pos diff=3.375e-03 m  max rot diff=1.079e-01 deg
 dt=0.01   n_steps= 500  max pos diff=1.990e-02 m  max rot diff=2.823e-01 deg
 dt=0.02   n_steps= 250  max pos diff=7.821e-03 m  max rot diff=1.493e-01 deg
@@ -359,7 +361,7 @@ Two honest findings, reported without smoothing over either:
 
 Measured on one run of `use_numpy/pointcloud_pose_tracking.py` at default args. Time is per step. Memory is the **whole-run peak** (tracemalloc), which is what the script prints now. An earlier version of this table divided memory by the step count. Both figures depend on the machine:
 
-```
+```text
 EKF (recursive)    avg time=  338.08 µs/step | peak mem=  135.117 KB
 IEKF (invariant)   avg time=  245.18 µs/step | peak mem=  134.773 KB
 UKF (unscented)    avg time= 2163.72 µs/step | peak mem=  174.981 KB
@@ -395,7 +397,7 @@ Vanilla KF's divergence (§4) doesn't belong on this isotropy spectrum at all - 
 
 ---
 
-## Appendix: Related terms
+## 6. Appendix: related terms
 
 Short definitions of a few terms this doc leans on, gathered in one place rather than left implicit in §2/§4/§5.
 
@@ -425,6 +427,6 @@ This is a different axis from A.4: A.4 is about covariance *generality* (scalar/
 
 ---
 
-## References
+## 7. References
 
 1. Julier, S. J., & Uhlmann, J. K. (1997). *A New Extension of the Kalman Filter to Nonlinear Systems*. Proceedings of SPIE, 3068 (Signal Processing, Sensor Fusion, and Target Recognition VI), 182-193. - the original unscented transform/UKF this doc's §3 empirically compares against EKF/IEKF.

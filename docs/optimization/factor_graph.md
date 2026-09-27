@@ -8,9 +8,9 @@ Think of a **factor graph** as a way to represent:
 
 For SLAM:
 
-* **Variables** = things we don't know
+- **Variables** = things we don't know
   → robot poses, landmarks, sensor biases, etc.
-* **Factors** = measurements/constraints
+- **Factors** = measurements/constraints
   → odometry, camera observations, IMU measurements, GPS, loop closures, etc.
 
 ![A bipartite factor graph for a SLAM-style problem: robot poses x0..xn connected by odometry-measurement factors u1..un, with landmarks l1, l2 connected to poses via landmark-measurement factors m1..m4, plus a small "variable node / factor node" legend](../images/factor_graph_1.jpg)
@@ -259,10 +259,10 @@ This is worth memorizing.
 
 Something you're trying to estimate:
 
-* $X_0$ = robot pose
-* $X_1$ = robot pose
-* $L_0$ = landmark position
-* $b$ = IMU bias
+- $X_0$ = robot pose
+- $X_1$ = robot pose
+- $L_0$ = landmark position
+- $b$ = IMU bias
 
 ### Factor
 
@@ -311,8 +311,8 @@ X0 ── X1 ── X2 ── X3
 
 Usually:
 
-* nodes = robot poses
-* edges = relative pose constraints
+- nodes = robot poses
+- edges = relative pose constraints
 
 A **factor graph** is more general:
 
@@ -331,14 +331,14 @@ X2 ●─────────●
 
 It can represent:
 
-* poses
-* landmarks
-* velocity
-* IMU biases
-* calibration parameters
-* time offsets
-* sensor extrinsics
-* etc.
+- poses
+- landmarks
+- velocity
+- IMU biases
+- calibration parameters
+- time offsets
+- sensor extrinsics
+- etc.
 
 So:
 

@@ -58,10 +58,10 @@ Now we have:
 
 We want to know:
 
-* How does $y_1$ change when $x_1$ changes?
-* How does $y_1$ change when $x_2$ changes?
-* How does $y_2$ change when $x_1$ changes?
-* How does $y_2$ change when $x_2$ changes?
+- How does $y_1$ change when $x_1$ changes?
+- How does $y_1$ change when $x_2$ changes?
+- How does $y_2$ change when $x_1$ changes?
+- How does $y_2$ change when $x_2$ changes?
 
 To make this concrete, suppose:
 
@@ -277,14 +277,14 @@ small change in measurement
 
 That's why Jacobians are everywhere in:
 
-* EKF
-* ESKF
-* IEKF
-* bundle adjustment
-* nonlinear least squares
-* factor graphs
-* visual odometry
-* SLAM
+- EKF
+- ESKF
+- IEKF
+- bundle adjustment
+- nonlinear least squares
+- factor graphs
+- visual odometry
+- SLAM
 
 ---
 
@@ -449,9 +449,9 @@ Notice $J_r = J_l^\top$, exactly as the identity predicts. If you instead plug i
 
 ### 11.6 Where this actually matters
 
-* **IMU preintegration**: the effect of a small change in gyroscope bias is naturally expressed in the sensor's own (body) frame, so bias-correction Jacobians in preintegration use $J_r$ - worked out end-to-end in [imu_preintegration.md](../optimization/imu_preintegration.md).
-* **Covariance/uncertainty propagation on the manifold**: a rotation's uncertainty is stored as a covariance on the tangent vector $\delta\varphi$, but whether that $\delta\varphi$ is defined via $`R\,\text{Exp}(\delta\varphi)`$ (right) or $`\text{Exp}(\delta\varphi)\, R`$ (left) changes what the covariance numerically means. Converting between the two conventions is exactly a multiplication by $R$ itself (the adjoint) - as the §11.4 identity shows, $`J_l = R\, J_r`$ - a change of frame, not a change of the underlying uncertainty.
-* **Factor graphs/bundle adjustment on $SE(3)$**: residual Jacobians w.r.t. a pose depend on which perturbation convention (left vs. right) the library uses; using the wrong one silently biases the optimization even though the code runs without error.
+- **IMU preintegration**: the effect of a small change in gyroscope bias is naturally expressed in the sensor's own (body) frame, so bias-correction Jacobians in preintegration use $J_r$ - worked out end-to-end in [imu_preintegration.md](../optimization/imu_preintegration.md).
+- **Covariance/uncertainty propagation on the manifold**: a rotation's uncertainty is stored as a covariance on the tangent vector $\delta\varphi$, but whether that $\delta\varphi$ is defined via $`R\,\text{Exp}(\delta\varphi)`$ (right) or $`\text{Exp}(\delta\varphi)\, R`$ (left) changes what the covariance numerically means. Converting between the two conventions is exactly a multiplication by $R$ itself (the adjoint) - as the §11.4 identity shows, $`J_l = R\, J_r`$ - a change of frame, not a change of the underlying uncertainty.
+- **Factor graphs/bundle adjustment on $SE(3)$**: residual Jacobians w.r.t. a pose depend on which perturbation convention (left vs. right) the library uses; using the wrong one silently biases the optimization even though the code runs without error.
 
 ### 11.7 One-sentence intuition
 

@@ -12,9 +12,9 @@ Suppose a robot moves through a room:
 
 At every time step, it gets:
 
-* IMU measurements
-* camera/LiDAR observations
-* wheel odometry, etc.
+- IMU measurements
+- camera/LiDAR observations
+- wheel odometry, etc.
 
 The robot wants to estimate:
 
@@ -174,9 +174,9 @@ Mathematically, you can think of:
 
 where:
 
-* $\mathbf{x}$ = all poses/landmarks
-* $r_i(\mathbf{x})$ = measurement residual
-* optimization finds the trajectory that minimizes the total error.
+- $\mathbf{x}$ = all poses/landmarks
+- $r_i(\mathbf{x})$ = measurement residual
+- optimization finds the trajectory that minimizes the total error.
 
 This is the fundamental idea behind **bundle adjustment**, **pose-graph optimization**, and many modern SLAM systems.
 
@@ -305,11 +305,11 @@ You don't spend much time reconsidering previous answers.
 
 At the end of the day, you give them:
 
-* GPS measurements
-* photos
-* timestamps
-* landmarks
-* the final destination
+- GPS measurements
+- photos
+- timestamps
+- landmarks
+- the final destination
 
 and ask:
 
@@ -482,12 +482,12 @@ A rough map is:
 
 Examples you'll encounter:
 
-* **EKF-SLAM** → filtering
-* **MSCKF** → an EKF-based filter for visual-inertial estimation (a sliding window of poses, landmarks marginalized out rather than kept in the state)
-* **VINS-Mono / VINS-Fusion** → nonlinear optimization + sliding window
-* **ORB-SLAM** → heavily optimization-based
-* **GTSAM-based systems** → factor-graph optimization
-* **iSAM / iSAM2** → incremental smoothing/optimization
+- **EKF-SLAM** → filtering
+- **MSCKF** → an EKF-based filter for visual-inertial estimation (a sliding window of poses, landmarks marginalized out rather than kept in the state)
+- **VINS-Mono / VINS-Fusion** → nonlinear optimization + sliding window
+- **ORB-SLAM** → heavily optimization-based
+- **GTSAM-based systems** → factor-graph optimization
+- **iSAM / iSAM2** → incremental smoothing/optimization
 
 (See [optimization/marginalization.md](optimization/marginalization.md) for the actual mechanics of how a state gets marginalized out and why that's what makes a bounded sliding window possible.)
 

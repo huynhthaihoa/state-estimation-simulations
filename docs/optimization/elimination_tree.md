@@ -91,7 +91,7 @@ That's a very important distinction.
 
 We want:
 
-$$A=LL^T$$
+$$A=LL^\top$$
 
 During factorization, we eliminate variables one by one.
 
@@ -126,7 +126,7 @@ So:
 
 $$parent(1)=2$$
 
-Now eliminate 2. It still has **two** neighbors left, 3 and 4 — and they were never directly connected. Removing 2 forces them to pick up each other's dependency, so a new edge appears:
+Now eliminate 2. It still has **two** neighbors left, 3 and 4 - and they were never directly connected. Removing 2 forces them to pick up each other's dependency, so a new edge appears:
 
 $$3 \leftrightarrow 4 \quad \text{(fill-in)}$$
 
@@ -151,7 +151,7 @@ giving the full tree:
 1
 ```
 
-Notice this ends up the same *shape* as Section 1's tree, but for a different reason: Section 1's chain came from a graph that was already a chain, while here the 3–4 link only exists because eliminating 2 created it. That's exactly Section 2's point — the tree is not the original graph.
+Notice this ends up the same *shape* as Section 1's tree, but for a different reason: Section 1's chain came from a graph that was already a chain, while here the 3–4 link only exists because eliminating 2 created it. That's exactly Section 2's point - the tree is not the original graph.
 
 The tree tells the factorization algorithm where information flows.
 
@@ -230,7 +230,7 @@ Shows computational dependency:
    l1    l2
 ```
 
-($l_2$ touches both $x_1$ and $x_2$, so eliminating it creates a new fill-in link between them — which is why $x_1$ ends up as $x_2$'s child.)
+($l_2$ touches both $x_1$ and $x_2$, so eliminating it creates a new fill-in link between them - which is why $x_1$ ends up as $x_2$'s child.)
 
 It answers:
 

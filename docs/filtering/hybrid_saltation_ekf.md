@@ -4,7 +4,7 @@
 
 A hybrid system alternates ordinary smooth motion (falling) with sudden, instantaneous jumps (bouncing), triggered the instant some condition is hit (touching the ground). The tricky part isn't the jump itself - it's that two nearby trajectories don't hit that condition at exactly the same moment:
 
-```
+```text
 ball A (nominal):     ●
                         ╲
                          ╲                    both start falling
@@ -26,6 +26,8 @@ An ordinary Jacobian (the reset map's own derivative, called $DR$ below) only ca
 Every filter in [kf_ekf_iekf.md](kf_ekf_iekf.md) and [extra_kf_variants.md](extra_kf_variants.md) assumes the state evolves *continuously* between measurements. Bio-inspired locomotion (a footstep, an inchworm anchor/release cycle, a friction-anisotropic grip-then-slip transition) breaks that assumption on purpose, not by accident: the whole point of these platforms is to move in discrete, hybrid bursts. This doc works through the tool that lets an EKF cross one of those discontinuities without either (a) silently pretending nothing happened, or (b) discarding all uncertainty information at the jump - using [`saltation_matrix_ekf.py`](../../use_numpy/saltation_matrix_ekf.py)'s bouncing-point-mass toy problem as the concrete example.
 
 > **Note (reading order)**: §1-§3 carry the core idea - why an ordinary reset Jacobian isn't enough, and a worked example showing it's wrong by a real, non-tiny amount. That's enough for a first read. §4 is a from-scratch derivation (with a documented wrong turn kept deliberately, as a teaching point - and one subtle enough that an earlier draft of this doc took the wrong turn itself and shipped it as the main formula for a while) - useful once you want to trust the formula yourself, skippable if you're willing to take it on faith for now. §5-§8 are the practical payoff (a structural property, a modest but real empirical finding, tuning gotchas, and a quantified account of what happens once contact detection itself is uncertain) and are worth reading even if §4 is skipped. §9 is an explicit tangent into a different, related context (periodic-orbit stability) that this script's own use case never needs - safe to skip entirely unless that's what brought you here.
+
+---
 
 ## 1. What a hybrid dynamical system is, here
 
@@ -99,6 +101,8 @@ $$
 
 and averages NEES per tick over 500 trials. §6's post-bounce window finds each bounce tick with `detect_bounce_ticks`: a local minimum of true height below $0.2$ m. It then averages the next 5 ticks, excluding the bounce tick itself. The other defaults are $\Delta t = 0.02$ s, $e = 0.85$, $g = 9.81$, a $5$ m drop, initial horizontal velocity $(1.0, 0.5)$ m/s, and a $5$ s duration.
 
+---
+
 ## 2. Why the reset map's own Jacobian is not enough
 
 Suppose you want to propagate a covariance $P$ through a bounce. The reset map itself is simple and linear: $`R(x) = \text{diag}(1,1,1,1,1,-e)\,x =: DR\,x`$. The natural (and wrong) instinct is
@@ -129,6 +133,8 @@ At a smooth (non-event) point, the ordinary Jacobian $A = \partial f/\partial x$
 | Linearization: $A = \partial f/\partial x$ | Linearization: saltation matrix $\Xi$ |
 | No event-time correction needed | Must correct for the crossing-time shift $\delta t$ |
 
+---
+
 ## 3. A worked example: naive vs. saltation, in numbers
 
 It's worth seeing the two approaches disagree on an actual number, not just abstractly - and worth being precise about *when* the two trajectories are compared, since that choice turns out to change which formula is correct (§4 below). `step_hybrid` always compares nominal and perturbed trajectories at a fixed external time (the next filter tick), so that's the comparison worked out here.
@@ -147,6 +153,8 @@ The naive approach isn't slightly off here; it's qualitatively wrong on both com
 $DR$ cannot see any of this because it has no notion of time at all - it only knows how to transform a state that is already sitting on the guard, and composing it with the ordinary flow Jacobians on either side doesn't fix that blind spot. $\Xi$ adds exactly the missing piece: its correction term accounts for how much the perturbation shifts the crossing time, and for what that shift does to the state both before *and* after the bounce.
 
 (Computed directly from this repo's own `flow`, `crossing_time`, `reset_map`, `reset_jacobian`, and `saltation_matrix` functions in `saltation_matrix_ekf.py`, not hand-derived - reproducible with $x_0=(0,0,5,0,0,-2)$, $\delta x_0=(0,0,0.05,0,0,0)$, $e=0.5$, $g=9.81$, $T=1.0$. Composing three matrices by hand isn't a natural calculator exercise the way a single scalar formula is, so unlike earlier drafts of this section there's no hand-arithmetic appendix for this version - see the [Appendix](#appendix-a-simpler-related-quantity-worked-by-hand) instead for a closely related, hand-workable quantity and how it connects to this one.)
+
+---
 
 ## 4. Deriving $\Xi$ - including a wrong turn, caught by verification
 
@@ -186,6 +194,8 @@ where $`\Phi_{\text{before}} = D_1\Phi(x_0, t^{*})`$ (so $`S(t^{*})=\Phi_{\text{
 
 is exactly $\Xi_{\text{own-time}}$ plus the extra correction term that formula was missing. It is also the standard saltation matrix of the literature: Kong et al. (2023), Definition 2 (Eq. 9), with a time-independent reset and guard ($`D_t R = 0`$, $`D_t g = 0`$). This is what `saltation_matrix` computes, and $`\Phi_{\text{after}}\,\Xi\,\Phi_{\text{before}}`$ matches the finite-difference ground truth of the whole fixed-$`\Delta t`$ map to $`\sim\!7\times10^{-6}`$ (limited by the finite-difference step itself, not this formula) - checked in `tests/use_numpy/test_saltation_matrix_ekf.py` (`test_saltation_matrix_composes_to_the_fixed_dt_jacobian`).
 
+---
+
 ## 5. A structural property that matters in practice: $`Dg\,\Xi = -e\,Dg`$
 
 For this guard ($g(x) = p_z$), $\Xi$'s output row for $p_z$ scales by exactly $-e$, for *any* $x^{-}$, $e$, $g$:
@@ -198,13 +208,15 @@ Equivalently, in code: `Dg @ saltation_matrix(x_minus, e, g)` always equals `-e 
 
 The practical consequence is the opposite of what an exactly-zero claim would produce: $\Xi$ does not drive $P$'s guard-normal row/column to a near-singular state at every bounce, so it needs no artificial regularizing floor to stay numerically well-behaved against a true trajectory sampled at fixed ticks rather than at its own exact crossing (§7 below measures this directly). `step_hybrid`'s small isotropic "impact noise" floor remains in the code as a simplified stand-in for the explicit impact-timing/model-uncertainty term a real contact-aided filter would carry - not, as an earlier draft of this section claimed, a numerical necessity forced by an exact-zero projection.
 
+---
+
 ## 6. The empirical finding: a modest, real gap, not a dramatic one
 
-The intuitive story going in was that the naive $`P^{+} = DR\,P^{-}\,DR^\top`$ update would be measurably overconfident (too-small reported uncertainty) right after each bounce compared to the saltation-corrected one, and a Monte Carlo NEES (Normalized Estimation Error Squared - a per-trial score for how far the true state falls from the estimate relative to how much uncertainty $P$ claims; a well-calibrated 6-DoF filter should average NEES $\approx 6$, *persistently* higher values mean $P$ is too small for the errors actually being made (overconfident), and persistently lower values mean it is too large (underconfident) - full formula in the [Appendix](#appendix-related-terms)) consistency check would show it. The data does not bear that out.
+The intuitive story going in was that the naive $`P^{+} = DR\,P^{-}\,DR^\top`$ update would be measurably overconfident (too-small reported uncertainty) right after each bounce compared to the saltation-corrected one, and a Monte Carlo NEES (Normalized Estimation Error Squared - a per-trial score for how far the true state falls from the estimate relative to how much uncertainty $P$ claims; a well-calibrated 6-DoF filter should average NEES $\approx 6$, *persistently* higher values mean $P$ is too small for the errors actually being made (overconfident), and persistently lower values mean it is too large (underconfident) - full formula in the [Appendix](#10-appendix-related-terms)) consistency check would show it. The data does not bear that out.
 
 Running `saltation_matrix_ekf.py` at its defaults (500 Monte Carlo trials, 3 well-separated bounces from a 5m drop at $e = 0.85$) and looking at NEES in the few ticks immediately following each bounce (excluding the shared spike at the bounce tick itself, which both filters exhibit for the mundane reason that the true trajectory is also close to its own crossing at that tick):
 
-```
+```text
 Mean NEES, 5 ticks after each of 3 bounces (seed 0):
   EKF (naive)      ≈ 2.35
   EKF (saltation)  ≈ 2.49
@@ -216,10 +228,14 @@ Mean NEES, 5 ticks after each of 3 bounces (seed 0):
 
 So with exact detection there is no case for the naive update: the two filters are close both right after a bounce and averaged over the whole trajectory, neither is overconfident, and the naive update has no principled derivation behind it at all. The larger miscalibration here is the conservatism both filters share over the whole trajectory, not the difference between their bounce updates. A real Hybrid-InEKF implementation would still benefit from an explicit model of detection uncertainty (e.g., an impact-timing noise term scaled by the velocity jump at the event, rather than this script's simple isotropic floor) - §8 measures how much detection error costs each filter.
 
+---
+
 ## 7. Two things worth knowing before reusing this pattern
 
 - **The regularizing floor is no longer numerically load-bearing, but still worth tuning deliberately.** Sweeping `--impact-noise-std` from `0` (fully disabled) to `0.02` on this same problem no longer flips the ordering between the two filters the way an exact-zero-projection formula would: naive and saltation move together and stay close at every setting (`0`: 2.94 vs. 3.05; `0.0005`: 2.93 vs. 3.04; `0.005`, this script's default: 2.35 vs. 2.49; `0.02`: 2.28 vs. 2.32 - all below the consistent value of $6$, so even with the floor disabled both filters stay conservative) - both a sign that §5's $`Dg\,\Xi = -e\,Dg`$ genuinely fixed the near-singularity problem the floor originally existed to paper over, and a reminder that the floor still shifts *both* filters' absolute NEES level together as it grows, so it's still a real modeling choice, just no longer one that can flip the qualitative story between the two filters.
 - **Stay well clear of the Zeno regime.** A lossy bounce ($e<1$) produces infinitely many, ever-faster bounces approaching a finite settling time ($`\approx 12.45\,\text{s}`$ for this script's defaults: $`t_1 + \frac{2 e v_1}{g(1-e)}`$ with first impact at $t_1 \approx 1.01$ s and speed $v_1 \approx 9.90$ m/s). Well before that time, bounce intervals become comparable to the fixed measurement step $\Delta t$, and comparing a fixed-tick-sampled estimate against a true trajectory that's bouncing many times within a single tick breaks the entire comparison's premise: with `--duration 12` (seed 0), post-bounce mean NEES is $\approx 3{,}600$ (naive) and $\approx 5{,}100$ (saltation), with peaks near $56{,}000$ for both - an explosion both filters share, for reasons that have nothing to do with the saltation matrix. `--duration`'s default is deliberately chosen to stop after 3 clean, well-separated bounces and before the 4th starts crowding the settling regime.
+
+---
 
 ## 8. Quantifying contact-detection timing jitter
 
@@ -229,7 +245,7 @@ So with exact detection there is no case for the naive update: the two filters a
 \tau_{\text{detect}} = \text{clip}\big(\tau + b_{\text{detect}} + \mathcal{N}(0,\,\sigma_{\text{detect}}^2)\,,\ 0,\ \tau_{\text{remain}}\big)
 ```
 
-instead of the true geometric $\tau$, so early detection resets the mean while still above ground and late detection resets it after the free-fall model has carried it slightly below $p_z = 0$ - both real artifacts of a delayed or jittery contact detector (e.g. an accelerometer spike, as in the IMU-based foot-strike detector of [Čížek et al., 2018](#references), or a force threshold), not numerical noise.
+instead of the true geometric $\tau$, so early detection resets the mean while still above ground and late detection resets it after the free-fall model has carried it slightly below $p_z = 0$ - both real artifacts of a delayed or jittery contact detector (e.g. an accelerometer spike, as in the IMU-based foot-strike detector of [Čížek et al., 2018](#11-references), or a force threshold), not numerical noise.
 
 This also means that under detection jitter, `saltation_matrix` is evaluated at an $x^{-}$ that is off the guard ($p_z \neq 0$). That is outside its own stated assumption (its docstring says $x^{-}$ already satisfies $p_z = 0$). The code does not correct for this. It just uses the current $v_z$, since nothing in the formula depends on $p_z$.
 
@@ -254,6 +270,8 @@ With that fixed, sweeping $\sigma_{\text{detect}}$ (with $b_{\text{detect}} = 0$
 
 **The finding**: both filters' post-bounce NEES rises monotonically as detection jitter grows - unsurprising, since neither one's $P$ accounts for this extra error source at all. Read against the consistent value of $6$, the ordering flips along the way. At $`0.001\,\text{s}`$ both are still below $6$, and the saltation-corrected filter (5.21) is the closer of the two. From $`0.002\,\text{s}`$ on, both are overconfident (NEES $> 6$), and the saltation-corrected filter is the *more* overconfident one, by a ratio that grows from $1.41\times$ to $1.59\times$ once jitter reaches half the tick interval. That is a genuine (if modest) instance of "saltation matrices assume a known transition time, and that assumption isn't free": this is consistent with the saltation update committing more strongly to the detected bounce (it shrinks $P$'s height variance by $e^2$ there, §5), leaving less slack when the detected bounce time is wrong. The naive filter's absolute numbers here are unaffected by §4's formula correction (its own covariance update never used `saltation_matrix` in the first place); only the saltation column, and therefore the ratio, changed. What's no longer true is the earlier, much larger claim this section used to make: with §4's $f^{+}$ term correctly included, $`Dg\,\Xi = -e\,Dg`$ (§5), not exactly zero, so the saltation-corrected filter never stakes *everything* on the detected crossing being exactly right the way an incomplete formula would - it is somewhat more sensitive to detection jitter than the naive update, not dramatically so.
 
+---
+
 ## 9. Connection to Poincaré maps
 
 Saltation matrices show up in a second, related context: analyzing the stability of a *periodic* hybrid trajectory - e.g., a robot repeatedly bouncing (or, for legged locomotion, repeatedly striking the ground once per stride). Sampling the state once per cycle, at a chosen event, defines a discrete return map $x_{k+1} = P(x_k)$, and its derivative $DP$ governs whether nearby trajectories converge back to the periodic orbit or diverge from it - the hybrid-systems analogue of eigenvalue stability analysis for a fixed point.
@@ -262,7 +280,9 @@ The standard tool for this is the **monodromy matrix**: a product of continuous-
 
 This script doesn't build or verify that composition itself - it propagates one covariance forward through one fixed-$`\Delta t`$ tick at a time, which is exactly the different setting §3-§4 work out in detail - so this section stays a pointer to where saltation matrices show up next, not a second worked derivation. Anyone extending this toy into a periodic-orbit-stability tool should start from the full $\Xi$, and still verify the composed monodromy matrix numerically (the same finite-difference discipline §4 uses here) before trusting it.
 
-## Appendix: related terms
+---
+
+## 10. Appendix: related terms
 
 - **Guard condition/reset map**: the switching-surface function $g(x)=0$ and the (possibly discontinuous) map $R$ applied when a trajectory reaches it - the two ingredients that make a system "hybrid" rather than purely continuous.
 - **NEES (Normalized Estimation Error Squared)**: $(x_{\text{true}} - x_{\text{est}})^\top P^{-1} (x_{\text{true}} - x_{\text{est}})$. A well-calibrated $n$-DoF filter's NEES should average to $n$ across many independent trials; systematically larger values mean the filter's reported $P$ is too small (overconfident) for the errors it's actually making, and systematically smaller values mean it is too large (underconfident). See [pose_graph_optimization.md §15.3](../optimization/pose_graph_optimization.md#153-objective-function) for the closely-related Mahalanobis-distance framing already used elsewhere in this repo.
@@ -310,7 +330,7 @@ matching the true (own-crossing-time) answer to within second-order error, same 
 
 ---
 
-## References
+## 11. References
 
 1. Kong, N. J., Payne, J. J., Zhu, J., & Johnson, A. M. (2023). *Saltation Matrices: The Essential Tool for Linearizing Hybrid Dynamical Systems*. arXiv:2306.06862. https://doi.org/10.48550/arXiv.2306.06862 - a modern tutorial/survey on saltation matrices - its Definition 2 (Eq. 9) is exactly the boxed $\Xi(x^-)$ derived in §4, $f^{+}$ term included, and its Eq. 34 composes it with flow Jacobians into the monodromy matrix discussed in §9.
 2. Kong, N. J., Payne, J. J., Council, G., & Johnson, A. M. (2021). *The Salted Kalman Filter: Kalman Filtering on Hybrid Dynamical Systems*. Automatica, 131, 109752. https://doi.org/10.1016/j.automatica.2021.109752 - the direct precedent for this doc's whole exercise: propagating a Kalman filter's covariance correctly through a hybrid guard-crossing event via the saltation matrix, exactly what `saltation_matrix_ekf.py` implements for a single bounce.

@@ -4,7 +4,7 @@
 
 "Anisotropic friction" means a surface grips well in one direction and slides easily in the other - the canonical image is a snake's belly scales, or a ratchet:
 
-```
+```text
         low-friction (slide) axis
                  ↑
                  │
@@ -16,7 +16,7 @@
 
 That noise ellipse is fixed *to the pad*, i.e. to the robot's body frame. The catch this doc explores: as the robot turns, that ellipse turns with it in the world frame -
 
-```
+```text
 heading = 0°:        heading = 45°:       heading = 90°:
    ⬭ (flat)             ⬮ (tilted)            |‾| (rotated 90°)
 ```
@@ -32,6 +32,8 @@ This doc works through the simplest concrete version of that claim, using [`fric
 **This isn't new theory** - it's a direct application of an argument this repo already made, just applied on the other side of the filter. [`pointcloud_pose_tracking_empirical_note.md`](pointcloud_pose_tracking_empirical_note.md) §A.1/§2 established that a noise ellipsoid fixed in an object's own frame looks anisotropic-and-rotating once expressed in the world frame, and that what actually matters is whether the filter's noise model tracks that rotation - not "rigid vs. non-rigid." That note was about *measurement* noise in a point-cloud registration EKF/IEKF. This script is the first to apply the identical argument to *process* noise for a robot that's actually moving and turning, and deliberately stays an ordinary EKF throughout - no new IEKF/Lie-group derivation, since the question here is purely "does $Q$'s shape track heading," not a linearization-frame question.
 
 **Scope, stated up front**: heading itself is exact and noise-free, driven only by a known, constant commanded turn rate. Only the *position* picks up random friction-anisotropic slip. This isolates the one question this script is about (does the process-noise ellipse's orientation track heading correctly) from a second one (heading estimation itself), which this toy deliberately doesn't touch.
+
+---
 
 ## 1. The setup
 
@@ -148,6 +150,8 @@ Three things follow directly from these formulas:
 - **The off-diagonal term is what points the ellipse.** It is zero only when $\theta_Q$ is a multiple of 90°. With the defaults, the slip variance is 25 times the grip variance (a 5:1 ratio in standard deviation), so pointing the ellipse the wrong way matters a lot. When `fixed_anisotropic`'s ellipse is misaligned, the filter assumes little noise in a direction where the real slip is large. It becomes overconfident in exactly that direction, which drives the NEES gap in §2.
 - **A 180° error costs nothing.** Replacing $\theta_Q$ with $\theta_Q + \pi$ flips the sign of both $c$ and $s$, which leaves $c^2$, $s^2$ and $cs$ unchanged. So $Q_{\text{pos}}^{\text{aniso}}$ repeats every 180°, which is the periodicity §3 builds on.
 
+---
+
 ## 2. The dominant finding: `fixed_anisotropic` is dramatically worse, everywhere
 
 Monte Carlo NEES (500 trials, seed 0, $`dt = 0.05\,\text{s}`$ - the script's own default, verified to reproduce the table below to two significant figures - one full loop over $`20\,\text{s}`$), binned by how far the true heading has rotated away from `fixed_anisotropic`'s fixed reference heading:
@@ -163,11 +167,15 @@ Monte Carlo NEES (500 trials, seed 0, $`dt = 0.05\,\text{s}`$ - the script's own
 
 This part is robust: verified across seeds 0-3, `fixed_anisotropic` is worse than *both* alternatives at *every* checkpoint, by a wide margin, in every seed tried - not just "eventually," from the very first bin. RMS position error tells a smaller but consistent story too: $`\text{heading\_aware}\ (0.0108\,\text{m}) < \text{isotropic}\ (0.0118\,\text{m}) < \text{fixed\_anisotropic}\ (0.0131\,\text{m})`$ - getting the shape right and pointed the right way is both more accurate and, as the table shows, far better calibrated.
 
+---
+
 ## 3. A secondary finding, and where it stops being clean
 
 The *worst* of `fixed_anisotropic`'s own four checkpoints is the 90-135° bin in three of the four seeds tried (0, 1, 3), not the largest possible mismatch (135-180°) - seed 2 is the exception (see below). The reason isn't an accident: a covariance ellipse $`R(\theta)\,\mathrm{diag}(a,b)\,R(\theta)^\top`$ has period $\pi$ in $\theta$, not $2\pi$ - rotating it by 180° gives back the identical ellipse. So a heading mismatch of 180° is, for the *orientation of the noise ellipse specifically*, no mismatch at all; the worst possible ellipse-orientation mismatch is at 90°, exactly where the empirical peak sits for those three seeds.
 
 What happens **beyond** that peak, heading back out toward a full 180° difference, is *not* a clean story, and this doc says so rather than overselling one: in seeds 0, 1, and 3, `fixed_anisotropic`'s NEES does partially recover in the 135-180° bin (matching the ellipse-symmetry prediction); in seed 2, it keeps climbing all the way through. The most likely explanation is that the pure instantaneous-orientation-mismatch effect (which the ellipse-symmetry argument correctly predicts) is competing with a second, accumulated-trajectory-drift effect that grows with elapsed time/distance regardless of instantaneous heading - and depending on the particular noise realization, either one can dominate by the time a full loop has been driven. The NEES-vs-time plot shows this concretely: `fixed_anisotropic` (red) has repeated, roughly periodic bumps over the $`20\,\text{s}`$ loop rather than one clean single-peaked hump, consistent with a real periodic effect that isn't the *only* thing going on.
+
+---
 
 ## 4. Takeaway for a real friction-anisotropic contact model
 

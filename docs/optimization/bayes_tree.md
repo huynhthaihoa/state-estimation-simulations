@@ -2,6 +2,8 @@
 
 The name sounds probabilistic, but for SLAM, you can understand it mainly as a **smart tree representation of the factorization of your optimization problem**.
 
+---
+
 ## 1. Start with the factor graph
 
 Suppose your robot has four poses:
@@ -22,11 +24,11 @@ And suppose it observes a landmark:
 
 The factor graph represents **constraints**:
 
-* `x1 → x2`: odometry
-* `x2 → x3`: odometry
-* `x3 → x4`: odometry
-* `x1 → l1`: observation
-* `x3 → l1`: observation
+- `x1 → x2`: odometry
+- `x2 → x3`: odometry
+- `x3 → x4`: odometry
+- `x1 → l1`: observation
+- `x3 → l1`: observation
 
 The goal is still:
 
@@ -48,7 +50,7 @@ $$A\Delta x=b$$
 
 Now we need to solve this large sparse system.
 
-This is where **Sparse Cholesky Factorization** becomes important — see [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) if you want the full explainer: $H = LL^T$, solved via two triangular substitutions instead of a full inversion, exploiting the fact that $H$ is mostly zero.
+This is where **Sparse Cholesky Factorization** becomes important - see [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) if you want the full explainer: $H = LL^\top$, solved via two triangular substitutions instead of a full inversion, exploiting the fact that $H$ is mostly zero.
 
 We want to factorize the system efficiently.
 
@@ -289,7 +291,7 @@ That's much smarter than rebuilding the entire factorization blindly.
 
 ## 9. Bayes tree + sparse Cholesky
 
-This connects directly to [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) and to iSAM2's use of it in [`isam2_optimization.md` §7](isam2_optimization.md#7-bayes-tree--the-most-important-intuition).
+This connects directly to [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) and to iSAM2's use of it in [`isam2_optimization.md` §7](isam2_optimization.md#7-bayes-tree---the-most-important-intuition).
 
 You can think of the pipeline as:
 

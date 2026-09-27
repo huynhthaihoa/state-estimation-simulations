@@ -82,9 +82,9 @@ $$\text{nonlinear function} \rightarrow \text{sigma points} \rightarrow \text{tr
 
 UKF can be attractive when:
 
-* the nonlinearities are strong,
-* calculating Jacobians is difficult,
-* you want a derivative-free method.
+- the nonlinearities are strong,
+- calculating Jacobians is difficult,
+- you want a derivative-free method.
 
 But it can be computationally more expensive than EKF, especially for high-dimensional states.
 
@@ -118,10 +118,10 @@ This is extremely useful because some states, especially **rotation**, live on m
 
 You'll see things like:
 
-* ESKF
-* Error-State EKF
-* Multiplicative EKF (MEKF)
-* Right/left invariant error-state filters
+- ESKF
+- Error-State EKF
+- Multiplicative EKF (MEKF)
+- Right/left invariant error-state filters
 
 in visual-inertial odometry and inertial navigation.
 
@@ -179,18 +179,18 @@ rather than treating everything as an ordinary vector.
 
 There are particularly interesting formulations involving:
 
-* left-invariant error
-* right-invariant error
+- left-invariant error
+- right-invariant error
 
 which can give the estimation error dynamics properties that are independent of the current state in ways that ordinary EKF linearizations aren't. See [left_right_invariant.md](left_right_invariant.md) for exactly what distinguishes the two and when to reach for each.
 
 This is particularly relevant to:
 
-* IMU navigation
-* VIO
-* SLAM
-* robotics
-* pose estimation
+- IMU navigation
+- VIO
+- SLAM
+- robotics
+- pose estimation
 
 ---
 
@@ -212,8 +212,8 @@ Why?
 
 Because covariance matrices should be:
 
-* symmetric
-* positive semi-definite
+- symmetric
+- positive semi-definite
 
 But floating-point numerical errors can cause problems.
 
@@ -258,10 +258,10 @@ You propagate them through the nonlinear model.
 
 This is especially popular in:
 
-* weather prediction
-* geophysical systems
-* ocean modeling
-* very high-dimensional systems
+- weather prediction
+- geophysical systems
+- ocean modeling
+- very high-dimensional systems
 
 It's generally **less central to robotics/SLAM** than EKF/ESKF/IEKF.
 
@@ -290,9 +290,9 @@ This lets a PF represent **multimodal** beliefs - "the robot is either in room A
 
 **Why care?**
 
-* No linearity or Gaussian-noise assumption at all - works for arbitrarily nonlinear, non-Gaussian problems.
-* Naturally represents multimodal beliefs (ambiguous data association, the kidnapped-robot problem, global localization).
-* Classic robotics use case: **Monte Carlo Localization (MCL)** - localizing a robot on a known map from range/bearing measurements.
+- No linearity or Gaussian-noise assumption at all - works for arbitrarily nonlinear, non-Gaussian problems.
+- Naturally represents multimodal beliefs (ambiguous data association, the kidnapped-robot problem, global localization).
+- Classic robotics use case: **Monte Carlo Localization (MCL)** - localizing a robot on a known map from range/bearing measurements.
 
 **The catch**: accuracy scales with particle count, and in high-dimensional state spaces (like a full SLAM state vector) you need an impractically large number of particles to cover the space adequately. That's why particle filters are common for low-dimensional localization but rare for full SLAM state estimation, where EKF/UKF/factor-graph approaches dominate instead.
 
@@ -308,8 +308,8 @@ $$R = \text{known}$$
 
 where:
 
-* $Q$ = process noise covariance
-* $R$ = measurement noise covariance
+- $Q$ = process noise covariance
+- $R$ = measurement noise covariance
 
 But in real life, those values may change.
 
@@ -348,11 +348,11 @@ Robust filtering tries to reduce the influence of bad measurements.
 
 This is particularly relevant to:
 
-* visual SLAM
-* feature tracking
-* GNSS
-* LiDAR
-* multi-sensor fusion
+- visual SLAM
+- feature tracking
+- GNSS
+- LiDAR
+- multi-sensor fusion
 
 Although in robotics, robust losses such as **Huber loss** are also commonly used within optimization-based estimators rather than relying exclusively on a "robust KF."
 
@@ -447,11 +447,11 @@ A reasonable prioritization:
 
 Understand:
 
-* prediction
-* measurement update
-* covariance
-* Kalman gain
-* $Q$, $R$
+- prediction
+- measurement update
+- covariance
+- Kalman gain
+- $Q$, $R$
 
 ↓
 
@@ -459,9 +459,9 @@ Understand:
 
 Understand:
 
-* nonlinear dynamics
-* Jacobians
-* local linearization
+- nonlinear dynamics
+- Jacobians
+- local linearization
 
 ↓
 
@@ -469,10 +469,10 @@ Understand:
 
 Understand:
 
-* nominal state
-* error state
-* perturbations
-* why rotations need special treatment
+- nominal state
+- error state
+- perturbations
+- why rotations need special treatment
 
 ↓
 
@@ -480,11 +480,11 @@ Understand:
 
 Understand:
 
-* Lie groups
-* $SO(3)$
-* $SE(3)$
-* left/right invariant errors
-* system symmetries
+- Lie groups
+- $SO(3)$
+- $SE(3)$
+- left/right invariant errors
+- system symmetries
 
 ### Tier 2 - Very useful
 
@@ -556,11 +556,11 @@ IMU    IMU    IMU    GPS
 
 Examples include:
 
-* Bundle Adjustment
-* Factor Graphs
-* iSAM / iSAM2
-* GTSAM-style smoothing
-* pose-graph optimization
+- Bundle Adjustment
+- Factor Graphs
+- iSAM / iSAM2
+- GTSAM-style smoothing
+- pose-graph optimization
 
 A particularly useful learning progression is:
 
