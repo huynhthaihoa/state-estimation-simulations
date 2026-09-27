@@ -5,8 +5,8 @@ dynamical system, and the simplest analog of a foot-strike / ground-contact
 impact (a discrete velocity reset at a discrete contact event) without any of
 SE(3)'s rotational complexity. State `x = [p (3,), v (3,)]`, plain R^6 -- no
 Lie group is involved anywhere in this script (the guard/reset act on flat
-position/velocity coordinates), so unlike every other script in this repo
-there is no `use_manif/` counterpart: nothing here would change if it were
+position/velocity coordinates), so -- like the repo's other flat-state
+scripts -- there is no `use_manif/` counterpart: nothing here would change if it were
 rewritten against manifpy, since there is no SE(3)/SO(3) object to delegate
 to in the first place.
 
@@ -43,25 +43,22 @@ Three ways to track the trajectory are implemented:
     question, was checked against the same ground truth and found wrong by a
     wide margin for *this* one).
 
-A Monte Carlo consistency check (`run_monte_carlo_consistency`, new to this
-repo -- there is no existing NEES/NIS/chi-squared helper anywhere else here)
-repeats the naive and saltation-corrected EKFs over many independent noise
+A Monte Carlo consistency check (`run_monte_carlo_consistency`;
+inchworm_zupt_ekf.py and friction_anisotropic_ekf.py carry their own copies
+of the same `nees` helper) repeats the naive and saltation-corrected EKFs over many independent noise
 realizations of the same nominal trajectory and averages each one's NEES
 (Normalized Estimation Error Squared) per step. The finding here is modest,
-not dramatic: the saltation-corrected EKF's post-bounce NEES runs slightly
-*higher* than the naive EKF's (~2.5 vs. ~2.4 at this script's defaults, a
-~5% gap -- see docs/filtering/hybrid_saltation_ekf.md §6 for the full
-numbers), the opposite direction from the naive "saltation fixes naive's
-overconfidence" expectation, but nowhere near large enough to call either
-filter's calibration meaningfully broken. `saltation_matrix` reduces (but,
-unlike the rejected formula, does not zero out) the guard-normal (height)
-direction's *reported* variance at every bounce -- see its own docstring's
-`Dg @ Xi = -e * Dg` identity -- which is *most* accurate when the filter's
-own estimated bounce time coincides with the true one, and tracking error
-generally keeps that from being exact; the small residual gap above is that
-effect, still present but far more muted than the near-singular-covariance
-version an incorrect formula without the `f+` term would produce. Both EKFs'
-*mean* trajectories still look nearly identical throughout regardless: this
+not dramatic: at this script's defaults both EKFs' post-bounce NEES sits
+well below the consistent value of 6 (~2.4 naive vs. ~2.5 saltation), i.e.
+both are conservative, not overconfident -- there is no naive
+overconfidence for saltation to fix. Which of the two is higher depends on
+the tuning (e.g. at --process-noise-std 0.05 the naive one is); see
+docs/filtering/hybrid_saltation_ekf.md §6 for the numbers. The two differ
+only at bounces: `saltation_matrix` scales the guard-normal (height)
+direction's reported variance by e**2 at every bounce -- reduced but, unlike
+the rejected formula, not zeroed; see its own docstring's
+`Dg @ Xi = -e * Dg` identity -- while the naive update leaves it unchanged.
+Both EKFs' *mean* trajectories still look nearly identical throughout regardless: this
 entire effect is invisible in the point estimate and only shows up in
 whether the reported uncertainty can be trusted.
 
@@ -72,13 +69,13 @@ estimate already gets wrong about the geometric crossing time.
 default 0.0, reproducing the exact-detection behavior above) model that
 directly, by applying the bounce reset at a `tau_detect` offset from the
 true geometric crossing instead of at the crossing itself. Quantified (see
-docs/filtering/hybrid_saltation_ekf.md §8 for the full sweep): the
-naive-vs-saltation post-bounce NEES gap above (already present at exact
-detection, ~1.05x) widens further as --detect-time-noise-std grows, reaching
-~1.6x once jitter reaches half the measurement interval -- both filters
-degrade (unsurprising, since neither one's P accounts for detection
-uncertainty at all), and saltation degrades somewhat faster, a real if
-modest instance of the general gap between "saltation matrices assume a
+docs/filtering/hybrid_saltation_ekf.md §8 for the full sweep): both
+filters' post-bounce NEES rises with --detect-time-noise-std (unsurprising,
+since neither one's P accounts for detection uncertainty at all), and
+saltation's rises faster -- once jitter pushes both past the consistent
+value of 6 (from ~0.002 s at dt = 0.02 s), the saltation-corrected EKF is
+the more overconfident one, by ~1.4x rising to ~1.6x at half the
+measurement interval. That is a real if modest instance of the general gap between "saltation matrices assume a
 known transition time" and "contact/phase detection is itself uncertain".
 Getting this measurement right required a real bug fix, not just a new
 parameter: `crossing_time` originally accepted any future zero-crossing,
@@ -86,9 +83,9 @@ which was harmless as long as every reset landed exactly on the guard, but
 once detect_time_* can leave a reset off-guard, the point mass can end up
 slightly below `p_z = 0` and immediately re-cross it on the way back *up*
 -- an ascending, non-physical "impact" that (before the fix) triggered a
-cascade of spurious re-bounces and inflated NEES/position error by 4-5
-orders of magnitude for reasons having nothing to do with the phenomenon
-being modeled. `crossing_time` now only returns a *descending* crossing --
+cascade of spurious re-bounces and inflated post-bounce NEES by roughly
+3-4.5 orders of magnitude (to ~1e5; RMS position error itself only ~3-23x)
+for reasons having nothing to do with the phenomenon being modeled. `crossing_time` now only returns a *descending* crossing --
 see its own docstring.
 '''
 
@@ -170,9 +167,11 @@ def crossing_time(x, g):
     that crossing is ascending, not a real impact -- without this filter,
     step_hybrid would treat rising back out of that detection-induced
     "dip" as a fresh bounce, triggering a cascade of spurious re-bounces
-    within a single step (verified this was happening: NEES/RMS position
-    error exploded by orders of magnitude the instant any detect_time_*
-    noise was introduced, traced to exactly this). Every crossing this
+    within a single step (verified this was happening: post-bounce NEES
+    jumped to ~1e5, roughly 3-4.5 orders of magnitude, the instant any
+    detect_time_* noise was introduced, with RMS position error ~3-23x
+    larger -- traced to exactly this; see
+    docs/filtering/hybrid_saltation_ekf.md §8). Every crossing this
     script called before that feature existed was already the descending
     one (falling from p_z0>0, or starting exactly at p_z=0 with v_z0>0 where
     the only positive root left after excluding t=0 is the next *descending*
@@ -265,15 +264,16 @@ def saltation_matrix(x_minus, e, g):
     the post-impact state at its *own* natural post-impact time (no shared
     reference time at all) with respect to the pre-impact state at its own
     natural pre-impact time. That quantity is correct for what it measures
-    (verified separately, to ~2.9e-8, in this module's tests) and is
-    exactly the building block composed-across-events for Poincare-map
-    stability analysis (docs/filtering/hybrid_saltation_ekf.md's §9) -- but
-    it is missing the f+ term entirely, and using it here, where every
+    (verified against a central finite difference to ~1e-10; see
+    docs/filtering/hybrid_saltation_ekf.md §4) -- but it is not the
+    saltation matrix of the literature (Kong et al. 2023, Def. 2, which is
+    the formula above, also used for periodic-orbit/monodromy analysis --
+    see the doc's §9), and it is missing the f+ term entirely, and using it here, where every
     comparison is against a fixed dt tick rather than each trajectory's own
     crossing time, was checked against this function's own finite-difference
     ground truth and found wrong by a wide margin (max abs diff ~4.4, not
-    floating-point noise) -- this module's docs/tests keep that failed
-    check as a deliberate point: getting the *shape* of a saltation-matrix
+    floating-point noise) -- docs/filtering/hybrid_saltation_ekf.md §4 keeps
+    that failed check as a deliberate point: getting the *shape* of a saltation-matrix
     formula right is not the same as getting the right saltation matrix for
     the specific comparison at hand.
 
@@ -701,7 +701,7 @@ def main():
     parser.add_argument("--duration", type=float, default=5.0,
                          help="Simulation length in seconds. Keep this comfortably below the "
                               "trajectory's own Zeno settling time (for the defaults below, an "
-                              "e=0.85 restitution bounce dropped from 5m settles around ~12.4s, "
+                              "e=0.85 restitution bounce dropped from 5m settles around ~12.45s, "
                               "but bounce intervals shrink quickly enough that the 5th+ bounce "
                               "already shows Zeno-adjacent instability well before that -- both "
                               "filters become unreliable there for reasons unrelated to the "
