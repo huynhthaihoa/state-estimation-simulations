@@ -16,7 +16,7 @@ You define a **residual**:
 
 $$r(x) = \text{prediction}(x) - \text{measurement}$$
 
-and want to minimize the total squared error:
+and want to minimize the **total squared error**:
 
 ```math
 \min_x \frac12 \|r(x)\|^2
