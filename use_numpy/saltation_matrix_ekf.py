@@ -266,7 +266,7 @@ def saltation_matrix(x_minus, e, g):
     natural pre-impact time. That quantity is correct for what it measures
     (verified against a central finite difference to ~1e-10; see
     docs/filtering/hybrid_saltation_ekf.md §4) -- but it is not the
-    saltation matrix of the literature (Kong et al. 2023, Def. 2, which is
+    saltation matrix of the literature (Kong et al. 2024, Def. 2, which is
     the formula above, also used for periodic-orbit/monodromy analysis --
     see the doc's §9), and it is missing the f+ term entirely, and using it here, where every
     comparison is against a fixed dt tick rather than each trajectory's own
