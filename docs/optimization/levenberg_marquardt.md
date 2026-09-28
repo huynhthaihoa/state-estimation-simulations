@@ -108,7 +108,7 @@ For example, $f = \tfrac12(x^2 + 100y^2)$ is 100× steeper in $y$, so $\alpha$ m
 
 - $\alpha = 0.019$ needs **361 steps** to get within $0.01$ of the minimum.
 - $\alpha = 0.021$ **diverges**.
-- Gauss-Newton gets there in **one step**, because $J^\top J$ rescales each direction by its own curvature.
+- Gauss-Newton gets there in **one step**, because $J^\top J$ rescales each direction by its own curvature. Here the errors are $e = (x,\ 10y)$, so $J = \text{diag}(1, 10)$ and $J^\top J = \text{diag}(1, 100)$.
 
 §5 shows that LM with a large $\lambda$ becomes exactly this step with $\alpha = 1/\lambda$, and §12 shows how Marquardt's scaling removes the valley problem.
 
