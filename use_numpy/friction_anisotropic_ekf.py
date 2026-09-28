@@ -14,10 +14,11 @@ frame (low variance along the grip/forward axis, high variance along the
 slip/lateral axis), not in the world frame -- so a real slip event, expressed
 in world coordinates, is a random displacement drawn in the body frame and
 then rotated by the *true* heading at that instant. `pointcloud_pose_tracking_
-empirical_note.md`'s §A.1/§2 already established the general shape of this
-argument (a noise ellipsoid fixed in an object's own frame looks anisotropic-
-and-rotating in the world frame; what matters is whether the noise model
-tracks that rotation, not "rigid vs. non-rigid") for *measurement* noise in a
+empirical_note.md`'s §2/§5 (terms: docs/glossary.md) already established the
+general shape of this argument (a noise ellipsoid fixed in an object's own
+frame looks anisotropic-and-rotating in the world frame; what matters is
+whether the noise model tracks that rotation, not "rigid vs. non-rigid") for
+*measurement* noise in a
 point-cloud registration EKF/IEKF -- this script is the first to apply the
 same argument to *process* noise for a moving-and-turning robot instead, and
 deliberately stays an ordinary EKF throughout (no new IEKF/Lie-group

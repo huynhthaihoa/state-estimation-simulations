@@ -197,7 +197,7 @@ $$
 
 where $\Omega_k$ is the **information matrix** - the same quantity [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty) calls $W_i$; both are $\Sigma^{-1}$ for a factor's measurement; this doc's $\Omega$ notation is what everything built on top of it (including [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md)) uses from here on.
 
-> **Note**: $\Omega_k$ is the inverse of that measurement's covariance, $\Omega_k = \Sigma_k^{-1}$ - a precise sensor (small $\Sigma_k$) inverts to a *large* $\Omega_k$, so its error counts more in the sum, while a noisy sensor (large $\Sigma_k$) inverts to a *small* $\Omega_k$ and gets down-weighted. The term $e_k^\top\Omega_k e_k$ is a **Mahalanobis distance** - see [pointcloud_pose_tracking_empirical_note.md Appendix A.3](../filtering/pointcloud_pose_tracking_empirical_note.md#a3-mahalanobis-distance-and-the-information-matrix) for the full derivation and the isotropic special case where it collapses to plain squared error divided by a constant.
+> **Note**: $\Omega_k$ is the inverse of that measurement's covariance, $\Omega_k = \Sigma_k^{-1}$ - a precise sensor (small $\Sigma_k$) inverts to a *large* $\Omega_k$, so its error counts more in the sum, while a noisy sensor (large $\Sigma_k$) inverts to a *small* $\Omega_k$ and gets down-weighted. The term $e_k^\top\Omega_k e_k$ is a **Mahalanobis distance** - see the [glossary](../glossary.md#2-uncertainty-and-probability) for the definition and the isotropic special case where it collapses to plain squared error divided by a constant.
 
 So:
 

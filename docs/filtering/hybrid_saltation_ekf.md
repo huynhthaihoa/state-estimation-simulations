@@ -152,7 +152,7 @@ The naive approach isn't slightly off here; it's qualitatively wrong on both com
 
 $DR$ cannot see any of this because it has no notion of time at all - it only knows how to transform a state that is already sitting on the guard, and composing it with the ordinary flow Jacobians on either side doesn't fix that blind spot. $\Xi$ adds exactly the missing piece: its correction term accounts for how much the perturbation shifts the crossing time, and for what that shift does to the state both before *and* after the bounce.
 
-(Computed directly from this repo's own `flow`, `crossing_time`, `reset_map`, `reset_jacobian`, and `saltation_matrix` functions in `saltation_matrix_ekf.py`, not hand-derived - reproducible with $x_0=(0,0,5,0,0,-2)$, $\delta x_0=(0,0,0.05,0,0,0)$, $e=0.5$, $g=9.81$, $T=1.0$. Composing three matrices by hand isn't a natural calculator exercise the way a single scalar formula is, so unlike earlier drafts of this section there's no hand-arithmetic appendix for this version - see the [Appendix](#appendix-a-simpler-related-quantity-worked-by-hand) instead for a closely related, hand-workable quantity and how it connects to this one.)
+(Computed directly from this repo's own `flow`, `crossing_time`, `reset_map`, `reset_jacobian`, and `saltation_matrix` functions in `saltation_matrix_ekf.py`, not hand-derived - reproducible with $x_0=(0,0,5,0,0,-2)$, $\delta x_0=(0,0,0.05,0,0,0)$, $e=0.5$, $g=9.81$, $T=1.0$. Composing three matrices by hand isn't a natural calculator exercise the way a single scalar formula is, so unlike earlier drafts of this section there's no hand-arithmetic appendix for this version - see [§10](#10-a-simpler-related-quantity-worked-by-hand) instead for a closely related, hand-workable quantity and how it connects to this one.)
 
 ---
 
@@ -212,7 +212,7 @@ The practical consequence is the opposite of what an exactly-zero claim would pr
 
 ## 6. The empirical finding: a modest, real gap, not a dramatic one
 
-The intuitive story going in was that the naive $`P^{+} = DR\,P^{-}\,DR^\top`$ update would be measurably overconfident (too-small reported uncertainty) right after each bounce compared to the saltation-corrected one, and a Monte Carlo NEES (Normalized Estimation Error Squared - a per-trial score for how far the true state falls from the estimate relative to how much uncertainty $P$ claims; a well-calibrated 6-DoF filter should average NEES $\approx 6$, *persistently* higher values mean $P$ is too small for the errors actually being made (overconfident), and persistently lower values mean it is too large (underconfident) - full formula in the [Appendix](#10-appendix-related-terms)) consistency check would show it. The data does not bear that out.
+The intuitive story going in was that the naive $`P^{+} = DR\,P^{-}\,DR^\top`$ update would be measurably overconfident (too-small reported uncertainty) right after each bounce compared to the saltation-corrected one, and a Monte Carlo NEES (Normalized Estimation Error Squared - a per-trial score for how far the true state falls from the estimate relative to how much uncertainty $P$ claims; a well-calibrated 6-DoF filter should average NEES $\approx 6$, *persistently* higher values mean $P$ is too small for the errors actually being made (overconfident), and persistently lower values mean it is too large (underconfident) - full formula in the [glossary](../glossary.md#2-uncertainty-and-probability)) consistency check would show it. The data does not bear that out.
 
 Running `saltation_matrix_ekf.py` at its defaults (500 Monte Carlo trials, 3 well-separated bounces from a 5m drop at $e = 0.85$) and looking at NEES in the few ticks immediately following each bounce (excluding the shared spike at the bounce tick itself, which both filters exhibit for the mundane reason that the true trajectory is also close to its own crossing at that tick):
 
@@ -282,13 +282,7 @@ This script doesn't build or verify that composition itself - it propagates one 
 
 ---
 
-## 10. Appendix: related terms
-
-- **Guard condition/reset map**: the switching-surface function $g(x)=0$ and the (possibly discontinuous) map $R$ applied when a trajectory reaches it - the two ingredients that make a system "hybrid" rather than purely continuous.
-- **NEES (Normalized Estimation Error Squared)**: $(x_{\text{true}} - x_{\text{est}})^\top P^{-1} (x_{\text{true}} - x_{\text{est}})$. A well-calibrated $n$-DoF filter's NEES should average to $n$ across many independent trials; systematically larger values mean the filter's reported $P$ is too small (overconfident) for the errors it's actually making, and systematically smaller values mean it is too large (underconfident). See [pose_graph_optimization.md §15.3](../optimization/pose_graph_optimization.md#153-objective-function) for the closely-related Mahalanobis-distance framing already used elsewhere in this repo.
-- **Zeno behavior**: a hybrid system undergoing infinitely many discrete transitions in a finite time interval - the generic long-run behavior of any lossy bouncing system, and a standard pathology to guard against in hybrid-system simulation, not specific to saltation matrices themselves.
-
-### Appendix: a simpler, related quantity worked by hand
+## 10. A simpler, related quantity, worked by hand
 
 §3's fixed-time comparison needs three composed matrices and isn't a natural hand-arithmetic exercise. $\Xi_{\text{own-time}}$ from §4 - the formula this script's `saltation_matrix` *used to* compute, still correct for the different, event-to-event question it answers - reduces to a single scalar correction and is worth working out by hand once, with a calculator, no code required. Uses the same setup as §3's opening (before it moves to a fixed comparison time): $x^{-}_0=(0,0,5,0,0,-2)$ (so $p_z^0=5$, $v_z^0=-2$), $\delta x_0=(0,0,0.05,0,0,0)$ (so $\delta p_z^0 = 0.05$), $e=0.5$, $g=9.81$, comparing each trajectory at its *own* post-bounce moment (no shared fixed time here, unlike §3).
 
