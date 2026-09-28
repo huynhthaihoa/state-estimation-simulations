@@ -113,7 +113,7 @@ Notation follows the docs: $^\top$ is transpose, $\Omega$ is an information matr
 
 ## 8. References
 
-1. Solà, J., Deray, J., & Atchuthan, D. (2018). *A micro Lie theory for state estimation in robotics*. arXiv:1812.01537. https://doi.org/10.48550/arXiv.1812.01537 - the $SO(3)$/$SE(3)$, Exp/Log and hat conventions behind §1.
+1. Solà, J., Deray, J., & Atchuthan, D. (2018). *A micro Lie theory for state estimation in robotics*. arXiv:1812.01537. https://doi.org/10.48550/arXiv.1812.01537 - the $SO(3)$/$`SE(3)`$, Exp/Log and hat conventions behind §1.
 2. Thrun, S., Burgard, W., & Fox, D. (2005). *Probabilistic Robotics*. MIT Press. - the probabilistic and filtering vocabulary behind §2 and §6.
 3. Nocedal, J., & Wright, S. J. (2006). *Numerical Optimization* (2nd ed.). Springer. https://doi.org/10.1007/978-0-387-40065-5 - the least-squares, Gauss-Newton and Levenberg-Marquardt terms in §3.
 4. Dellaert, F., & Kaess, M. (2017). *Factor Graphs for Robot Perception*. Foundations and Trends in Robotics, 6(1–2), 1–139. https://doi.org/10.1561/2300000043 - the factor-graph, elimination and incremental-smoothing terms in §4 and §5.
