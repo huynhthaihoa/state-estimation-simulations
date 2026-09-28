@@ -92,7 +92,7 @@ The third row is dropped because it is a combination of the first two (the third
 The recovered $3\times3$ block is only a *scaled, possibly reflected* rotation - not yet a valid element of $SO(3)$. `linear_pnp_dlt` turns $x$ into a pose in this order:
 
 1. **Unpack.** $x$ is the last row of $V^\top$. Its first 9 entries, row-major, give $R_{\text{raw}}$. The last 3 give $t_{\text{raw}}$.
-2. **Fix the sign.** $x$ and $-x$ both solve $Ax = 0$. If the median over all points of the raw depth $(R_{\text{raw}}P_i + t_{\text{raw}})_z$ is negative, both $R_{\text{raw}}$ and $t_{\text{raw}}$ are negated (§4). This runs *before* orthogonalization.
+2. **Fix the sign.** $x$ and $-x$ both solve $Ax = 0$. If the median over all points of the raw depth $`(R_{\text{raw}}P_i + t_{\text{raw}})_z`$ is negative, both $`R_{\text{raw}}`$ and $`t_{\text{raw}}`$ are negated (§4). This runs *before* orthogonalization.
 3. **Orthogonalize.** With $R_{\text{raw}} = U\Sigma V^\top$, set $R_{cw} = UV^\top$. If $\det(R_{cw}) < 0$, the last row of $V^\top$ is negated and $R_{cw}$ is recomputed, so the result is a proper rotation.
 4. **Recover scale.** $s = (\sigma_1 + \sigma_2 + \sigma_3)/3$, the mean of the singular values of $R_{\text{raw}}$. Then $t_{cw} = t_{\text{raw}}/s$.
 5. **Invert.** The function returns the camera-to-world pose, with rotation $R_{cw}^\top$ and translation $-R_{cw}^\top t_{cw}$.
