@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 440" width="1200" height="440" role="img" aria-labelledby="t d">
+<title id="t">State Estimation Simulations</title>
+<desc id="d">Pipeline overview: sensors feed a front-end (PnP, triangulation, visual-inertial initialization), whose constraints go to two back-end families - Kalman filtering and factor-graph optimization - producing a trajectory and map estimate, all built on Lie-group and Jacobian foundations.</desc>
+<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16213b"/><stop offset="1" stop-color="#0b1222"/></linearGradient><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#94a3b8"/></marker></defs>
+<rect width="1200" height="440" rx="18" fill="url(#bg)"/>
+<text x="48.0" y="64.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="34" font-weight="700" fill="#e2e8f0" text-anchor="start">State Estimation Simulations</text>
+<text x="48.0" y="96.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="17" font-weight="400" fill="#94a3b8" text-anchor="start">From-scratch pose estimation on SO(3) / SE(3) · NumPy and manif side by side</text>
+<rect x="48" y="170" width="190" height="132" rx="14" fill="#facc15" fill-opacity=".10" stroke="#facc15" stroke-opacity=".65" stroke-width="2"/>
+<text x="66.0" y="200.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#facc15" text-anchor="start" letter-spacing="1.5">SENSORS</text>
+<text x="66.0" y="228.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">IMU · camera</text>
+<text x="66.0" y="252.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">odometry</text>
+<text x="66.0" y="276.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">point clouds</text>
+<rect x="278" y="170" width="214" height="132" rx="14" fill="#38bdf8" fill-opacity=".10" stroke="#38bdf8" stroke-opacity=".65" stroke-width="2"/>
+<text x="296.0" y="200.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#38bdf8" text-anchor="start" letter-spacing="1.5">FRONT-END</text>
+<text x="296.0" y="228.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">PnP</text>
+<text x="296.0" y="252.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">triangulation</text>
+<text x="296.0" y="276.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">VI initialization</text>
+<rect x="532" y="126" width="336" height="106" rx="14" fill="#a78bfa" fill-opacity=".10" stroke="#a78bfa" stroke-opacity=".65" stroke-width="2"/>
+<text x="550.0" y="156.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#a78bfa" text-anchor="start" letter-spacing="1.5">FILTERING</text>
+<text x="550.0" y="184.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">KF · EKF · IEKF · UKF</text>
+<text x="550.0" y="208.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">saltation · ZUPT · friction</text>
+<rect x="532" y="246" width="336" height="106" rx="14" fill="#34d399" fill-opacity=".10" stroke="#34d399" stroke-opacity=".65" stroke-width="2"/>
+<text x="550.0" y="276.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#34d399" text-anchor="start" letter-spacing="1.5">OPTIMIZATION</text>
+<text x="550.0" y="304.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">Gauss-Newton · Levenberg-Marquardt</text>
+<text x="550.0" y="328.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">factor graphs · iSAM2 · BA</text>
+<rect x="908" y="126" width="244" height="226" rx="14" fill="#e2e8f0" fill-opacity=".10" stroke="#e2e8f0" stroke-opacity=".65" stroke-width="2"/>
+<text x="926.0" y="156.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#e2e8f0" text-anchor="start" letter-spacing="1.5">ESTIMATE</text>
+<path d="M240.0 236.0 L274.0 236.0" stroke="#94a3b8" stroke-width="2.5" fill="none" marker-end="url(#ah)"/>
+<path d="M494.0 222.0 L528.0 180.0" stroke="#94a3b8" stroke-width="2.5" fill="none" marker-end="url(#ah)"/>
+<path d="M494.0 250.0 L528.0 300.0" stroke="#94a3b8" stroke-width="2.5" fill="none" marker-end="url(#ah)"/>
+<path d="M870.0 180.0 L904.0 214.0" stroke="#94a3b8" stroke-width="2.5" fill="none" marker-end="url(#ah)"/>
+<path d="M870.0 300.0 L904.0 266.0" stroke="#94a3b8" stroke-width="2.5" fill="none" marker-end="url(#ah)"/>
+<path d="M934.0 318.0 L961.4 256.0 L988.9 205.0 L1016.3 174.3 L1043.7 169.4 L1071.1 191.0 L1098.6 235.4 L1126.0 294.5" stroke="#64748b" stroke-width="2.5" stroke-dasharray="4 5" fill="none"/>
+<ellipse cx="934.0" cy="318.0" rx="5.0" ry="3.0" transform="rotate(0 934.0 318.0)" fill="#a78bfa" fill-opacity=".12" stroke="#a78bfa" stroke-opacity=".55"/>
+<ellipse cx="961.9" cy="256.3" rx="7.2" ry="4.3" transform="rotate(20 961.9 256.3)" fill="#a78bfa" fill-opacity=".12" stroke="#a78bfa" stroke-opacity=".55"/>
+<ellipse cx="989.7" cy="206.2" rx="9.4" ry="5.6" transform="rotate(40 989.7 206.2)" fill="#a78bfa" fill-opacity=".12" stroke="#a78bfa" stroke-opacity=".55"/>
+<ellipse cx="1017.6" cy="176.9" rx="11.6" ry="6.9" transform="rotate(60 1017.6 176.9)" fill="#a78bfa" fill-opacity=".12" stroke="#a78bfa" stroke-opacity=".55"/>
+<ellipse cx="1045.4" cy="173.9" rx="13.8" ry="8.2" transform="rotate(80 1045.4 173.9)" fill="#a78bfa" fill-opacity=".12" stroke="#a78bfa" stroke-opacity=".55"/>
+<ellipse cx="1073.3" cy="198.1" rx="16.0" ry="9.5" transform="rotate(100 1073.3 198.1)" fill="#a78bfa" fill-opacity=".12" stroke="#a78bfa" stroke-opacity=".55"/>
+<ellipse cx="1101.1" cy="245.7" rx="18.2" ry="10.8" transform="rotate(120 1101.1 245.7)" fill="#a78bfa" fill-opacity=".12" stroke="#a78bfa" stroke-opacity=".55"/>
+<ellipse cx="1129.0" cy="308.5" rx="20.4" ry="12.1" transform="rotate(140 1129.0 308.5)" fill="#a78bfa" fill-opacity=".12" stroke="#a78bfa" stroke-opacity=".55"/>
+<path d="M934.0 318.0 L961.9 256.3 L989.7 206.2 L1017.6 176.9 L1045.4 173.9 L1073.3 198.1 L1101.1 245.7 L1129.0 308.5" stroke="#38bdf8" stroke-width="2.5" fill="none"/>
+<path d="M1101.1 245.7 Q1031.5 296.3 961.9 256.3" stroke="#34d399" stroke-width="2.5" stroke-dasharray="7 5" fill="none"/>
+<circle cx="934.0" cy="318.0" r="5" fill="#0b1222" stroke="#38bdf8" stroke-width="2.5"/>
+<circle cx="961.9" cy="256.3" r="5" fill="#0b1222" stroke="#38bdf8" stroke-width="2.5"/>
+<circle cx="989.7" cy="206.2" r="5" fill="#0b1222" stroke="#38bdf8" stroke-width="2.5"/>
+<circle cx="1017.6" cy="176.9" r="5" fill="#0b1222" stroke="#38bdf8" stroke-width="2.5"/>
+<circle cx="1045.4" cy="173.9" r="5" fill="#0b1222" stroke="#38bdf8" stroke-width="2.5"/>
+<circle cx="1073.3" cy="198.1" r="5" fill="#0b1222" stroke="#38bdf8" stroke-width="2.5"/>
+<circle cx="1101.1" cy="245.7" r="5" fill="#0b1222" stroke="#38bdf8" stroke-width="2.5"/>
+<circle cx="1129.0" cy="308.5" r="5" fill="#0b1222" stroke="#38bdf8" stroke-width="2.5"/>
+<path d="M958.0 184.0 L959.6 187.8 L963.7 188.1 L960.6 190.8 L961.5 194.9 L958.0 192.7 L954.5 194.9 L955.4 190.8 L952.3 188.1 L956.4 187.8 Z" fill="#facc15" fill-opacity=".85"/>
+<path d="M1062.0 226.0 L1063.6 229.8 L1067.7 230.1 L1064.6 232.8 L1065.5 236.9 L1062.0 234.7 L1058.5 236.9 L1059.4 232.8 L1056.3 230.1 L1060.4 229.8 Z" fill="#facc15" fill-opacity=".85"/>
+<path d="M1112.0 186.0 L1113.6 189.8 L1117.7 190.1 L1114.6 192.8 L1115.5 196.9 L1112.0 194.7 L1108.5 196.9 L1109.4 192.8 L1106.3 190.1 L1110.4 189.8 Z" fill="#facc15" fill-opacity=".85"/>
+<path d="M1000.0 294.0 L1001.6 297.8 L1005.7 298.1 L1002.6 300.8 L1003.5 304.9 L1000.0 302.7 L996.5 304.9 L997.4 300.8 L994.3 298.1 L998.4 297.8 Z" fill="#facc15" fill-opacity=".85"/>
+<path d="M1090.0 290.0 L1091.6 293.8 L1095.7 294.1 L1092.6 296.8 L1093.5 300.9 L1090.0 298.7 L1086.5 300.9 L1087.4 296.8 L1084.3 294.1 L1088.4 293.8 Z" fill="#facc15" fill-opacity=".85"/>
+<text x="1030.0" y="344.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="middle">trajectory + map</text>
+<rect x="48" y="372" width="1104" height="42" rx="12" fill="#64748b" fill-opacity=".14" stroke="#64748b" stroke-opacity=".6" stroke-width="2"/>
+<text x="66.0" y="399.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#94a3b8" text-anchor="start" letter-spacing="1.5">FOUNDATIONS</text>
+<text x="196.0" y="399.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">Jacobians · Lie groups (Exp / Log) · quaternions · Umeyama alignment</text>
+</svg>

@@ -1,5 +1,7 @@
 # State Estimation Simulations
 
+![State Estimation Simulations: sensors feed a front-end, whose constraints go to Kalman filtering or factor-graph optimization, producing a trajectory and map estimate, all built on Lie-group and Jacobian foundations](assets/banner.svg)
+
 > New here? [GETTING_STARTED.md](GETTING_STARTED.md) is a suggested reading-and-running order through every doc and script in this repo, phase by phase.
 
 ## A. Introduction
