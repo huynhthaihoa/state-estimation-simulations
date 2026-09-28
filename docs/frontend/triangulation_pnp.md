@@ -65,7 +65,7 @@ $$
 \left[R_k^\top (P - o_k)\right]_z > 0 \quad \text{for every observer } k
 $$
 
-In `bundle_adjustment_advanced.py` a landmark is triangulated once it has `min_observations` = 3 observers (the default), with that script's `gn_tol` = $10^{-6}$ and `gn_max_iters` = 15.
+In `bundle_adjustment_advanced.py`, a landmark is triangulated once it has `min_observations` = 3 observers (the default), with that script's `gn_tol` = $10^{-6}$ and `gn_max_iters` = 15.
 
 ---
 
@@ -75,11 +75,11 @@ In `bundle_adjustment_advanced.py` a landmark is triangulated once it has `min_o
 
 $$d_i \times (R_{cw}P_i + t_{cw}) = 0$$
 
-This is **linear and homogeneous** in the 12 flattened entries of $[R_{cw} \mid t_{cw}]$ - exactly the classical **Direct Linear Transform (DLT)** camera-resectioning setup, specialized to *known* intrinsics. Stacking two independent rows of this constraint per correspondence gives an over-determined homogeneous system $Ax=0$, solved via `linear_pnp_dlt` as the smallest right-singular vector of $A$ (`np.linalg.svd`).
+This is **linear and homogeneous** in the 12 flattened entries of $[R_{cw} \mid t_{cw}]$ - exactly the classical **Direct Linear Transform (DLT)** camera-resectioning setup, specialized to *known* intrinsics. Stacking two independent rows of this constraint per correspondence gives an overdetermined homogeneous system $Ax=0$, solved via `linear_pnp_dlt` as the smallest right-singular vector of $A$ (`np.linalg.svd`).
 
-> **Note**: SVD (Singular Value Decomposition) factors any matrix as $A=U\Sigma V^\top$, with $U,V$ orthogonal and $\Sigma$ diagonal (the singular values, ranking how much each orthogonal direction contributes to $A$). Taking the smallest right-singular vector of $A$ - the column of $V$ paired with the smallest singular value - gives the least-squares null-space solution `linear_pnp_dlt` uses above; taking $UV^\top$ from a matrix's own SVD gives the nearest true rotation, which is exactly what the orthogonalization step below does.
+> **Note**: SVD (Singular Value Decomposition) factors any matrix as $A=U\Sigma V^\top$, with $U, V$ orthogonal and $\Sigma$ diagonal (the singular values, ranking how much each orthogonal direction contributes to $A$). Taking the smallest right-singular vector of $A$ - the column of $V$ paired with the smallest singular value - gives the least-squares null-space solution `linear_pnp_dlt` uses above; taking $UV^\top$ from a matrix's own SVD gives the nearest true rotation, which is exactly what the orthogonalization step below does.
 
-Concretely, each correspondence adds two rows to $A$: the first two rows of the cross-product matrix $[d_i]_\times$, times a $3\times12$ matrix that maps $x$ to $R_{cw}P_i + t_{cw}$. Here $r_1, r_2, r_3$ are the rows of $R_{cw}$:
+Concretely, each correspondence adds two rows to $A$: the first two rows of the cross-product matrix $`[d_i]_\times`$, times a $`3\times12`$ matrix that maps $x$ to $R_{cw}P_i + t_{cw}$. Here $r_1, r_2, r_3$ are the rows of $R_{cw}$:
 
 ```math
 A_i = \left([d_i]_\times\right)_{\text{rows }1,2}
@@ -97,7 +97,7 @@ The recovered $3\times3$ block is only a *scaled, possibly reflected* rotation -
 4. **Recover scale.** $s = (\sigma_1 + \sigma_2 + \sigma_3)/3$, the mean of the singular values of $R_{\text{raw}}$. Then $t_{cw} = t_{\text{raw}}/s$.
 5. **Invert.** The function returns the camera-to-world pose, with rotation $R_{cw}^\top$ and translation $-R_{cw}^\top t_{cw}$.
 
-With noise-free pixels this recovers the true pose to floating-point precision.
+With noise-free pixels, this recovers the true pose to floating-point precision.
 
 `refine_pose_gn` then runs Gauss-Newton on the true reprojection error, updating the pose via a right-multiplicative correction $T \leftarrow T\cdot\mathrm{Exp}(\delta)$ - mirroring `refine_landmark_gn`'s loop exactly, just solving a $6\times6$ system for the pose instead of a $3\times3$ system for the point. It uses the same $J_{\text{pose}}$ as bundle adjustment ([bundle_adjustment.md Section 6.1](../optimization/bundle_adjustment.md#61-the-ba-math-concretely)), for $\delta = [\delta v, \delta\omega]$:
 
@@ -122,7 +122,7 @@ Known point P                 Unknown pose?
 
 Both directions share the same underlying ambiguity: a pinhole camera's projection equation is invariant to certain sign flips, so a *linear* solve (which only sees the projection equation's algebraic structure, not "in front of the camera" as a constraint) can return a geometrically nonsensical but numerically consistent answer.
 
-- Triangulation: `passes_cheirality` explicitly checks the recovered point has positive depth in every observer.
+- Triangulation: `passes_cheirality` explicitly checks that the recovered point has positive depth in every observer.
 - PnP: `linear_pnp_dlt`'s sign-fix step (checking `np.median(depths_raw) < 0.0` before orthogonalization) is doing the *identical* check, just applied to fix the pose's sign ambiguity rather than reject a bad point outright.
 
 Neither problem is "solved" by the linear step alone - both need this positive-depth reasoning layered on top before the result is trustworthy.
