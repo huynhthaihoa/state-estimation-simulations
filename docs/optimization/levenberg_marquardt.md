@@ -24,12 +24,12 @@ For example:
 ```text
        camera observation
               ↓
-X1 ●──────── Factor ────────● L1
+x1 ●──────── Factor ────────● l1
        "How inconsistent
         is this observation?"
 ```
 
-We want to adjust $X_1$ and $L_1$ so that the error becomes smaller.
+We want to adjust $x_1$ and $l_1$ so that the error becomes smaller.
 
 ---
 
@@ -384,15 +384,15 @@ LM is therefore frequently useful for:
 
 ## 10. LM and your factor graph
 
-Take the small factor graph from [factor_graph.md §5](factor_graph.md#5-why-call-it-a-graph), where landmark L0 is seen from X0 and X1, and L1 from X1 and X2:
+Take the small factor graph from [factor_graph.md §5](factor_graph.md#5-why-call-it-a-graph), where landmark $l_0$ is seen from $x_0$ and $x_1$, and $l_1$ from $x_1$ and $x_2$:
 
 ```text
-       L0    L1
+       l0    l1
        ●     ●
       / \   / \
      /   \ /   \
     ●─────●─────●
-    X0    X1    X2
+    x0    x1    x2
 ```
 
 Each factor produces an error:

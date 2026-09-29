@@ -28,13 +28,13 @@ For SLAM:
 For example:
 
 ```text
-        landmark L1
+        landmark l1
              ●
             / \
        camera observations
           /     \
          /       \
-Pose X0 ●─────────● X1 ──────● X2
+Pose x0 ●─────────● x1 ──────● x2
          odometry
 ```
 
@@ -49,15 +49,15 @@ The connections are **factors**.
 Suppose your robot moves:
 
 ```text
-X0 → X1 → X2 → X3
+x0 → x1 → x2 → x3
 ```
 
 The odometry says:
 
 ```text
-X1 is 1m ahead of X0
-X2 is 1m ahead of X1
-X3 is 1m ahead of X2
+x1 is 1m ahead of x0
+x2 is 1m ahead of x1
+x3 is 1m ahead of x2
 ```
 
 But every measurement has error.
@@ -69,7 +69,7 @@ $$\text{estimated position} \approx 3.00\ \text{m}$$
 Maybe the real motion, though, was:
 
 ```text
-X0  →  X1  →  X2  →  X3
+x0  →  x1  →  x2  →  x3
   1.02   0.97    1.05 m
 ```
 
@@ -77,26 +77,26 @@ $$\text{real position} \approx 3.04\ \text{m}$$
 
 Integrating noisy per-step measurements never magically cancels their errors, so the estimate (3.00 m) and the real position (3.04 m) diverge - you accumulate error.
 
-> **Note**: each of those per-step measurements (`X1 is 1m ahead of X0`, etc.) is what **odometry** actually provides - an estimate of the robot's *incremental* change in pose between two nearby moments, from onboard motion sensors (wheel encoders, IMU, visual odometry, ...). Chaining ("integrating") a sequence of these incremental measurements to track pose relative to a starting point, the way the `3.00 m` estimate above was computed, is called **dead reckoning**. Since every measurement carries a small error and dead reckoning sums them with no correction, the drift grows unboundedly the longer you integrate - exactly the problem the loop closure below fixes. The term is also used more loosely for propagating a known motion *model* forward from an initial guess without looking at any measurements (e.g. the `saltation_matrix_ekf.py` baseline in the README) - the same "no correction" idea, with the same growing error.
+> **Note**: each of those per-step measurements ($x_1$ is 1m ahead of $x_0$, etc.) is what **odometry** actually provides - an estimate of the robot's *incremental* change in pose between two nearby moments, from onboard motion sensors (wheel encoders, IMU, visual odometry, ...). Chaining ("integrating") a sequence of these incremental measurements to track pose relative to a starting point, the way the `3.00 m` estimate above was computed, is called **dead reckoning**. Since every measurement carries a small error and dead reckoning sums them with no correction, the drift grows unboundedly the longer you integrate - exactly the problem the loop closure below fixes. The term is also used more loosely for propagating a known motion *model* forward from an initial guess without looking at any measurements (e.g. the `saltation_matrix_ekf.py` baseline in the README) - the same "no correction" idea, with the same growing error.
 
-Now imagine that at X3 the camera re-observes a landmark it first saw from X0. Recognizing a previously seen place like this is a **loop closure**, and it gives a direct measurement between X0 and X3 - say, 3.03 m:
+Now imagine that at $x_3$ the camera re-observes a landmark it first saw from $x_0$. Recognizing a previously seen place like this is a **loop closure**, and it gives a direct measurement between $x_0$ and $x_3$ - say, 3.03 m:
 
 ```text
-X0 ── 1 m ── X1 ── 1 m ── X2 ── 1 m ── X3
+x0 ── 1 m ── x1 ── 1 m ── x2 ── 1 m ── x3
 │                                      │
 └─────────────── 3.03 m ───────────────┘
 ```
 
 The loop-closure measurement says:
 
-> "X3 is 3.03 m from X0 - not the 3.00 m that the chained odometry claims."
+> "$`x_3`$ is 3.03 m from $x_0$ - not the 3.00 m that the chained odometry claims."
 
 Now we have conflicting information.
 
 The optimizer can adjust:
 
 ```text
-X0, X1, X2, X3
+x0, x1, x2, x3
 ```
 
 so that **all measurements are as consistent as possible**.
@@ -157,7 +157,7 @@ The factor answers:
 Suppose we have:
 
 ```text
-X0 ── odometry ── X1 ── odometry ── X2
+x0 ── odometry ── x1 ── odometry ── x2
  │                                  │
  └──────────── loop closure ────────┘
 ```
@@ -165,22 +165,22 @@ X0 ── odometry ── X1 ── odometry ── X2
 We have three errors:
 
 $$
-e_{01}(X_0,X_1)
+e_{01}(x_0,x_1)
 $$
 
 $$
-e_{12}(X_1,X_2)
+e_{12}(x_1,x_2)
 $$
 
 $$
-e_{02}(X_0,X_2)
+e_{02}(x_0,x_2)
 $$
 
 The optimizer tries to find poses that minimize:
 
 ```math
 \boxed{
-\min_{X_0,X_1,X_2}
+\min_{x_0,x_1,x_2}
 \sum_k \|e_k\|^2
 }
 ```
@@ -214,7 +214,7 @@ For example:
 ```text
 VARIABLES
 
-X0       X1       X2       X3
+x0       x1       x2       x3
 ●────────●────────●────────●
     F01      F12      F23
 ```
@@ -222,26 +222,26 @@ X0       X1       X2       X3
 Adding landmarks:
 
 ```text
-       L0    L1
+       l0    l1
        ●     ●
       / \   / \
      /   \ /   \
     ●─────●─────●
-    X0    X1    X2
+    x0    x1    x2
 ```
 
-Here landmark L0 is seen from X0 and X1, and L1 from X1 and X2.
+Here landmark $l_0$ is seen from $x_0$ and $x_1$, and $l_1$ from $x_1$ and $x_2$.
 
 Adding IMU:
 
 ```text
-X0          X1          X2
+x0          x1          x2
 ●────IMU────●────IMU────●
  \           \
   camera      camera
    \           \
     ●           ●
-    L0          L1
+    l0          l1
 ```
 
 Every measurement becomes a **factor connecting the variables it depends on**.
@@ -258,9 +258,9 @@ This is worth memorizing.
 
 Something you're trying to estimate:
 
-- $X_0$ = robot pose
-- $X_1$ = robot pose
-- $L_0$ = landmark position
+- $x_0$ = robot pose
+- $x_1$ = robot pose
+- $l_0$ = landmark position
 - $b$ = IMU bias
 
 ### Factor
@@ -284,15 +284,15 @@ For example:
               Factor
              /      \
             /        \
-          X1          L0
+          x1          l0
        robot pose   landmark
 ```
 
-The camera measurement doesn't directly "set" X1 or L0.
+The camera measurement doesn't directly "set" $x_1$ or $l_0$.
 
 Instead it says:
 
-> "X1 and L0 should satisfy this observation."
+> "$`x_1`$ and $l_0$ should satisfy this observation."
 
 ---
 
@@ -303,7 +303,7 @@ This distinction is particularly important for SLAM.
 A **[pose graph](pose_graph_optimization.md)** might look like:
 
 ```text
-X0 ── X1 ── X2 ── X3
+x0 ── x1 ── x2 ── x3
 │                 │
 └─────────────────┘
 ```
@@ -316,13 +316,13 @@ Usually:
 A **factor graph** is more general:
 
 ```text
-              L0
+              l0
                ●
               / \
        camera/   \camera
             /     \
-X0 ●──IMU──●──IMU──● X2
-          X1
+x0 ●──IMU──●──IMU──● x2
+          x1
 ```
 
 IMU factors link consecutive poses, and each camera factor links a pose to the landmark it observes. A pose graph would keep only the poses and the relative-pose factors between them.
@@ -430,13 +430,13 @@ Suppose:
 
 ```text
 Odometry says:
-X1 should be here ─────────┐
+x1 should be here ─────────┐
                            │
 Camera says:
-X1 should be there ────────┤ → compromise
+x1 should be there ────────┤ → compromise
                            │
 IMU says:
-X1 should be somewhere else┘
+x1 should be somewhere else┘
 ```
 
 The optimizer doesn't necessarily choose one measurement.
@@ -448,15 +448,15 @@ And when a loop closure arrives:
 ```text
 Before:
 
-X0 ●──●──●──●──●
+x0 ●──●──●──●──●
                 \
                  \
-                  ● X5
+                  ● x5
 
 
 After loop closure:
 
-X0 ●──────────────● X5
+x0 ●──────────────● x5
    │              │
    └──●──●──●──●──┘
 ```
@@ -480,8 +480,8 @@ If you remember only one picture, remember this:
         │      │      │
         ↓      ↓      ↓
 
-X0 ●──────●──────●──────● X3
-          X1     X2
+x0 ●──────●──────●──────● x3
+          x1     x2
 
  ↑                         ↑
  └────── loop closure ─────┘

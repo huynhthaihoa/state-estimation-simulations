@@ -220,7 +220,7 @@ It answers:
 
 ### Elimination tree
 
-Shows computational dependency, here for the elimination order l1, l2, l3, x1, x2:
+Shows computational dependency, here for the elimination order $l_1$, $l_2$, $l_3$, $x_1$, $x_2$:
 
 ```text
         x2
@@ -366,7 +366,7 @@ x1 ─ x2 ─ x3 ─ x4 ─ x5
      l2        l3
 ```
 
-Suppose we eliminate `x1` and the landmarks first, then the remaining poses oldest first: x1, l1, l2, l3, x2, x3, x4, x5.
+Suppose we eliminate $x_1$ and the landmarks first, then the remaining poses oldest first: $x_1$, $l_1$, $l_2$, $l_3$, $x_2$, $x_3$, $x_4$, $x_5$.
 
 The elimination tree is:
 

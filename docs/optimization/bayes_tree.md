@@ -24,11 +24,11 @@ And suppose it observes a landmark:
 
 The factor graph represents **constraints**:
 
-- `x1 → x2`: odometry
-- `x2 → x3`: odometry
-- `x3 → x4`: odometry
-- `x1 → l1`: observation
-- `x3 → l1`: observation
+- $x_1$ → $x_2$: odometry
+- $x_2$ → $x_3$: odometry
+- $x_3$ → $x_4$: odometry
+- $x_1$ → $l_1$: observation
+- $x_3$ → $l_1$: observation
 
 The goal is still:
 
@@ -66,7 +66,7 @@ Imagine we have:
 x1 ─── x2 ─── x3
 ```
 
-Suppose we decide to eliminate `x1`.
+Suppose we decide to eliminate $x_1$.
 
 Originally:
 
@@ -74,11 +74,11 @@ Originally:
 x1 ─── x2
 ```
 
-After eliminating `x1`, we no longer need `x1` in the remaining problem.
+After eliminating $x_1$, we no longer need $x_1$ in the remaining problem.
 
 But its information has to go somewhere.
 
-It gets **summarized into a new constraint involving x2**.
+It gets **summarized into a new constraint involving $x_2$**.
 
 Conceptually:
 
@@ -99,7 +99,7 @@ Eliminate x1:
 
 This is the fundamental idea behind elimination. See [`elimination_tree.md`](elimination_tree.md) for the full explainer of the dependency structure this produces.
 
-(Here `x1` is eliminated as part of building a solve order - it's still part of the problem, and a later update re-eliminates it if that update affects it. [marginalization.md](marginalization.md) reuses this exact step for a different purpose: permanently discarding an old state to bound a sliding-window estimator's size.)
+(Here $x_1$ is eliminated as part of building a solve order - it's still part of the problem, and a later update re-eliminates it if that update affects it. [marginalization.md](marginalization.md) reuses this exact step for a different purpose: permanently discarding an old state to bound a sliding-window estimator's size.)
 
 ---
 
@@ -209,7 +209,7 @@ Their joint probability can always be decomposed with the chain rule:
 
 $$P(x_1,x_2,x_3) = P(x_1|x_2,x_3)P(x_2|x_3)P(x_3)$$
 
-That holds for any three variables, so it says nothing yet. What elimination adds is structure. For the chain `x1 ─ x2 ─ x3`, eliminating `x1` first finds that it connects only to `x2`, so the first factor simplifies:
+That holds for any three variables, so it says nothing yet. What elimination adds is structure. For the chain $x_1$ ─ $x_2$ ─ $x_3$, eliminating $x_1$ first finds that it connects only to $x_2$, so the first factor simplifies:
 
 ```math
 P(x_1,x_2,x_3) = P(x_1 \mid x_2)\,P(x_2 \mid x_3)\,P(x_3)
@@ -233,7 +233,7 @@ Suppose we have:
 x1 ─ x2 ─ x3 ─ x4 ─ x5
 ```
 
-The robot gets a new measurement involving `x5`.
+The robot gets a new measurement involving $x_5$.
 
 iSAM2 doesn't want to rebuild everything.
 
@@ -255,7 +255,7 @@ For example:
        x1  ← leaf
 ```
 
-An update only has to redo the path from the touched variables up to the root. Here `x5` *is* the root, so only the top of the tree changes, and `x1`-`x4` below it are left alone.
+An update only has to redo the path from the touched variables up to the root. Here $x_5$ *is* the root, so only the top of the tree changes, and $x_1$-$`x_4`$ below it are left alone.
 
 ---
 
@@ -269,7 +269,7 @@ x1 ─ x2 ─ x3 ─ x4 ─ x5
 └──── loop closure ──┘
 ```
 
-The new loop-closure factor connects `x1` and `x5`.
+The new loop-closure factor connects $x_1$ and $x_5$.
 
 This can change the solution for many variables.
 
@@ -289,7 +289,7 @@ Conceptually:
        x1    ← affected (leaf)
 ```
 
-`x1` is affected too, not just `x2`-`x5`: the new factor touches `x1` directly, and `x1` is also the deepest leaf under this chain's elimination order, so it must be re-eliminated along with everything above it on the path to `x5`. (The repo's own `bayes_tree_construction.py` demonstrates exactly this on its square-loop topology: with the default 16 nodes, a single loop-closure edge affects all 16/16 *variables*, including the one at the very bottom of the chain. The script counts elimination-tree nodes, one per variable, not merged cliques; see §4.1 and §15.)
+$x_1$ is affected too, not just $x_2$-$`x_5`$: the new factor touches $x_1$ directly, and $x_1$ is also the deepest leaf under this chain's elimination order, so it must be re-eliminated along with everything above it on the path to $x_5$. (The repo's own `bayes_tree_construction.py` demonstrates exactly this on its square-loop topology: with the default 16 nodes, a single loop-closure edge affects all 16/16 *variables*, including the one at the very bottom of the chain. The script counts elimination-tree nodes, one per variable, not merged cliques; see §4.1 and §15.)
 
 The affected section is removed/re-eliminated and then reinserted into the Bayes tree.
 
@@ -436,10 +436,10 @@ For example:
       {x1 | x2}
 ```
 
-This is the Bayes tree of §4's chain `x1 ─ x2 ─ x3 ─ x4`, eliminated left to right. `{x2 | x3}` reads "x2, given x3": the variable eliminated at that node, then its separator. The cliques come from merging:
+This is the Bayes tree of §4's chain $x_1$ ─ $x_2$ ─ $x_3$ ─ $x_4$, eliminated left to right. $`\{x_2 \mid x_3\}`$ reads "$`x_2`$, given $x_3$": the variable eliminated at that node, then its separator. The cliques come from merging:
 
-- `x3`'s separator, `{x4}`, is exactly the root's variables, so `x3` joins the root clique instead of getting its own node.
-- `x2`'s separator, `{x3}`, is smaller than the clique `{x3, x4}` it hangs from, so `x2` starts a new clique. So does `x1`.
+- $x_3$'s separator, $`\{x_4\}`$, is exactly the root's variables, so $x_3$ joins the root clique instead of getting its own node.
+- $x_2$'s separator, $`\{x_3\}`$, is smaller than the clique $`\{x_3, x_4\}`$ it hangs from, so $x_2$ starts a new clique. So does $x_1$.
 
 `bayes_tree_construction.py` skips this merging and keeps one node per variable (§4.1, §15).
 

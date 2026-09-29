@@ -10,7 +10,7 @@ Imagine a robot moving:
 
 ```text
 t0       t1       t2       t3
-X0 ───── X1 ───── X2 ───── X3
+x0 ───── x1 ───── x2 ───── x3
 ```
 
 At every timestep, you receive new measurements.
@@ -20,19 +20,19 @@ A traditional **batch** approach might do:
 ```text
 Measurement at t0
        ↓
-Optimize X0
+Optimize x0
 
 Measurement at t1
        ↓
-Optimize X0, X1
+Optimize x0, x1
 
 Measurement at t2
        ↓
-Optimize X0, X1, X2
+Optimize x0, x1, x2
 
 Measurement at t3
        ↓
-Optimize X0, X1, X2, X3
+Optimize x0, x1, x2, x3
 ```
 
 So every time a new measurement arrives, you potentially solve the **whole problem again**.
@@ -40,7 +40,7 @@ So every time a new measurement arrives, you potentially solve the **whole probl
 For a large SLAM system:
 
 ```text
-X0 X1 X2 ... X1000
+x0 x1 x2 ... x1000
 ```
 
 re-solving everything repeatedly becomes expensive.
@@ -64,14 +64,14 @@ Conceptually:
 ```text
 Before:
 
-X0 ─── X1 ─── X2 ─── X3
+x0 ─── x1 ─── x2 ─── x3
               ↑
         already solved
 
 
 New measurement:
 
-X3 ─── X4
+x3 ─── x4
        ↑
       new
 
@@ -92,9 +92,9 @@ This is where things get interesting.
 Suppose we have a [factor graph](factor_graph.md):
 
 ```text
-X0 ─── X1 ─── X2 ─── X3
+x0 ─── x1 ─── x2 ─── x3
               │
-              L1
+              l1
 ```
 
 After linearization, the nonlinear optimization becomes approximately a linear least-squares problem:
@@ -148,20 +148,20 @@ iSAM applies a similar philosophy to the optimization problem.
 Suppose your robot has estimated:
 
 ```text
-X0 ── X1 ── X2 ── X3 ── X4
+x0 ── x1 ── x2 ── x3 ── x4
 ```
 
 and each edge represents odometry.
 
-Then you get a new camera observation at X4.
+Then you get a new camera observation at $x_4$.
 
-Maybe it observes landmark L0:
+Maybe it observes landmark $l_0$:
 
 ```text
-                        L0
+                        l0
                         ●
                         │   ← new factor
-X0 ── X1 ── X2 ── X3 ── X4
+x0 ── x1 ── x2 ── x3 ── x4
                         ↑
                    new camera
 ```
@@ -172,7 +172,7 @@ A batch optimizer says:
 
 An incremental optimizer says roughly:
 
-> "The new factor primarily affects X4 and the variables connected to it. Update the existing solution accordingly."
+> "The new factor primarily affects $x_4$ and the variables connected to it. Update the existing solution accordingly."
 
 ---
 
@@ -183,7 +183,7 @@ This is where incremental SLAM becomes especially interesting.
 Suppose we have:
 
 ```text
-X0 ── X1 ── X2 ── X3 ── X4
+x0 ── x1 ── x2 ── x3 ── x4
 │                       │
 └───────────────────────┘
        loop closure
@@ -191,9 +191,9 @@ X0 ── X1 ── X2 ── X3 ── X4
 
 The loop closure can affect **many previous poses**.
 
-So incremental optimization cannot simply update X4.
+So incremental optimization cannot simply update $x_4$.
 
-Original iSAM still absorbs the loop-closure factor like any other: as one more row folded into the factorization with Givens rotations (§3). But this row links X4 all the way back to X0, so the rotations sweep through most of the factorization and leave it denser than before (fill-in). Original iSAM cleans this up periodically, by relinearizing everything and choosing a new variable ordering in one batch step (Kaess et al. 2008). This repo's script goes straight to that batch step when the loop closes (§14.1).
+Original iSAM still absorbs the loop-closure factor like any other: as one more row folded into the factorization with Givens rotations (§3). But this row links $x_4$ all the way back to $x_0$, so the rotations sweep through most of the factorization and leave it denser than before (fill-in). Original iSAM cleans this up periodically, by relinearizing everything and choosing a new variable ordering in one batch step (Kaess et al. 2008). This repo's script goes straight to that batch step when the loop closes (§14.1).
 
 So loop closures are exactly where incremental updates lose most of their advantage. Working out *which* variables a new factor really affects, and recomputing only those, is what iSAM2's Bayes tree adds (§7).
 
@@ -265,39 +265,39 @@ For example:
 ```text
 Before loop closure:
 
-X0 ── X1 ── X2 ── X3 ── X4
+x0 ── x1 ── x2 ── x3 ── x4
                         ↑
                  slightly wrong
 
 
 Loop closure arrives:
 
-X4 ───────── X0
+x4 ───────── x0
 ```
 
-X0 is the anchor, so it stays put; the small errors of every odometry step add up along the chain and show at X4. Now the loop closure tells us the trajectory is inconsistent.
+$x_0$ is the anchor, so it stays put; the small errors of every odometry step add up along the chain and show at $x_4$. Now the loop closure tells us the trajectory is inconsistent.
 
 The optimizer may change:
 
 ```text
-X0
-X1
-X2
-X3
-X4
+x0
+x1
+x2
+x3
+x4
 ```
 
-All of them can move, because the loop closure ties X4 back to X0 through the whole chain. As §6 explains, this is the expensive case, not a cheap one: original iSAM, and this repo's script, handle it with a full batch relinearization.
+All of them can move, because the loop closure ties $x_4$ back to $x_0$ through the whole chain. As §6 explains, this is the expensive case, not a cheap one: original iSAM, and this repo's script, handle it with a full batch relinearization.
 
 That's why the term **smoothing** is important.
 
 The system is not merely estimating:
 
-$$X_t$$
+$$x_t$$
 
 It is continually refining:
 
-$$X_0,\ldots,X_t$$
+$$x_0,\ldots,x_t$$
 
 using all available information.
 
@@ -312,16 +312,16 @@ This connects directly to **[filtering vs optimization/smoothing](../filtering_s
 Conceptually:
 
 ```text
-X0 → X1 → X2 → X3 → X4
+x0 → x1 → x2 → x3 → x4
                     ↑
             current state
 ```
 
-Once you've processed X0, you largely summarize its information and move forward.
+Once you've processed $x_0$, you largely summarize its information and move forward.
 
 You primarily care about:
 
-$$P(X_t|Z_{1:t})$$
+$$P(x_t \mid z_{1:t})$$
 
 ---
 
@@ -330,7 +330,7 @@ $$P(X_t|Z_{1:t})$$
 Instead:
 
 ```text
-X0 ── X1 ── X2 ── X3 ── X4
+x0 ── x1 ── x2 ── x3 ── x4
 │     │     │     │     │
 └─────┴─────┴─────┴─────┘
        all history
@@ -338,7 +338,7 @@ X0 ── X1 ── X2 ── X3 ── X4
 
 You maintain a representation of the entire trajectory:
 
-$$X_{0:t}$$
+$$x_{0:t}$$
 
 and continuously refine it.
 

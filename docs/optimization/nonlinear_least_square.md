@@ -393,9 +393,9 @@ So:
 Suppose your SLAM graph contains:
 
 ```text
-X0 ─── X1 ─── X2
+x0 ─── x1 ─── x2
 │      │      │
-L0     L1     L2
+l0     l1     l2
 ```
 
 Each factor provides a residual:
