@@ -93,7 +93,7 @@ The motion might look like:
  - $`x_{k+1}=x_k+v\cos\theta\,\Delta t`$
  - $`y_{k+1}=y_k+v\sin\theta\,\Delta t`$
 
-This is **nonlinear** because of the $\cos\theta$ and $\sin\theta$.
+This is **nonlinear** because of the $\cos\theta$ and $\sin\theta$. (For how to tell linear from nonlinear in general, and whether the nonlinearity actually matters at your uncertainty level, see [linear_nonlinear.md](linear_nonlinear.md).)
 
 A standard KF can't handle this directly.
 

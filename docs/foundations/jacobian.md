@@ -318,6 +318,8 @@ This is also the fundamental weakness of EKF.
 
 If the function is highly nonlinear, the local approximation might become poor.
 
+How poor is "poor" depends on how far from the linearization point you need it to hold: for a filter, that's the region its uncertainty covers. [linear_nonlinear.md](../filtering/linear_nonlinear.md) shows how to tell linear from nonlinear, and how to check whether the nonlinearity matters at your uncertainty level.
+
 ---
 
 ## 9. Connecting this back to IEKF

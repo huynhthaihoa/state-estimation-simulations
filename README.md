@@ -24,7 +24,7 @@ Each `use_manif/<name>.py` is the manifpy counterpart of `use_numpy/<name>.py` o
 [docs/](docs/) has the conceptual write-ups behind these simulations:
 - **Math foundations**: Jacobian, Lie algebra, quaternions, Umeyama alignment
 - The **front-end**: triangulation and PnP, visual-inertial initialization
-- The **Kalman-filter** family: KF/EKF/IEKF, UKF/ESKF/MSCKF and other variants, left- vs. right-invariant errors, an empirical note on the point-cloud tracking results, and non-smooth-motion filters (saltation-matrix EKF, ZUPT, friction-anisotropic process noise)
+- The **Kalman-filter** family: KF/EKF/IEKF, telling linear from nonlinear systems (and when linearization holds), UKF/ESKF/MSCKF and other variants, left- vs. right-invariant errors, an empirical note on the point-cloud tracking results, and non-smooth-motion filters (saltation-matrix EKF, ZUPT, friction-anisotropic process noise)
 - The **factor-graph/smoothing** family: NLS, Gauss-Newton, Levenberg-Marquardt, factor graphs,
 pose-graph optimization, bundle adjustment, sparse Cholesky factorization, IMU preintegration, iSAM/iSAM2, elimination and Bayes trees, marginalization
 

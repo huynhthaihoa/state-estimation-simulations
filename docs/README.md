@@ -23,6 +23,7 @@ Conceptual/pedagogical notes on the state-estimation and SLAM ideas behind the c
 ## [`filtering/`](filtering/) - The Kalman-filter lineage
 
 - [kf_ekf_iekf.md](filtering/kf_ekf_iekf.md): KF → EKF → Invariant EKF, in one progression.
+- [linear_nonlinear.md](filtering/linear_nonlinear.md): how to tell whether a system is linear or nonlinear, and how to check whether the nonlinearity actually matters over the region your uncertainty covers.
 - [extra_kf_variants.md](filtering/extra_kf_variants.md): UKF, ESKF, MSCKF and other variants, and why each exists.
 - [left_right_invariant.md](filtering/left_right_invariant.md): left- vs. right-invariant error formulations in the IEKF (builds on `extra_kf_variants.md`).
 - [pointcloud_pose_tracking_empirical_note.md](filtering/pointcloud_pose_tracking_empirical_note.md): an empirical note (not a concept explainer) on why `run_ekf`/`run_iekf` produce bit-identical output in `pointcloud_pose_tracking.py`, why `run_ukf` only comes close but doesn't match either one exactly, and why `run_vanilla_kf` diverges from all three unconditionally, by changing the state representation rather than the linearization.
