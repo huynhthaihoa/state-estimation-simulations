@@ -588,9 +588,21 @@ Local BA and Global BA solve the *exact same* objective from Section 6 - they di
 | Outlier handling | Fast local robust cost (Huber) + chi-square gating | Heavy re-triangulation, track merging/filtering |
 | Scaling | Roughly constant per window | Grows cubically with the number of camera poses |
 
-### Local BA (ORB-SLAM)
+The example systems name where each style is the *workhorse*, not the only one used: ORB-SLAM2 also runs a full BA after a loop closure, and COLMAP runs a local BA after every image it registers (§13.4).
 
-Re-optimizing the entire map on every camera move is impossible in real time, so Local BA **trades global consistency for speed** by isolating a small subgraph:
+### 13.1 Why not re-solve everything every time?
+
+Picture the map as a long chain of cameras linked by shared landmarks. A new keyframe's measurements pull directly only on the landmarks it sees, and those landmarks are seen only by nearby keyframes. The pull reaches further back only through more shared landmarks, weakening at every hop, so cameras far behind barely move. Re-solving the whole map to move a handful of nearby poses wastes almost all of the work, and Sections 10-12 show how fast that work grows with the number of cameras.
+
+Local BA exploits this. It re-solves only the neighborhood the new keyframe actually affects, and holds everything else where it is. Because that neighborhood stays roughly the same size however big the map gets, each solve takes bounded, real-time-friendly time.
+
+The price is in "holds everything else where it is." Each window treats the poses on its border as exact, so any small error in them is frozen into the new estimates, and every window adds a little more. Over a long trajectory these small errors compound into **drift** - the same compounding as dead-reckoning drift in [pose_graph_optimization.md §3](pose_graph_optimization.md#3-why-do-we-need-optimization).
+
+### 13.2 Choosing the window: covisibility, not recency
+
+Which keyframes count as "the neighborhood"? The obvious answer, the last $N$ keyframes, fails whenever the camera turns around or revisits a place: an old keyframe that sees the same landmarks is more tightly coupled to the new one than a recent keyframe facing the other way.
+
+The right measure of coupling falls out of Section 12. After the Schur complement eliminates the landmarks, the reduced camera system has a nonzero block between cameras $i$ and $j$ exactly when they share at least one landmark. The **covisibility graph** - keyframes as nodes, with an edge wherever two keyframes share landmarks, weighted by how many - is that sparsity pattern, kept up to date as keyframes arrive. Choosing the new keyframe's strongest covisible neighbors means choosing the cameras its measurements are most strongly coupled to. (ORB-SLAM draws an edge at 15 or more shared points.)
 
 ```text
   [Fixed Keyframe]  sees -> (Fixed Map Point)
@@ -600,27 +612,38 @@ Re-optimizing the entire map on every camera move is impossible in real time, so
  [Active Keyframe] < optimizes > [Active Map Point]
 ```
 
-- **Active keyframes**: the new keyframe plus its neighbors in the **covisibility graph** (keyframes sharing many observed points).
+- **Active keyframes**: the new keyframe plus its neighbors in the covisibility graph.
 - **Active points**: every 3D point observed by an active keyframe.
-- **Fixed keyframes**: other keyframes that also see an active point, held fixed as rigid anchors so the local window can't drift the map's global frame.
+- **Fixed keyframes**: other keyframes that also see an active point, held fixed as rigid anchors.
 
-Because a covisibility neighborhood's size stays roughly constant regardless of total map size, Local BA runs in bounded, real-time-friendly time - at the cost of letting small errors accumulate into global drift over a long trajectory. SLAM systems correct that separately, via loop closure + pose-graph optimization ([pose_graph_optimization.md](pose_graph_optimization.md)) or an occasional Global BA pass.
+**Fixed, not marginalized.** The fixed keyframes do two jobs. They pin the gauge, so the window can't slide, rotate or rescale as a whole (Section 14), and their observations of the active points add constraints. But fixing a pose means treating it as exactly known, which throws its uncertainty away. The alternative is to *marginalize* the border instead, keeping what it knew as a prior on the window ([marginalization.md §2](marginalization.md#2-marginalization-keep-the-information-drop-the-variable)), as sliding-window visual-inertial estimators such as OKVIS and VINS-Mono do. That keeps the information, but the prior is dense ([marginalization.md §5](marginalization.md#5-the-fill-in-consequence)) and its linearization point is frozen, which causes the consistency problem in [marginalization.md §6](marginalization.md#6-the-consistency-gotcha-why-fej-exists). ORB-SLAM takes the cheaper route: fix the border, accept the drift that causes, and correct the drift when it closes a loop.
 
-### Global BA (COLMAP)
+### 13.3 What Local BA can't fix, and what can
 
-Offline SfM pipelines sacrifice real-time speed for maximum accuracy: as COLMAP incrementally registers new images, it periodically re-optimizes **every** camera and **every** point jointly in one large least-squares problem, then uses the resulting global residuals to prune bad matches and re-triangulate points - something a local window can never do, since it never sees the whole map at once. The cost is that even after the Schur complement from Section 12, the reduced camera-only system still grows cubically with the number of camera poses - and assembling that Schur complement in the first place costs roughly linear time in the number of points/observations - so this can only run periodically or as a final step, not every frame.
+Drift has two parts, and they need different cures.
 
-### Choosing between them
+- **Inconsistency between windows.** Each window was solved against a slightly different frozen border, so neighboring windows disagree a little about the landmarks they share. The measurements *can* see this: solved jointly, the disagreement shows up as reprojection error. A Global BA pass removes it.
+- **Error the measurements can't see.** On a path that never revisits a place, nothing ties the end of the map to its start. The measurements only fix each part of the map relative to its neighbors, so the uncertainty in where the far end is grows with distance from the anchor. Even a perfect joint solve has this drift. A monocular camera adds **scale drift** on top, since images only determine the scene up to a scale factor (Strasdat et al. 2010).
+
+Only new information cures the second part: a **loop closure** (seeing a place again, which ties the far end back to the start) or another sensor, such as GPS, or an IMU, which makes roll, pitch and metric scale observable. So real systems split the work. ORB-SLAM runs Local BA on every keyframe. When it detects a loop, it estimates a similarity transform between the two ends (7 DoF, so scale drift is corrected too) and spreads the correction along the trajectory with pose-graph optimization ([pose_graph_optimization.md](pose_graph_optimization.md)). ORB-SLAM2 then runs a full BA in a separate thread to refine the result.
+
+### 13.4 Global BA in practice (COLMAP)
+
+Offline SfM pipelines sacrifice real-time speed for maximum accuracy. As COLMAP incrementally registers new images, it runs a local BA around each newly registered image. Once the model has grown by a set percentage, it re-optimizes **every** camera and **every** point jointly in one large least-squares problem, then uses the resulting global residuals to prune bad matches and re-triangulate points - something a local window can never do, since it never sees the whole map at once. The cost is that even after the Schur complement from Section 12, the reduced camera-only system still grows cubically with the number of camera poses - and assembling that Schur complement in the first place costs roughly linear time in the number of points/observations - so this can only run periodically or as a final step, not every frame.
+
+### 13.5 Choosing between them
 
 Use **Local BA** for real-time robotics/AR/VR where sub-30ms latency matters more than perfect global consistency (loop closure repairs that later).
 
 Use **Global BA** for offline reconstruction - meshes, NeRF/Gaussian-Splatting input scenes, photogrammetric surveys - where total geometric fidelity matters more than runtime.
 
+### 13.6 In this repo
+
 `bundle_adjustment.py`'s three solvers (`run_ba_landmarks_only`, `run_ba_poses_only`, `run_bundle_adjustment`) are all single-batch joint solves over the whole toy scene - closest in spirit to a (tiny) Global BA pass. It has no windowing, no covisibility graph, and no incremental registration, so it doesn't model Local BA's real-time system behavior at all.
 
 `bundle_adjustment_advanced.py` fills that gap. A camera moves keyframe-by-keyframe through a landmark corridor while a covisibility graph is built incrementally:
 
-- **Local BA**: every new keyframe triggers a bounded solve over an active window (the new keyframe plus its covisible neighbors, with other observing keyframes held fixed) - this section's diagram, made concrete.
+- **Local BA**: every new keyframe triggers a bounded solve over an active window (the new keyframe plus its covisible neighbors, with other observing keyframes held fixed) - §13.2's diagram, made concrete.
 - **Global BA**: a periodic pass over the whole map runs alongside for comparison.
 
 ![Three panels from bundle_adjustment_advanced.py: the keyframe path through a landmark corridor with the Local-only and Local plus Global estimates, solve time per call for the bounded Local BA window versus Global BA, and trailing RMS trajectory error over keyframes for both modes](../../assets/bundle_adjustment_advanced.png)
@@ -636,7 +659,17 @@ Use **Global BA** for offline reconstruction - meshes, NeRF/Gaussian-Splatting i
 
 So judge Global BA's benefit here from the aggregate statistics, not from any single run's printed numbers.
 
-**The windowed solver, concretely** (`run_windowed_gn_lm`). Local and Global BA call the same solver. They differ only in which poses and points are unknowns:
+**Why Global BA rarely helps here.** §13.3 predicts the answer: on the open default path, most of the error is the kind Global BA can't see. A one-off check over seeds 0-4 at the script's defaults (not part of the test suite) confirms this, and finds a second, script-specific error source:
+
+- **Most of the final error is one transform of the whole map.** Aligning each final trajectory to ground truth with a single similarity transform (Umeyama, Section 14) removes between half and four-fifths of the raw error in every run (default seed, Local-only: 1.87 m → 0.60 m). What remains - the inconsistency Global BA can actually fix - is small.
+- **That transform has two parts.** One is an orientation drift of 3-11°, which stays even with a perfect anchor: §13.3's unobservable drift. The other is a scale error set by the gauge anchor. Keyframes 0 and 1 are hard-fixed, and keyframe 1 keeps its noisy front-end pose, so their ~0.5 m baseline fixes the whole map's scale, off by up to 19% (fitted scale 0.81-1.14). Re-running with keyframe 1 fixed at its true pose brings the scale within 3% of correct and halves the mean raw Local-only error over the five seeds (2.56 m → 1.28 m).
+- **Global BA can make the scale worse.** On seed 2 with the noisy anchor, Global BA pulls the rest of the map into agreement with the wrong baseline: the fitted scale goes from 0.90 to 0.81 and the error from 2.62 m to 4.99 m. With keyframe 1 at its true pose, the same seed improves instead (1.53 m → 1.33 m).
+
+The anchor choice mirrors real monocular SLAM, where the first two keyframes' baseline sets the map's otherwise arbitrary scale. That's why monocular results are normally scored after a similarity alignment (Section 14), and why this script's raw, unaligned error mostly measures drift and gauge rather than what BA itself can fix.
+
+#### Implementation details
+
+**The windowed solver** (`run_windowed_gn_lm`). Local and Global BA call the same solver. They differ only in which poses and points are unknowns:
 
 - **Local** (`build_active_window`, `run_local_ba_step`): the new keyframe $k$ plus up to `max_window_keyframes` − 1 of its covisible neighbors (keyframes sharing at least `min_shared_for_covisibility` landmarks with $k$, strongest first) are active. Every already-triangulated landmark those keyframes see is active too. Every other keyframe that observes an active landmark is held fixed.
 - **Global** (`run_global_ba`): every keyframe processed so far and every triangulated landmark are unknowns.
@@ -693,3 +726,9 @@ For **visual SLAM**, BA is essentially the workhorse behind the idea of *"make m
 ## 16. References
 
 1. Triggs, B., McLauchlan, P. F., Hartley, R. I., & Fitzgibbon, A. W. (2000). *Bundle Adjustment - A Modern Synthesis*. In B. Triggs, A. Zisserman, & R. Szeliski (Eds.), Vision Algorithms: Theory and Practice (Vol. 1883, pp. 298-372). Springer. https://doi.org/10.1007/3-540-44480-7_21 - the standard reference survey behind this whole doc's framing (joint pose+landmark refinement, the Schur complement in §12, and the "modern synthesis" of BA as a sparse nonlinear least-squares problem rather than a purely photogrammetric one).
+2. Mur-Artal, R., Montiel, J. M. M., & Tardós, J. D. (2015). *ORB-SLAM: A Versatile and Accurate Monocular SLAM System*. IEEE Transactions on Robotics, 31(5), 1147-1163. https://doi.org/10.1109/TRO.2015.2463671 - the Local BA window (covisible keyframes active, other observers fixed), the covisibility graph, and Sim(3) loop closure with pose-graph optimization in §13.
+3. Mur-Artal, R., & Tardós, J. D. (2017). *ORB-SLAM2: An Open-Source SLAM System for Monocular, Stereo, and RGB-D Cameras*. IEEE Transactions on Robotics, 33(5), 1255-1262. https://doi.org/10.1109/TRO.2017.2705103 - the full BA run in a separate thread after loop closure, in §13.3.
+4. Schönberger, J. L., & Frahm, J.-M. (2016). *Structure-from-Motion Revisited*. CVPR 2016, 4104-4113. https://doi.org/10.1109/CVPR.2016.445 - COLMAP's local BA after each registration and global BA after model growth, with re-triangulation and filtering, in §13.4.
+5. Strasdat, H., Montiel, J. M. M., & Davison, A. J. (2010). *Scale Drift-Aware Large Scale Monocular SLAM*. Robotics: Science and Systems VI. https://doi.org/10.15607/RSS.2010.VI.010 - monocular scale drift and why loop closure must correct a 7-DoF similarity, in §13.3.
+6. Leutenegger, S., Lynen, S., Bosse, M., Siegwart, R., & Furgale, P. (2015). *Keyframe-based visual-inertial odometry using nonlinear optimization*. The International Journal of Robotics Research, 34(3), 314-334. https://doi.org/10.1177/0278364914554813 - OKVIS, a keyframe window that marginalizes its border instead of fixing it, in §13.2.
+7. Qin, T., Li, P., & Shen, S. (2018). *VINS-Mono: A Robust and Versatile Monocular Visual-Inertial State Estimator*. IEEE Transactions on Robotics, 34(4), 1004-1020. https://doi.org/10.1109/TRO.2018.2853729 - the other marginalizing sliding-window estimator in §13.2, already cited in [marginalization.md §11](marginalization.md#11-references).
