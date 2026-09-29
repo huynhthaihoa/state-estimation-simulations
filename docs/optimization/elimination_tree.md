@@ -91,7 +91,7 @@ That's a very important distinction.
 
 We want:
 
-$$A=LL^\top$$
+$$H=LL^\top$$
 
 During factorization, we eliminate variables one by one.
 
@@ -124,17 +124,17 @@ Conceptually:
 
 So:
 
-$$parent(1)=2$$
+$$\text{parent}(1)=2$$
 
 Now eliminate 2. It still has **two** neighbors left, 3 and 4 - and they were never directly connected. Removing 2 forces them to pick up each other's dependency, so a new edge appears:
 
 $$3 \leftrightarrow 4 \quad \text{(fill-in)}$$
 
-$$parent(2)=3$$
+$$\text{parent}(2)=3$$
 
 Eliminating 3 next, its only remaining neighbor is 4 (via that new fill-in edge), so:
 
-$$parent(3)=4$$
+$$\text{parent}(3)=4$$
 
 giving the full tree:
 
@@ -220,7 +220,7 @@ It answers:
 
 ### Elimination tree
 
-Shows computational dependency:
+Shows computational dependency, here for the elimination order l1, l2, l3, x1, x2:
 
 ```text
         x2
@@ -304,17 +304,17 @@ You can see computational dependencies immediately:
 3 ─┘       │
            ├──> 6 ─┐
 5 ─────────┘       │
-                   ▼
-                   8
+                   ├──> 8
+1 ──> 7 ───────────┘
 ```
 
-This exposes **parallelism**.
+The two subtrees under 8, {6, 4, 5, 2, 3} and {7, 1}, share nothing until 8, so they can be processed fully in parallel. This exposes **parallelism**.
 
 ---
 
 ## 7. This becomes very important for iSAM2
 
-iSAM2 uses a **Bayes tree**, which is closely related to the elimination tree.
+iSAM2 uses a [**Bayes tree**](bayes_tree.md), which is built directly from the elimination tree.
 
 Very roughly:
 
@@ -328,7 +328,7 @@ Variable elimination
 Bayes Tree
 ```
 
-The Bayes tree is essentially a richer probabilistic version of the elimination structure.
+Concretely, a Bayes tree is the elimination tree with some of its nodes merged into **cliques**, where each clique stores the conditional density produced when its variables were eliminated ([bayes_tree.md §13](bayes_tree.md#13-one-more-important-concept-cliques)).
 
 You can think of:
 
@@ -341,7 +341,7 @@ You can think of:
 ### Bayes tree
 
 ```text
-"What probabilistic information is summarized by each elimination group?"
+"What probabilistic information is summarized by each clique?"
 ```
 
 This is why the Bayes tree is so useful for **incremental SLAM**.
@@ -366,9 +366,9 @@ x1 ─ x2 ─ x3 ─ x4 ─ x5
      l2        l3
 ```
 
-Suppose we eliminate old poses/landmarks.
+Suppose we eliminate `x1` and the landmarks first, then the remaining poses oldest first: x1, l1, l2, l3, x2, x3, x4, x5.
 
-The elimination structure might look conceptually like:
+The elimination tree is:
 
 ```text
               x5
@@ -405,7 +405,7 @@ Pose 3
 Landmarks
 ```
 
-This can create lots of fill-in.
+In bundle adjustment, where each pose observes many landmarks, this creates lots of fill-in. Eliminating a pose connects every landmark it sees to every other one (Section 3's fill-in rule), so the landmark block fills in densely.
 
 You might end up with:
 
@@ -422,35 +422,33 @@ Lots of computation.
 
 ### Better ordering
 
-Often, SLAM systems exploit the structure by eliminating appropriate variables first, e.g. landmarks before certain poses:
+Eliminate the landmarks first:
 
 ```text
 Landmarks
    ↓
 Poses
-   ↓
-Trajectory
 ```
 
-This can maintain a much sparser structure.
+Landmarks never touch each other directly, so eliminating one only connects the poses that observe it. The structure stays much sparser. This is exactly bundle adjustment's Schur-complement trick ([bundle_adjustment.md §12](bundle_adjustment.md#12-block-sparsity-and-the-schur-complement)): eliminate every landmark first, then solve the much smaller camera-only system.
 
-The resulting $L$ is smaller, and the elimination tree is more manageable.
+The resulting $L$ has far fewer nonzeros (it's always $n \times n$), and the elimination tree is more manageable.
 
 ---
 
 ## 10. One subtle point
 
-Don't think of the elimination tree as simply:
-
-> "The tree representation of the sparse matrix."
-
-That's not quite correct.
-
-Instead:
+Don't think of the elimination tree as a picture of the original matrix's graph. It isn't one: Section 3's tree contains a 3–4 link that the original graph doesn't have.
 
 > **The elimination tree represents the dependency structure of the Cholesky factorization.**
 
-That's why two matrices with similar sparsity patterns can behave differently under different orderings.
+Precisely (Liu 1990), it's read off the sparsity of the **factor** $L$, with the variables numbered in elimination order:
+
+```math
+\text{parent}(j) = \min\{\, i > j : L_{ij} \neq 0 \,\}
+```
+
+That is, the parent of $j$ is the row of the first nonzero below the diagonal in column $j$ of $L$. $L$'s pattern depends on both the matrix's pattern and the elimination order, so the same matrix under two different orderings gives two different trees - Section 9's point.
 
 ---
 

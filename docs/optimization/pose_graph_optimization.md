@@ -78,16 +78,15 @@ Each edge says:
 
 Because measurements are noisy.
 
-Suppose the robot actually walks in a square:
+Suppose the robot actually walks in a square, x₀ → x₁ → x₂ → x₃, and then returns to where it started, so its fifth pose x₄ lands right on top of x₀:
 
 ```text
-      x₃ ───── x₄
-      │        │
-      │        │
-      x₂       x₅
-      │        │
-      │        │
-      x₁ ───── x₀
+ x₃ ────────── x₂
+ │             │
+ │             │
+ │             │
+ x₀ ────────── x₁
+ (x₄ is back here)
 ```
 
 But odometry has small errors.
@@ -95,14 +94,14 @@ But odometry has small errors.
 The robot might estimate:
 
 ```text
-x₀ ───── x₁
-          \
-           x₂
-            \
-             x₃
-              \
-               x₄
+ x₃ ────────── x₂
+ │             │
+ │             │
+ │             │
+ x₄    x₀ ──── x₁
 ```
+
+Chaining slightly wrong steps leaves the estimated x₄ some distance away from x₀, even though the robot is really back at its start.
 
 After enough motion, small errors accumulate.
 
@@ -160,7 +159,7 @@ This is the crucial intuition.
 
 It doesn't necessarily say:
 
-> "$x_4$ is wrong."
+> "$`x_4`$ is wrong."
 
 Instead, it says:
 
@@ -169,8 +168,6 @@ Instead, it says:
 ---
 
 ## 6. Imagine stretching a rubber band
-
-This is my favorite analogy.
 
 Imagine every pose is a bead:
 
@@ -195,11 +192,11 @@ But the rubber bands are pulling in slightly conflicting directions.
 If you release the system:
 
 ```text
-      ●────●
-     /      \
-    ●        ●
-     \      /
-      ●────●
+       ●
+     /   \
+    ●     ●
+     \   /
+      ●─●
 ```
 
 the beads settle into a configuration that best satisfies all the rubber bands.
@@ -314,8 +311,8 @@ without explicitly optimizing the 3D landmarks.
 
 ```text
 T₀ ───── T₁ ───── T₂ ───── T₃
- \                         /
-  └────── loop closure ───┘
+│                          │
+└────── loop closure ──────┘
 ```
 
 So:
@@ -670,7 +667,7 @@ $$Ly = -b \quad\text{(forward substitution)}, \qquad L^\top \boldsymbol{\delta}^
 
 Each pass is just row-by-row substitution - no matrix inversion needed.
 
-**Why "sparse" matters:** most pose pairs never share a constraint, so most of $H$'s off-diagonal blocks are exactly zero. Sparse Cholesky exploits that known zero pattern instead of doing dense arithmetic on entries it already knows are zero. One subtlety: eliminating a variable can turn some of those zeros into nonzeros - called **fill-in**. For example, eliminating $x_2$ out of a chain $x_1 - x_2 - x_3$ creates a new dependency between $x_1$ and $x_3$ even though they were never directly measured. Which order variables are eliminated in controls how much fill-in accumulates; see [`elimination_tree.md`](elimination_tree.md) for a worked elimination example, and [`isam2_optimization.md` §7](isam2_optimization.md#7-bayes-tree---the-most-important-intuition) for why iSAM2 cares about this at all.
+**Why "sparse" matters:** most pose pairs never share a constraint, so most of $H$'s off-diagonal blocks are exactly zero. Sparse Cholesky exploits that known zero pattern instead of doing dense arithmetic on entries it already knows are zero. One subtlety: eliminating a variable can turn some of those zeros into nonzeros - called **fill-in**. For example, eliminating $x_2$ out of a chain $x_1 - x_2 - x_3$ creates a new dependency between $x_1$ and $x_3$ even though they were never directly measured. Which order variables are eliminated in controls how much fill-in accumulates; see [`elimination_tree.md`](elimination_tree.md) for a worked elimination example, and [`isam2_optimization.md` §12](isam2_optimization.md#12-variable-ordering-is-also-crucial) for why iSAM2 cares about this at all.
 
 In practice a pure Gauss-Newton step can overshoot or diverge far from the solution, so a **Levenberg-Marquardt** damping term $\lambda$ is added to the Hessian's diagonal before solving. Both `pose_graph.py` implementations (`use_numpy/` and `use_manif/`) use the Marquardt-scaled form, which scales $\lambda$ by $H$'s own diagonal instead of adding $\lambda I$:
 
@@ -726,7 +723,7 @@ $$J_c = \mathrm{Ad}\big(Z_{ij}^{-1}\big), \qquad J_a = J_r^{-1}(e_{ij}), \qquad 
 J_i = J_b \, J_c, \qquad J_j = J_a
 ```
 
-These are `Jc_self` ($\partial \hat{X}_j / \partial X_i$), `Ja` ($\partial e_{ij} / \partial X_j$) and `Jb` ($\partial e_{ij} / \partial \hat{X}_j$). `use_manif/` gets the same three matrices from `Xi.compose(Z_ij, Jc_self)` and `Xj.rminus(T_pred, Ja, Jb)`. The product equals §15.4's closed form:
+These are `Jc_self` ($`\partial \hat{X}_j / \partial X_i`$), `Ja` ($`\partial e_{ij} / \partial X_j`$) and `Jb` ($`\partial e_{ij} / \partial \hat{X}_j`$). `use_manif/` gets the same three matrices from `Xi.compose(Z_ij, Jc_self)` and `Xj.rminus(T_pred, Ja, Jb)`. The product equals §15.4's closed form:
 
 ```math
 -J_r^{-1}(-e_{ij}) \, \mathrm{Ad}\big(Z_{ij}^{-1}\big) = -J_r^{-1}(e_{ij}) \, \mathrm{Ad}\big(X_j^{-1} X_i\big)
@@ -809,7 +806,7 @@ $$\rho(e) = \frac{k^2}{2} \ln\left(1 + \frac{e^2}{k^2}\right), \quad w(e) = \fra
 
 ### 16.3 Dynamic Covariance Scaling (DCS)
 
-Dynamic Covariance Scaling (Agarwal et al., 2013) is specifically designed for pose-graph optimization. Instead of reweighting during every residual evaluation, DCS dynamically scales the information matrix based on an analytical closed-form solution derived from Switchable Constraints.
+Dynamic Covariance Scaling (Agarwal et al., 2013) is specifically designed for pose-graph optimization. It is still a reweighting scheme - like §16.1's IRLS, it rescales each edge's information matrix at every iteration - but its weight comes from a closed-form solution derived from Switchable Constraints, rather than from a chosen kernel $\rho$.
 
 DCS adds a dynamic scaling parameter $s_{ij} \in (0, 1]$ directly to the information matrix $\Omega_{ij}$:
 

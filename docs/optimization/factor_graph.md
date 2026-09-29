@@ -79,21 +79,17 @@ Integrating noisy per-step measurements never magically cancels their errors, so
 
 > **Note**: each of those per-step measurements (`X1 is 1m ahead of X0`, etc.) is what **odometry** actually provides - an estimate of the robot's *incremental* change in pose between two nearby moments, from onboard motion sensors (wheel encoders, IMU, visual odometry, ...). Chaining ("integrating") a sequence of these incremental measurements to track pose relative to a starting point, the way the `3.00 m` estimate above was computed, is called **dead reckoning**. Since every measurement carries a small error and dead reckoning sums them with no correction, the drift grows unboundedly the longer you integrate - exactly the problem the loop closure below fixes. The term is also used more loosely for propagating a known motion *model* forward from an initial guess without looking at any measurements (e.g. the `saltation_matrix_ekf.py` baseline in the README) - the same "no correction" idea, with the same growing error.
 
-Now imagine that at X3 the camera recognizes a place it saw at X0.
-
-That's a **loop closure**:
+Now imagine that at X3 the camera re-observes a landmark it first saw from X0. Recognizing a previously seen place like this is a **loop closure**, and it gives a direct measurement between X0 and X3 - say, 3.03 m:
 
 ```text
-X0 ●──────────────● X3
-    \            /
-     \          /
-      ●────────●
-      X1      X2
+X0 ── 1 m ── X1 ── 1 m ── X2 ── 1 m ── X3
+│                                      │
+└─────────────── 3.03 m ───────────────┘
 ```
 
 The loop-closure measurement says:
 
-> "Hey, X3 should actually be close to X0."
+> "X3 is 3.03 m from X0 - not the 3.00 m that the chained odometry claims."
 
 Now we have conflicting information.
 
@@ -131,9 +127,13 @@ $$
 \hat Z_{ij}=X_i^{-1}X_j
 $$
 
-Then compare:
+Then compare them. $Z_{ij}^{-1}\hat Z_{ij}$ is itself a transform, equal to the identity exactly when the estimate agrees with the measurement. The log map turns it into a 6-vector (a translation part and a rotation part) that optimization can square and sum:
 
-$$\text{error}=Z_{ij}^{-1}\hat Z_{ij}$$
+```math
+e_{ij} = \mathrm{Log}\left(Z_{ij}^{-1}\hat Z_{ij}\right) = \mathrm{Log}\left(Z_{ij}^{-1} X_i^{-1} X_j\right) \in \mathbb{R}^6
+```
+
+This is the residual `pose_graph.py` uses ([pose_graph_optimization.md §15.7](pose_graph_optimization.md#157-the-solver-concretely)); [lie_algebra.md](../foundations/lie_algebra.md) explains Log.
 
 Conceptually:
 
@@ -222,16 +222,15 @@ X0       X1       X2       X3
 Adding landmarks:
 
 ```text
-           L0
-           ●
-          / \
-         /   \
-X0  ●───●─────● X1
-     \        /
-      \      /
-       ●────●
-       L1   X2
+       L0    L1
+       ●     ●
+      / \   / \
+     /   \ /   \
+    ●─────●─────●
+    X0    X1    X2
 ```
+
+Here landmark L0 is seen from X0 and X1, and L1 from X1 and X2.
 
 Adding IMU:
 
@@ -317,17 +316,16 @@ Usually:
 A **factor graph** is more general:
 
 ```text
-          L0
-          ●
-         / \
-        /   \
-X0 ●───●─────● X1
-   │         │
-   │         │
-  IMU      Camera
-   │         │
-X2 ●─────────●
+              L0
+               ●
+              / \
+       camera/   \camera
+            /     \
+X0 ●──IMU──●──IMU──● X2
+          X1
 ```
+
+IMU factors link consecutive poses, and each camera factor links a pose to the landmark it observes. A pose graph would keep only the poses and the relative-pose factors between them.
 
 It can represent:
 
@@ -353,7 +351,7 @@ Factor-graph optimization is usually a **nonlinear least-squares problem**.
 We have:
 
 ```math
-\min_X \sum_i \|e_i(X)\|^2
+\min_X \sum_i e_i(X)^\top \Omega_i\, e_i(X)
 ```
 
 But the errors are nonlinear because poses involve rotations and transformations.
@@ -364,7 +362,11 @@ $$e(X+\Delta X)\approx e(X)+J\Delta X$$
 
 Then **[Gauss–Newton](gauss_newton.md)** solves:
 
-$$J^\top W J\Delta X =-J^\top W e$$
+```math
+J^\top \Omega J\,\Delta X = -J^\top \Omega\, e
+```
+
+with every factor's error stacked into $e$, and its $\Omega_i$ blocks into $\Omega$.
 
 and updates:
 

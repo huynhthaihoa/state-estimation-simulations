@@ -24,13 +24,13 @@ Imagine a camera looking at a 3D point:
 The 3D point $P$ gets projected onto the camera image:
 
 ```text
-3D world                 Image
-
-   P ●                      • p
-      \                    /
-       \                  /
-        \                /
-         📷 ------------ image plane
+     P ●              3D point, world frame
+        \
+         \            ray from P to the camera center
+  ────────•────────   image plane: the ray crosses it at the pixel p
+           \
+            \
+             📷       camera center
 ```
 
 If we know:
@@ -66,11 +66,11 @@ predicted point:          ×
 There is an error:
 
 ```text
-        ● observed
-
-           ↕ error
-
-              × predicted
+     ● observed
+      \
+       \   reprojection error e
+        \
+         × predicted
 ```
 
 This is called the **reprojection error**.
@@ -387,7 +387,7 @@ Everything moves together to minimize the total reprojection error.
 
 This is exactly why BA is an **optimization-based SLAM technique**.
 
-Remember our previous discussion:
+Recall the two estimation strategies from [filtering_smoothing.md](../filtering_smoothing.md):
 
 > Filtering → maintain the current belief.
 
@@ -435,8 +435,8 @@ using relative pose constraints:
 
 ```text
 T₀ ───── T₁ ───── T₂ ───── T₃
- \                         /
-  └────── loop closure ───┘
+│                          │
+└────── loop closure ──────┘
 ```
 
 The landmarks may already have been marginalized or aren't explicitly part of the optimization.
@@ -494,7 +494,7 @@ This sparsity is one of the fundamental reasons efficient BA algorithms are poss
 
 ## 11. The deepest intuition
 
-Here's how I'd recommend thinking about BA:
+A useful way to think about BA:
 
 Imagine you have a pile of photographs and you're trying to reconstruct a miniature 3D world.
 
@@ -693,7 +693,7 @@ Script defaults: 50 keyframes on a 90° arc of radius 15 m, 8 landmarks per keyf
 
 Monocular BA recovers the scene only up to an unknown similarity transform (rigid + scale) - shifting, rotating, or uniformly rescaling the whole reconstructed scene and every camera pose together leaves reprojection error completely unchanged. `bundle_adjustment.py`'s `run_bundle_adjustment` pins that freedom down to *some* solution with a soft gauge-prior factor on the first two camera poses, but the resulting frame still won't match ground truth's frame or scale exactly. So before computing pose/landmark error, the script Umeyama-aligns the solved cameras and landmarks onto ground truth with one shared scale+rotation+translation - see [umeyama_alignment.md](../foundations/umeyama_alignment.md) for how that alignment is computed and why it's needed. Reprojection error itself is reported *before* this alignment step and is unaffected by it.
 
-`bundle_adjustment_advanced.py` sidesteps this entirely: hard-fixing two anchor keyframes (rather than a soft prior) removes all residual gauge freedom up front, so there's nothing left to align away before reporting its error.
+`bundle_adjustment_advanced.py` takes a different route: it hard-fixes two anchor keyframes instead of using a soft prior, which removes all gauge freedom up front, and it reports raw, unaligned error. The catch is *where* that gauge gets pinned. Keyframe 0 sits at its true pose, but keyframe 1 keeps its noisy front-end pose, so the scale and orientation it fixes are slightly wrong, and that error is part of what the script reports. [§13.6](#136-in-this-repo) measures it: up to 19% off in scale over seeds 0-4.
 
 ---
 

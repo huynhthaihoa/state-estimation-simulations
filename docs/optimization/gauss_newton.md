@@ -24,6 +24,8 @@ and want to minimize the **total squared error**:
 
 We'll call this cost $f(x) = \tfrac12\|r(x)\|^2$.
 
+> **Note on signs**: some docs in this repo, such as [bundle_adjustment.md §6.1](bundle_adjustment.md#61-the-ba-math-concretely), write the residual the other way round, $r = \text{measurement} - \text{prediction}$, and take $J$ as the Jacobian of the *prediction*. That $J$ is minus the Jacobian of their residual, so their Gauss-Newton equation reads $J^\top J\Delta x = +J^\top r$, with no minus sign. It's the same step as this doc's $J^\top J\Delta x = -J^\top r$ (§4), just written with different sign conventions.
+
 The problem is that $r(x)$ is usually **nonlinear**.
 
 Gauss-Newton says:
@@ -116,7 +118,7 @@ $$J^\top J\Delta x = -J^\top r$$
 
 This is the famous **Gauss-Newton equation**.
 
-> **Note**: solving it needs $J^\top J$ to be invertible, i.e. $J$ must have full column rank. In SLAM it isn't by default: shifting or rotating the whole trajectory and map together changes no residual (a **gauge freedom**), so $J^\top J$ stays singular until something pins the solution down - typically a strong prior anchoring the first pose, which is what this repo's scripts do (e.g. `pose_graph.py` "heavily anchoring node 0"). Levenberg-Marquardt's damping (§11) also keeps the system solvable.
+> **Note**: solving it needs $J^\top J$ to be invertible, i.e. $J$ must have full column rank. In SLAM it isn't by default: shifting or rotating the whole trajectory and map together changes no residual (a **gauge freedom**), so $J^\top J$ stays singular until something pins the solution down - typically a strong prior anchoring the first pose, which is what this repo's scripts do (e.g. `pose_graph.py` "heavily anchoring node 0"). [Levenberg-Marquardt](levenberg_marquardt.md)'s damping (its §4-§5) also keeps the system solvable.
 
 Then:
 
@@ -236,7 +238,7 @@ The right-hand sides are the same thing: the gradient of $f(x) = \tfrac12\|r(x)\
 
 This makes Gauss-Newton **cheaper and particularly well suited to least-squares problems**.
 
-> **Note**: dropping $\sum_i r_i \nabla^2 r_i$ is a good approximation when the residuals are small at the solution (the measurements fit well) or $r$ is only mildly nonlinear. With large residuals or strong nonlinearity, the Gauss-Newton step can overshoot and even increase the cost - exactly what Levenberg-Marquardt's damping (§11) guards against.
+> **Note**: dropping $\sum_i r_i \nabla^2 r_i$ is a good approximation when the residuals are small at the solution (the measurements fit well) or $r$ is only mildly nonlinear. With large residuals or strong nonlinearity, the Gauss-Newton step can overshoot and even increase the cost - exactly what [Levenberg-Marquardt's damping](levenberg_marquardt.md#4-lms-brilliant-idea) guards against.
 
 ---
 
@@ -375,7 +377,7 @@ That's why it can converge much faster near the solution - quadratically for zer
 
 ---
 
-## 11. Gauss-Newton vs Newton
+## 11. The family of methods
 
 A useful hierarchy:
 
@@ -384,7 +386,7 @@ A useful hierarchy:
 | **Gradient Descent**    | Follow the slope                                |
 | **Newton**              | Use slope + curvature                           |
 | **Gauss-Newton**        | Use Jacobian structure to approximate curvature |
-| **Levenberg-Marquardt** | Gauss-Newton + damping for robustness           |
+| **[Levenberg-Marquardt](levenberg_marquardt.md)** | Gauss-Newton + damping for robustness           |
 
 In SLAM, you'll frequently encounter:
 
@@ -410,4 +412,4 @@ That idea is the bridge from **[Jacobian](../foundations/jacobian.md) → Gauss-
 
 ## 13. References
 
-1. Nocedal, J., & Wright, S. J. (2006). *Numerical Optimization* (2nd ed.). Springer. https://doi.org/10.1007/978-0-387-40065-5 - the standard textbook treatment of the Gauss-Newton method (Chapter 10) behind this whole doc, including the relationship to Newton's method (§11) and gradient descent (§10) covered here.
+1. Nocedal, J., & Wright, S. J. (2006). *Numerical Optimization* (2nd ed.). Springer. https://doi.org/10.1007/978-0-387-40065-5 - the standard textbook treatment of the Gauss-Newton method (Chapter 10) behind this whole doc, including the relationship to Newton's method (§7) and gradient descent (§10) covered here.

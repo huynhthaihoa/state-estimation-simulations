@@ -43,7 +43,7 @@ Each measurement usually connects only:
 - one pose
 - one landmark
 
-So the Hessian/information matrix might look conceptually like:
+So the graph of which variables share a measurement looks like:
 
 ```text
 Pose 1 ─ Landmark 1
@@ -61,7 +61,7 @@ Most variables don't directly interact.
 
 Therefore the Hessian
 
-$$H = J^\top WJ$$
+$$H = J^\top \Omega J$$
 
 is **sparse**.
 
@@ -81,7 +81,7 @@ we have something more like:
 ██
 ███
  ███
-  ██
+  ███
    ███
     ██
 ```
@@ -99,6 +99,8 @@ Suppose we're at the linear-solve step of Gauss-Newton or LM - [gauss_newton.md]
 $$H\Delta x = -b$$
 
 and $H$ is symmetric positive definite.
+
+That last condition isn't automatic. If every factor is relative (odometry, loop closures, reprojections with no prior), moving the whole solution rigidly leaves the cost unchanged. $H$ is then only positive *semi*-definite, and Cholesky breaks down on a zero pivot. Anchoring one pose fixes this ([pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive)), and so does LM's damping $H + \lambda I$ ([levenberg_marquardt.md](levenberg_marquardt.md)).
 
 We factor:
 
@@ -122,16 +124,14 @@ However, there is an important complication.
 
 ## 3. The surprising part: Fill-in
 
-This is probably the most important concept to understand.
-
 Even if $H$ is sparse, $L$ is **not necessarily equally sparse**.
 
 Consider:
 
 ```math
-H=\begin{bmatrix} [*] & * & * \\
-* & [*] & 0 \\
-* & 0 &[*] \end{bmatrix}
+H=\begin{bmatrix} * & * & * \\
+* & * & 0 \\
+* & 0 & * \end{bmatrix}
 ```
 
 There is no connection between variable 2 and variable 3.
@@ -143,12 +143,14 @@ $$L_{32}\neq0$$
 so the factor becomes:
 
 ```math
-{L = \begin{bmatrix} * & 0 & 0 \\ 
-* & * & 0 \\ 
-* & [*] & * \end{bmatrix}}
+L = \begin{bmatrix} * & 0 & 0 \\
+* & * & 0 \\
+* & [*] & * \end{bmatrix}
 ```
 
-That newly created nonzero is called **fill-in**.
+where $[*]$ marks the entry that was zero in $H$. That newly created nonzero is called **fill-in**. It comes straight from the formula at the top: $`L_{32} = (H_{32} - L_{31}L_{21}) / L_{22}`$, and $H_{32} = 0$ doesn't help when $L_{31}$ and $L_{21}$ are both nonzero.
+
+Eliminate the hub last instead (order 2, 3, 1, so variable 1 becomes the last row and column), and $L$ has no fill at all. §5 turns this into a general rule.
 
 So:
 
@@ -194,8 +196,6 @@ That's **fill-in**.
 
 ## 5. Ordering becomes extremely important
 
-Here's where sparse Cholesky gets interesting.
-
 Suppose we have:
 
 ```text
@@ -230,12 +230,14 @@ there is no fill-in:
 
 So the **order in which variables are eliminated** dramatically affects the amount of computation and memory required.
 
-This is why SLAM systems use algorithms such as:
+Both examples follow the same rule: eliminating a variable connects all of its remaining neighbors, so eliminate variables with few neighbors first and hubs last. Finding the truly optimal order is NP-hard, so solvers use heuristics built on that rule:
 
-- AMD - Approximate Minimum Degree
-- COLAMD
-- nested dissection
-- specialized SLAM variable orderings
+- **AMD** (Approximate Minimum Degree): repeatedly eliminate the variable with the fewest remaining neighbors.
+- **COLAMD**: the same idea, computed from the columns of $J$ without forming $H$. This is what batch solvers and the original iSAM use.
+- **CCOLAMD**: constrained COLAMD, which can force chosen variables (for example the newest poses) to the end. iSAM2 uses it ([isam2_optimization.md §12](isam2_optimization.md#12-variable-ordering-is-also-crucial)).
+- **Nested dissection**: split the graph with a small separator, order each half recursively, and put the separator last.
+
+[elimination_tree.md §9](elimination_tree.md#9-why-ordering-matters-so-much) works through the effect of ordering on a SLAM example.
 
 ---
 
@@ -256,35 +258,11 @@ l_2\\
 \vdots \end{bmatrix}
 ```
 
-and your nonlinear least-squares problem is:
-
-```math
-\min_x \sum_i \|e_i(x)\|^2.
-```
-
-After linearization:
-
-$$J\Delta x \approx -e$$
-
-and solving the normal equations gives:
-
-$$J^\top WJ\Delta x=-J^\top We$$
-
-Define:
-
-$$H=J^\top WJ$$
-
-so:
-
-$$H\Delta x=-b$$
-
-Now factor:
-
-$$H=LL^\top$$
-
-This is where sparse Cholesky can be used.
+with robot poses $x_1, \dots, x_N$ followed by landmarks $l_1, l_2, \dots$. Linearizing the residuals and forming the normal equations gives exactly §2's system $H\Delta x = -b$, with $H = J^\top\Omega J$ and $b = J^\top\Omega r$, which is then factored as $H = LL^\top$.
 
 Because each measurement only involves a small number of variables, $J$ and $H$ are sparse.
+
+The pattern also stays fixed. Every Gauss-Newton or LM iteration relinearizes at a new estimate, which changes the *values* in $H$, but the same factors connect the same variables, so the *nonzero pattern* doesn't change. Solvers exploit this by splitting the factorization in two: a **symbolic** step (choose the ordering, predict where $L$'s nonzeros go, allocate memory) done once, and a **numeric** step (compute the values) repeated every iteration. CHOLMOD's `analyze`/`factorize` calls are this split. That's why an expensive ordering heuristic is affordable: its cost is paid once, not per iteration.
 
 ---
 
@@ -299,7 +277,7 @@ Factor Graph
      ▼
 Jacobian J
      │
-     │ Jᵀ W J
+     │ Jᵀ Ω J
      ▼
 Sparse Hessian H
      │
@@ -323,9 +301,10 @@ This is one of the core computational pipelines behind graph-based SLAM.
 | Matrix              | Mostly dense             | Mostly zeros                |
 | Stores zeros?       | Yes                      | No                          |
 | Computation         | Lots of unnecessary work | Exploits sparsity           |
-| Memory              | $O(n^2)$               | Depends on sparsity/fill-in |
+| Memory              | $O(n^2)$                 | Nonzeros of $L$, including fill-in |
+| Time                | $O(n^3)$                 | Depends on sparsity/fill-in |
 | Large SLAM          | Usually impractical      | Very useful                 |
-| Ordering important? | Less important           | **Extremely important**     |
+| Ordering important? | No: a dense $L$ has no zeros left to fill | **Extremely important**     |
 
 ---
 
@@ -341,7 +320,7 @@ is sparse because each measurement depends on only a few variables.
 
 ### Sparse Hessian
 
-$$H=J^\top WJ$$
+$$H=J^\top \Omega J$$
 
 is also sparse, but its sparsity pattern represents **variable interactions**.
 
@@ -358,7 +337,7 @@ Measurement 3:
 Pose 2 ─ Landmark 2
 ```
 
-gives a Hessian structure roughly like:
+gives this Hessian structure:
 
 ```text
        P1 P2 L1 L2
@@ -369,15 +348,17 @@ L1     X     X
 L2     X  X     X
 ```
 
-The graph structure of $H$ is therefore closely related to the **factor graph**.
+The rule is exact: $H_{ij} \neq 0$ exactly when variables $i$ and $j$ appear together in at least one factor. So $H$'s graph is the **factor graph** with each factor replaced by edges between all of its variables.
 
 ---
 
 ## 10. The key intuition
 
-If you remember only one thing:
+In one sentence:
 
-> **Sparse Cholesky is a way of solving a large linear system by factoring only the important nonzero interactions, while carefully choosing the elimination order to minimize new interactions (fill-in).**
+> **Sparse Cholesky is a way of solving a large linear system exactly, doing arithmetic only on the entries that can be nonzero, while carefully choosing the elimination order to minimize new interactions (fill-in).**
+
+It is still exact: nothing small is dropped. Dropping small entries on purpose is a different method, *incomplete* Cholesky, used as a preconditioner for iterative solvers.
 
 And in SLAM:
 

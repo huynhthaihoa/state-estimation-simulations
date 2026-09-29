@@ -66,6 +66,8 @@ $$1^2+(-2)^2+3^2=14$$
 
 Now every error contributes positively.
 
+Absolute values, $\sum_i|e_i|$, would also stop the cancelling, so why squares specifically? Two reasons. Squares are smooth everywhere, while $|e|$ has a kink at zero, and that smoothness is what lets Gauss-Newton linearize the problem (§7). And when the measurement noise is Gaussian, minimizing squared error gives the maximum-likelihood estimate - which is also why §12's weights turn out to be $W_i=\Sigma_i^{-1}$.
+
 So:
 
 $$\boxed{\text{total error}=\sum_i e_i^2}$$
@@ -106,7 +108,7 @@ $$e_i = z_i-\pi(TX_i)$$
 
 where:
 
-- $T$ = camera pose
+- $T$ = camera pose, written here as world-to-camera, so $TX_i$ is the landmark in the camera frame. [bundle_adjustment.md](bundle_adjustment.md) uses the inverse convention: a camera-to-world $T$, and $\pi(T^{-1}P)$.
 - $X_i$ = 3D landmark
 - $\pi$ = camera projection
 
@@ -420,13 +422,14 @@ Then an optimizer such as GN or LM tries to solve the resulting NLS problem.
 
 In real SLAM, measurements aren't equally reliable.
 
-Suppose:
+Suppose two position fixes for the same pose come from different receivers:
 
 ```text
-Camera measurement → uncertain
-IMU measurement    → relatively reliable
-GPS measurement    → very reliable
+consumer GPS fix → good to about ±5 m
+RTK-GPS fix      → good to about ±2 cm
 ```
+
+(Ranking different *kinds* of sensor this way doesn't work - a camera measures pixels, an IMU measures rates. That's why each measurement carries its own covariance $\Sigma_i$, in its own units.)
 
 We can weight their residuals:
 
@@ -470,13 +473,13 @@ you find the position $x$ that minimizes:
 
 $$(x-10.0)^2+(x-10.5)^2+(x-9.8)^2$$
 
-The solution is a compromise.
+The solution is a compromise: the average, $x = 10.1$ m.
 
 Now imagine Sensor B is much noisier:
 
 $$(x-10.0)^2+0.1(x-10.5)^2+(x-9.8)^2$$
 
-Now Sensor B has less influence.
+Now Sensor B has less influence, and the solution moves toward A and C: $x = (10.0 + 0.1\cdot 10.5 + 9.8)/2.1 \approx 9.93$ m.
 
 That's the intuition behind weighted least squares in SLAM.
 
@@ -512,7 +515,7 @@ $$e_{gps}(X_i)$$
 
 $$e_{loop}(X_i,X_j)$$
 
-Put everything together:
+Put everything together (each term weighted by its $W_i$ as in §12, left out here for readability):
 
 ```math
 \boxed{
@@ -558,7 +561,7 @@ At this point, the concepts above organize into a mental map like this:
                   Iterative optimization
 ```
 
-And for online SLAM:
+Two ways to solve it:
 
 ```text
 Factor graph
@@ -582,7 +585,7 @@ Incremental smoothing
 
 ---
 
-## 16. The one thing I want you to remember
+## 16. The one thing to remember
 
 **Nonlinear least squares is not an optimizer. It's the mathematical problem you're trying to solve.**
 

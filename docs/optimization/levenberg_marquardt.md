@@ -110,7 +110,7 @@ For example, $f = \tfrac12(x^2 + 100y^2)$ is 100× steeper in $y$, so $\alpha$ m
 - $\alpha = 0.021$ **diverges**.
 - Gauss-Newton gets there in **one step**, because $J^\top J$ rescales each direction by its own curvature. Here the errors are $e = (x,\ 10y)$, so $J = \text{diag}(1, 10)$ and $J^\top J = \text{diag}(1, 100)$.
 
-§5 shows that LM with a large $\lambda$ becomes exactly this step with $\alpha = 1/\lambda$, and §12 shows how Marquardt's scaling removes the valley problem.
+§5 shows that LM with a large $\lambda$ becomes exactly this step with $\alpha = 1/\lambda$, and §12 shows how Marquardt's scaling removes this valley problem when the valley runs along the parameter axes, as it does here.
 
 ---
 
@@ -354,7 +354,7 @@ $$u =\pi(TX)$$
 where:
 
 - $X$ = 3D landmark
-- $T$ = camera pose
+- $T$ = camera pose, written here as world-to-camera, so $TX$ is the landmark in the camera frame. [bundle_adjustment.md](bundle_adjustment.md) uses the inverse convention: a camera-to-world $T$, and $\pi(T^{-1}P)$.
 - $\pi$ = camera projection
 
 The reprojection error is:
@@ -384,17 +384,15 @@ LM is therefore frequently useful for:
 
 ## 10. LM and your factor graph
 
-Remember our factor graph:
+Take the small factor graph from [factor_graph.md §5](factor_graph.md#5-why-call-it-a-graph), where landmark L0 is seen from X0 and X1, and L1 from X1 and X2:
 
 ```text
-       L1
-       ●
-      / \
-     /   \
-X0  ●─────● X1
-     \   /
-      \ /
-       X2
+       L0    L1
+       ●     ●
+      / \   / \
+     /   \ /   \
+    ●─────●─────●
+    X0    X1    X2
 ```
 
 Each factor produces an error:
@@ -485,7 +483,9 @@ where $D$ might be:
 
 $$D=\text{diag}(J^\top J)$$
 
-This is Marquardt's version: each parameter is damped in proportion to its own curvature, which makes the step independent of how you scale individual parameters (e.g. metres vs. millimetres) - plain $\lambda I$ doesn't have that property. With a large $\lambda$ it becomes a gradient-descent step scaled *per parameter*, rather than §5's plain one. One catch: a parameter that no measurement constrains has a zero on that diagonal and gets no damping at all, so implementations clamp the diagonal to a small positive floor.
+This is Marquardt's version: each parameter is damped in proportion to its own curvature, which makes the step independent of how you scale individual parameters (e.g. metres vs. millimetres) - plain $\lambda I$ doesn't have that property. With a large $\lambda$ it becomes a gradient-descent step scaled *per parameter*, rather than §5's plain one. For §3's example, $D = \text{diag}(J^\top J) = \text{diag}(1, 100)$, so with a large $\lambda$ the step becomes $-\tfrac{1}{\lambda}D^{-1}\nabla f = -\tfrac{1}{\lambda}(x,\ y)$: both directions shrink at the same rate, and the zigzag is gone. That only works because §3's valley runs along the parameter axes. A valley running diagonally to them keeps its zigzag, because a diagonal $D$ can't rescale a tilted direction.
+
+One catch: a parameter that no measurement constrains has a zero on that diagonal and gets no damping at all, so implementations clamp the diagonal to a small positive floor.
 
 Different implementations use slightly different damping schemes.
 

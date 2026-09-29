@@ -208,6 +208,24 @@ The key concepts are:
 
 These three ideas are the heart of iSAM2.
 
+### 6.1 iSAM vs. iSAM2, side by side
+
+iSAM2 solves the same problem as iSAM, on the same factorization: iSAM's square-root information matrix $R$ and iSAM2's Bayes tree hold the same numbers, just organized differently. What changes is how much each one can do *incrementally*:
+
+| | iSAM (Kaess et al. 2008) | iSAM2 (Kaess et al. 2012) |
+| --- | --- | --- |
+| Data structure | A sparse upper-triangular matrix $R$ | A Bayes tree: the same factorization, grouped into cliques (§7) |
+| New measurement | Folded into $R$ as a new row, with Givens rotations | The cliques it touches, and everything above them, are removed, re-eliminated and put back (§8-§9) |
+| Relinearization | Periodic batch step: every variable at once | Selective: only variables that moved past a threshold (§10) |
+| Variable reordering | Periodic batch step: COLAMD over every variable | Incremental: CCOLAMD over just the re-eliminated part (§12) |
+| Loop closure | The Givens sweep runs through most of $R$, and the fill-in it adds stays until the next batch step | A large affected region, but re-eliminated right away with a fresh ordering (§9, §12) |
+| Updating the estimate | Back-substitution through $R$ | Starts at the root and stops in branches where the changes are negligible (§13) |
+| Periodic batch steps | Required: the only way to relinearize and reorder | None |
+
+One idea sits behind every row. In matrix form, iSAM can't cheaply tell which part of $R$ a relinearization or a reordering would touch, so it periodically does both for everything. The Bayes tree makes those dependencies explicit - each clique knows its parent - so iSAM2 can redo exactly the affected part at every step, and never needs a batch step.
+
+This repo implements the iSAM column ([`isam_optimization.md` §14](isam_optimization.md#14-where-this-is-implemented-in-this-repo)) and only the tree-building part of the iSAM2 column (§19).
+
 ---
 
 ## 7. Bayes tree - the most important intuition
