@@ -76,7 +76,7 @@ periodic Global BA pass has no genuinely *new* geometric constraint to
 exploit beyond what the overlapping local windows already used -- that
 only comes from revisiting a place (loop closure) or an absolute
 measurement. Comparing the two runs here shows the default seed doing well
-(Global BA beating Local-only by 32% RMS trajectory error), but that's not
+(Global BA beating Local-only by 18% RMS trajectory error), but that's not
 the typical case: a wider sweep across seeds (see this module's own tests)
 shows Global BA is close to a wash against Local-only overall -- a roughly
 50% per-seed win rate, with the *median* difference near zero either way --
@@ -358,6 +358,14 @@ def refine_landmark_gn(T_obs_list, z_list, P0, K, gn_tol, gn_max_iters):
     triangulate_landmark's closed-form guess. Same 3x3 normal-equations
     solve as bundle_adjustment.py's run_ba_landmarks_only, applied to a
     single point at the moment it first becomes triangulable.
+
+    Stops early, returning the current (invalid) point, as soon as a step
+    puts it at non-positive depth in any observer. Past that camera's image
+    plane the projection Jacobian grows like 1/depth^2, so H becomes
+    numerically singular and the next solve would raise (seen in the manif
+    backend's 15-seed test). Returning the point instead lets the caller's
+    passes_cheirality check reject it and retry once another observation
+    arrives.
     Arguments:
         T_obs_list: list of observing camera poses (4,4)
         z_list: list of corresponding observed pixels (2,)
@@ -366,7 +374,7 @@ def refine_landmark_gn(T_obs_list, z_list, P0, K, gn_tol, gn_max_iters):
         gn_tol: convergence tolerance on the correction step norm
         gn_max_iters: maximum number of iterations
     Returns:
-        P: (3,) refined landmark position
+        P: (3,) refined landmark position (behind some observer if stopped early)
     """
     p = P0.copy()
     for _ in range(gn_max_iters):
@@ -379,6 +387,8 @@ def refine_landmark_gn(T_obs_list, z_list, P0, K, gn_tol, gn_max_iters):
             g += J_point.T @ r
         delta = np.linalg.solve(H + np.eye(3) * 1e-9, g)
         p = p + delta
+        if any(point_depth(T, p) <= 0.0 for T in T_obs_list):
+            break
         if np.linalg.norm(delta) < gn_tol:
             break
     return p
@@ -395,8 +405,9 @@ def passes_cheirality(T_obs_list, P):
     parallax (observers close together, as is common for landmarks near
     this corridor's forward-motion path) can fail this: pixel = f*x/z is
     invariant under negating a camera-frame point's x, y AND z together, so
-    refine_landmark_gn's unguarded GN can converge to a point reflected
-    behind a camera that still fits the pixel data. A point that fails this
+    refine_landmark_gn's GN can walk to a point reflected behind a camera
+    that still fits the pixel data (it stops and returns such a point as
+    soon as it gets there). A point that fails this
     check should not be committed to the map -- see
     run_incremental_local_ba, which instead leaves it pending and retries
     once it gets another observation (more parallax).

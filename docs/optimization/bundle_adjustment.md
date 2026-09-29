@@ -269,6 +269,10 @@ Real implementations usually wrap the squared reprojection error in a **robust l
 
 `bundle_adjustment.py` minimizes the objective above with plain Gauss-Newton. Each pose $T_i$ is a $4\times4$ camera-to-world matrix with rotation $R_i$ and translation $t_i$. Each landmark $P_j$ is a world point. Pose corrections are 6-vectors $\delta = [\delta v, \delta\omega]$, translation first.
 
+![Two panels from bundle_adjustment.py: a top-down view of cameras on an arc around a landmark cluster (ground truth, noisy initial guess, joint BA), and log-scale RMS errors for the noisy initial guess, landmarks-only, poses-only and joint bundle adjustment](../../assets/bundle_adjustment.png)
+
+*Figure: `use_numpy/bundle_adjustment.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py bundle_adjustment`.*
+
 **Projection** (`camera_project`): move the point into the camera frame, then apply the pinhole model with intrinsics $(f_x, f_y, c_x, c_y)$:
 
 ```math
@@ -619,12 +623,16 @@ Use **Global BA** for offline reconstruction - meshes, NeRF/Gaussian-Splatting i
 - **Local BA**: every new keyframe triggers a bounded solve over an active window (the new keyframe plus its covisible neighbors, with other observing keyframes held fixed) - this section's diagram, made concrete.
 - **Global BA**: a periodic pass over the whole map runs alongside for comparison.
 
+![Three panels from bundle_adjustment_advanced.py: the keyframe path through a landmark corridor with the Local-only and Local plus Global estimates, solve time per call for the bounded Local BA window versus Global BA, and trailing RMS trajectory error over keyframes for both modes](../../assets/bundle_adjustment_advanced.png)
+
+*Figure: `use_numpy/bundle_adjustment_advanced.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py bundle_adjustment_advanced`.*
+
 **What it confirms:** the "Scaling" row above. Measured wall-clock solve time stays roughly flat for the local window as the map grows, while Global BA's grows with it.
 
 **What it doesn't confirm:** a reliable accuracy payoff from Global BA on this small scene.
 
-- **Open path (default):** the default seed looks like a clean win (final RMS trajectory error 1.8652 m Local-only → 1.2692 m Local+Global, −32%). The 15-seed sweep in the script's regression test is closer to a wash, though: roughly a 50% per-seed win rate, a median difference near zero, and a few seeds that diverge to thousands of meters in *either* mode from a rare bad local minimum in the windowed GN/LM solve.
-- **Loop closure** (`--arc-span-deg 350`): the path swings back within view of its start, and the script reports `Loop closure detected at keyframe K ...`. No code changes are needed, because the covisibility bookkeeping, window builder and Global BA solve don't assume temporal locality. Across several seeds, the Global BA pass right after the closure ranges from a 9.9% improvement to a 6.2% regression (default seed: 5.596 m → 5.671 m, 1.3% worse). The closure adds one genuinely new residual, but among hundreds of others it isn't a dominant correction.
+- **Open path (default):** the default seed looks like a win (final RMS trajectory error 1.8686 m Local-only → 1.5335 m Local+Global, −18%). The 15-seed sweep in the script's regression test is closer to a wash, though: roughly a 50% per-seed win rate (8/15), a median difference near zero, and an occasional seed that diverges to thousands of meters in *either* mode from a rare bad local minimum in the windowed GN/LM solve.
+- **Loop closure** (`--arc-span-deg 350`): the path swings back within view of its start, and the script reports `Loop closure detected at keyframe K ...`. No code changes are needed, because the covisibility bookkeeping, window builder and Global BA solve don't assume temporal locality. Over seeds 0-4, the closure is detected on 4 of the 5 paths (seed 4 never re-observes an early landmark), and the Global BA pass right after it ranges from a 2.2% improvement to a 2.2% regression (default seed: 5.596 m → 5.721 m, 2.2% worse). The closure adds one genuinely new residual, but among hundreds of others it isn't a dominant correction.
 
 So judge Global BA's benefit here from the aggregate statistics, not from any single run's printed numbers.
 

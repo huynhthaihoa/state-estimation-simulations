@@ -125,6 +125,10 @@ The headline NEES comparison below also excludes the ramp ticks themselves (`is_
 
 The going-in expectation was that `always` would at least match `phase_conditional` during genuine anchor ticks (both apply the identical, correct update there) and only diverge during motion. Running it says otherwise (seeds 0-3, `n_trials=500`, mean NEES over the cruise-only/anchor-only windows):
 
+![Two panels from inchworm_zupt_ekf.py: velocity over the anchor/extend gait with the estimates of the three ZUPT policies, and Monte Carlo NEES for never, every-tick and anchor-only ZUPT against the consistent value of 2](../../assets/inchworm_zupt_ekf.png)
+
+*Figure: `use_numpy/inchworm_zupt_ekf.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py inchworm_zupt_ekf`.*
+
 | Variant | anchor-only NEES | cruise-only NEES | velocity RMS (single run) |
 | --- | --- | --- | --- |
 | `never` | ~6.0 | ~10.8 | ~0.055-0.060 m/s |

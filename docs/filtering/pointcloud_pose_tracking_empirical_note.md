@@ -25,6 +25,10 @@ Four ways to turn a predicted pose + point-cloud measurement into a correction:
 
 EKF and IEKF are two algebraically related ways of *linearizing the same model*; UKF instead avoids linearizing it altogether. That difference in kind is exactly why the first pair can be proven identical while the third can only be shown to be *close*. Vanilla KF (§4) is a different move again - not a different linearization or a different sampling scheme, but a different *state representation* entirely.
 
+![Two panels from pointcloud_pose_tracking.py at its defaults: the x-y trajectories of ground truth, dead reckoning and five estimators (EKF, invariant EKF, UKF, vanilla KF, batch Gauss-Newton), and each one's position error over time on a log scale](../../assets/pose_tracking.png)
+
+*Figure: `use_numpy/pointcloud_pose_tracking.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py pose_tracking`.*
+
 ### 1.1 The filter math, concretely
 
 This section maps each piece of math to the function in [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/pointcloud_pose_tracking.py) that computes it. Lie-group helpers live in [`use_numpy/lie_utils.py`](../../use_numpy/lie_utils.py), and the UKF helpers live in [`utils.py`](../../utils.py). The `use_manif` version implements the same math with the `manif` library.

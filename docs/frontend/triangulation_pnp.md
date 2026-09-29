@@ -133,6 +133,10 @@ Neither problem is "solved" by the linear step alone - both need this positive-d
 
 `linear_pnp_dlt` is the simplest *correct* version of linear PnP, not a production algorithm - it needs $n\geq 6$ well-conditioned correspondences to be numerically stable (rank-3+ data), and its accuracy degrades faster than purpose-built solvers as $n$ grows or points become near-coplanar. Production systems (OpenCV's own `solvePnP`, ORB-SLAM, COLMAP) typically use **EPnP** (Lepetit, Moreno-Noguer & Fua, 2009 - see References), an $O(n)$ algorithm that expresses every 3D point as a weighted combination of four virtual control points, turning the problem into recovering just those four points' camera-frame coordinates - more accurate and much cheaper at scale than a general DLT null-space solve. This repo implements the simpler DLT version for pedagogical clarity, matching `triangulate_landmark`'s own choice of a simple closed-form linear solve over a more sophisticated one.
 
+![Two panels from pnp_estimation.py: the image plane with observed pixels and 20-times-magnified reprojection residuals for the linear DLT pose and the Gauss-Newton-refined pose, and bars of rotation, position and reprojection error for both](../../assets/pnp_estimation.png)
+
+*Figure: `use_numpy/pnp_estimation.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py pnp_estimation`.*
+
 ---
 
 ## 6. One-sentence summary

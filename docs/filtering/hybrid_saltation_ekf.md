@@ -228,6 +228,10 @@ Mean NEES, 5 ticks after each of 3 bounces (seed 0):
 
 So with exact detection there is no case for the naive update: the two filters are close both right after a bounce and averaged over the whole trajectory, neither is overconfident, and the naive update has no principled derivation behind it at all. The larger miscalibration here is the conservatism both filters share over the whole trajectory, not the difference between their bounce updates. A real Hybrid-InEKF implementation would still benefit from an explicit model of detection uncertainty (e.g., an impact-timing noise term scaled by the velocity jump at the event, rather than this script's simple isotropic floor) - §8 measures how much detection error costs each filter.
 
+![Two panels from saltation_matrix_ekf.py: the height of the bouncing point mass with measurements, ground truth and both EKFs, and Monte Carlo NEES over time for the naive and saltation bounce updates against the consistent value of 6](../../assets/saltation_matrix_ekf.png)
+
+*Figure: `use_numpy/saltation_matrix_ekf.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py saltation_matrix_ekf`.*
+
 ---
 
 ## 7. Two things worth knowing before reusing this pattern

@@ -156,6 +156,10 @@ Three things follow directly from these formulas:
 
 Monte Carlo NEES (500 trials, seed 0, $`dt = 0.05\,\text{s}`$ - the script's own default, verified to reproduce the table below to two significant figures - one full loop over $`20\,\text{s}`$), binned by how far the true heading has rotated away from `fixed_anisotropic`'s fixed reference heading:
 
+![Two panels from friction_anisotropic_ekf.py: the circular path with the per-step slip covariance ellipse turning with the heading, and Monte Carlo NEES over one full turn for isotropic, frozen anisotropic and heading-aware process noise](../../assets/friction_anisotropic_ekf.png)
+
+*Figure: `use_numpy/friction_anisotropic_ekf.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py friction_anisotropic_ekf`.*
+
 | Rotation away from reference | `isotropic` | `fixed_anisotropic` | `heading_aware` |
 | --- | --- | --- | --- |
 | 0-45° | 2.9 | 4.8 | 2.6 |

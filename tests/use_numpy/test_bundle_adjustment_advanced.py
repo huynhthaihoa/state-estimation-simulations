@@ -285,21 +285,20 @@ def test_global_ba_does_not_regress_local_only_in_aggregate(baa, seeds):
     median_diff = diffs[n // 2] if n % 2 else (diffs[n // 2 - 1] + diffs[n // 2]) / 2
     # An earlier version of this test used only seeds (0,1,2,3,4) and asserted
     # a >=60% per-seed win rate, on the theory that Global BA "helps on most
-    # noise draws" here. That specific 5-seed sample happened to clear the
-    # bar at an exact 3/5 -- one of those three wins by a 0.0009 m margin --
-    # but it wasn't representative: over a wider 15-seed sweep the raw win
-    # rate is under 50%, and a few individual seeds diverge to 1000s of
+    # noise draws" here. That 5-seed sample cleared the bar at an exact 3/5 --
+    # one of those wins by a 0.0009 m margin -- but it wasn't representative:
+    # over this 15-seed sweep the win rate is close to a coin flip (8/15 at
+    # the time of writing), and an occasional seed diverges to 1000s of
     # meters in *either* run mode (a rare bad local minimum in the windowed
-    # GN solve that neither mode is reliably protected from). Seed 1 here is
-    # the extreme case: Local-only diverges to ~19,221 m in this backend for
-    # this exact scenario, while the use_manif backend's Local-only run on
-    # the identical seed stays at ~1.19 m -- a real, backend-specific
-    # numerical fragility worth knowing about separately from this test. A
-    # per-seed win-count assertion over a small, fixed seed set is exactly
-    # this fragile by construction. The median of (hybrid - local) over a
-    # wider seed sweep is far more robust to both the sampling noise and the
-    # rare catastrophic-divergence outliers (like seed 1 here), and
-    # empirically sits very close to 0 (a wash, not a reliable win) -- so
+    # GN solve that neither mode is protected from; currently seed 12, at
+    # ~27,000 m Local-only and ~12,900 m Local + Global BA). Before
+    # refine_landmark_gn stopped at camera-plane crossings, the two backends
+    # also disagreed seed by seed (use_numpy's seed 1 diverged, use_manif's
+    # seed 11 crashed with a singular solve); they now agree to ~1e-4 m. A
+    # per-seed win-count assertion over a small, fixed seed set is fragile by
+    # construction. The median of (hybrid - local) is robust to both the
+    # sampling noise and the rare divergent outliers, and sits very close to
+    # 0 (-0.0005 m at the time of writing: a wash, not a reliable win) -- so
     # this checks Global BA isn't a *systematic* regression against
     # Local-only, without overclaiming an improvement the data doesn't
     # actually support.

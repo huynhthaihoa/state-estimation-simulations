@@ -700,6 +700,10 @@ This iteration repeats until the accepted step is small, ${\Vert{}\boldsymbol{\d
 
 The whole solver is `run_pose_graph_optimization` in [`use_numpy/pose_graph.py`](../../use_numpy/pose_graph.py). It works on $4 \times 4$ pose matrices $X_k$. Tangent vectors are ordered translation first, $`\boldsymbol{\xi} = [\mathbf{v}^\top \;\; \boldsymbol{\omega}^\top]^\top`$, the same order as §15.4's $`[\boldsymbol{\rho}^\top \;\; \boldsymbol{\phi}^\top]^\top`$. The code numbers nodes from 0, while §15.1 numbers them from 1. Below, $X$ is §15's $T$ and $Z_{ij}$ is §15's ${\tilde{T}_{ij}}$.
 
+![Two panels from pose_graph.py: the four-pose square loop with ground truth, drifting odometry, the optimized estimate and the loop-closure edge, and each pose's position error before and after optimization](../../assets/pose_graph.png)
+
+*Figure: `use_numpy/pose_graph.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py pose_graph`.*
+
 **Measurements** (`simulate_noisy_edges`): each edge is the true relative pose with right-multiplied noise. The loop-closure edge scales both std-devs by `--loop-noise-scale` (default 0.5):
 
 ```math

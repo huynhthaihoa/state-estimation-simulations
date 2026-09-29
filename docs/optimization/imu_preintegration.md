@@ -121,6 +121,18 @@ A full VIO (Visual-Inertial Odometry)/VI-SLAM back-end (GTSAM's `CombinedImuFact
 - **`robot_imu_simulation.py`** is a related but different script: it [dead-reckons](factor_graph.md#2-why-do-we-need-it) noisy body-twist readings directly on $SE(3)$ every micro-step (chaining `se3_exp`, no bundle, no bias Jacobians at all). Its "IMU" reports a 6-D velocity twist, so there is no accelerometer, no bias, and no gravity. It then periodically runs a small damped Gauss-Newton correction against a separate GPS-like position fix. It's about *twist dead-reckoning + periodic on-manifold correction*, not preintegration.
 - **`imu_integration_comparison.py`** is also related but different: like [pointcloud_pose_tracking_empirical_note.md](../filtering/pointcloud_pose_tracking_empirical_note.md), it's an empirical comparison note rather than a concept explainer - it plots naive Euler-angle (vector-space) integration against proper $SO(3)$ Exp-map integration. The Exp-map estimate still drifts from gyro noise, just far less: with the defaults, it ends at about 0.47° rotation error vs. about 70.8° for naive. Each method is scored against its own noise-free ground truth (§7.1). No bias correction is involved.
 
+![Two panels from imu_preintegration.py: the preintegrated position change built up sample by sample from keyframe i to keyframe j, and a log-scale bar chart comparing how much a bias update changes each preintegrated quantity with the error of the first-order Jacobian correction against a full re-integration](../../assets/imu_preintegration.png)
+
+*Figure: `use_numpy/imu_preintegration.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py imu_preintegration`.*
+
+![Two panels from robot_imu_simulation.py run for 10 s: position error just before and just after each 1 Hz position fix, and orientation error growing throughout because a position-only fix cannot correct rotation](../../assets/robot_imu_tracking.png)
+
+*Figure: `use_numpy/robot_imu_simulation.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py robot_imu_tracking`.*
+
+![Two log-scale panels from imu_integration_comparison.py: rotation error and position error over 20 s for naive Euler-angle integration versus the SO(3) exponential-map update, both fed the same noisy IMU samples](../../assets/imu_integration_comparison.png)
+
+*Figure: `use_numpy/imu_integration_comparison.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py imu_integration_comparison`.*
+
 ### 7.1 The comparison and correction math, concretely
 
 Both scripts share `lie_utils.py`. The $SO(3)$ exponential `so3_exp` is Rodrigues' formula, with the $I + [\phi]_\times$ fallback below $\theta < 10^{-6}$ noted in §4:
