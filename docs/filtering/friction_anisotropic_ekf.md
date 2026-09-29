@@ -2,7 +2,7 @@
 
 ## Intuition
 
-"Anisotropic friction" means a surface grips well in one direction and slides easily in the other - the canonical image is a snake's belly scales, or a ratchet:
+"Anisotropic friction" means a surface grips well along one axis and slides easily along the perpendicular one. The classic biological example is a snake's belly scales, which slide easily along the body and grip sideways (Hu et al. 2009). This doc's pad is set up the other way round: it grips along its forward axis and slips sideways, as in the drawing below. Which axis is which doesn't matter to the argument; swapping them only rotates the noise ellipse by 90°.
 
 ```text
         low-friction (slide) axis
@@ -14,20 +14,20 @@
         low-friction (slide) axis
 ```
 
-That noise ellipse is fixed *to the pad*, i.e. to the robot's body frame. The catch this doc explores: as the robot turns, that ellipse turns with it in the world frame -
+That noise ellipse is fixed *to the pad*, i.e. to the robot's body frame. The catch this doc explores: as the robot turns, that ellipse turns with it in the world frame. Drawing the ellipse's long (slip) axis in world coordinates:
 
 ```text
-heading = 0°:        heading = 45°:       heading = 90°:
-   ⬭ (flat)             ⬮ (tilted)            |‾| (rotated 90°)
+heading = 0°        heading = 45°        heading = 90°
+     ↕                    ⤡                    ↔
+ (slip along y)    (slip along the       (slip along x)
+                     diagonal)
 ```
 
 So a filter whose process-noise model uses a *fixed* orientation for that ellipse (set once, e.g. at $t = 0$) is only correct at the instant it was set - as soon as the robot turns, it's confidently modeling slip in the wrong direction. The toy problem below (a unicycle looping through every heading) is built to expose exactly that: `fixed_anisotropic` (wrong orientation once turned) vs. `heading_aware` (ellipse re-oriented every step to match current heading) vs. `isotropic` (no directional claim at all, the safe fallback).
 
-Consider this claim about friction-anisotropic platforms (pads that grip well in one direction and slide easily in another - "the way a snake's belly scales do"): 
+The question behind this comes from hybrid-systems filtering. There, friction is usually modeled as discrete contact modes (stuck or sliding), each switch with its own saltation matrix. Kong et al. (2024, §V-F) derive the saltation matrix for this stick-slip transition under Coulomb friction, whose single coefficient $\mu$ has no preferred direction. For an anisotropic pad, that's not enough: slip variance depends on heading relative to the pad's own friction axes, not only on which mode is active. A filter that switches modes correctly but keeps an isotropic $Q$ treats slip along the low-friction axis the same as along the high-friction axis.
 
-> Anisotropic-friction slip variance is a function of heading relative to the pad's fixed friction axis, not just which discrete contact mode is active - a mode-switching saltation matrix with an otherwise-isotropic $Q$ would treat slip along the low-friction axis the same as the high-friction axis
-
-This doc works through the simplest concrete version of that claim, using [`friction_anisotropic_ekf.py`](../../use_numpy/friction_anisotropic_ekf.py)'s crawling unicycle as the toy problem.
+This doc works through the simplest concrete version of that point, using [`friction_anisotropic_ekf.py`](../../use_numpy/friction_anisotropic_ekf.py)'s crawling unicycle as the toy problem.
 
 **This isn't new theory** - it's a direct application of an argument this repo already made, just applied on the other side of the filter. [`pointcloud_pose_tracking_empirical_note.md`](pointcloud_pose_tracking_empirical_note.md) §2/§5 (terms in the [glossary](../glossary.md#1-geometry-and-lie-groups)) established that a noise ellipsoid fixed in an object's own frame looks anisotropic-and-rotating once expressed in the world frame, and that what actually matters is whether the filter's noise model tracks that rotation - not "rigid vs. non-rigid." That note was about *measurement* noise in a point-cloud registration EKF/IEKF. This script is the first to apply the identical argument to *process* noise for a robot that's actually moving and turning, and deliberately stays an ordinary EKF throughout - no new IEKF/Lie-group derivation, since the question here is purely "does $Q$'s shape track heading," not a linearization-frame question.
 
@@ -37,7 +37,7 @@ This doc works through the simplest concrete version of that claim, using [`fric
 
 ## 1. The setup
 
-A unicycle robot drives at a *known* constant commanded forward speed $v_{\text{cmd}}$ and turn rate $\omega_{\text{cmd}}$, so its true path is an exact circular arc (`exact_arc_step`, closed-form, exact for any $dt$ - the same "exact propagation, not a linearization" convention as `saltation_matrix_ekf.flow`, though an EKF Jacobian is still needed here since heading enters the position update nonlinearly). $\omega_{\text{cmd}}$ defaults to $\dfrac{2\pi}{T}$ (where $T$ is the run duration), i.e. exactly one full loop over the run - so the heading sweeps through every possible orientation relative to a fixed reference.
+A unicycle robot drives at a *known* constant commanded forward speed $v_{\text{cmd}}$ and turn rate $\omega_{\text{cmd}}$, so its true path is an exact circular arc (`exact_arc_step`, closed-form, exact for any $dt$ - the same "exact propagation, not a linearization" convention as `saltation_matrix_ekf.flow`; §1.1 gives the formulas and the Jacobian). $\omega_{\text{cmd}}$ defaults to $\dfrac{2\pi}{T}$ (where $T$ is the run duration), i.e. exactly one full loop over the run - so the heading sweeps through every possible orientation relative to a fixed reference.
 
 On top of that exact commanded arc, true position picks up a random slip disturbance each tick, drawn in the **pad's own body frame** - low variance along the grip/forward axis, high variance along the slip/lateral axis - then rotated into world coordinates by the **true** heading at that instant.
 
@@ -101,7 +101,7 @@ R(\theta_Q)^\top \Delta t^2,
 R(\theta_Q) = \begin{bmatrix} \cos\theta_Q & -\sin\theta_Q \\ \sin\theta_Q & \cos\theta_Q \end{bmatrix}
 ```
 
-The $\Delta t^2$ converts a slip-velocity standard deviation (m/s) into a per-tick position variance (m²). Written out, with $a = \sigma_{\text{grip}}^2 \Delta t^2$, $b = \sigma_{\text{slip}}^2 \Delta t^2$, $c = \cos\theta_Q$ and $s = \sin\theta_Q$:
+The $\Delta t^2$ converts a slip-velocity standard deviation (m/s) into a per-tick position variance (m²). This is a simple heuristic scaling (the script's comments flag it as one), not the $\sigma^2\Delta t$ of continuous-time white noise; it's a tuning choice, not what this doc studies. Written out, with $a = \sigma_{\text{grip}}^2 \Delta t^2$, $b = \sigma_{\text{slip}}^2 \Delta t^2$, $c = \cos\theta_Q$ and $s = \sin\theta_Q$:
 
 ```math
 Q_{\text{pos}}^{\text{aniso}}(\theta_Q) =
@@ -148,13 +148,13 @@ Three things follow directly from these formulas:
 
 - **All three variants carry the same total noise.** Rotation doesn't change a matrix's trace, so $Q_{\text{pos}}^{\text{aniso}}$ always has trace $(\sigma_{\text{grip}}^2 + \sigma_{\text{slip}}^2)\Delta t^2$. That is exactly $2\sigma_{\text{iso}}^2 \Delta t^2$, the trace of the isotropic version. The variants differ only in *direction*, not in how much noise they assume overall.
 - **The off-diagonal term is what points the ellipse.** It is zero only when $\theta_Q$ is a multiple of 90°. With the defaults, the slip variance is 25 times the grip variance (a 5:1 ratio in standard deviation), so pointing the ellipse the wrong way matters a lot. When `fixed_anisotropic`'s ellipse is misaligned, the filter assumes little noise in a direction where the real slip is large. It becomes overconfident in exactly that direction, which drives the NEES gap in §2.
-- **A 180° error costs nothing.** Replacing $\theta_Q$ with $\theta_Q + \pi$ flips the sign of both $c$ and $s$, which leaves $c^2$, $s^2$ and $cs$ unchanged. So $Q_{\text{pos}}^{\text{aniso}}$ repeats every 180°, which is the periodicity §3 builds on.
+- **A 180° error costs nothing.** Replacing $\theta_Q$ with $\theta_Q + \pi$ flips the sign of both $c$ and $s$, which leaves $c^2$, $s^2$ and $cs$ unchanged. So $Q_{\text{pos}}^{\text{aniso}}$ repeats every 180°, which is the periodicity §3 builds on. (That holds for $Q$ itself; §3 shows the error a mismatch leaves behind in the heading estimate doesn't disappear when the ellipse realigns.)
 
 ---
 
 ## 2. The dominant finding: `fixed_anisotropic` is dramatically worse, everywhere
 
-Monte Carlo NEES (500 trials, seed 0, $`dt = 0.05\,\text{s}`$ - the script's own default, verified to reproduce the table below to two significant figures - one full loop over $`20\,\text{s}`$), binned by how far the true heading has rotated away from `fixed_anisotropic`'s fixed reference heading:
+Monte Carlo NEES over 500 trials (seed 0, $`dt = 0.05\,\text{s}`$, one full loop over $`20\,\text{s}`$, all script defaults), binned by how far the true heading has rotated away from `fixed_anisotropic`'s fixed reference heading. Each trial draws a fresh slip realization, initial error and measurement noise. Redrawing the slip matters, because the slip is the process noise whose model $Q$ is being tested.
 
 ![Two panels from friction_anisotropic_ekf.py: the circular path with the per-step slip covariance ellipse turning with the heading, and Monte Carlo NEES over one full turn for isotropic, frozen anisotropic and heading-aware process noise](../../assets/friction_anisotropic_ekf.png)
 
@@ -162,31 +162,48 @@ Monte Carlo NEES (500 trials, seed 0, $`dt = 0.05\,\text{s}`$ - the script's own
 
 | Rotation away from reference | `isotropic` | `fixed_anisotropic` | `heading_aware` |
 | --- | --- | --- | --- |
-| 0-45° | 2.9 | 4.8 | 2.6 |
-| 45-90° | 3.0 | 8.3 | 2.5 |
-| 90-135° | 3.5 | 8.9 | 3.3 |
-| 135-180° | 3.1 | 6.6 | 2.8 |
+| 0-45° | 3.5 | 11.1 | 3.1 |
+| 45-90° | 3.7 | 20.1 | 3.1 |
+| 90-135° | 3.7 | 23.8 | 3.0 |
+| 135-180° | 3.6 | 18.2 | 3.1 |
 
-(A consistent 3-DoF filter should average $\text{NEES} \approx 3$ everywhere; `isotropic` and `heading_aware` both sit close to that at every checkpoint. `fixed_anisotropic` clears the $\chi^2$ 95% bound ($7.8$) in two of the four bins.)
+A consistent 3-DoF filter averages $\text{NEES} = 3$. For an average over 500 independent trials, the 95% acceptance interval is $[2.79, 3.22]$ (the single-run bound of 7.81 doesn't apply to an average).
 
-This part is robust: verified across seeds 0-3, `fixed_anisotropic` is worse than *both* alternatives at *every* checkpoint, by a wide margin, in every seed tried - not just "eventually," from the very first bin. RMS position error tells a smaller but consistent story too: $`\text{heading\_aware}\ (0.0108\,\text{m}) < \text{isotropic}\ (0.0118\,\text{m}) < \text{fixed\_anisotropic}\ (0.0131\,\text{m})`$ - getting the shape right and pointed the right way is both more accurate and, as the table shows, far better calibrated.
+- `heading_aware` stays inside that interval in every bin: it is consistent.
+- `isotropic` sits just above it (3.4-3.8) in every bin: mildly overconfident, because its circle assumes half the true variance along the slip axis.
+- `fixed_anisotropic` is 3.7-8× too high: badly overconfident.
+
+This is robust. Across seeds 0-3, `isotropic`'s and `heading_aware`'s bins move by at most 0.15 and `fixed_anisotropic`'s by at most 1.4, and `fixed_anisotropic` is worse than *both* alternatives in every bin of every seed, from the first bin on.
+
+RMS position error from the script's single run (one trajectory, not the Monte Carlo) tells a smaller but consistent story: at seed 0, $`\text{heading\_aware}\ (0.0108\,\text{m}) < \text{isotropic}\ (0.0118\,\text{m}) < \text{fixed\_anisotropic}\ (0.0131\,\text{m})`$, and the same ordering holds in seeds 1-3. Getting the shape right and pointed the right way is both more accurate and, as the table shows, far better calibrated.
 
 ---
 
-## 3. A secondary finding, and where it stops being clean
+## 3. A secondary finding: the worst mismatch is 90°, not 180°
 
-The *worst* of `fixed_anisotropic`'s own four checkpoints is the 90-135° bin in three of the four seeds tried (0, 1, 3), not the largest possible mismatch (135-180°) - seed 2 is the exception (see below). The reason isn't an accident: a covariance ellipse $`R(\theta)\,\mathrm{diag}(a,b)\,R(\theta)^\top`$ has period $\pi$ in $\theta$, not $2\pi$ - rotating it by 180° gives back the identical ellipse. So a heading mismatch of 180° is, for the *orientation of the noise ellipse specifically*, no mismatch at all; the worst possible ellipse-orientation mismatch is at 90°, exactly where the empirical peak sits for those three seeds.
+The *worst* of `fixed_anisotropic`'s four bins is 90-135° in all four seeds, not the largest possible mismatch (135-180°). The reason: a covariance ellipse $`R(\theta)\,\mathrm{diag}(a,b)\,R(\theta)^\top`$ has period $\pi$ in $\theta$, not $2\pi$, since rotating it by 180° gives back the identical ellipse. So for the *orientation of the noise ellipse*, a 180° heading difference is no mismatch at all, and the worst possible mismatch is 90°. (The binned peak lands in 90-135° rather than 45-90° because the filter's error takes about a second to build up, so its NEES trails the mismatch slightly.)
 
-What happens **beyond** that peak, heading back out toward a full 180° difference, is *not* a clean story, and this doc says so rather than overselling one: in seeds 0, 1, and 3, `fixed_anisotropic`'s NEES does partially recover in the 135-180° bin (matching the ellipse-symmetry prediction); in seed 2, it keeps climbing all the way through. The most likely explanation is that the pure instantaneous-orientation-mismatch effect (which the ellipse-symmetry argument correctly predicts) is competing with a second, accumulated-trajectory-drift effect that grows with elapsed time/distance regardless of instantaneous heading - and depending on the particular noise realization, either one can dominate by the time a full loop has been driven. The NEES-vs-time plot shows this concretely: `fixed_anisotropic` (red) has repeated, roughly periodic bumps over the $`20\,\text{s}`$ loop rather than one clean single-peaked hump, consistent with a real periodic effect that isn't the *only* thing going on.
+Past the peak, NEES recovers only partly: 18.2 in the 135-180° bin, still about 6× the consistent value, although the ellipse is realigned at 180°. Splitting the NEES into its position and heading parts shows why (a separate check over 200 trials, not something the script prints):
+
+| Time (heading) | Position NEES (2 DoF, consistent = 2) | Heading NEES (1 DoF, consistent = 1) |
+| --- | --- | --- |
+| 0 s (0°) | 2.0 | 0.9 |
+| 5 s (90°) | 6.9 | 8.8 |
+| 10 s (180°) | 2.6 | 14.1 |
+| 15 s (270°) | 9.9 | 11.1 |
+| 20 s (360°) | 2.2 | 10.5 |
+
+The position part follows the ellipse mismatch exactly: it peaks at 90° and 270° and returns to nearly consistent at 180° and 360°. The heading part doesn't come back. While the ellipse is misaligned, the filter explains real slip with the wrong position noise and pushes part of that error into its heading estimate. Heading is never measured directly, so that error drains away only slowly through the position-heading cross-covariance, and it persists long after the ellipse realigns. The figure's NEES curve shows both effects: two humps a half-turn apart, sitting on a floor that doesn't return to 3.
 
 ---
 
 ## 4. Takeaway for a real friction-anisotropic contact model
 
-Both findings point the same direction for modeling a friction-anisotropic pad's slip in a real filter: the noise model needs to track the *current* heading, not just "know" the pad is anisotropic in the abstract. Getting the shape right but the orientation wrong (`fixed_anisotropic`) isn't a small, forgivable approximation - it's dramatically worse than the naive isotropic fallback almost everywhere, precisely because it makes a confident, specific directional claim that's actively false most of the time, and (per §3) that claim is worst exactly at the 90° mismatch a fixed reference heading is most likely to drift into. The safe fallback, if heading-tracking isn't available for some reason, is to not claim a direction at all (`isotropic`) rather than claim the wrong one.
+Both findings point the same direction for modeling a friction-anisotropic pad's slip in a real filter: the noise model needs to track the *current* heading, not just "know" the pad is anisotropic in the abstract. Getting the shape right but the orientation wrong (`fixed_anisotropic`) isn't a small, forgivable approximation. It's dramatically worse than the naive isotropic fallback in every bin, because it makes a confident, specific directional claim that's false most of the time. That claim does the most damage at a 90° mismatch (§3), and the damage outlasts the mismatch through the heading estimate. The safe fallback, if heading-tracking isn't available for some reason, is to not claim a direction at all (`isotropic`) rather than claim the wrong one.
 
 ---
 
 ## 5. References
 
-1. Hu, D. L., Nirody, J., Scott, T., & Shelley, M. J. (2009). *The Mechanics of Slithering Locomotion*. Proceedings of the National Academy of Sciences, 106(25), 10081-10085. https://doi.org/10.1073/pnas.0812533106 - the source of this doc's opening image (a snake's belly scales) and the physical phenomenon it models: friction fixed to the body/scale frame with different coefficients along vs. across the body axis. The paper's friction model is deterministic and doesn't itself use a stochastic slip-variance/covariance framing - that translation into an EKF process-noise ellipse is this doc's own extension, applying the world-frame-rotation argument from [`pointcloud_pose_tracking_empirical_note.md`](pointcloud_pose_tracking_empirical_note.md) (see §Intuition above) to process rather than measurement noise.
+1. Hu, D. L., Nirody, J., Scott, T., & Shelley, M. J. (2009). *The Mechanics of Slithering Locomotion*. Proceedings of the National Academy of Sciences, 106(25), 10081-10085. https://doi.org/10.1073/pnas.0812533106 - the source of this doc's opening image (a snake's belly scales) and the physical phenomenon it models: friction fixed to the body/scale frame with different coefficients along vs. across the body axis (for snakes, lower along the body than across it). The paper's friction model is deterministic and doesn't itself use a stochastic slip-variance/covariance framing - that translation into an EKF process-noise ellipse is this doc's own extension, applying the world-frame-rotation argument from [`pointcloud_pose_tracking_empirical_note.md`](pointcloud_pose_tracking_empirical_note.md) (see §Intuition above) to process rather than measurement noise.
+2. Kong, N. J., Payne, J. J., Zhu, J., & Johnson, A. M. (2024). *Saltation Matrices: The Essential Tool for Linearizing Hybrid Dynamical Systems*. Proceedings of the IEEE, 112(6), 585-608. https://doi.org/10.1109/JPROC.2024.3440211 (preprint: arXiv:2306.06862) - §V-F derives the saltation matrix for the stick-slip friction transition under Coulomb friction with a single, direction-free coefficient; this doc's direction-dependent process noise is the part that model leaves out. Also reference 1 of [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md#11-references).

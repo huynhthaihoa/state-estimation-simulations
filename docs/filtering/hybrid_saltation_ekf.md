@@ -5,18 +5,17 @@
 A hybrid system alternates ordinary smooth motion (falling) with sudden, instantaneous jumps (bouncing), triggered the instant some condition is hit (touching the ground). The tricky part isn't the jump itself - it's that two nearby trajectories don't hit that condition at exactly the same moment:
 
 ```text
-ball A (nominal):     ●
-                        ╲
-                         ╲                    both start falling
-                          ╲                    together...
-ball B (started 5cm       ╲●
-higher):                    ╲╲
-                              ╲╲
-──────────────────────────────●●──── ground
-                               A B
-                           A lands first, B a moment later -
-                           having had farther to fall, B is
-                           already moving faster when it lands
+ball B (starts 5 cm higher):   ●
+ball A (nominal):              │ ●
+                               │ │        both start falling
+                               │ │        together...
+                               │ │
+                               ▼ ▼
+───────────────────────────────●─●───── ground
+                               B A
+                     A lands first, B a moment later -
+                     having had farther to fall, B is
+                     already moving faster when it lands
 ```
 
 Ball A and ball B start almost identically - B is just 5 cm higher. But because B has slightly farther to fall, it lands a fraction of a second *later* than A, by which point B has picked up extra speed from that extra bit of falling time. So B's bounce isn't just "the same bounce rule applied to a slightly different starting state" - it's applied to a state that's had a bit more time to accelerate first.
@@ -35,7 +34,7 @@ A **hybrid dynamical system** alternates **continuous flow** with **instantaneou
 
 - **State**: $x = (p, v) \in \mathbb{R}^6$ with $p, v \in \mathbb{R}^3$ - a point mass's position and velocity, plain $\mathbb{R}^6$ (no rotation, unlike most scripts in this repo).
 - **Flow**: $`\dot x = f(x) = \begin{bmatrix} v \\ (0,0,-g) \end{bmatrix}`$ - ordinary free-fall, affine in $x$ (linear plus a constant gravity term), so it can be integrated exactly.
-- **Guard**: $g(x) = p_z$. The system jumps whenever a falling trajectory reaches $g(x) = 0$ (touches the ground). Its gradient $Dg = \partial g/\partial x$ - which shows up throughout this doc, starting in §2 - is the constant row vector $(0,0,1,0,0,0)$ here: it just picks out the $p_z$ component.
+- **Guard**: $g(x) = p_z$. (The letter $g$ does double duty in this doc, following the saltation-matrix literature: $g(x)$ and its gradient $Dg$ are the guard, while a bare $g$ in the dynamics, as in $\tfrac12 g t^2$, is gravity, $9.81\ \text{m/s}^2$.) The system jumps whenever a falling trajectory reaches $g(x) = 0$ (touches the ground). Its gradient $Dg = \partial g/\partial x$ - which shows up throughout this doc, starting in §2 - is the constant row vector $(0,0,1,0,0,0)$ here: it just picks out the $p_z$ component.
 - **Reset map**: $R(x)$, applied at the guard - here, $`v_z \mapsto -e\,v_z`$ (an inelastic bounce with restitution $e$), position and horizontal velocity untouched. Throughout this doc, a superscript $-$/$`+`$ on a state or vector field (e.g. $x^{-}$, $f^{-}$, $x^{+}$, $f^{+}$) means "evaluated just before/after the reset."
 
 This is the textbook canonical example (the word "saltation" is Latin for "leaping"), and it is the simplest possible analog of a foot-strike/ground-contact impact - a discrete velocity reset at a discrete contact event - without $SE(3)$'s rotational complexity layered on top.
@@ -222,7 +221,7 @@ Mean NEES, 5 ticks after each of 3 bounces (seed 0):
   EKF (saltation)  ≈ 2.49
 ```
 
-**Both filters are *under*confident after a bounce, and the saltation-corrected one slightly less so.** Post-bounce NEES is reproduced tightly across seeds 0-3 (naive 2.35-2.38, saltation 2.49-2.50 in every one). A consistent 6-DoF filter averages $6$, and for an average over 500 trials the 95% band around that is narrow - about $`6 \pm 1.96\sqrt{2\cdot 6/500} \approx 6 \pm 0.30`$ (the $12.59$ chi-squared bound applies to a *single* NEES sample, not to a 500-trial mean). So both filters report a clearly larger $P$ than the errors they actually make. This conservatism is shared and not specific to bounces: the whole-run mean NEES is $\approx 3.3$ for both. Part of it is process noise the truth doesn't have - the true trajectory has none, yet both filters add $Q$ every sub-interval (and the impact floor at every bounce) - but only part: cutting `--process-noise-std` from $0.3$ to $0.01$ raises the whole-run mean only to $\approx 4.0$-$4.4$ (seed 0), still well below $6$. Against that backdrop, saltation's slightly higher post-bounce NEES at these defaults - a 5-6% gap, consistent across seeds - means slightly *closer* to consistent, not worse. It is also not the dramatic, order-of-magnitude-scale effect an incorrect formula (one missing §4's $f^{+}$ correction term) would produce here instead.
+**Both filters are *under*confident after a bounce, and the saltation-corrected one slightly less so.** Post-bounce NEES is reproduced tightly across seeds 0-3 (naive 2.35-2.38, saltation 2.49-2.50 in every one). A consistent 6-DoF filter averages $6$, and for an average over 500 trials the 95% band around that is narrow - about $`6 \pm 1.96\sqrt{2\cdot 6/500} \approx 6 \pm 0.30`$ (the $12.59$ chi-squared bound applies to a *single* NEES sample, not to a 500-trial mean). So both filters report a clearly larger $P$ than the errors they actually make. This conservatism is shared and not specific to bounces: the whole-run mean NEES is $\approx 3.3$ for both. Part of it is process noise the truth doesn't have - the true trajectory has none, yet both filters add $Q$ every sub-interval (and the impact floor at every bounce) - but only part: cutting `--process-noise-std` from $0.3$ to $0.01$ raises the whole-run mean only to about 4.0 to 4.4 (seed 0), still well below $6$. Against that backdrop, saltation's slightly higher post-bounce NEES at these defaults - a 5-6% gap, consistent across seeds - means slightly *closer* to consistent, not worse. It is also not the dramatic, order-of-magnitude-scale effect an incorrect formula (one missing §4's $f^{+}$ correction term) would produce here instead.
 
 **What differs, and how robust the ordering is**: the two filters differ only at bounces, where §5's $`Dg\,\Xi = -e\,Dg`$ property means the saltation-corrected update scales $P$'s height (guard-normal) variance by $e^2$ ($\approx 0.72$ at $e = 0.85$), while the naive update carries it through unchanged ($DR$'s position rows are the identity). Which filter ends up with the higher post-bounce NEES depends on the tuning, though: at `--process-noise-std` $0.05$ or $0.01$ (seed 0) the *naive* filter's is higher (2.86 vs. 2.60, and 3.29 vs. 2.65). What does hold at every setting tried is that both stay below $6$ - with exact contact detection, neither filter is overconfident after a bounce. The picture changes once the bounce time itself is misjudged: §8 shows that when contact-detection jitter pushes both filters into overconfidence (NEES $> 6$), the saltation-corrected one is the more overconfident of the two.
 
@@ -320,7 +319,7 @@ Write $B(x^{-}) = I - \dfrac{f(x^{-})\otimes Dg}{Dg\cdot f(x^{-})}$ for the rank
 (B\,\delta x_0)_{v_z} = 0-(-9.81)(-0.004948) \approx -0.04854\ \text{m/s}
 ```
 
-Read this as: *starting 5cm higher behaves, to first order, like starting at the same height but already falling $\approx 0.0485$ m/s faster* - which is a language $DR$ already knows how to handle. Applying $DR$'s bounce law to that equivalent velocity gives the $\Xi_{\text{own-time}}$ prediction:
+Read this as: *starting 5cm higher behaves, to first order, like starting at the same height but already falling* $`\approx 0.0485`$ *m/s faster* - which is a language $DR$ already knows how to handle. Applying $DR$'s bounce law to that equivalent velocity gives the $\Xi_{\text{own-time}}$ prediction:
 
 $$\Xi_{\text{own-time}}\text{ change} = -e\times(-0.04854) \approx +0.02427\ \text{m/s}$$
 

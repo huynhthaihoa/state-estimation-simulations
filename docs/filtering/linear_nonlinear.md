@@ -116,14 +116,16 @@ Evaluate $J$ at $\hat x \pm \sigma$ along the main axes of $P$ (the eigenvectors
 Run the filter and check whether its reported uncertainty is believable:
 
 - **NIS**, the normalized innovation squared, $\nu^\top S^{-1}\nu$, needs no ground truth.
-- **NEES**, the normalized estimation error squared, needs simulated ground truth. This repo reports a Monte Carlo NEES in [`saltation_matrix_ekf.py`](../../use_numpy/saltation_matrix_ekf.py), [`inchworm_zupt_ekf.py`](../../use_numpy/inchworm_zupt_ekf.py) and [`friction_anisotropic_ekf.py`](../../use_numpy/friction_anisotropic_ekf.py).
+- **NEES**, the normalized estimation error squared, needs simulated ground truth. This repo reports a Monte Carlo NEES in three scripts, which test different things: [`friction_anisotropic_ekf.py`](../../use_numpy/friction_anisotropic_ekf.py) has a genuinely nonlinear motion model (heading enters through $\cos\theta$, $\sin\theta$); [`inchworm_zupt_ekf.py`](../../use_numpy/inchworm_zupt_ekf.py) is exactly linear; and [`saltation_matrix_ekf.py`](../../use_numpy/saltation_matrix_ekf.py) is linear between bounces, with the nonlinearity concentrated in the bounce itself.
 
-Linearization error that matters shows up as:
+A consistent filter's NEES averages the state dimension $n$ (NIS: the measurement dimension). Which bound to compare against depends on what you're looking at:
 
-- NIS or NEES above the chi-square bounds (the filter is overconfident);
-- a nonzero mean in the innovations.
+- **One run**: a single NEES value is chi-square with $n$ degrees of freedom, so its 95% upper bound is wide (7.81 for $n = 3$).
+- **An average over $N$ Monte Carlo runs**: $N$ times the average is chi-square with $nN$ degrees of freedom, so the interval is much tighter, about $`n \pm 1.96\sqrt{2n/N}`$. For $n = 3$ and $N = 500$ that's $[2.79, 3.22]$, which is what the three scripts print.
 
-This test tells you *that* the approximation failed, not why.
+Above the upper bound, the filter is overconfident. Below the lower bound, it's underconfident, which is what `saltation_matrix_ekf.py` shows after a bounce (NEES about 2.4 against 6). A nonzero mean in the innovations is a second warning sign.
+
+These tests catch **any** mismatch between the filter's model and reality, not just linearization error: a wrong $Q$ or $R$, or dynamics the model leaves out, fail them just as well. `inchworm_zupt_ekf.py` is a clean example: its model is exactly linear, yet its NEES is 6-16 against 2, all of it from a ramp acceleration the model doesn't include ([inchworm_zupt_ekf.md §3](inchworm_zupt_ekf.md#3-the-finding-not-just-always-is-wrong-while-moving)). So a failed consistency test tells you *that* something is wrong, not what. To pin it on the linearization, use the direct checks in §4.1-§4.3, or remove the suspected cause and run again.
 
 ### Where it matters most
 

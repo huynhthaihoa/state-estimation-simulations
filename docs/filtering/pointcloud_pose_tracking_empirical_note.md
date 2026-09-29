@@ -2,9 +2,9 @@
 
 Applies to both [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/pointcloud_pose_tracking.py) and [`use_manif/pointcloud_pose_tracking.py`](../../use_manif/pointcloud_pose_tracking.py), which implement four ways to turn the same predicted point-cloud measurements into a pose correction: `run_ekf`, `run_iekf`, `run_ukf`, `run_vanilla_kf`. It's tempting to lump "they all give similar numbers" into one claim, but on this benchmark three very different things are actually true at once:
 
-- **EKF and IEKF are bit-identical** (to ~1e-14, floating-point noise) - a proven property of this specific problem setup, not a coincidence.
-- **UKF is close to both, but is not the same algorithm and does not match bit-for-bit** - small in *absolute* terms on this benchmark (~1.4mm), but a real, structural difference (about 11 orders of magnitude larger than the EKF/IEKF floating-point position gap, ~4.6 orders for rotation) that's actually a sizeable fraction (~47%) of the final position error itself, not noise.
-- **Vanilla KF is neither identical to nor merely "close" to the other three - it structurally diverges from all of them, unconditionally.** Unlike the EKF/IEKF equivalence, it has no isotropy precondition; unlike the UKF gap, which does grow and shrink with $\Delta t$ over the range where the underlying linearization/sampling mechanisms actually dominate (§3.4), vanilla KF's gap is present at *every* $\Delta t$ tested, dominated by a completely different, state-representation-level mechanism (§4) - not a different linearization, residual frame, or sampling scheme.
+- **EKF and IEKF are identical** (position to ~1e-15 m, rotation to exactly 0) - a proven property of this specific problem setup, not a coincidence.
+- **UKF is close to both, but is not the same algorithm and does not match bit-for-bit.** Its largest disagreement (~1.4 mm) happens at the very first update, while the filters are correcting the initial pose error; after that it settles to micrometers (~4e-6 to 2e-5 m at the default step), and it grows with the step size as the mechanism predicts (§3).
+- **Vanilla KF is neither identical to nor merely "close" to the other three.** It changes the state representation rather than the linearization, residual frame, or sampling scheme. Its steady-state gap (~4 mm at the defaults) comes mainly from a first-order truncation of the motion step, so it shrinks roughly in proportion to $\Delta t$ (§4).
 
 This doc keeps these three claims separate and explains the mechanism behind each.
 
@@ -13,13 +13,13 @@ This doc keeps these three claims separate and explains the mechanism behind eac
 ## 1. The setup
 
 - **State**: a single rigid pose $T \in SE(3)$.
-- **Motion model**: $`T_{\text{pred}} = T_{\text{prev}}\exp(u\,\Delta t)`$ - constant body-frame twist $u$ over a step of length $\Delta t$. Composing with this known relative motion makes the predict step's linearization exact, not first-order (loosely "group-affine" in spirit, though that term technically describes richer coupled systems like IMU position/velocity/attitude propagation) - true for EKF, IEKF, and UKF (not part of the equivalence argument below), but notably **not** for vanilla KF, which only approximates this composition (§4.2).
+- **Motion model**: $`T_{\text{pred}} = T_{\text{prev}}\exp(u\,\Delta t)`$ - constant body-frame twist $u$ over a step of length $\Delta t$. Composing with this known relative motion makes the predict step's linearization exact, not first-order. This is the simplest *group-affine* system (right-multiplication by a known group element, listed explicitly by Barrau & Bonnabel 2017, Remark 1); IMU position/velocity/attitude propagation is a richer example of the same class. This holds for EKF, IEKF, and UKF (not part of the equivalence argument below), but notably **not** for vanilla KF, which only approximates this composition (§4.2).
 - **Observation model**: a fixed body-frame point cloud $p_i$, observed as $z_i = T\cdot p_i + \text{noise}$ ($T\cdot p_i$ is the pose applied to a point, `T.act(p_i)` in code), with **isotropic** Gaussian noise ($R = \sigma^2 I$, same variance in every direction, uncorrelated across x/y/z).
 
 Four ways to turn a predicted pose + point-cloud measurement into a correction:
 
 - **EKF**: residual and Jacobian expressed in the **world frame**: $r_{\text{world}} = z_i - T_{\text{pred}}\cdot p_i$, $`H_{\text{world}} = R_{\text{pred}}\left[I \;\; -p_i^\wedge\right]`$ (rebuilt every step from the current rotation estimate $R_{\text{pred}}$).
-- **IEKF**: residual and Jacobian expressed in the **object's own body frame**: $r_{\text{body}} = T_{\text{pred}}^{-1}\cdot z_i - p_i$, $`H_{\text{body}} = \left[I \;\; -p_i^\wedge\right]`$ (fixed - depends only on the object's known geometry, precomputed once). This residual is **left-invariant**: redefining the world frame (left-multiplying both the true and the estimated pose by the same fixed transform) doesn't change it. The measurement shape $h(T) = T\cdot p_i$ is the "$X b$" row of [left_right_invariant.md §4](left_right_invariant.md#4-why-it-actually-matters-not-just-bookkeeping)'s table, which pairs with the left-invariant choice.
+- **IEKF**: residual and Jacobian expressed in the **object's own body frame**: $r_{\text{body}} = T_{\text{pred}}^{-1}\cdot z_i - p_i$, $`H_{\text{body}} = \left[I \;\; -p_i^\wedge\right]`$ (fixed - depends only on the object's known geometry, precomputed once). This residual is **left-invariant**: redefining the world frame (left-multiplying both the true and the estimated pose by the same fixed transform) doesn't change it. The measurement shape $h(T) = T\cdot p_i$ is the $`X b`$ row of [left_right_invariant.md §4](left_right_invariant.md#4-why-it-actually-matters-not-just-bookkeeping)'s table, which pairs with the left-invariant choice.
 - **UKF**: no Jacobian at all. Sigma points sampled around the current estimate are retracted onto $SE(3)$ and pushed through the *exact* `motion_model`/`observation_model`, then recombined into a new mean/covariance (equations in §1.1).
 - **Vanilla KF**: no Jacobian either, but for a different reason - it never calls `motion_model`/`observation_model` at all. It reparameterizes the pose as a redundant 12-dim ambient state $`x = [\text{vec}(R) \in \mathbb{R}^9,\ t \in \mathbb{R}^3]`$ (with $\text{vec}$ taken **row-major**, as `R.flatten()` does - see §1.1) instead of the minimal 6-dim $SE(3)$ tangent state the other three use, which makes the point-cloud observation model exactly linear ($`\text{pred}_i = R\,p_i + t`$, a fixed $H$ built once - stronger than IEKF's still-$`SE(3)`$-flavored fixed $H$). The price: its own transition matrix is only exact for a first-order truncation $\exp(\omega^\wedge) \approx I + \omega^\wedge$ of the true motion composition every other method uses exactly, and nothing keeps the 9-vector $\text{vec}(R)$ orthonormal, so it's explicitly re-projected onto $SO(3)$ via SVD after every update (full mechanism in §4).
 
@@ -250,7 +250,7 @@ The step $`R_{\text{big}}\,R_{\text{diag}}\,R_{\text{big}}^\top = R_{\text{diag}
 ### 2.3 Empirical verification
 
 - Printed final/RMS rotation+position error rows are identical between EKF and IEKF across seed 0 (default args) and stress tests (`--init-pose-noise-std 0.5`/`0.8`, `--duration 8`).
-- Direct numerical diff of the full trajectory (duration 5.0, seed 0, 51 poses): max position diff ~1.0e-14 m, max rotation diff ~1.7e-6 deg - floating-point noise, not a real difference.
+- Direct numerical diff of the full trajectory (duration 5.0, seed 0, 51 poses): max position diff ~3e-15 m, and max rotation diff exactly 0 when measured as $`\lVert\mathrm{Log}(R_{\text{EKF}}^\top R_{\text{IEKF}})\rVert`$. The script's own `rotation_geodesic_error` reports ~1e-6 deg instead: it uses $\arccos$, which can't resolve angles below about $\sqrt{\varepsilon_{\text{machine}}} \approx 10^{-8}$ rad, so that figure is the metric's precision limit, not a difference between the filters.
 - Saved trajectory/error plots show the IEKF line drawn exactly on top of the EKF line everywhere (invisible because identical).
 
 ### 2.4 What actually differs between them: speed, not accuracy
@@ -274,38 +274,43 @@ Both effects shrink as the per-step rotation increment shrinks (smaller $\Delta 
 
 ### 3.3 Empirical verification
 
-Direct numerical diff of the full trajectory (`use_numpy`, duration 5.0, seed 0, 51 poses, default UKF tuning $\alpha = 1.0,\ \beta = 2.0,\ \kappa = -3.0$):
+Direct numerical diff of the full trajectory against EKF (`use_numpy`, duration 5.0, seed 0, 51 poses, default UKF tuning $\alpha = 1.0,\ \beta = 2.0,\ \kappa = -3.0$). Rotation differences are measured with $\mathrm{Log}$, not the $\arccos$-based metric (§2.3):
 
 ```text
-EKF  vs IEKF: max pos diff = 1.031e-14 m, max rot diff = 1.708e-06 deg
-EKF  vs UKF : max pos diff = 1.445e-03 m, max rot diff = 6.298e-02 deg
-IEKF vs UKF : max pos diff = 1.445e-03 m, max rot diff = 6.298e-02 deg
+EKF vs IEKF: max pos diff = 3.2e-15 m                                     max rot diff = 0
+EKF vs UKF : max pos diff = 1.445e-03 m (at k = 1)  final pos diff = 3.8e-06 m   max rot diff = 6.3e-02 deg
 ```
 
-The EKF-vs-UKF gap is about **11 orders of magnitude larger** than the EKF-vs-IEKF position gap ($1.445\times10^{-3} / 1.031\times10^{-14} \approx 1.4\times10^{11}$), and about **4.6 orders of magnitude** larger for rotation ($6.298\times10^{-2} / 1.708\times10^{-6} \approx 3.7\times10^{4}$) - not the same ratio, and neither is the "9 orders of magnitude" an earlier version of this note claimed. Both are a real, structural difference, not floating-point noise - though it's not negligible in absolute terms relative to the actual pose error on this benchmark: final position error is ~0.003 m, and the UKF/EKF disagreement (1.445e-3 m) is **~47%** of that ($1.445\times10^{-3} / 0.0031 \approx 0.466$), not the "roughly half a percent" an earlier version of this note claimed. The "Final / RMS errors" table `pointcloud_pose_tracking.py` prints at the end of a run only shows 3-4 decimal places, which is why EKF/IEKF/UKF can look identical there even though only EKF/IEKF actually are.
+The UKF gap is real and structural, not floating-point noise, but *where* it happens matters. The maximum sits at $k = 1$, the first update, when every filter is correcting the initial pose error ($\sigma_0 = 0.1$, so a correction of order 0.1 m / 0.1 rad): that's the largest correction in the run, and §3.2's second-order term scales with the size of the correction. Once the filters have converged the two agree far more closely: at the final pose the difference is 3.8e-6 m, about 0.1% of the final position error (0.0031 m, the same for both). The same pattern holds for seeds 1 and 2 (maximum at $k = 1$ each time). The "Final / RMS errors" table the script prints only shows 3-4 decimal places, which is why EKF, IEKF and UKF look identical there.
 
-### 3.4 How the gap moves as the step size changes (verified, not just predicted)
+### 3.4 How the gap moves as the step size changes
 
-Since both mechanisms in §3.2 scale with the per-step rotation increment, the EKF/UKF gap should *grow* under conditions that make that increment larger, e.g. a bigger $\Delta t$ (fewer, larger steps covering the same `true_body_rates` profile). This is directly checkable - re-running the numerical diff (§3.3) at a sweep of $\Delta t$ values, same seed and duration:
+Both mechanisms in §3.2 scale with the per-step increment, so the steady-state gap should grow with $\Delta t$. Because the first update dominates the maximum over the whole run, the sweep reports two numbers separately: the maximum position gap during the first second (the initial transient), and the maximum after it (the steady state). Same seed and duration throughout:
 
 ```text
-dt=0.001 n_steps=5000  max pos diff=7.221e-04 m  max rot diff=4.915e-02 deg
-dt=0.002 n_steps=2500  max pos diff=1.105e-03 m  max rot diff=8.060e-02 deg
-dt=0.005 n_steps=1000  max pos diff=6.067e-04 m  max rot diff=2.533e-02 deg
-dt=0.01  n_steps= 500  max pos diff=1.089e-03 m  max rot diff=5.871e-02 deg
-dt=0.02  n_steps=250  max pos diff=8.906e-04 m  max rot diff=7.909e-02 deg
-dt=0.05  n_steps=100  max pos diff=1.033e-03 m  max rot diff=4.482e-02 deg
-dt=0.10  n_steps= 50  max pos diff=1.445e-03 m  max rot diff=6.298e-02 deg
-dt=0.20  n_steps= 25  max pos diff=2.921e-03 m  max rot diff=8.555e-02 deg
-dt=0.40  n_steps= 12  max pos diff=4.360e-03 m  max rot diff=3.663e-02 deg
-dt=0.80  n_steps=  6  max pos diff=1.204e-02 m  max rot diff=7.072e-02 deg
+dt      first 1 s (m)   after 1 s (m)   after 1 s, rot (deg)
+0.001   7.2e-04         2.6e-04         4.4e-02
+0.002   1.1e-03         1.4e-04         2.5e-02
+0.005   6.1e-04         3.4e-05         6.7e-03
+0.01    1.1e-03         1.1e-05         2.6e-03
+0.02    8.9e-04         4.3e-06         1.5e-03
+0.05    1.0e-03         8.6e-06         2.9e-03
+0.10    1.4e-03         1.9e-05         9.5e-03
+0.20    2.9e-03         6.4e-05         2.5e-02
+0.40    4.4e-03         6.2e-04         3.3e-02
 ```
 
-The **position** gap grows cleanly and monotonically with $\Delta t$ from $\Delta t = 0.02$ up to $0.80$, exactly as predicted - but going *below* $\Delta t = 0.02$ (an earlier version of this doc didn't test that far), it stops shrinking: $\Delta t = 0.01$'s gap (1.089e-03 m) is larger than $\Delta t = 0.02$'s, and it stays noisy and non-monotonic all the way down to $\Delta t = 0.001$, never dropping meaningfully below the ~6e-4-to-1e-3 m range it first reaches around $\Delta t = 0.01$ to $0.02$ - confirmed across several seeds, not a one-off. This isn't simply "more accumulated steps over the same duration": re-running $\Delta t = 0.001$ at much shorter durations (fewer total steps) shows the same ~6e-4-to-1e-3 m floor appears almost immediately, not only after thousands of steps have run - consistent with a floating-point precision floor tied to $\Delta t$ itself (e.g. $`Q_{\text{tangent}} = \Delta t^2\,Q_{\text{rate}}`$ becoming a very small number at $\Delta t = 0.001$, $\Delta t^2 = 10^{-6}$) rather than a slowly-accumulating rounding-error effect. The **rotation** gap tells the same qualitative story - it is a noisier, max-over-the-whole-trajectory statistic even in the large-$`\Delta t`$ regime, and it's equally non-monotonic once $\Delta t$ drops below $0.02$. Worth reporting honestly rather than smoothing over: the *mechanism* (§3.2) correctly predicts the gap grows with larger $\Delta t$, and the evidence backs that up cleanly from $\Delta t = 0.02$ to $0.80$ - but it does **not** predict, and the data does **not** show, a clean continued shrink all the way to zero as $\Delta t$ keeps getting smaller. There's a floor down there instead, most likely numerical rather than a property of the EKF/UKF mismatch mechanisms themselves.
+Three things show up:
+
+- **The transient depends little on $\Delta t$** (6e-4 to 1.4e-3 m up to $\Delta t = 0.1$, rising to 4.4e-3 m only at the largest step): it's set mainly by the size of the initial correction.
+- **From $\Delta t = 0.02$ upward, the steady-state gap grows with $\Delta t$**, as the mechanism predicts, for position and rotation alike.
+- **Below $\Delta t = 0.02$ it grows again**, to 2.6e-4 m at $\Delta t = 0.001$. This is not floating-point precision. It comes from `unscented_sigma_offsets` ([`utils.py`](../../utils.py)), which adds a fixed $10^{-9} I$ to $P$ before taking its Cholesky factor. As $\Delta t$ shrinks, so does $Q = \Delta t^2 Q_{\text{rate}}$ and with it the converged $P$, until that fixed term is no longer small next to $P$ and visibly widens the sigma points. Setting it to $10^{-15}$ or $0$ (a local experiment; the code still uses $10^{-9}$) drops the gap at $\Delta t = 0.001$ from 2.8e-4 m to 4.2e-6 m, with $\sigma_0 = 0.01$. So the small-$`\Delta t`$ rise is an artifact of a numerical-safety constant, not of the EKF/UKF mechanisms.
+
+Seeds 1 and 2 show the same pattern (steady state at $\Delta t = 0.001 / 0.02 / 0.1 / 0.4$: 2.3e-4 / 5.1e-6 / 2.4e-5 / 7.8e-4 m and 2.8e-4 / 6.0e-6 / 2.0e-5 / 3.9e-4 m).
 
 ### 3.5 What actually differs: a small accuracy gap, and a real cost gap
 
-Unlike EKF vs. IEKF (§2.4, speed only, zero accuracy difference), UKF's disagreement with EKF/IEKF is a genuine (if tiny) accuracy difference in *both* directions - it's not that UKF is strictly more correct here, since both are approximations to the true nonlinear posterior for different reasons (EKF's is a linearization error; UKF's is the additive-noise simplification of §3.2's point 1, combined with a finite, unscented-only sample of the nonlinearity). What is unambiguous is the cost: `run_ukf` calls `motion_model` and `observation_model` $2n+1 = 13$ times per step (sigma points for $n=6$), redrawing a fresh set for the update, versus one Jacobian-inclusive call each for EKF/IEKF - measured at roughly 5-13x the per-step wall-clock time of EKF/IEKF on this benchmark, for an accuracy difference that (per §3.3) is small in absolute terms but not negligible relative to this benchmark's own final error (~47% of it) at this problem's scale of nonlinearity.
+Unlike EKF vs. IEKF (§2.4, speed only, zero accuracy difference), UKF's disagreement with EKF/IEKF is a genuine (if tiny) accuracy difference in *both* directions - it's not that UKF is strictly more correct here, since both are approximations to the true nonlinear posterior for different reasons (EKF's is a linearization error; UKF's is the additive-noise simplification of §3.2's point 1, combined with a finite, unscented-only sample of the nonlinearity). What is unambiguous is the cost: `run_ukf` calls `motion_model` and `observation_model` $2n+1 = 13$ times per step (sigma points for $n=6$), redrawing a fresh set for the update, versus one Jacobian-inclusive call each for EKF/IEKF - measured at roughly 5-13x the per-step wall-clock time of EKF/IEKF on this benchmark, for an accuracy difference that (per §3.3) matters mainly during the initial correction and is about 0.1% of the final error once converged, at this problem's scale of nonlinearity.
 
 ---
 
@@ -323,7 +328,7 @@ That gain isn't free. Three costs come bundled with it, none of them part of tex
 2. **Ambient (12-dim, redundant) vs. minimal (6-dim tangent) covariance.** $P$ is lifted from the initial $6\times6$ tangent covariance into the 12-dim ambient space via `se3_tangent_to_ambient_jacobian`, and the entire recursion - predict, update, gain - runs in that redundant linear space. This $P$ isn't directly comparable dimension-for-dimension to the other four methods' $6\times6$ tangent covariance (see [minimal vs. ambient parameterization](../glossary.md#1-geometry-and-lie-groups) in the glossary).
 3. **Post-hoc SVD re-projection.** Nothing in a linear KF constrains a 9-vector to stay an orthonormal rotation matrix. After every update, $\text{vec}(R)$ is explicitly re-projected onto $SO(3)$ via SVD ($`U\,\text{diag}\big(1, 1, \mathrm{sign}(\det(UV^\top))\big)\,V^\top`$) and fed back into the recursion. This is a correction bolted onto the recursion from the outside, not a property of the KF math itself - EKF/IEKF/UKF never need it because they never leave the manifold in the first place ($\exp$/$`\log`$ for EKF/IEKF, retraction for UKF's sigma points).
 
-Only mechanism 1 is a genuine small-angle approximation that should shrink as the per-step rotation shrinks; mechanisms 2 and 3 are structural and present regardless of step size. That's the mechanical reason this gap doesn't shrink toward zero over the $\Delta t$ range where mechanisms 2/3 already dominate (§4.4) - a different, stronger claim than UKF's gap not shrinking to zero (§3.4): UKF's non-shrinking behavior only shows up once a numerical floor is hit at very small $\Delta t$, while vanilla KF's gap fails to shrink across its *entire* tested range, including the large-$`\Delta t`$ region where UKF's gap tracks the predicted mechanism cleanly.
+Mechanism 1 is a small-angle approximation whose error per step grows with the per-step motion, so over a fixed duration it should shrink roughly in proportion to $\Delta t$. Mechanisms 2 and 3 don't depend on the step size, but they only bite hard when the linearization in the ambient space is poor, i.e. when the correction is large. The measurements (§4.4) bear this out: after the initial transient the gap shrinks roughly in proportion to $\Delta t$, so mechanism 1 dominates the steady state, while the first-second gap is large and irregular at every $\Delta t$, which is where mechanisms 2 and 3 show up.
 
 **None of these three mechanisms involve noise shape, a residual frame, or a Jacobian-linearization choice at all** - this divergence axis is completely orthogonal to §2's/§5's isotropy argument. It is already fully present under this benchmark's default isotropic point-noise model, and would not be created or fixed by switching to anisotropic noise.
 
@@ -332,38 +337,40 @@ Only mechanism 1 is a genuine small-angle approximation that should shrink as th
 Direct numerical diff of the full trajectory (`use_numpy`, duration 5.0, seed 0, 51 poses, default args), same protocol as §3.3:
 
 ```text
-EKF  vs IEKF: max pos diff = 1.494e-14 m, max rot diff = 2.091e-06 deg
-EKF  vs UKF : max pos diff = 1.445e-03 m, max rot diff = 6.298e-02 deg
-EKF  vs VKF : max pos diff = 1.349e-02 m, max rot diff = 1.441e-01 deg
+EKF vs UKF: max pos diff = 1.445e-03 m (at k = 1)   final pos diff = 3.8e-06 m   max rot diff = 6.3e-02 deg
+EKF vs VKF: max pos diff = 1.349e-02 m (at k = 1)   final pos diff = 1.4e-03 m   max rot diff = 1.4e-01 deg
 ```
 
-The EKF-vs-vanilla-KF position gap is about **9.3x larger** than the EKF-vs-UKF gap, and about **12 orders of magnitude** above the EKF/IEKF floating-point floor; the rotation gap is a more modest **2.3x larger** than UKF's - the two ratios aren't the same, and it's worth reporting both rather than rounding the smaller one up to match the bigger one.
+Vanilla KF's maximum is also at the first update, and about 9x UKF's. The bigger difference is at the end: after convergence UKF agrees with EKF to micrometers, while vanilla KF is still 1.4 mm away, about 45% of the final error.
 
-The script's own printed "Final / RMS errors" table shows exactly how easy this is to miss at a glance: at default args, EKF's final rot/pos reads `0.289 deg / 0.0031 m` against vanilla KF's `0.314 deg / 0.0026 m` - close enough at 3-4 decimal places to look like noise. The actual full-trajectory max diff (`0.144 deg / 0.0135 m`, above) tells a different story: EKF/IEKF/UKF are printed identically to this precision (§3.3), but vanilla KF visibly is not, even in the truncated table.
+The script's own printed "Final / RMS errors" table shows how easy this is to miss at a glance: at default args, EKF's final rot/pos reads `0.289 deg / 0.0031 m` against vanilla KF's `0.314 deg / 0.0026 m`, which looks like noise at 3-4 decimal places. Vanilla KF happens to land slightly closer to the truth in position at this particular final pose, but it follows a different trajectory, not the same one with rounding.
 
-### 4.4 How the gap moves as the step size changes (verified, not just predicted)
+### 4.4 How the gap moves as the step size changes
 
-Sweeping $\Delta t$ the same way as §3.4, plus a smaller-$`\Delta t`$ extension (0.005, 0.01) to check whether the gap shrinks toward zero the way UKF's does over its own cleanly-predicted large-$`\Delta t`$ range (§3.4):
+Same sweep and split as §3.4:
 
 ```text
-dt=0.005  n_steps=1000  max pos diff=3.375e-03 m  max rot diff=1.079e-01 deg
-dt=0.01   n_steps= 500  max pos diff=1.990e-02 m  max rot diff=2.823e-01 deg
-dt=0.02   n_steps= 250  max pos diff=7.821e-03 m  max rot diff=1.493e-01 deg
-dt=0.05   n_steps= 100  max pos diff=8.860e-03 m  max rot diff=1.975e-01 deg
-dt=0.10   n_steps=  50  max pos diff=1.349e-02 m  max rot diff=1.441e-01 deg
-dt=0.20   n_steps=  25  max pos diff=8.118e-03 m  max rot diff=6.166e-01 deg
-dt=0.40   n_steps=  12  max pos diff=9.058e-03 m  max rot diff=2.281e+00 deg
-dt=0.80   n_steps=   6  max pos diff=1.721e-02 m  max rot diff=1.019e+01 deg
+dt      first 1 s (m)   after 1 s (m)   after 1 s, rot (deg)
+0.001   1.1e-02         5.0e-05         3.7e-03
+0.002   2.1e-02         8.9e-05         1.4e-02
+0.005   3.4e-03         2.4e-04         1.0e-02
+0.01    2.0e-02         5.0e-04         2.1e-02
+0.02    7.8e-03         8.9e-04         5.7e-02
+0.05    8.9e-03         2.1e-03         1.4e-01
+0.10    1.3e-02         3.8e-03         1.4e-01
+0.20    8.1e-03         6.1e-03         6.2e-01
+0.40    4.6e-03         9.1e-03         2.3e+00
 ```
 
-Two honest findings, reported without smoothing over either:
+- **The steady-state position gap shrinks roughly in proportion to $\Delta t$**, from 9.1e-3 m at $\Delta t = 0.4$ to 5.0e-5 m at $\Delta t = 0.001$, monotonically. That's mechanism 1, the truncated motion step, whose accumulated error over a fixed duration scales with $\Delta t$. Seeds 1 and 2 agree (5.5e-5 / 8.9e-4 / 3.3e-3 / 1.4e-2 m and 5.2e-5 / 8.8e-4 / 3.6e-3 / 1.3e-2 m at $\Delta t = 0.001 / 0.02 / 0.1 / 0.4$).
+- **The steady-state rotation gap grows fast at large $\Delta t$** (0.14° → 0.62° → 2.3° from $\Delta t = 0.1$ to 0.4), consistent with the per-step truncation error growing with the per-step rotation.
+- **The first-second gap is large and irregular at every $\Delta t$** (3e-3 to 2e-2 m). That's the initial correction, and it's consistent with the ambient-space linearization and the SVD re-projection (mechanisms 2 and 3) doing the most damage when the correction is large (not isolated separately here). Reporting only the maximum over the whole run would mix this transient into the step-size trend and hide it.
 
-- **The gap does not shrink toward zero as $\Delta t$ shrinks, anywhere in this sweep** - a stronger and more consistent non-shrink than §3.4's UKF gap, which *does* track the predicted mechanism cleanly over most of its range ($\Delta t = 0.02$ to $0.80$) and only stops shrinking once a much smaller numerical floor (~6e-4-to-1e-3 m) is hit below $\Delta t \approx 0.02$. Vanilla KF's position gap instead stays in a ~3e-3-to-2e-2 m band - several times larger than UKF's floor - across the *entire* two-decade sweep, including at $\Delta t = 0.005$, exactly as predicted by §4.2: mechanisms 2 and 3 aren't step-size effects, so they set a floor mechanism 1 alone can't fall below, and that floor is high enough to dominate at every $\Delta t$ tested, not just the smallest ones.
-- **Rotation only becomes cleanly monotonic once per-step rotation dominates** ($\Delta t \ge 0.10$: $0.144° \to 0.617° \to 2.281° \to 10.19°$, roughly 4x per doubling of $\Delta t$) - a much cleaner confirmation of "error growing with the per-step rotation magnitude" (the transition matrix's own docstring claim) than §3.4's noisier UKF rotation series. Below $\Delta t = 0.10$, it is not monotonic ($\Delta t = 0.01$'s 0.282 deg is larger than $\Delta t = 0.02$'s, $\Delta t = 0.05$'s, or even $\Delta t = 0.10$'s own value) - the small-$`\Delta t`$ regime is dominated by mechanisms 2/3's structural noise floor rather than mechanism 1's shrinking truncation error, so there's no reason to expect monotonicity there. Position, by contrast, is not monotonic anywhere in this sweep. This is close to the reverse of §3.4's pattern (clean position trend, noisy rotation) - worth stating plainly rather than implying either series behaves like §3.4's.
+Unlike UKF, vanilla KF's steady-state gap is not limited by a numerical-safety constant; it keeps shrinking down to the smallest step tested.
 
 ### 4.5 What actually differs: a real but different cost trade-off
 
-Measured on one run of `use_numpy/pointcloud_pose_tracking.py` at default args. Time is per step. Memory is the **whole-run peak** (tracemalloc), which is what the script prints now. An earlier version of this table divided memory by the step count. Both figures depend on the machine:
+Measured on one run of `use_numpy/pointcloud_pose_tracking.py` at default args. Time is per step; memory is the whole-run peak (tracemalloc). Both depend on the machine:
 
 ```text
 EKF (recursive)    avg time=  338.08 µs/step | peak mem=  135.117 KB
@@ -372,9 +379,9 @@ UKF (unscented)    avg time= 2163.72 µs/step | peak mem=  174.981 KB
 Vanilla KF         avg time=  216.26 µs/step | peak mem=  145.960 KB
 ```
 
-Timing is noisy. Across four re-runs on the same machine, vanilla KF took 210-379 µs/step and IEKF took 196-245 µs/step, so their order flipped between runs. Only EKF > IEKF and UKF ≫ the rest held in every run. The paragraph below comes from the original, slower measurement (EKF 919, IEKF 551, UKF 6532, vanilla 636 µs/step). Read its ordering claim with that noise in mind.
+Timing is noisy. Across four re-runs on the same machine, vanilla KF took 210-379 µs/step and IEKF 196-245 µs/step, so their order flipped between runs. What held in every run: EKF is slower than IEKF, and UKF is several times slower than everything else.
 
-Vanilla KF lands *between* IEKF and EKF/UKF, not at IEKF's floor - a naive reading of "no Jacobian, ever" (§4.1) might expect it to match IEKF's speed, but it pays a different cost instead: building the $12\times12$ transition matrix $A$ and the $12\times6$ ambient-lift Jacobian $J$ (`se3_tangent_to_ambient_jacobian`) via basis-vector loops every step, plus the per-step SVD re-projection (§4.2, point 3) that IEKF never needs. So the accuracy cost (§4.3-4.4) and the speed benefit here are both real, but neither mirrors IEKF's clean "same accuracy, pure speed win" story from §2.4 - vanilla KF trades a *worse* estimate for a *partial*, not full, speed gain.
+So vanilla KF runs at about IEKF's speed, not faster, despite needing no Jacobian (§4.1). It pays a different cost instead: building the $12\times12$ transition matrix $A$ and the $12\times6$ ambient-lift Jacobian $J$ (`se3_tangent_to_ambient_jacobian`) with basis-vector loops every step, plus the per-step SVD re-projection (§4.2, point 3). IEKF gets its speed with the same accuracy as EKF (§2.4); vanilla KF gets about the same speed with a worse estimate.
 
 ---
 
@@ -393,11 +400,11 @@ The EKF/IEKF equivalence (§2) rests on **isotropic noise**, not on rigidity per
 
 **Rule of thumb (EKF vs. IEKF):** it's not **rigid** vs. **non-rigid** that decides this - it's **whether the uncertainty is isotropic or anisotropic-and-tied-to-the-object's-frame**. Non-rigid objects are simply a natural, common source of the latter. None of this affects UKF's already-approximate agreement with either filter one way or the other, since §3's gap comes from linearization/noise-injection mechanics, not from the isotropy argument in §2.
 
-**Rule of thumb (UKF vs. EKF/IEKF):** per §3.4, the gap widens with stronger per-step nonlinearity (bigger $\Delta t$, faster rotation, larger corrections) and narrows as the per-step motion shrinks, over the range where that mechanism actually dominates ($\Delta t = 0.02$ to $0.80$ here) - but it does **not** keep shrinking all the way to zero as $\Delta t \to 0$; below roughly $\Delta t = 0.02$ a much smaller numerical floor (~6e-4-to-1e-3 m) takes over and the gap stops shrinking, sometimes growing back a little. It does not have an isotropy precondition the way the EKF/IEKF equivalence does, and it never becomes bit-identical the way EKF/IEKF are (there's always a residual first-vs-second-order gap) - but "it just shrinks toward zero" overstates the small-$`\Delta t`$ regime specifically; it shrinks toward a small floor, not to zero.
+**Rule of thumb (UKF vs. EKF/IEKF):** the gap is largest when the correction is large (the initial convergence here), and in steady state it grows with the per-step motion (bigger $\Delta t$, faster rotation), per §3.4. It has no isotropy precondition and never becomes bit-identical the way EKF/IEKF are. At very small $\Delta t$ in this code, a fixed $10^{-9} I$ safety term in the sigma-point construction, not the filters themselves, sets the size of the gap.
 
 Vanilla KF's divergence (§4) doesn't belong on this isotropy spectrum at all - it isn't conditional on anisotropic noise the way the EKF/IEKF split is, and it isn't a linearization/sampling-mechanics gap the way the UKF split is. It comes from swapping out the state representation itself (ambient vs. minimal, §4.2 and the [glossary](../glossary.md#1-geometry-and-lie-groups)), and per §4's default-isotropic-noise measurements, it's already fully present without ever touching the noise model.
 
-**Rule of thumb (Vanilla KF vs. the other three):** unlike UKF's gap, which shrinks cleanly with $\Delta t$ over its own dominant range before hitting a small numerical floor, this one has no isotropy precondition and no shrink-toward-zero trend *anywhere* in the tested range (§4.4) - it's present unconditionally, at a level several times above UKF's floor, from a change of state representation rather than a choice of linearization, frame, or sampling scheme.
+**Rule of thumb (Vanilla KF vs. the other three):** no isotropy precondition. In steady state its gap shrinks roughly in proportion to $\Delta t$, because it comes mainly from the truncated motion step (§4.4); during large corrections the ambient representation and SVD re-projection add a larger, irregular error at any step size. At the default step it stays millimeters away from the other three after convergence, where UKF is within micrometers.
 
 ---
 
