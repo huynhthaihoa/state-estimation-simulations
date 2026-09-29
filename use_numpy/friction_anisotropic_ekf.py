@@ -43,23 +43,21 @@ the same noisy position measurement each tick -- they differ *only* in
   - heading_aware: anisotropic and re-oriented every predict step using the
     filter's own current heading estimate -- the correct policy.
 
-A Monte Carlo consistency check (`run_monte_carlo_consistency`, following the
-sibling scripts' NEES-based pattern) reports NEES as a function of how far
-the true heading has rotated away from the reference heading `fixed_
-anisotropic` is stuck with. `fixed_anisotropic` is dramatically worse than
-both `isotropic` and `heading_aware` throughout -- robust across seeds, at
-every checkpoint. Its *own* worst checkpoint is consistently a ~90-degree
-heading mismatch, not the largest possible (~180-degree) one: a covariance
-ellipse `R(theta) @ diag(a,b) @ R(theta).T` has period pi in theta (it's the
-same ellipse at a 180-degree difference as at 0), so the orientation mismatch
-peaks at 90 degrees, not 180. What happens *beyond* that peak, out toward a
-full 180-degree difference, was not robust across seeds when checked by hand
-(NEES partially recovers in some seeds, keeps climbing in others) -- most
-likely accumulated trajectory drift competing with the pure orientation-
-mismatch effect over a longer run, not a clean single-cause story, and this
-script deliberately doesn't oversell it as one. `isotropic` stays uniformly
-mediocre throughout (never claims a direction to be wrong about, but never
-gets the anisotropy's benefit either); `heading_aware` stays uniformly good.
+A Monte Carlo consistency check (`run_monte_carlo_consistency`, which redraws
+the slip, the initial error and the measurement noise every trial) reports
+NEES as a function of how far the true heading has rotated away from the
+reference heading `fixed_anisotropic` is stuck with. `fixed_anisotropic` is
+far worse than both `isotropic` and `heading_aware` at every checkpoint, in
+every seed tried. Its *own* worst checkpoint is the ~90-degree heading
+mismatch, not the largest possible (~180-degree) one: a covariance ellipse
+`R(theta) @ diag(a,b) @ R(theta).T` has period pi in theta (it's the same
+ellipse at a 180-degree difference as at 0), so the orientation mismatch
+peaks at 90 degrees. Beyond that peak its NEES only partly recovers: the
+position part returns to consistent once the ellipse realigns, but the
+mismatch has also pushed error into the heading, which is never measured
+directly and sheds that error slowly. `isotropic` stays mildly overconfident
+throughout (it never claims a direction to be wrong about, but never gets the
+anisotropy's benefit either); `heading_aware` stays consistent.
 '''
 
 import argparse
@@ -72,10 +70,23 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils import measure_performance
 
-# chi-squared, 3 degrees of freedom, 95th percentile (scipy.stats.chi2.ppf(0.95, 3));
-# hardcoded rather than importing scipy, since this script is otherwise pure numpy
-# and this is only needed as a reference line on the consistency plot.
-CHI2_3DOF_95 = 7.8147
+def averaged_nees_bounds(dof, n_trials, z=1.959964):
+    """Two-sided 95% acceptance interval for NEES averaged over n_trials
+    independent runs. n_trials * (average NEES) is chi-squared with
+    dof * n_trials degrees of freedom; its quantiles come from the
+    Wilson-Hilferty approximation (accurate to well under 1% at the
+    hundreds of degrees of freedom used here), avoiding a scipy dependency.
+    The single-run bound (7.81 for 3 DoF) does not apply to an average.
+    Arguments:
+        dof: state dimension
+        n_trials: number of Monte Carlo trials averaged
+        z: standard-normal quantile (1.96 for a two-sided 95% interval)
+    Returns:
+        (lower, upper): bounds on the averaged NEES
+    """
+    k = dof * n_trials
+    c = 2.0 / (9.0 * k)
+    return tuple(k * (1.0 - c + s * z * np.sqrt(c)) ** 3 / n_trials for s in (-1.0, 1.0))
 
 
 def rotation_2d(theta):
@@ -160,6 +171,25 @@ def generate_ground_truth_and_data(duration, dt, v_cmd, omega_cmd, sigma_grip, s
         z: (n_steps+1, 2) array of noisy position measurements
     """
     n_steps = int(duration / dt)
+    x_true = simulate_true_trajectory(n_steps, dt, v_cmd, omega_cmd, sigma_grip, sigma_slip, rng)
+    z = x_true[:, 0:2] + rng.normal(0.0, pos_noise_std, (n_steps + 1, 2))
+    return x_true, z
+
+
+def simulate_true_trajectory(n_steps, dt, v_cmd, omega_cmd, sigma_grip, sigma_slip, rng):
+    """One realization of the true trajectory: the exact commanded arc plus a
+    fresh body-frame slip draw each tick, rotated into the world frame by the
+    true heading (see generate_ground_truth_and_data). Heading is noise-free,
+    so every realization has the same heading history; only position differs.
+    Arguments:
+        n_steps: number of steps
+        dt: step interval (s)
+        v_cmd, omega_cmd: constant commanded forward speed (m/s) / turn rate (rad/s)
+        sigma_grip, sigma_slip: body-frame slip std-devs (m/s)
+        rng: numpy random number generator
+    Returns:
+        x_true: (n_steps+1, 3) array of true [p_x, p_y, theta] at each tick
+    """
     x_true = np.zeros((n_steps + 1, 3))
     x = np.zeros(3)
     x_true[0] = x
@@ -168,9 +198,7 @@ def generate_ground_truth_and_data(duration, dt, v_cmd, omega_cmd, sigma_grip, s
         slip_body = rng.normal(0.0, 1.0, 2) * np.array([sigma_grip, sigma_slip]) * dt
         x[0:2] += rotation_2d(x[2]) @ slip_body
         x_true[k + 1] = x
-
-    z = x_true[:, 0:2] + rng.normal(0.0, pos_noise_std, (n_steps + 1, 2))
-    return x_true, z
+    return x_true
 
 
 def isotropic_Q_pos(sigma_grip, sigma_slip, dt):
@@ -355,11 +383,16 @@ def run_monte_carlo_consistency(x_true, dt, v_cmd, omega_cmd, sigma_grip, sigma_
                                  R_pos, theta_ref, init_pos_noise_std, init_theta_noise_std,
                                  n_trials, rng):
     """Repeats the three run_ekf_* variants over n_trials independent noise
-    realizations of the same nominal true trajectory (fresh initial-condition
-    error and fresh measurement noise each trial), returning the per-step
-    average NEES for all three.
+    realizations, returning the per-step average NEES for all three. Each
+    trial draws a fresh slip realization (a new true trajectory), a fresh
+    initial-condition error and fresh measurement noise. Redrawing the slip
+    matters: it is the process noise whose model Q is under test, so reusing
+    one slip realization across trials would average over measurement noise
+    only and leave the result dependent on that single draw.
     Arguments:
-        x_true: (N, 3) array of true states at each tick
+        x_true: (N, 3) array of true states at each tick; only its initial
+            state and length are used (heading is noise-free, so every
+            trial's heading history is identical to x_true[:, 2])
         dt: step interval (s)
         v_cmd, omega_cmd: constant commanded forward speed/turn rate
         sigma_grip, sigma_slip: assumed body-frame slip std-devs (m/s)
@@ -384,8 +417,9 @@ def run_monte_carlo_consistency(x_true, dt, v_cmd, omega_cmd, sigma_grip, sigma_
     sum_fixed = np.zeros(n_pts)
     sum_aware = np.zeros(n_pts)
     for _ in range(n_trials):
-        x_init = x_true[0] + rng.normal(0.0, 1.0, 3) * init_std
-        z_trial = x_true[:, 0:2] + rng.normal(0.0, pos_noise_std, (n_pts, 2))
+        x_true_trial = simulate_true_trajectory(n_steps, dt, v_cmd, omega_cmd, sigma_grip, sigma_slip, rng)
+        x_init = x_true_trial[0] + rng.normal(0.0, 1.0, 3) * init_std
+        z_trial = x_true_trial[:, 0:2] + rng.normal(0.0, pos_noise_std, (n_pts, 2))
 
         x_iso, P_iso = run_ekf_isotropic(x_init, P_init, z_trial, dt, n_steps, v_cmd, omega_cmd,
                                           sigma_grip, sigma_slip, sigma_theta, R_pos)
@@ -397,9 +431,9 @@ def run_monte_carlo_consistency(x_true, dt, v_cmd, omega_cmd, sigma_grip, sigma_
                                                   R_pos)
 
         for k in range(n_pts):
-            sum_iso[k] += nees(x_true[k], x_iso[k], P_iso[k])
-            sum_fixed[k] += nees(x_true[k], x_fixed[k], P_fixed[k])
-            sum_aware[k] += nees(x_true[k], x_aware[k], P_aware[k])
+            sum_iso[k] += nees(x_true_trial[k], x_iso[k], P_iso[k])
+            sum_fixed[k] += nees(x_true_trial[k], x_fixed[k], P_fixed[k])
+            sum_aware[k] += nees(x_true_trial[k], x_aware[k], P_aware[k])
 
     return sum_iso / n_trials, sum_fixed / n_trials, sum_aware / n_trials
 
@@ -486,8 +520,10 @@ def main():
                    ("quarter-half turn", (rotation_away >= quarter) & (rotation_away < 2 * quarter)),
                    ("half-3quarter turn", (rotation_away >= 2 * quarter) & (rotation_away < 3 * quarter)),
                    ("3quarter-full turn", rotation_away >= 3 * quarter)]
+    nees_lo, nees_hi = averaged_nees_bounds(3, args.n_mc_trials)
     print("\nMonte Carlo NEES by rotation away from the reference heading "
-          "(consistent 3-DoF filter should average ~3.0 everywhere):")
+          f"(consistent 3-DoF filter should average ~3.0 everywhere; "
+          f"95% bounds for a {args.n_mc_trials}-trial average: [{nees_lo:.2f}, {nees_hi:.2f}]):")
     for label, mask in checkpoints:
         if not np.any(mask):
             continue
@@ -527,7 +563,10 @@ def main():
     ax_nees.plot(t_hist, nees_fixed, label="fixed_anisotropic", color="tab:red")
     ax_nees.plot(t_hist, nees_aware, label="heading_aware", color="tab:blue")
     ax_nees.axhline(3.0, color="black", linestyle="-", linewidth=1, label="Expected NEES (3 DoF)")
-    ax_nees.axhline(CHI2_3DOF_95, color="black", linestyle="--", linewidth=1, label="Chi-squared 95% bound")
+    nees_lo, nees_hi = averaged_nees_bounds(3, args.n_mc_trials)
+    ax_nees.axhline(nees_lo, color="black", linestyle="--", linewidth=1,
+                    label=f"95% bounds for a {args.n_mc_trials}-trial average")
+    ax_nees.axhline(nees_hi, color="black", linestyle="--", linewidth=1)
     ax_nees.set_ylabel(f"Monte Carlo avg. NEES ({args.n_mc_trials} trials)")
     ax_nees.set_xlabel("Time (s)")
     ax_nees.set_yscale("log")

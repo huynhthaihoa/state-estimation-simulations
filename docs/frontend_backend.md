@@ -46,7 +46,7 @@ Typical front-end tasks:
 - **Feature tracking / matching**
 - **Data association** - determining that a feature in frame $k$ is the same physical point seen in frame $k+1$
 - **Visual odometry**
-- **Depth estimation / triangulation** - see [frontend/triangulation_pnp.md](frontend/triangulation_pnp.md) for the actual math, plus its inverse problem, Perspective-n-Point (PnP)
+- **Depth estimation / triangulation** - see [frontend/triangulation_pnp.md](frontend/triangulation_pnp.md) for the actual math, plus its inverse problem, Perspective-n-Point (PnP), which estimates the pose from known points
 - **Keyframe selection**
 - **Loop-closure detection**
 
@@ -79,11 +79,11 @@ For example, the front-end might produce:
 
 $$T_{01}, T_{12}, T_{23}, T_{34}$$
 
-and observations such as:
+and landmark observations such as:
 
-$$x_1^0,\ x_2^1,\ x_3^2,\ldots$$
+$$z_{11},\ z_{12},\ z_{21},\ \ldots$$
 
-(following the same pairing as $T_{01}, T_{12}, T_{23}$ above, each $`x_n^{\,n-1}`$ reads as *the observation made at frame ${n}$, expressed relative to frame ${n-1}$* - the doc doesn't spell this out explicitly, but the indexing pattern matches.)
+where $z_{ij}$ is the observation (e.g., the pixel measurement) of landmark $j$ from pose $i$.
 
 The back-end asks:
 
@@ -111,7 +111,7 @@ Common back-end techniques include:
 
 ---
 
-## 3. The most intuitive example: loop closure
+## 3. Example: loop closure
 
 Imagine your robot walks around a building:
 
@@ -130,22 +130,21 @@ A → B → C → D → A
 
 But every motion estimate has a small error.
 
-So the estimated trajectory might become:
+So the estimated trajectory drifts, and the final pose does not land back on A:
 
 ```text
-       A ───── B
-        \       \
-         \       C
-          D ─────
+     A ───── B
+               \
+   A′            C
+     \          /
+      D ───────
 ```
 
-When the robot returns to A, the **front-end detects a loop closure**:
+Call the poses $x_0$ (A), $x_1$ (B), $x_2$ (C), $x_3$ (D) and $x_4$ (A′, the estimate of the final pose). The step D → A′ is just another odometry constraint. When the robot is back at A, the **front-end detects a loop closure**:
 
-> "Hey! This place looks like somewhere I've seen before."
+> "This place looks like somewhere I've seen before."
 
-It generates a constraint:
-
-$$T_{DA} \approx \text{known relationship}$$
+It generates a constraint between the *non-consecutive* poses $x_0$ and $x_4$: a measured relative pose $T_{04}$, which is close to the identity if the robot returned to exactly the same spot.
 
 The **back-end then optimizes the entire trajectory** so that all constraints are satisfied as well as possible.
 
@@ -172,7 +171,7 @@ That's why you can think of:
 
 ---
 
-## 5. One important distinction
+## 5. Front-end ≠ real-time, back-end ≠ offline
 
 The front-end **doesn't necessarily mean "real-time"**, and the back-end **doesn't necessarily mean "offline."**
 
@@ -192,7 +191,7 @@ Sensors ──→ Tracking ──→ Constraints
                   Updated SLAM state
 ```
 
-This distinction is particularly important because **front-end errors become constraints for the back-end**. If data association or motion estimation is wrong, even a very good optimizer can converge to the wrong solution.
+Separately, note that **front-end errors become constraints for the back-end**. If data association or motion estimation is wrong, a plain least-squares optimizer will fit the bad constraint and converge to the wrong solution. Back-ends therefore often use robust costs (Huber, Cauchy, DCS) that down-weight constraints that disagree strongly with the rest; see [optimization/pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
 
 A useful mental model is:
 
@@ -214,7 +213,7 @@ A useful mental model is:
 
 ### Image sources
 
-The 4 diagrams above were originally embedded as hotlinks to an OpenAI-hosted CDN (`images.openai.com`) and have since been downloaded into [`images/`](images/) for durability.
+The diagrams above were originally embedded as hotlinks to an OpenAI-hosted CDN (`images.openai.com`) and have since been downloaded into [`images/`](images/) for durability.
 
 1. `images/frontend_backend_1.jpg`
    - Original CDN URL: https://images.openai.com/static-rsc-4/ohut01r4hXxy0FBo1CUweMJvMR0DsWr7j5TugX3IqHY3ySm7JWT-MdDMc2CRdBXXvXt09Nx7tRO552QRLOCFQVlHDCt1ECQBAvWQ3EM4vtQVfcF4qvfLvULQutQRozc5gRTmOfctTMUsz0aIsbjamEKvI7-cPBEbDYm31qYmsS9bfmdHnOGJdUH9Z1ke9Gg4?purpose=fullsize
@@ -225,6 +224,6 @@ The 4 diagrams above were originally embedded as hotlinks to an OpenAI-hosted CD
 <!-- 3. `images/frontend_backend_3.jpg`
    - Original CDN URL: https://images.openai.com/static-rsc-4/wSKnA5y3wi9kOy12TexCHpO7AOzmAIMkZP2Lubf4gLoaeo0jwVd2DipIoWO0Wl3INhlXLgBCQdyTZDQDPTZ_RdR9zltV7hoG-H7wiRY1Ja5iCt4PRRL85wEpuQhuOsc_bFhxps25YgL-sEyUaeU8fOFDOwQkEP_pkcA_9pUoqBfG5E6skjfrZ_g_hbGjQ_X6?purpose=fullsize
    - Source: not yet identified - no candidate has been found or confirmed. Do not assume it shares a source with the other three. -->
-3. `images/frontend_backend_4.jpg`
+4. `images/frontend_backend_4.jpg`
    - Original CDN URL: https://images.openai.com/static-rsc-4/1oH3r36n4WxtILN9nlK9PXhy52VKoblXYiuWIZXpb-0MKArZ9UwGQ2MPtIRdMgIlUwEwt2pvxyX0Ri8_bukIvSur2fgcoVvciiGxRn3Dqtd1GXQ63CWXEJIAwd1Ua9qad043n0DNKLTnphMUzjYDmzneWRPZPEI_hn9jf-ij253TMJJs6oZh9k7FQ7KgA59-?purpose=fullsize
    - Confirmed source: Reference 7 above (Duan, Feng, & Wen, 2022, *Deep Pose Graph-Matching-Based Loop Closure Detection for Semantic Visual SLAM*), Figure 1.

@@ -12,10 +12,11 @@ This builds directly on:
 
 ## 1. The bootstrapping problem
 
-Every other doc in this repo assumes a decent initial guess already exists: `pose_graph.py`'s optimizer starts from [dead-reckoning](../optimization/factor_graph.md#2-why-do-we-need-it), `bundle_adjustment_advanced.py`'s GN starts from a triangulated point, `pnp_estimation.py`'s GN starts from a linear DLT solve ([triangulation_pnp.md](triangulation_pnp.md)). Visual-inertial initialization is the one place in this doc set where *no* such starting point exists yet, and three specific unknowns have to be pinned down before anything else can proceed:
+Every other doc in this repo assumes a decent initial guess already exists: `pose_graph.py`'s optimizer starts from [dead-reckoning](../optimization/factor_graph.md#2-why-do-we-need-it), `bundle_adjustment_advanced.py`'s GN starts from a triangulated point, `pnp_estimation.py`'s GN starts from a linear DLT solve ([triangulation_pnp.md](triangulation_pnp.md)). Visual-inertial initialization is the one place in this doc set where *no* such starting point exists yet, and four specific unknowns have to be pinned down before anything else can proceed:
 
 - **Scale**: a single monocular camera can recover structure and motion only up to an unknown positive scale factor - "this camera moved some distance $d$" could mean 1 meter or 100, and vision alone can never tell you which.
 - **Gravity direction**: preintegration's $\Delta v$ accumulates the effect of true acceleration *and* gravity together; separating them requires knowing which way gravity points in whatever frame the estimator is working in.
+- **Velocity**: the IMU measures acceleration, not velocity, so integrating it gives velocity only up to an unknown starting value. Each keyframe's velocity has to be recovered too.
 - **Bias** ($b_g$, $b_a$): `imu_preintegration.md §1`'s "Problem B" - every raw sample was integrated using *some* bias estimate, and an uninitialized (zero) bias guess can be badly wrong, especially for the gyroscope.
 
 Get any of these wrong at the start, and the optimizer's very first linearization is already off - undermining exactly the guarantees the rest of this doc set relies on.
@@ -46,6 +47,14 @@ Hand off to IMU preintegration + factor-graph optimization
 
 **Accelerometer bias** is deliberately left near zero at this stage: over a short initialization window its effect on $\Delta v/\Delta p$ is small relative to gravity and noise, so trying to estimate it here is poorly conditioned - it's refined later, once the full optimizer is running with much more data to constrain it.
 
+**What the alignment needs from the data.** The linear solve only works if the motion actually reveals the unknowns, so real systems check before trusting it:
+
+- **Enough acceleration.** At constant velocity the accelerometer senses only gravity, and a scaled-up trajectory moving at a scaled-up constant speed fits the IMU data equally well, so scale is unobservable. The window needs real, varied acceleration.
+- **Enough translation.** Under pure rotation the vision-only SfM has no parallax to recover structure and translation from, so there is nothing for the IMU to align against.
+- **Known camera-IMU extrinsics.** The alignment needs the rotation and offset between camera and IMU; VINS-Mono can estimate the extrinsic rotation online if it isn't calibrated.
+
+VINS-Mono, for example, checks for sufficient parallax and IMU excitation and simply retries initialization with a later window if the current one isn't informative enough.
+
 ---
 
 ## 3. Why this has to be linear at all
@@ -56,7 +65,7 @@ Every other estimator in this doc set (§1's list) linearizes *around* an existi
 
 ## 4. The hand-off
 
-Once §2 produces an initial scale, gravity direction, and per-keyframe velocity/bias estimate, the problem looks exactly like every other doc in this repo assumes: a reasonable starting point exists, `imu_preintegration.md`'s $(\Delta R, \Delta v, \Delta p)$ bundles (now correctly scaled and bias-corrected) become real edges, and [factor_graph.md](../optimization/factor_graph.md)-style nonlinear optimization takes over from there. This doc's job stops exactly at that hand-off.
+Once §2 produces an initial scale, gravity direction, per-keyframe velocities, and gyroscope bias (the accelerometer bias still at its near-zero starting value), the problem looks exactly like every other doc in this repo assumes: a reasonable starting point exists, `imu_preintegration.md`'s $(\Delta R, \Delta v, \Delta p)$ bundles (now correctly scaled and bias-corrected) become real edges, and [factor_graph.md](../optimization/factor_graph.md)-style nonlinear optimization takes over from there. This doc's job stops exactly at that hand-off.
 
 ---
 
@@ -68,7 +77,7 @@ Conceptual only - there is no accompanying script for this doc. Unlike `triangul
 
 ## 6. One-sentence summary
 
-> **Visual-inertial initialization solves, once and in closed form, the one problem every other doc in this repo assumes is already solved - a trustworthy starting guess - by linearly aligning a short vision-only window against preintegrated IMU bundles to recover scale, gravity direction, and initial velocity/bias, before handing off to the ordinary preintegration + factor-graph machinery for good.**
+> **Visual-inertial initialization solves the one problem every other doc in this repo assumes is already solved - a trustworthy starting guess - by aligning a short, sufficiently exciting vision-only window against preintegrated IMU bundles (mostly with closed-form linear solves, plus a short gravity refinement) to recover scale, gravity direction, velocities, and gyroscope bias, before handing off to the ordinary preintegration + factor-graph machinery for good.**
 
 ---
 

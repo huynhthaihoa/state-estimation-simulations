@@ -99,10 +99,24 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils import measure_performance
 
-# chi-squared, 6 degrees of freedom, 95th percentile (scipy.stats.chi2.ppf(0.95, 6));
-# hardcoded rather than importing scipy, since this script is otherwise pure numpy
-# and this is only needed as a reference line on the consistency plot.
-CHI2_6DOF_95 = 12.5916
+def averaged_nees_bounds(dof, n_trials, z=1.959964):
+    """Two-sided 95% acceptance interval for NEES averaged over n_trials
+    independent runs. n_trials * (average NEES) is chi-squared with
+    dof * n_trials degrees of freedom; its quantiles come from the
+    Wilson-Hilferty approximation (accurate to well under 1% at the
+    hundreds of degrees of freedom used here), avoiding a scipy dependency.
+    The single-run bound (chi-squared with dof degrees of freedom) does not
+    apply to an average.
+    Arguments:
+        dof: state dimension
+        n_trials: number of Monte Carlo trials averaged
+        z: standard-normal quantile (1.96 for a two-sided 95% interval)
+    Returns:
+        (lower, upper): bounds on the averaged NEES
+    """
+    k = dof * n_trials
+    c = 2.0 / (9.0 * k)
+    return tuple(k * (1.0 - c + s * z * np.sqrt(c)) ** 3 / n_trials for s in (-1.0, 1.0))
 
 
 def flow(x, dt, g):
@@ -805,7 +819,9 @@ def main():
         print(f"  {name:<18s} final pos={pos_err[-1]:7.4f} m, vel={vel_err[-1]:7.4f} m/s | "
               f"RMS pos={np.sqrt(np.mean(pos_err**2)):7.4f} m, vel={np.sqrt(np.mean(vel_err**2)):7.4f} m/s")
 
-    print("\nMonte Carlo NEES (consistent 6-DoF filter should average ~6.0 everywhere):")
+    nees_lo, nees_hi = averaged_nees_bounds(6, args.n_mc_trials)
+    print("\nMonte Carlo NEES (consistent 6-DoF filter should average ~6.0 everywhere; "
+          f"95% bounds for a {args.n_mc_trials}-trial average: [{nees_lo:.2f}, {nees_hi:.2f}]):")
     print(f"  EKF (naive)      mean NEES={np.mean(nees_naive):8.2f} | max NEES={np.max(nees_naive):8.2f}")
     print(f"  EKF (saltation)  mean NEES={np.mean(nees_salt):8.2f} | max NEES={np.max(nees_salt):8.2f}")
 
@@ -857,7 +873,10 @@ def main():
     ax_nees.plot(t_hist, nees_naive, label="EKF (naive)", color="tab:red")
     ax_nees.plot(t_hist, nees_salt, label="EKF (saltation)", color="tab:blue")
     ax_nees.axhline(6.0, color="black", linestyle="-", linewidth=1, label="Expected NEES (6 DoF)")
-    ax_nees.axhline(CHI2_6DOF_95, color="black", linestyle="--", linewidth=1, label="Chi-squared 95% bound")
+    nees_lo, nees_hi = averaged_nees_bounds(6, args.n_mc_trials)
+    ax_nees.axhline(nees_lo, color="black", linestyle="--", linewidth=1,
+                    label=f"95% bounds for a {args.n_mc_trials}-trial average")
+    ax_nees.axhline(nees_hi, color="black", linestyle="--", linewidth=1)
     ax_nees.set_ylabel(f"Monte Carlo avg. NEES ({args.n_mc_trials} trials)")
     ax_nees.set_xlabel("Time (s)")
     ax_nees.set_yscale("log")

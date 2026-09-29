@@ -4,7 +4,7 @@
 
 > Given two point sets that are supposed to describe the same shape but live in different, unaligned coordinate frames, what's the best rigid-plus-scale transform that overlays one onto the other?
 
-It's not a SLAM algorithm by itself - it's the evaluation tool you reach for *after* running one, whenever the algorithm's own output is only defined up to an ambiguity that has to be removed before comparing against ground truth.
+It's not a SLAM algorithm by itself. This doc focuses on its most common use, as the evaluation tool you reach for *after* running one, whenever the algorithm's own output is only defined up to an ambiguity that has to be removed before comparing against ground truth. The same closed-form fit also runs *inside* SLAM pipelines: it's the per-iteration alignment step of point-to-point ICP (with the scale fixed to 1), and monocular systems use the similarity version to align two maps at a loop closure.
 
 ---
 
@@ -18,6 +18,18 @@ A monocular camera looking at a static scene can recover the *shape* of the scen
 Together, that's a **7-parameter similarity ambiguity**: 3 translation + 3 rotation + 1 scale. This is the same **gauge freedom** idea as in [pose_graph_optimization.md](../optimization/pose_graph_optimization.md)'s "one subtlety this formula hides" note - a direction the optimizer's cost function is completely blind to - except pose graphs only have the 6-DoF rigid version (their edges are *relative rigid* constraints, so scale is never in question), while monocular bundle adjustment's edges are *projective*, so scale is unobservable too.
 
 You can't compute a meaningful "position error in meters" against ground truth while this ambiguity is still there - the reconstruction and the ground truth are simply expressed in two different (and differently scaled) coordinate systems. Umeyama alignment is how you solve for the one similarity transform that brings them into the same frame before measuring error.
+
+### 1.1 Align only what's actually unobservable
+
+The 7-DoF similarity transform is right for monocular output, but not for every system. The rule: align away exactly the degrees of freedom the sensors can't observe, and no more. Aligning extra degrees of freedom hides real estimation error in the fitted transform.
+
+| Sensor setup | Unobservable | Alignment |
+| --- | --- | --- |
+| Monocular camera | position, orientation, scale | 7-DoF similarity (this doc's full Umeyama) |
+| Stereo, RGB-D, LiDAR | position, orientation | 6-DoF rigid: the same algorithm with $s$ fixed to 1 (the classic Kabsch/Horn fit) |
+| Visual-inertial (camera + IMU) | position, yaw | 4-DoF: translation plus rotation about gravity only, because gravity makes roll and pitch observable |
+
+Zhang & Scaramuzza (2018) give the full treatment, including the 4-DoF variant.
 
 ---
 
@@ -77,7 +89,7 @@ Without step 3's correction, the fit can silently return a **mirror image** inst
 - **Uncorrected** ($R = UV^\top$): fits **perfectly** (residual $\approx 0$), but $\det(R) \approx -1$ - not a valid rotation, and physically meaningless as a camera/robot pose.
 - **Corrected** ($R = USV^\top$): $\det(R) = +1$, a valid rotation, but can now only *approximate* the mirrored points - in this example the best achievable fit has a max per-point residual of about $0.77$ (at the origin point; the other three are off by about $0.31$), and scale drops from the uncorrected $1.0$ to $s = 7/9 \approx 0.78$ to partially compensate.
 
-So the guard is a deliberate trade: it always returns a physically valid rotation, at the cost of no longer being able to claim a perfect fit on point sets that are actually mirror-related. For the well-conditioned, non-degenerate point sets this repo's scripts generate (cameras spread around a 3D landmark cluster), the reflection case essentially never triggers in practice - it matters most for near-coplanar or otherwise degenerate configurations.
+So the guard is a deliberate trade: it always returns a physically valid rotation, at the cost of no longer being able to claim a perfect fit on point sets that are actually mirror-related. For the well-conditioned, non-degenerate point sets this repo's scripts generate (cameras spread around a 3D landmark cluster), the reflection case is not expected to trigger (this hasn't been measured separately) - it matters most for near-coplanar, very noisy, or otherwise degenerate configurations.
 
 ---
 
@@ -109,16 +121,17 @@ Running `umeyama_alignment(X, Y)` recovers $\hat{s} = 2.0$, $\hat{R} = R_{\text{
 ## 6. Where this is (and isn't) used in this repo
 
 - **[`bundle_adjustment.py`](../../use_numpy/bundle_adjustment.py)** (both `use_numpy/` and `use_manif/`) calls `umeyama_alignment` on the *camera positions* after solving, then applies the recovered $(s, R, t)$ to **both** the camera poses and the landmark positions before computing `pose_errors`/`landmark_errors` against ground truth. This is standard practice for evaluating monocular BA/SfM (Structure from Motion) output - see [bundle_adjustment.md](../optimization/bundle_adjustment.md) for how the alignment step fits into the rest of that script. Note that reprojection error itself is computed *before* alignment and is unaffected by it - only the absolute pose/landmark error numbers depend on this step.
-- **[`bundle_adjustment_advanced.py`](../../use_numpy/bundle_adjustment_advanced.py)** deliberately does **not** call it. That script hard-fixes **two** keyframes (poses 0 and 1) as a gauge anchor instead of using a soft gauge-prior factor. Fixing a single keyframe removes only the 6 rigid DoF (translation + rotation) - scale stays completely unobservable from that alone, since the same reconstruction rescaled about the one fixed pose satisfies every constraint equally well. It takes a *second* fixed keyframe to pin scale too, because it also fixes the *distance* between the two anchors, and with both rigid and scale freedom gone there's no residual transform left in the solution to align away - so the alignment step this doc describes simply doesn't apply there.
+- **[`bundle_adjustment_advanced.py`](../../use_numpy/bundle_adjustment_advanced.py)** deliberately does **not** call it. That script hard-fixes **two** keyframes (poses 0 and 1) as a gauge anchor instead of using a soft gauge-prior factor. Fixing a single keyframe removes only the 6 rigid DoF (translation + rotation) - scale stays completely unobservable from that alone, since the same reconstruction rescaled about the one fixed pose satisfies every constraint equally well. A *second* fixed keyframe pins scale too, because it also fixes the *distance* between the two anchors, so the optimizer has no gauge freedom left. That doesn't mean there's nothing to align, though: keyframe 0 is fixed at its true pose, but keyframe 1 keeps its noisy front-end pose, so the scale and orientation it pins are slightly wrong. The script reports raw, unaligned error, which therefore includes that small similarity-transform offset; Umeyama alignment would remove it ([bundle_adjustment.md §14](../optimization/bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment)).
 
 ---
 
 ## 7. One-sentence intuition
 
-> **Umeyama alignment is least-squares curve-fitting applied to whole point clouds instead of scalar points - it finds the one scale+rotation+translation that best overlays an estimate onto ground truth, which is exactly the piece missing before "position error in meters" against monocular reconstruction output means anything.**
+> **Umeyama alignment is a closed-form least-squares fit between two point clouds: it finds the one scale+rotation+translation that best overlays an estimate onto ground truth, which is exactly the piece missing before "position error in meters" against monocular reconstruction output means anything.**
 
 ---
 
 ## 8. References
 
 1. Umeyama, S. (1991). *Least-Squares Estimation of Transformation Parameters Between Two Point Patterns*. IEEE Transactions on Pattern Analysis and Machine Intelligence, 13(4), 376-380. https://doi.org/10.1109/34.88573 - the original closed-form SVD-based derivation behind §3, and the namesake of `umeyama_alignment` in `utils.py`.
+2. Zhang, Z., & Scaramuzza, D. (2018). *A Tutorial on Quantitative Trajectory Evaluation for Visual(-Inertial) Odometry*. 2018 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 7244-7251. https://doi.org/10.1109/IROS.2018.8593941 - which alignment to use for which sensor setup (§1.1), including the 4-DoF visual-inertial case.

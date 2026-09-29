@@ -44,16 +44,20 @@ dramatically worse than `phase_conditional`'s in *both* windows (~20-50x, not
 just during cruise) -- misapplying ZUPT throughout every cruise phase leaves
 it so overconfident that ~20 ticks of genuinely correct ZUPT evidence at the
 start of the next anchor phase isn't enough to recover before that phase
-ends. A second, more subtle finding echoes saltation_matrix_ekf.py's own:
-`never`, despite discarding real information, ends up at least as well
-*calibrated* (NEES) as `phase_conditional`, even though `phase_conditional`
-has the best raw *accuracy* (lowest velocity RMS) of the three -- correctly
-staking confidence on a strong pseudo-measurement is still measurably more
-fragile than never staking it at all, the same theme as the saltation-
-corrected filter in the sibling script running slightly *worse*-calibrated
-than the naive one once its own timing assumption stops being exact (see
-hybrid_saltation_ekf.md §6/§8). Verified stable across seeds 0-3 before
-being written up here or in the doc.
+ends, and its NEES at the start of each anchor phase grows cycle after cycle.
+
+No variant is consistent at the defaults (NEES ~6-16 against 2), and the
+reason is the ramps, not ZUPT: the true ramp acceleration (0.5 m/s^2) is
+~3.3x the filters' assumed acceleration noise (0.15), and with no motion at
+all every variant's NEES drops below 2. That mismatch also produces this
+script's subtler result: at the defaults `never` is better calibrated in the
+cruise window and more accurate in position than `phase_conditional`,
+because ZUPT leaves `phase_conditional` very confident in its velocity just
+as the unmodeled ramp-up acceleration arrives. It is a property of the
+under-sized process model, not of ZUPT: with --process-noise-std 0.5 (enough
+to cover the ramps) `never` and `phase_conditional` are both consistent and
+`phase_conditional` wins on position too. See
+docs/filtering/inchworm_zupt_ekf.md §3. Verified stable across seeds 0-3.
 '''
 
 import argparse
@@ -66,10 +70,24 @@ import matplotlib.pyplot as plt
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils import measure_performance
 
-# chi-squared, 2 degrees of freedom, 95th percentile (scipy.stats.chi2.ppf(0.95, 2));
-# hardcoded rather than importing scipy, since this script is otherwise pure numpy
-# and this is only needed as a reference line on the consistency plot.
-CHI2_2DOF_95 = 5.9915
+def averaged_nees_bounds(dof, n_trials, z=1.959964):
+    """Two-sided 95% acceptance interval for NEES averaged over n_trials
+    independent runs. n_trials * (average NEES) is chi-squared with
+    dof * n_trials degrees of freedom; its quantiles come from the
+    Wilson-Hilferty approximation (accurate to well under 1% at the
+    hundreds of degrees of freedom used here), avoiding a scipy dependency.
+    The single-run bound (chi-squared with dof degrees of freedom) does not
+    apply to an average.
+    Arguments:
+        dof: state dimension
+        n_trials: number of Monte Carlo trials averaged
+        z: standard-normal quantile (1.96 for a two-sided 95% interval)
+    Returns:
+        (lower, upper): bounds on the averaged NEES
+    """
+    k = dof * n_trials
+    c = 2.0 / (9.0 * k)
+    return tuple(k * (1.0 - c + s * z * np.sqrt(c)) ** 3 / n_trials for s in (-1.0, 1.0))
 
 
 def is_anchor_phase(t, t_anchor, t_extend):
@@ -487,7 +505,9 @@ def main():
         print(f"  {name:<18s} RMS pos={np.sqrt(np.mean(pos_err**2)):7.4f} m, "
               f"vel={np.sqrt(np.mean(vel_err**2)):7.4f} m/s")
 
-    print("\nMonte Carlo NEES (consistent 2-DoF filter should average ~2.0 everywhere):")
+    nees_lo, nees_hi = averaged_nees_bounds(2, args.n_mc_trials)
+    print("\nMonte Carlo NEES (consistent 2-DoF filter should average ~2.0 everywhere; "
+          f"95% bounds for a {args.n_mc_trials}-trial average: [{nees_lo:.2f}, {nees_hi:.2f}]):")
     print("  (anchor-only/cruise-only exclude ramp ticks -- the shared, all-3-variants transition")
     print("  spike that isn't the point here; see true_velocity's docstring)")
     for name, nees_arr in [("never", nees_never), ("always", nees_always), ("phase_conditional", nees_phase)]:
@@ -525,7 +545,10 @@ def main():
     ax_nees.plot(t_hist, nees_always, label="always", color="tab:red")
     ax_nees.plot(t_hist, nees_phase, label="phase_conditional", color="tab:blue")
     ax_nees.axhline(2.0, color="black", linestyle="-", linewidth=1, label="Expected NEES (2 DoF)")
-    ax_nees.axhline(CHI2_2DOF_95, color="black", linestyle="--", linewidth=1, label="Chi-squared 95% bound")
+    nees_lo, nees_hi = averaged_nees_bounds(2, args.n_mc_trials)
+    ax_nees.axhline(nees_lo, color="black", linestyle="--", linewidth=1,
+                    label=f"95% bounds for a {args.n_mc_trials}-trial average")
+    ax_nees.axhline(nees_hi, color="black", linestyle="--", linewidth=1)
     ax_nees.set_ylabel(f"Monte Carlo avg. NEES ({args.n_mc_trials} trials)")
     ax_nees.set_xlabel("Time (s)")
     ax_nees.set_yscale("log")

@@ -4,8 +4,6 @@ The **Jacobian** is one of those things that looks intimidating mathematically b
 
 > **A Jacobian tells you how a small change in the input will cause a small change in the output.**
 
-That's basically it.
-
 ---
 
 ## 1. Start with a simple function
@@ -85,8 +83,6 @@ That's the **Jacobian**. Notice the convention: each **row** is one output ($y_i
 
 ## 3. Think of it as a "sensitivity map"
 
-This is probably the most useful intuition.
-
 Suppose your robot's state is:
 
 ```math
@@ -165,7 +161,7 @@ Putting every partial derivative together gives the full Jacobian:
 0 & f/Z & -fY/Z^2 \end{bmatrix}}
 ```
 
-Notice the zeros: $\partial u/\partial Y = 0$ and $\partial v/\partial X = 0$, because horizontal image position ($u$) doesn't depend on vertical 3D position ($Y$) at all, and vice versa for $v$ and $X$. This is the actual Jacobian a visual-SLAM or bundle-adjustment system would compute at every reprojected point.
+Notice the zeros: $\partial u/\partial Y = 0$ and $\partial v/\partial X = 0$, because horizontal image position ($u$) doesn't depend on vertical 3D position ($Y$) at all, and vice versa for $v$ and $X$. This is the projection Jacobian a visual-SLAM or bundle-adjustment system computes at every reprojected point, with $(X, Y, Z)$ the point in *camera* coordinates; it is then chained with the Jacobians of the world-to-camera transform to get derivatives with respect to the pose and the world-frame point.
 
 ---
 
@@ -177,9 +173,9 @@ Suppose the real system is nonlinear:
 
 $$z = h(x)$$
 
-The EKF doesn't want to deal with the full nonlinear function every time.
+The EKF still evaluates the exact $h$ at its estimate, to predict the measurement. What it can't do is push a whole probability distribution through $h$ exactly: the Kalman gain and covariance update need a linear model.
 
-So it says:
+So for those it says:
 
 > "Around my current estimate $\hat{x}$, can I approximate this nonlinear function with a linear one?"
 
@@ -196,8 +192,6 @@ So the Jacobian is essentially the **local slope of a multidimensional nonlinear
 ---
 
 ## 6. Think about a mountain
-
-This analogy is extremely useful.
 
 Imagine you're standing somewhere on a mountain.
 
@@ -241,7 +235,7 @@ That's essentially what EKF does.
 
 ## 7. Jacobian $\approx$ "local translator"
 
-Here's another mental model I really like for robotics - the same idea as the mountain in Section 6, just written as an equation instead of a picture.
+The same idea as the mountain in Section 6, written as an equation instead of a picture.
 
 Suppose you have:
 
@@ -289,8 +283,6 @@ That's why Jacobians are everywhere in:
 ---
 
 ## 8. One subtle point: Jacobian is LOCAL
-
-This is extremely important.
 
 Suppose:
 
@@ -368,11 +360,13 @@ you carefully ask:
 
 That's one reason Lie groups and Jacobians become so tightly connected in modern SLAM.
 
+A manifold perturbation on its own isn't yet what makes a filter *invariant*: error-state filters such as the ESKF and MEKF already perturb on the manifold. The IEKF goes one step further and picks the specific error that ignores a change of world or body frame (left- or right-invariant), which is what makes its linearization independent of the current estimate. See [kf_ekf_iekf.md §5](../filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error) and [left_right_invariant.md](../filtering/left_right_invariant.md).
+
 ---
 
 ## 10. The one-sentence intuition
 
-If you remember only one thing:
+In one sentence:
 
 > **The Jacobian is a multidimensional "local sensitivity map": it tells you how small changes in one thing approximately translate into small changes in another thing.**
 
@@ -384,7 +378,7 @@ And in EKF specifically:
 
 ## 11. Left and right Jacobians: sensitivity on a curved space
 
-Section 9 mentioned that IEKF perturbs the state "according to the geometry and invariance of the system" instead of just subtracting vectors. This section makes that concrete for rotations, and explains where the **left Jacobian** $J_l$ and **right Jacobian** $J_r$ come from.
+Section 9 mentioned that manifold-aware filters (error-state filters and the IEKF) perturb the state by composition instead of just subtracting vectors. This section makes that concrete for rotations, and explains where the **left Jacobian** $J_l$ and **right Jacobian** $J_r$ come from.
 
 ### 11.1 Why plain addition breaks
 
@@ -452,8 +446,8 @@ Notice $J_r = J_l^\top$, exactly as the identity predicts. If you instead plug i
 ### 11.6 Where this actually matters
 
 - **IMU preintegration**: the effect of a small change in gyroscope bias is naturally expressed in the sensor's own (body) frame, so bias-correction Jacobians in preintegration use $J_r$ - worked out end-to-end in [imu_preintegration.md](../optimization/imu_preintegration.md).
-- **Covariance/uncertainty propagation on the manifold**: a rotation's uncertainty is stored as a covariance on the tangent vector $\delta\varphi$, but whether that $\delta\varphi$ is defined via $`R\,\text{Exp}(\delta\varphi)`$ (right) or $`\text{Exp}(\delta\varphi)\, R`$ (left) changes what the covariance numerically means. Converting between the two conventions is exactly a multiplication by $R$ itself (the adjoint) - as the §11.4 identity shows, $`J_l = R\, J_r`$ - a change of frame, not a change of the underlying uncertainty.
-- **Factor graphs/bundle adjustment on $SE(3)$**: residual Jacobians w.r.t. a pose depend on which perturbation convention (left vs. right) the library uses; using the wrong one silently biases the optimization even though the code runs without error.
+- **Covariance/uncertainty propagation on the manifold**: a rotation's uncertainty is stored as a covariance on the tangent vector $\delta\varphi$, but whether that $\delta\varphi$ is defined via $`R\,\text{Exp}(\delta\varphi)`$ (right) or $`\text{Exp}(\delta\varphi)\, R`$ (left) changes what the covariance numerically means. Converting between the two conventions is a multiplication by $R$ (for rotations, the adjoint is $R$ itself): $`\text{Exp}(\delta\varphi_{\text{left}})\,R = R\,\text{Exp}(\delta\varphi_{\text{right}})`$ gives $`\delta\varphi_{\text{left}} = R\,\delta\varphi_{\text{right}}`$, so $`\Sigma_{\text{left}} = R\,\Sigma_{\text{right}}R^\top`$ - a change of frame, not a change of the underlying uncertainty. The §11.4 identity $`J_l = R\,J_r`$ follows from the same fact.
+- **Factor graphs/bundle adjustment on $SE(3)$**: residual Jacobians w.r.t. a pose depend on which perturbation convention (left vs. right) the library uses, and the update must apply the step with the same convention. Mixing them computes wrong step directions: the optimization converges slowly, converges to the wrong place, or diverges, all while the code runs without error.
 
 ### 11.7 One-sentence intuition
 

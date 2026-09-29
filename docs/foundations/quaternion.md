@@ -18,11 +18,12 @@ The obvious approach is Euler angles:
 
 > "Rotate 30° around X, then 20° around Y, then 10° around Z."
 
-But there is a problem: **the rotations interact with each other**.
+But three angles cause two separate problems:
 
-For example, rotating around X and then Y is not generally the same as rotating around Y and then X.
+- **Gimbal lock.** At certain orientations (for the common yaw-pitch-roll order, pitch $= \pm 90°$) two of the three rotation axes line up, and one degree of freedom disappears: different angle combinations give the same orientation, and small orientation changes can need large angle jumps. It's a singularity of the three-angle description, not of rotation itself.
+- **Order conventions.** Rotating around X and then Y is not the same as around Y and then X, so every set of Euler angles only means something together with its convention (XYZ, ZYX, ...). Interpolating the three angles separately also gives awkward paths.
 
-This creates problems such as **gimbal lock** and awkward interpolation.
+Quaternions avoid gimbal lock, because a unit quaternion has no singular orientation. They don't make rotation order-independent (nothing can: composing rotations is inherently order-dependent, Section 13), but they make composition a single, convention-free multiplication.
 
 A quaternion gives us another representation.
 
@@ -91,6 +92,8 @@ You can think of it as:
 
 The four numbers are just a convenient mathematical encoding of that idea.
 
+> **Watch the component order.** This doc writes quaternions scalar-first, $(w, x, y, z)$. Many libraries store them scalar-last, $[x, y, z, w]$: scipy's `Rotation.as_quat()`, ROS messages, and this repo's own `utils.py`. Reading one ordering as the other silently gives a different rotation. There are also two multiplication conventions in the literature: **Hamilton** (used here, and by most robotics libraries) and **JPL** (common in older aerospace and MSCKF-era VIO papers), which compose in opposite orders; Solà (2017) compares them. Always check both before mixing code or equations from different sources.
+
 ---
 
 ## 3. Why four numbers?
@@ -119,7 +122,7 @@ That's why a quaternion can represent a 3D orientation even though it has four c
 
 ## 4. The most important intuition: don't think of it as a mysterious 4D object
 
-When you're learning robotics, I'd recommend **not initially thinking of a quaternion as "a point in 4D space."**
+When learning robotics, it helps **not to think of a quaternion as "a point in 4D space" at first**.
 
 Instead think:
 
@@ -213,11 +216,11 @@ Conceptually:
 
 > **Quaternion multiplication = "apply one rotation after another."**
 
-That's incredibly useful for IMU integration.
+This is the operation at the heart of IMU orientation integration.
 
 ---
 
-## 7. A beautiful geometric intuition
+## 7. A geometric intuition
 
 Imagine holding a phone.
 
@@ -231,13 +234,13 @@ Initially:
    └─────┘
 ```
 
-Now rotate it 90° around the Z-axis:
+Now rotate it +90° around the Z-axis (Z pointing out of the page, so positive is counterclockwise by the right-hand rule):
 
 ```text
-          ┌─────┐
-          │PHONE│
-          └─────┘
-              →
+   ┌─────┐
+   │PHONE│
+   └─────┘
+  ←
 ```
 
 Instead of storing:
@@ -275,7 +278,7 @@ Quaternions have only four numbers and one simple normalization constraint: $`\|
 So they're generally:
 
 - more compact
-- numerically convenient
+- numerically convenient: rounding makes $\lVert q\rVert$ drift slowly from 1 over many multiplications, so implementations renormalize regularly, which is much cheaper than re-orthogonalizing a rotation matrix
 - efficient for composing rotations
 - excellent for interpolation
 - free of gimbal lock
@@ -283,8 +286,6 @@ So they're generally:
 ---
 
 ## 9. Quaternion vs Euler angles
-
-This is probably the most useful mental comparison:
 
 | Representation  | Intuition                         | Main problem                  |
 | --------------- | --------------------------------- | ----------------------------- |
@@ -320,7 +321,7 @@ Same physical rotation. Different mathematical representation.
 
 ---
 
-## 10. One subtle but VERY important fact
+## 10. q and -q are the same rotation
 
 There is a strange property: $q$ and $-q$ represent **the exact same physical orientation**.
 
@@ -364,13 +365,18 @@ $${q_{\text{true}} = \delta q\otimes q_{\text{estimate}}}$$
 
 where $\delta q$ represents a **small 3D rotational error**.
 
-This idea leads directly into **SO(3), Lie groups, Lie algebra, and the Invariant EKF**. In the terminology of [left_right_invariant.md](../filtering/left_right_invariant.md), this particular $\delta q$ is a *right*-invariant error (the mismatch viewed from a fixed point in the world frame) - see that doc for when you'd instead want the left-invariant, body-frame version.
+The small error can be attached on either side, and both are common:
+
+- $`q_{\text{true}} = \delta q\otimes \hat q`$: the error is expressed in the world frame. In the terminology of [left_right_invariant.md](../filtering/left_right_invariant.md) this is a *right*-invariant error.
+- $`q_{\text{true}} = \hat q\otimes \delta q`$: the error is expressed in the body frame. This is the *left*-invariant error, the convention of Solà's ESKF and of this repo's `run_iekf` (the $\hat X\,\mathrm{Exp}(\xi)$ form).
+
+This is the error-state idea of [extra_kf_variants.md §2](../filtering/extra_kf_variants.md#2-error-state-kalman-filter-eskf), and it leads directly into **SO(3), Lie groups, Lie algebra, and the Invariant EKF**.
 
 ---
 
 ## 12. The one-sentence intuition
 
-If you remember only one thing:
+In one sentence:
 
 > **A quaternion is a clever four-number representation of a 3D rotation, essentially encoding "rotate by this angle around this axis," in a form that makes chaining and estimating rotations much easier.**
 
@@ -378,6 +384,8 @@ And in a robotics context, it's worth mentally organizing it as:
 
 $${ \boxed{ \text{Euler angles} \rightarrow \text{Quaternion} \rightarrow SO(3) \rightarrow \mathfrak{so}(3) \rightarrow \text{Lie-group state estimation} } }
 $$
+
+That chain is a learning order, not a hierarchy: unit quaternions are a Lie group in their own right, and each rotation in $SO(3)$ corresponds to exactly two of them, $q$ and $-q$ (Section 10). Both groups share the same small-motion space, so the tools in [lie_algebra.md](lie_algebra.md) apply to either.
 
 The really interesting next step is **why quaternion multiplication actually performs rotation**, because that is the part that makes quaternions initially feel like magic. That's the next section.
 
@@ -537,3 +545,4 @@ In 3D, one quaternion multiplication *can* leak out of 3D space (Step 2), so a s
 ## 14. References
 
 1. Diebel, J. (2006). *Representing Attitude: Euler Angles, Unit Quaternions, and Rotation Vectors*. Stanford University Technical Report. https://www.astro.rug.nl/software/kapteyn-beta/_downloads/attitude.pdf - a widely-cited technical reference covering the quaternion/Euler-angle/rotation-vector conversions and conventions this doc builds intuition for.
+2. Solà, J. (2017). *Quaternion kinematics for the error-state Kalman filter*. arXiv:1711.02508. https://arxiv.org/abs/1711.02508 - the Hamilton vs. JPL comparison in Section 2's note, and the body-frame quaternion error of Section 11.

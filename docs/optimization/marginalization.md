@@ -4,7 +4,7 @@ Marginalizing a variable means permanently removing it from the optimization whi
 
 This builds directly on two things you've already seen:
 - **Variable elimination** from [`elimination_tree.md`](elimination_tree.md) ("eliminate $x_1$ → its info gets summarized into a new constraint on $x_2$") - this doc reuses that exact mechanic for a different purpose.
-- **Sparsity and full vs. fixed-lag smoothing** from [filtering_smoothing.md §9-10](../filtering_smoothing.md#9-one-subtle-but-very-important-point) (filtering marginalizes old information, smoothing keeps it) - this doc is the missing mechanical middle ground the diagram there only names.
+- **Sparsity and full vs. fixed-lag smoothing** from [filtering_smoothing.md §9-10](../filtering_smoothing.md#9-the-precise-distinction) (filtering marginalizes old information, smoothing keeps it) - this doc is the missing mechanical middle ground the diagram there only names.
 
 ---
 

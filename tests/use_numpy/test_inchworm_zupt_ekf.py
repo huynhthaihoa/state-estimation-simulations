@@ -157,12 +157,13 @@ def test_always_zupt_is_dramatically_inconsistent_in_both_windows(inchworm_zupt_
 
 
 def test_never_zupt_is_at_least_as_well_calibrated_as_phase_conditional(inchworm_zupt_ekf):
-    # An echo of saltation_matrix_ekf.py's finding: the filter that stakes the least
-    # confidence (never) ends up at least as consistent (NEES) as the one that correctly
-    # exploits a strong pseudo-measurement (phase_conditional) -- exact/aggressive claims
-    # are more fragile to any real-world imperfection than conservative ones, even when
-    # used exactly as intended. phase_conditional still wins on raw accuracy (see the
-    # RMS test above); this is specifically about calibration, not accuracy.
+    # Pins the default-parameter behavior: never ends up at least as consistent (NEES) as
+    # phase_conditional. The cause is the under-sized process model at the ramps (true
+    # ramp acceleration ~3.3x process_noise_std), which hits phase_conditional harder
+    # because ZUPT has just made it confident in its velocity -- not a flaw of ZUPT
+    # itself: with process_noise_std large enough to cover the ramps, both are consistent
+    # (docs/filtering/inchworm_zupt_ekf.md §3). phase_conditional still wins on velocity
+    # accuracy (see the RMS test above).
     m = inchworm_zupt_ekf
     rng = np.random.default_rng(0)
     duration, dt, t_anchor, t_extend, t_ramp, v_extend = 10.0, 0.05, 1.0, 1.0, 0.2, 0.1

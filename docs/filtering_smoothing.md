@@ -95,8 +95,6 @@ This makes filtering **naturally online and computationally efficient**.
 
 ### The big limitation of filtering
 
-Here's where SLAM becomes interesting.
-
 Suppose the robot sees:
 
 ```text
@@ -134,7 +132,7 @@ After:
      A ------------- E
 ```
 
-A pure filtering mindset is uncomfortable with this because it has already compressed the past.
+A pure filtering mindset is uncomfortable with this because it has already compressed the past: the old poses are no longer in its state, so it cannot move them. (An EKF-SLAM filter still benefits from the loop closure. Through the correlations in its covariance, it corrects the current pose and the whole landmark map; see [§9](#9-the-precise-distinction).)
 
 ---
 
@@ -227,8 +225,6 @@ The important point is:
 
 ### Optimization can revise the past.
 
-That's a huge conceptual difference.
-
 ---
 
 ## 4. Smoothing: optimization with a probabilistic interpretation
@@ -269,11 +265,11 @@ x₀ x₁ x₂ x₃
   joint estimate
 ```
 
-Optimization is often used as the computational mechanism for obtaining this joint estimate.
+Optimization is often used as the computational mechanism for obtaining this joint estimate. Strictly, least-squares optimization returns the single most likely trajectory (the MAP estimate, i.e. the peak of $`p(x_{0:t} \mid z_{0:t})`$), not the whole distribution; the uncertainty around it is usually approximated as a Gaussian whose information matrix is the Gauss-Newton Hessian $`J^\top J`$ at the solution.
 
 ---
 
-## 5. A very intuitive analogy
+## 5. An analogy
 
 Imagine you're reconstructing a person's route through a city.
 
@@ -342,7 +338,7 @@ This gives us a useful trade-off:
 | Global consistency | Harder                         | Stronger                                   |
 | Typical idea       | EKF-SLAM                       | Pose graph/factor graph / BA             |
 
-**A caveat worth remembering**: "filtering is cheaper, optimization is more expensive" is the right intuition for small, fixed-size problems, but it inverts at scale. EKF-style filtering maintains a *dense* joint covariance over the state, so each update costs roughly $O(n^2)$ in the number of landmarks/poses (Dissanayake et al., 2001), with no way around it - every update touches the whole dense matrix, every time. Sparse factor-graph smoothing exploits the sparsity of the underlying graph instead, so incremental solvers like iSAM2 update *most* new odometry-only measurements cheaply, touching only a small, roughly constant-size affected region of the Bayes tree (Kaess et al., 2012) - but there's no universal $O(1)$ - $O(\log n)$ *amortized* bound backing that up the way there is for, say, a balanced-tree data structure: a single loop-closure edge can force re-elimination of a large fraction of the tree in the worst case, exactly the same as EKF-style filtering's every-update cost, not a bounded fraction of it. This repo's own [`bayes_tree_construction.py`](../use_numpy/bayes_tree_construction.py) demonstrates this directly - one loop-closure edge on its 16-node square-loop topology invalidates all 16 of 16 nodes, not a small affected subtree (see [`bayes_tree.md` §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo)). So the real, defensible claim is narrower than a clean complexity bound: *most* updates in a typical SLAM graph (which is mostly odometry, occasionally punctuated by loop closures) are cheap under iSAM2, and that's still the actual reason large-scale SLAM systems moved from EKF-SLAM toward factor-graph smoothing - dense filtering's $O(n^2)$-*every*-update cost has no equivalent "usually cheap" case to lean on the way sparse smoothing does.
+**A caveat on cost**: "filtering is cheaper" holds for small, fixed-size problems, but it inverts at scale. EKF-SLAM keeps a *dense* joint covariance, so every update costs roughly $O(n^2)$ in the number of landmarks (Dissanayake et al., 2001). Sparse factor-graph smoothing exploits the sparsity of the graph instead. With an incremental solver such as iSAM2 (Kaess et al., 2012), an odometry measurement only re-eliminates a small part of the Bayes tree near the newest pose. There is no guaranteed bound, though: a loop closure can force re-elimination of most or all of the tree, and the cost of that step depends on the fill-in of the sparse factorization. This repo's [`bayes_tree_construction.py`](../use_numpy/bayes_tree_construction.py) shows both cases on a 16-node square loop: an odometry edge affects 2 of 16 variables, while a loop-closure edge affects all 16 (see [`bayes_tree.md` §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo)). The defensible claim is therefore that *most* updates in a typical SLAM graph (mostly odometry, occasionally a loop closure) are cheap under iSAM2, while dense filtering pays $O(n^2)$ on every update. That is why large-scale SLAM moved from EKF-SLAM toward factor-graph smoothing.
 
 ---
 
@@ -350,9 +346,9 @@ This gives us a useful trade-off:
 
 A **factor graph** is an excellent mental bridge between the two worlds.
 
-A factor graph has **(at least) three kinds of factors**: 
+A SLAM factor graph typically contains **three kinds of factors**:
 
-- A **landmark factor** ties a pose to a landmark it observed:
+- A **landmark factor** ties a pose to a landmark it observed (the drawing shows two such factors, from $x_0$ and $x_2$ to the same landmark):
 
 ```text
       landmark
@@ -368,7 +364,7 @@ A factor graph has **(at least) three kinds of factors**:
 x₀ ● ── x₁ ● ── x₂ ● ── x₃ ●
 ```
 
-- A **unary (prior) factor** constrains a single pose directly, with no other variable involved - typically used to anchor gauge freedom (e.g., fixing $x_0$ to break the "the whole solution can shift/rotate/rescale together" ambiguity, exactly what this repo's own `pose_graph.py` and `bundle_adjustment.py`/`bundle_adjustment_advanced.py` do) or to inject an absolute measurement like GPS:
+- A **unary (prior) factor** constrains a single pose directly, with no other variable involved - typically used to remove gauge freedom (the whole solution could otherwise shift and rotate together, and in monocular BA also rescale) or to inject an absolute measurement like GPS. In this repo, [`pose_graph.py`](../use_numpy/pose_graph.py) anchors node 0 with a strong prior on its block of the information matrix, and [`bundle_adjustment.py`](../use_numpy/bundle_adjustment.py) puts soft prior factors on the first two cameras, which also pins the monocular scale. [`bundle_adjustment_advanced.py`](../use_numpy/bundle_adjustment_advanced.py) uses no prior factor; it fixes the gauge by holding two keyframes constant:
 
 ```text
 prior
@@ -440,13 +436,13 @@ The past is **kept around so it can be reconsidered**.
 
 ---
 
-## 9. One subtle but very important point
+## 9. The precise distinction
 
 It's tempting to say:
 
 > "Filtering is local, optimization is global."
 
-That's **mostly useful intuitively, but not strictly correct**.
+That is **useful intuition, but not strictly correct**.
 
 A filter can incorporate loop closures and other global information. For example, EKF-SLAM can update the entire state covariance/mean when a landmark is re-observed.
 
@@ -519,7 +515,7 @@ A smoothing approach can instead ask:
 
 That can become very interesting when the motion model is **hybrid/discontinuous**, because future observations may provide strong evidence about what actually happened during an ambiguous transition.
 
-So, if there's only one thing to remember:
+In summary:
 
 > **Filtering is like continuously updating a belief about where the robot is.**
 

@@ -11,7 +11,7 @@ The easiest way to think about **Lie groups and Lie algebras** is:
 For robotics:
 
 - Rotation matrix → an actual orientation
-- Quaternion → an actual orientation
+- Quaternion → an actual orientation ([quaternion.md](quaternion.md))
 - $SE(3)$ transformation → an actual robot pose
 - Lie algebra → a convenient way to describe **tiny changes** to those poses
 
@@ -106,13 +106,7 @@ So ordinary vector addition works.
 
 ## 4. Rotations are different
 
-Imagine an arrow pointing forward.
-
-You rotate it by 10°.
-
-Then another 10°.
-
-Then another 10°.
+Turning by 10° and then another 10° about the *same* axis is harmless: the angles simply add up to 20°, in either order. The trouble starts when the axes differ.
 
 Rotations don't behave like ordinary vectors because **the meaning of a rotation depends on the current orientation**.
 
@@ -166,7 +160,7 @@ Now imagine you're currently at some rotation $R$.
 
 Instead of thinking about **all possible rotations**, zoom in around $R$.
 
-Locally, small rotations behave approximately like ordinary vectors:
+Locally, small rotations behave approximately like ordinary vectors. Near $R$, every nearby rotation can be written as $R\exp(\delta\theta^\wedge)$ for a small 3-vector:
 
 ```math
 \delta\theta =\begin{bmatrix}\delta\theta_x\\ 
@@ -174,17 +168,17 @@ Locally, small rotations behave approximately like ordinary vectors:
 \delta\theta_z \end{bmatrix}
 ```
 
-This is the Lie algebra:
+The space these small motions live in is the Lie algebra:
 
 $$\mathfrak{so}(3)$$
+
+Strictly, $\mathfrak{so}(3)$ is the tangent space *at the identity*, and its elements are $3\times3$ skew-symmetric matrices; the 3-vector $\delta\theta$ is their coordinates, related by the hat operator of Section 7. Moving near some other $R$ reuses the same algebra by composing with $R$, as above, rather than needing a separate one at every point.
 
 So:
 
 > **$SO(3)$ tells you where you are.**
 
 > **$\mathfrak{so}(3)$ tells you how you can move from there.**
-
-That's probably the single most useful intuition.
 
 ---
 
@@ -218,13 +212,11 @@ So the matrix is essentially a convenient way of representing the **cross produc
 
 ## 8. The exponential map
 
-Here's where Lie theory becomes extremely useful.
-
-You have a small rotation:
+You have a rotation vector:
 
 $$\delta\theta$$
 
-and you want to turn it into a real rotation matrix.
+(an axis times an angle) and you want to turn it into a real rotation matrix.
 
 Use the exponential map:
 
@@ -246,7 +238,15 @@ So:
 
 > **Exponential map = turn a local motion into an actual transformation.**
 
-For a small rotation:
+**Notation.** Other docs in this repo, the Solà et al. reference, and the `manif` library write the same maps directly on vectors, with capital letters: $`\mathrm{Exp}(\delta\theta) = \exp(\delta\theta^\wedge)`$ and $`\mathrm{Log}(R) = \log(R)^\vee`$ (the vee operator is defined in Section 9).
+
+This is exact for any rotation vector, not just small ones. With $\theta = \lVert\delta\theta\rVert$ it has a closed form (Rodrigues' formula), the same kind of expression as the Jacobians in [jacobian.md §11.4](jacobian.md#114-closed-form-for-so3):
+
+```math
+\exp(\delta\theta^\wedge) = I + \frac{\sin\theta}{\theta}\,\delta\theta^\wedge + \frac{1-\cos\theta}{\theta^2}\,(\delta\theta^\wedge)^2
+```
+
+For a small rotation it reduces to:
 
 $$R \approx I+\delta\theta^\wedge$$
 
@@ -316,8 +316,6 @@ Then update:
 
 $$R_{\text{new}}=R\exp(\delta\theta^\wedge)$$
 
-This is extremely convenient.
-
 The optimizer works with an ordinary 3-dimensional vector:
 
 $$\delta\theta$$
@@ -359,7 +357,7 @@ and a small pose perturbation can be represented as:
 
 where:
 
-- $\rho$: tiny translation
+- $\rho$: translational part (the actual translation it produces is $V\rho$, see below)
 - $\phi$: tiny rotation
 
 So one 6D vector represents a tiny change in the entire robot pose:
@@ -410,11 +408,11 @@ Now someone tells you:
 
 > "Move forward 2 cm, left 1 cm, rotate 0.5° around X, and rotate 0.2° around Z."
 
-That's essentially a **Lie algebra vector**:
+With the common robotics body-frame convention (x forward, y left, z up), that's essentially a **Lie algebra vector**:
 
 ```math
 \xi = \begin{bmatrix} 2\,\text{cm}\\ 
--1\,\text{cm}\\ 
+1\,\text{cm}\\ 
 0\\ 
 0.5^\circ\\ 
 0\\ 
@@ -489,7 +487,7 @@ and approximate:
 
 $$f(T\exp(\delta\xi^\wedge)) \approx f(T)+J\delta\xi$$
 
-where $J$ is the **Jacobian with respect to the Lie-algebra perturbation**.
+where $J$ is the **Jacobian with respect to the Lie-algebra perturbation**. Whether the perturbation is applied on the right, as here, or on the left changes $J$; [jacobian.md §11](jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space) explains the left and right Jacobians this leads to.
 
 That's why Lie algebra appears everywhere in modern SLAM.
 
@@ -499,11 +497,11 @@ It gives optimization algorithms a nice **locally Euclidean 6D space** to work i
 
 ## 16. The one-sentence intuition
 
-If you remember only one thing:
+In one sentence:
 
 > **A Lie group represents the actual robot state (rotation/pose), while its Lie algebra represents small changes around that state, allowing us to use ordinary vector calculus and optimization without breaking the geometry of the state.**
 
-For SLAM, the mental picture I recommend is:
+For SLAM, a useful mental picture is:
 
 ```text
              GLOBAL / ACTUAL STATE

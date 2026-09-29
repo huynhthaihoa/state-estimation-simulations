@@ -1,6 +1,6 @@
 # Triangulation and PnP: two sides of one geometric problem
 
-Triangulation asks "given known camera poses and a 2D observation in each, where is the 3D point?" PnP asks the exact inverse: "given several known 3D points and their observed 2D pixels, where is the camera?" (a single point/pixel pair pins down a ray, not a unique pose - PnP needs at least 3 correspondences (P3P), and this repo's own DLT implementation needs at least 6, per §5 below). Both reduce to the same reprojection residual, solved the same way in this repo - a closed-form linear initial guess, then a few Gauss-Newton iterations.
+Triangulation asks "given known camera poses and a 2D observation in each, where is the 3D point?" PnP asks the inverse: "given several known 3D points and their observed 2D pixels, where is the camera?" (a single point/pixel pair pins down a ray, not a unique pose - PnP needs at least 3 correspondences (P3P, which gives up to four candidate poses, so a fourth point is needed to pick the right one), and this repo's own DLT implementation needs at least 6, per §3 and §5 below). Both reduce to the same reprojection residual, solved the same way in this repo - a closed-form linear initial guess, then a few Gauss-Newton iterations.
 
 This builds directly on:
 - The **reprojection error** and **"bundle of rays"** intuition from [bundle_adjustment.md §5](../optimization/bundle_adjustment.md#5-why-is-it-called-bundle-adjustment).
@@ -131,7 +131,15 @@ Neither problem is "solved" by the linear step alone - both need this positive-d
 
 ## 5. What the accompanying scripts do (and don't)
 
-`linear_pnp_dlt` is the simplest *correct* version of linear PnP, not a production algorithm - it needs $n\geq 6$ well-conditioned correspondences to be numerically stable (rank-3+ data), and its accuracy degrades faster than purpose-built solvers as $n$ grows or points become near-coplanar. Production systems (OpenCV's own `solvePnP`, ORB-SLAM, COLMAP) typically use **EPnP** (Lepetit, Moreno-Noguer & Fua, 2009 - see References), an $O(n)$ algorithm that expresses every 3D point as a weighted combination of four virtual control points, turning the problem into recovering just those four points' camera-frame coordinates - more accurate and much cheaper at scale than a general DLT null-space solve. This repo implements the simpler DLT version for pedagogical clarity, matching `triangulate_landmark`'s own choice of a simple closed-form linear solve over a more sophisticated one.
+`linear_pnp_dlt` is the simplest *correct* version of linear PnP, not a production algorithm. It needs $n \geq 6$ correspondences for $A$ to reach rank 11 (§3), and its limits are about accuracy rather than cost:
+
+- **Cost is not the issue.** Like EPnP, it runs in time linear in $n$: the null-space solve only needs the SVD of $A^\top A$, a fixed $12\times12$ matrix, however many points there are.
+- **Accuracy is.** It solves for 12 unconstrained numbers and minimizes an *algebraic* error, ignoring that 9 of them must form a rotation until the orthogonalization step afterwards. More points help it, but with few points, noticeable noise, or points close to a plane it is less accurate than purpose-built solvers.
+- **Exactly coplanar points break it.** $A$ then loses rank and the null space is no longer one-dimensional; planar scenes need a homography-based method instead.
+
+**EPnP** (Lepetit, Moreno-Noguer & Fua, 2009 - see References) expresses every 3D point as a weighted combination of four virtual control points, which turns the problem into recovering just those four points' camera-frame coordinates. Its $`O(n)`$ in the paper title is relative to the earlier non-iterative PnP methods ($`O(n^5)`$ and $`O(n^8)`$), not to the DLT; its advantage over the DLT is accuracy.
+
+In practice, PnP almost always runs inside **RANSAC**, because some 2D-3D matches are wrong: a minimal solver (P3P, three points) generates candidate poses from random subsets, the pose with the most inliers wins, and a non-minimal solver and/or nonlinear refinement then uses all inliers. For example, ORB-SLAM runs EPnP inside RANSAC; COLMAP uses P3P in RANSAC with EPnP on the inliers; OpenCV's `solvePnP` offers several methods, with EPnP as one option (`SOLVEPNP_EPNP`) and an iterative method as the default, and `solvePnPRansac` for the outlier-robust version. This repo implements the simpler DLT without RANSAC for pedagogical clarity (its synthetic correspondences have no outliers), matching `triangulate_landmark`'s own choice of a simple closed-form linear solve over a more sophisticated one.
 
 ![Two panels from pnp_estimation.py: the image plane with observed pixels and 20-times-magnified reprojection residuals for the linear DLT pose and the Gauss-Newton-refined pose, and bars of rotation, position and reprojection error for both](../../assets/pnp_estimation.png)
 
@@ -148,5 +156,5 @@ Neither problem is "solved" by the linear step alone - both need this positive-d
 ## 7. References
 
 1. Hartley, R., & Zisserman, A. (2004). *Multiple View Geometry in Computer Vision* (2nd ed.). Cambridge University Press. - the standard reference for DLT camera resectioning behind §3's derivation.
-2. Lepetit, V., Moreno-Noguer, F., & Fua, P. (2009). *EPnP: An Accurate O(n) Solution to the PnP Problem*. International Journal of Computer Vision, 81(2), 155-166. https://doi.org/10.1007/s11263-008-0152-6 - the production-grade PnP algorithm named as a contrast in §5.
+2. Lepetit, V., Moreno-Noguer, F., & Fua, P. (2009). *EPnP: An Accurate O(n) Solution to the PnP Problem*. International Journal of Computer Vision, 81(2), 155-166. https://doi.org/10.1007/s11263-008-0152-6 - the more accurate linear-time PnP algorithm contrasted with the DLT in §5.
 3. Triggs, B., McLauchlan, P. F., Hartley, R. I., & Fitzgibbon, A. W. (2000). *Bundle Adjustment - A Modern Synthesis*. In Vision Algorithms: Theory and Practice (pp. 298-372). Springer. - already cited in [bundle_adjustment.md](../optimization/bundle_adjustment.md), covering the triangulation-within-BA context behind §2.
