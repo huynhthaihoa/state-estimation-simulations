@@ -355,7 +355,8 @@ def main():
               f"{r['mem_batch']/1024:8.2f} KB peak | window: {r['t_window']*1e6:8.2f} us/step, "
               f"{r['mem_window']/1024:8.2f} KB peak")
 
-    print("\nFinal RMS position error (accuracy isn't sacrificed for bounded memory):")
+    print("\nFinal RMS position error (identical by construction: with no loop closures, both equal "
+          "dead reckoning -- see marginalization.md Section 9):")
     for r in results:
         print(f"  n_poses={r['n_poses']:<6d} batch={r['rms_batch']:.4f} m, "
               f"window={r['rms_window']:.4f} m")

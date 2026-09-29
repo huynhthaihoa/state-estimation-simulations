@@ -63,8 +63,10 @@ class PreintegratedIMUBundle:
         self.delta_R = self.delta_R.rplus(manif.SO3Tangent(w_corrected * dt), J_self, J_tau)
 
         # 3. Propagate relative components step-by-step
-        # Note: In actual flight, accelerometer inputs measure raw acceleration. For clarity of
-        # tracking concept here, we integrate velocity commands directly to highlight manifold steps.
+        # Note: the linear input is used exactly like an accelerometer reading: it is
+        # integrated twice below (into delta_v, then delta_p), so despite the '--linear-vel'
+        # naming it is a body-frame acceleration in m/s^2. There is no gravity term, which a
+        # real accelerometer's specific force would need removed.
         self.delta_p += self.delta_v * dt + 0.5 * np.dot(R_prev, v_corrected) * (dt**2)
         self.delta_v += np.dot(R_prev, v_corrected) * dt
 
@@ -106,8 +108,8 @@ if __name__ == "__main__":
     parser.add_argument("--gyro-bias", type=float, nargs=3, default=[0.01, -0.01, 0.02], metavar=("X", "Y", "Z"), help="Initial estimated gyro bias (rad/s, default: 0.01 -0.01 0.02)")
     parser.add_argument("--accel-bias", type=float, nargs=3, default=[0.05, 0.00, -0.05], metavar=("X", "Y", "Z"), help="Initial estimated accel bias (m/s^2, default: 0.05 0.00 -0.05)")
 
-    # Commanded body-frame velocity configuration (the true, noise-free driving motion)
-    parser.add_argument("--linear-vel", type=float, nargs=3, default=[1.0, 0.1, 0.0], metavar=("X", "Y", "Z"), help="True commanded linear velocity in m/s (default: 1.0 0.1 0.0)")
+    # Commanded body-frame motion (the true, noise-free input): the linear channel is an acceleration
+    parser.add_argument("--linear-vel", type=float, nargs=3, default=[1.0, 0.1, 0.0], metavar=("X", "Y", "Z"), help="True commanded body-frame acceleration in m/s^2, fed to the accelerometer channel and integrated twice (the flag name says velocity for historical reasons; default: 1.0 0.1 0.0)")
     parser.add_argument("--angular-vel", type=float, nargs=3, default=[0.0, 0.0, 0.5], metavar=("X", "Y", "Z"), help="True commanded angular velocity in rad/s (default: 0.0 0.0 0.5)")
 
     # Post-optimization bias update configuration (the corrected bias guess after a graph-SLAM update)
@@ -129,7 +131,7 @@ if __name__ == "__main__":
     frequency_hz = args.frequency_hz
     dt_step = 1.0 / frequency_hz
 
-    # Smooth baseline commanded velocity + angular rate
+    # Smooth baseline commanded acceleration + angular rate
     true_v_cmd = np.array(args.linear_vel)  # Driving forward and sliding right slightly
     true_w_cmd = np.array(args.angular_vel)  # Turning around the Z-axis (Yaw)
 
