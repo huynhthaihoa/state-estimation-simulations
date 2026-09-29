@@ -47,7 +47,7 @@ re-solving everything repeatedly becomes expensive.
 
 ---
 
-## 2. Incremental optimization says:
+## 2. The incremental idea
 
 Instead:
 
@@ -97,17 +97,19 @@ X0 ─── X1 ─── X2 ─── X3
               L1
 ```
 
-After linearization, the nonlinear optimization becomes approximately:
+After linearization, the nonlinear optimization becomes approximately a linear least-squares problem:
 
-$$A\Delta x=b$$
+```math
+\min_{\Delta x} \lVert A\Delta x - b \rVert^2
+```
 
-Instead of directly solving this system every time, we can factorize it:
+Instead of solving this from scratch every time, we can factorize $A$:
 
-$$A \approx QR$$
+$$A = QR$$
 
 or equivalently work with a related factorization of the information/Hessian system.
 
-> **Note**: QR decomposition factors a matrix as $A=QR$, with $Q$ orthogonal and $R$ upper-triangular. Because $Q$ is orthogonal it doesn't change the least-squares solution, so solving $A\Delta x=b$ reduces to the cheap triangular solve $R\Delta x = Q^\top b$ - and, critically for iSAM, $R$ can be updated incrementally via Givens rotations when a new row (factor) arrives, instead of refactorizing $A$ from scratch. That incremental-update property is exactly what the next paragraph relies on.
+> **Note**: QR decomposition factors a matrix as $A=QR$, with $Q$ orthogonal and $R$ upper-triangular. Because $Q$ is orthogonal it doesn't change the least-squares solution, so minimizing $`\lVert A\Delta x - b \rVert^2`$ reduces to the cheap triangular solve $R\Delta x = Q^\top b$ - and, critically for iSAM, $R$ can be updated incrementally via Givens rotations when a new row (factor) arrives, instead of refactorizing $A$ from scratch. That incremental-update property is exactly what the next paragraph relies on.
 
 The important point is:
 
@@ -156,13 +158,12 @@ Then you get a new camera observation at X4.
 Maybe it observes landmark L0:
 
 ```text
-                 L0
-                 ●
-                /
-               /
-X0 ●──X1──X2──X3──X4
-                  ↑
-             new camera
+                        L0
+                        ●
+                        │   ← new factor
+X0 ── X1 ── X2 ── X3 ── X4
+                        ↑
+                   new camera
 ```
 
 A batch optimizer says:
@@ -183,22 +184,18 @@ Suppose we have:
 
 ```text
 X0 ── X1 ── X2 ── X3 ── X4
-│                        │
-└────────────────────────┘
-           loop closure
+│                       │
+└───────────────────────┘
+       loop closure
 ```
 
 The loop closure can affect **many previous poses**.
 
 So incremental optimization cannot simply update X4.
 
-It needs to determine:
+Original iSAM still absorbs the loop-closure factor like any other: as one more row folded into the factorization with Givens rotations (§3). But this row links X4 all the way back to X0, so the rotations sweep through most of the factorization and leave it denser than before (fill-in). Original iSAM cleans this up periodically, by relinearizing everything and choosing a new variable ordering in one batch step (Kaess et al. 2008). This repo's script goes straight to that batch step when the loop closes (§14.1).
 
-> **Which variables are affected by this new constraint?**
-
-Then update the relevant part of the solution.
-
-This is why iSAM maintains and updates a structured factorization of the problem.
+So loop closures are exactly where incremental updates lose most of their advantage. Working out *which* variables a new factor really affects, and recomputing only those, is what iSAM2's Bayes tree adds (§7).
 
 ---
 
@@ -219,7 +216,7 @@ Eliminate variables
      ↓
 Bayes tree
 
-     X0
+     X0   ← eliminated first (a leaf)
      │
      X1
      │
@@ -227,7 +224,7 @@ Bayes tree
      │
      X3
      │
-     X4
+     X4   ← eliminated last (the root)
 ```
 
 (A straight chain here, not a branch - the underlying factor graph is itself a chain $X_0-X_1-X_2-X_3-X_4$ with no side edges, so eliminating it in order produces a chain elimination/Bayes tree too. Two variables joined by a real edge in the factor graph - like $X_2$ and $X_3$ here - can never end up as siblings with no ancestor/descendant relationship in a correctly-built Bayes tree.)
@@ -238,9 +235,9 @@ When a new factor connects X4 to X0:
 X0 ───────────── X4
 ```
 
-the algorithm identifies the affected portion of the Bayes tree and **relinearizes/recalculates that portion**, rather than rebuilding everything.
+the algorithm walks from the variables the factor touches up to the root, and **re-eliminates only that path**. Here, that path is the whole tree: X0 is the leaf eliminated first, so everything between it and the root is affected. That's the worst case, the same one [`bayes_tree.md` §8](bayes_tree.md#8-even-more-interesting-loop-closure) works through, and it's why iSAM2 also reorders variables as it goes ([`isam2_optimization.md` §12](isam2_optimization.md#12-variable-ordering-is-also-crucial)). An ordinary odometry factor between X3 and X4 would affect only X3 and X4, at the top of the tree.
 
-That's the really powerful idea behind iSAM2.
+Limiting each update to such a path - usually a short one - is the really powerful idea behind iSAM2.
 
 ---
 
@@ -252,7 +249,7 @@ Here's the simplest comparison:
 | ------------------------------- | ------------------------------- |
 | Add measurements                | Add measurements                |
 | Rebuild/solve the whole problem | Reuse previous computation      |
-| Potentially expensive           | Much more efficient             |
+| Full cost on every update       | Cheaper per update, except around loop closures |
 | Good for offline SLAM           | Good for online SLAM            |
 | Simple conceptual model         | More complicated implementation |
 | Example: standard Gauss-Newton  | Example: iSAM/iSAM2             |
@@ -305,8 +302,8 @@ For example:
 Before loop closure:
 
 X0 ── X1 ── X2 ── X3 ── X4
-↑
-slightly wrong
+                        ↑
+                 slightly wrong
 
 
 Loop closure arrives:
@@ -314,7 +311,7 @@ Loop closure arrives:
 X4 ───────── X0
 ```
 
-Now the loop closure tells us the trajectory is inconsistent.
+X0 is the anchor, so it stays put; the small errors of every odometry step add up along the chain and show at X4. Now the loop closure tells us the trajectory is inconsistent.
 
 The optimizer may change:
 
@@ -326,7 +323,7 @@ X3
 X4
 ```
 
-But it does so **selectively and efficiently**, using the existing structure.
+All of them can move, because the loop closure ties X4 back to X0 through the whole chain. As §6 explains, this is the expensive case, not a cheap one: original iSAM, and this repo's script, handle it with a full batch relinearization.
 
 That's why the term **smoothing** is important.
 
@@ -537,7 +534,7 @@ Between rebuilds, the linearization points ${\bar{X}}$ of old nodes never move. 
 
 ## 15. References
 
-1. Dellaert, F., & Kaess, M. (2006). *Square Root SAM: Simultaneous Localization and Mapping via Square Root Information Smoothing*. International Journal of Robotics Research, 25(12), 1181–1203. https://doi.org/10.1177/0278364906072768 - the sparse QR/square-root-information factorization behind §3's $A \approx QR$ and the claim that most of the previous factorization stays reusable.
+1. Dellaert, F., & Kaess, M. (2006). *Square Root SAM: Simultaneous Localization and Mapping via Square Root Information Smoothing*. International Journal of Robotics Research, 25(12), 1181–1203. https://doi.org/10.1177/0278364906072768 - the sparse QR/square-root-information factorization behind §3's $A = QR$ and the claim that most of the previous factorization stays reusable.
 2. Kaess, M., Ranganathan, A., & Dellaert, F. (2008). *iSAM: Incremental Smoothing and Mapping*. IEEE Transactions on Robotics, 24(6), 1365–1378. https://doi.org/10.1109/TRO.2008.2006706 - the original iSAM algorithm (incremental QR updates via Givens rotations, with periodic variable reordering) behind §1, §2, §4–§6, and §9.
 3. Kaess, M., Johannsson, H., Roberts, R., Ila, V., Leonard, J. J., & Dellaert, F. (2012). *iSAM2: Incremental Smoothing and Mapping Using the Bayes Tree*. International Journal of Robotics Research, 31(2), 216–235. https://doi.org/10.1177/0278364911430419 - the Bayes-tree data structure and fluid relinearization behind §7, §11, and §13's iSAM2 description. Covered in full in [`isam2_optimization.md`](isam2_optimization.md) and [`bayes_tree.md`](bayes_tree.md).
 4. Dellaert, F., & Kaess, M. (2017). *Factor Graphs for Robot Perception*. Foundations and Trends in Robotics, 6(1–2), 1–139. https://doi.org/10.1561/2300000043 - general reference for the factor-graph formulation underlying §3 and §11.

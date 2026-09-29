@@ -61,31 +61,21 @@ You want to find the poses that best explain all measurements:
 X^*=\arg\min_X \sum_i \|r_i(X)\|^2
 ```
 
-For example:
+For example, each odometry measurement says roughly how far the robot moved between two poses. The true step was 1 m each time, but every measurement carries a little noise:
 
 ```text
-        measurement
-x1 ───────────────────── x2
-      "you moved 1 m"
-                                 measurement
-                         x2 ───────────────────── x3
-                               "you moved 1 m"
-                                                          measurement
-                                                  x3 ───────────────────── x4
-                                                        "you moved 1 m"
+x1 ── 1.02 m ── x2 ── 0.97 m ── x3 ── 1.05 m ── x4
 ```
 
-But measurements contain noise.
-
-So maybe the robot actually estimates:
+On its own, this chain has nothing to reconcile: placing the poses exactly 1.02, 0.97 and 1.05 m apart satisfies every measurement perfectly, with zero residual. Optimization only has real work to do once a measurement is **redundant** - say a second sensor measures the distance from $x_1$ to $x_4$ directly:
 
 ```text
-x1 ---- 1.02m ---- x2
-                   x2 ---- 0.97m ---- x3
-                                      x3 ---- 1.05m ---- x4
+x1 ── 1.02 m ── x2 ── 0.97 m ── x3 ── 1.05 m ── x4
+│                                               │
+└─────────────────── 2.90 m ────────────────────┘
 ```
 
-Optimization finds the set of poses that makes **all measurements reasonably happy at the same time**.
+The chain adds up to 3.04 m, but the direct measurement says 2.90 m. They can't all be exactly right, so optimization finds the set of poses that makes **all measurements reasonably happy at the same time**, weighting each one by how much it's trusted.
 
 ---
 
@@ -212,11 +202,9 @@ This is where **iSAM2** improves upon the original iSAM.
 
 The key concepts are:
 
-### ① Bayes tree
-
-### ② Variable reordering
-
-### ③ Selective relinearization
+1. **Bayes tree** (§7-§9)
+2. **Selective relinearization** (§10-§11)
+3. **Variable reordering** (§12)
 
 These three ideas are the heart of iSAM2.
 
@@ -249,7 +237,7 @@ This doc only needs that one-sentence version. For the full mechanism - how elim
 Suppose your robot adds a new pose:
 
 ```text
-x1 — x2 — x3 — x4 — x5
+x1 ─ x2 ─ x3 ─ x4 ─ x5
 ```
 
 and receives a new measurement involving:
@@ -290,10 +278,9 @@ This is where things get interesting.
 Suppose your robot drives around:
 
 ```text
-        x1 ─ x2 ─ x3
-        |          |
-        |          |
-        x6 ─ x5 ─ x4
+x1 ─ x2 ─ x3
+          │
+x6 ─ x5 ─ x4
 ```
 
 The robot realizes:
@@ -304,8 +291,10 @@ So you add a loop-closure factor:
 
 ```text
 x1 ─ x2 ─ x3
-│          │
+┆         │
 x6 ─ x5 ─ x4
+
+┆ = new loop-closure factor (x6 ↔ x1)
 ```
 
 Now the new measurement can affect **many old poses**.
@@ -386,6 +375,8 @@ Only the important variables need relinearization.
 
 This is called **selective relinearization**.
 
+It isn't free for that one variable, though. Relinearizing $x_4$ changes every factor that touches $x_4$, so every Bayes-tree clique containing $x_4$ - and everything on the path from there up to the root - has to be re-eliminated, exactly as if a new factor had arrived there (§8-§9). In iSAM2 (Kaess et al. 2012), a variable counts as having moved "enough" when its change from the point it was last linearized at exceeds a threshold. The variables marked this way, together with the ones touched by new factors, make up the affected region of each update.
+
 ---
 
 ## 11. Why is that powerful?
@@ -426,15 +417,14 @@ Remember sparse Cholesky?
 
 The amount of computation depends heavily on **variable ordering**.
 
-For example:
+The order decides two things at once:
 
-```text
-x1 x2 x3 x4 x5
-```
+- **Fill-in**: how dense the factorization gets ([sparse_cholesky_factorization.md](sparse_cholesky_factorization.md)).
+- **Where each variable sits in the Bayes tree.** The last variable eliminated becomes the root, and an update's affected region is the path from the touched cliques up to the root (§8-§9).
 
-might produce much less fill-in than a bad ordering.
+A fixed order can be fine for one and terrible for the other. This repo's own example ([bayes_tree.md §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo)) eliminates a square loop of 16 poses oldest first. Fill-in stays small (no separator larger than 2), but the tree comes out as a single chain with the first pose at the bottom, so a loop closure touching the first pose invalidates all 16 variables.
 
-iSAM2 therefore dynamically manages the ordering of variables.
+iSAM2 therefore reorders as it goes. Each time it re-eliminates the affected part of the tree, it picks a new order for just those variables with **constrained COLAMD (CCOLAMD)**: a fill-reducing ordering, constrained so that the variables touched by the newest factors are eliminated last. They end up near the root, where the next measurement - which usually involves the same recent variables - disturbs only a few cliques.
 
 Very roughly:
 
@@ -450,53 +440,45 @@ re-eliminate affected region
 update Bayes tree
 ```
 
-This helps preserve sparsity.
+This keeps both the fill-in and the next update small.
 
 ---
 
 ## 13. The complete iSAM2 picture
 
-Now put everything together:
+Now put everything together. One iSAM2 update, following Algorithm 1 of Kaess et al. (2012):
 
 ```text
-        Sensor measurements
-                │
-                ▼
-          Factor graph
-                │
-                ▼
-       Nonlinear optimization
-                │
-                ▼
-          Linearization
-                │
-                ▼
-       Sparse linear system
-                │
-                ▼
-        Bayes tree / factorization
-                │
-       ┌────────┴─────────┐
-       │                  │
- new measurement     robot estimate
-       │                  │
-       ▼                  │
- affected variables       │
-       │                  │
-       ▼                  │
- selective                │
- relinearization          │
-       │                  │
-       ▼                  │
- variable ordering        │
-       │                  │
-       └────────┬─────────┘
-                ▼
-       Incremental update
-                │
-                ▼
-         updated SLAM state
+             new measurements
+                    │
+                    ▼
+ 1. Add the new factors (and any new variables)
+                    │
+                    ▼
+ 2. Mark the affected variables:
+      - those touched by the new factors
+      - those that moved past the relinearization threshold (§10)
+                    │
+                    ▼
+ 3. Remove the Bayes-tree cliques containing them,
+    plus everything above them up to the root
+                    │
+                    ▼
+ 4. Relinearize the marked variables' factors (§10)
+                    │
+                    ▼
+ 5. Reorder the removed variables (CCOLAMD, §12) and
+    re-eliminate them into a new top of the tree
+                    │
+                    ▼
+ 6. Update the estimate from the root downward, stopping
+    in branches where the changes become negligible
+                    │
+                    ▼
+           updated SLAM state ──► wait for the next measurements
 ```
+
+Everything below the removed top of the tree is reused untouched.
 
 ---
 
@@ -558,7 +540,7 @@ This is probably the most intuitive comparison:
 | Sparse factorization   | Yes                   | Yes                  |
 | Relinearization        | Broad                 | Selective            |
 | Variable ordering      | Important             | Dynamically managed  |
-| Loop closure           | Expensive             | Efficiently handled  |
+| Loop closure           | Full re-solve, same as any other step | Large affected region; can approach a full re-solve (§9, §19) |
 | Real-time suitability  | Lower                 | Higher               |
 
 The key difference isn't that iSAM2 uses a fundamentally different SLAM objective.
@@ -637,9 +619,9 @@ If you remember only one thing:
 
 > **iSAM2 is an incremental nonlinear least-squares solver for SLAM that maintains a Bayes-tree factorization and efficiently updates only the parts of the solution affected by new information.**
 
-And the three keywords to remember are:
+And the three ideas to remember, plus what they add up to, are:
 
-**Bayes tree → selective relinearization → incremental update**
+**Bayes tree + selective relinearization + variable reordering → incremental update**
 
 ---
 
@@ -647,7 +629,7 @@ And the three keywords to remember are:
 
 Partially - and it's worth being precise about which part rather than leaving it as one bare claim. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds the elimination tree underlying this doc's §7 Bayes tree (symbolic elimination over this repo's pose-graph topology, via `symbolic_eliminate`/`bayes_tree_affected_path` in `utils.py`). It keeps one node per variable and never merges them into cliques, so its affected counts are counts of variables, not cliques. The tree is built once from all edges, the loop-closure edge included, and then queried per edge. It quantifies §9's "small vs. large affected region" claim with a computed example instead of only prose: with the default 16 nodes (`--nodes-per-side 4`), the newest odometry edge affects 2/16 variables and the loop-closure edge affects 16/16 - see [`bayes_tree.md` §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo) for the details, including a genuinely useful finding: with a *fixed* elimination order (oldest node first, since §12's variable reordering is explicitly not implemented), this repo's loop-closure edge produces the worst possible case - the entire tree, not just a subtree, gets invalidated.
 
-**§10 selective relinearization and §12 variable reordering (COLAMD) remain unimplemented** - no numeric solve is integrated with the tree above. That's still [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`)'s job, and it implements the original **iSAM v1** mechanism described in [`isam_optimization.md`](isam_optimization.md) instead - incremental Givens-rotation QR row insertion into a running square-root-information matrix, plus periodic/loop-closure-triggered full relinearization, with no Bayes tree involved at all. Its own module docstring explicitly calls out the Bayes tree and COLAMD as out of scope; see [`isam_optimization.md` §14](isam_optimization.md#14-where-this-is-implemented-in-this-repo) for exactly where that line is drawn.
+**§10 selective relinearization and §12 variable reordering (CCOLAMD) remain unimplemented** - no numeric solve is integrated with the tree above. That's still [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`)'s job, and it implements the original **iSAM v1** mechanism described in [`isam_optimization.md`](isam_optimization.md) instead - incremental Givens-rotation QR row insertion into a running square-root-information matrix, plus periodic/loop-closure-triggered full relinearization, with no Bayes tree involved at all. Its own module docstring explicitly calls out the Bayes tree and COLAMD as out of scope; see [`isam_optimization.md` §14](isam_optimization.md#14-where-this-is-implemented-in-this-repo) for exactly where that line is drawn.
 
 So this page's Bayes tree now has a real, runnable counterpart, but iSAM2 as a whole - the tree, selective relinearization, and dynamic reordering working together against an actual numeric solve - is still the conceptual target no single script in `use_numpy/`/`use_manif/` reaches.
 

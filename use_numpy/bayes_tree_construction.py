@@ -27,7 +27,7 @@ node indices a factor connects, never on the noisy relative-pose values
 themselves.
 
 Elimination order is fixed as oldest-first (node 0 first, the newest node
-last/root) -- a simple, deterministic choice, not iSAM2's dynamic COLAMD
+last/root) -- a simple, deterministic choice, not iSAM2's dynamic CCOLAMD
 reordering (out of scope here, see docs/optimization/isam2_optimization.md
 Section 12). Worked out by hand before writing this script: under that
 order, the loop-closure edge connects the *first*-eliminated node (the
@@ -35,7 +35,7 @@ deepest possible leaf) to the root, so the resulting tree is a straight
 chain (constant-size-2 separators throughout, per this script's own printed
 "Largest separator" line -- not "ever-growing" as an earlier version of this
 docstring claimed), and the loop closure invalidates the *entire* chain --
-the worst case a fill-reducing reordering like COLAMD exists specifically to
+the worst case iSAM2's constrained reordering (CCOLAMD) exists specifically to
 avoid. That worst case isn't hidden here; it's the whole point of the
 comparison this script prints and plots.
 
@@ -179,7 +179,7 @@ def main():
     print(f"Affected region if loop-closure edge {loop_edge} arrives:     "
           f"{len(affected_loop)}/{n_poses} variables ({100 * len(affected_loop) / n_poses:.1f}%)")
     print("\nSame fixed elimination order, wildly different cost: this is exactly why real "
-          "iSAM2 needs dynamic reordering (COLAMD) instead of a fixed one -- not implemented "
+          "iSAM2 needs dynamic reordering (CCOLAMD) instead of a fixed one -- not implemented "
           "here, see docs/optimization/isam2_optimization.md Section 12.")
 
     pos = layout_tree(children, root)
