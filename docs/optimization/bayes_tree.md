@@ -375,7 +375,7 @@ Team Leader
    ↓
 Manager A
    ↓
-CEO
+  CEO
 ```
 
 while leaving Manager B's branch alone. The CEO is always on the path: in a Bayes tree, every update reaches the root.
