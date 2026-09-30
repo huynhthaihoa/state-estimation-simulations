@@ -422,8 +422,8 @@ measurements
      ├─────────┤
      ▼         ▼
    x₀  ─── x₁ ─── x₂ ─── x₃
-    \                 /
-     └── loop closure┘
+    \                   /
+    └──loop closure────┘
              │
              ▼
         JOINT OPTIMIZATION
