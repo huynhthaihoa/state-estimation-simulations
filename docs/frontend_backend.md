@@ -10,7 +10,7 @@ A simple way to think about them is:
 
 ![Front-end (visual odometry: feature extraction, data association) feeding a back-end optimization stage that produces a mapped point-cloud trajectory, with loop closure looping back into the front-end](images/frontend_backend_1.jpg)
 
-![A tracking / window-optimization visual-odometry pipeline feeding a front-end manager (location awareness, loop-closure constraint) into back-end pose-map optimization, alongside a keyframe / point-cloud / vocabulary dataset](images/frontend_backend_2.jpg)
+![A tracking/window-optimization visual-odometry pipeline feeding a front-end manager (location awareness, loop-closure constraint) into back-end pose-map optimization, alongside a keyframe/point-cloud/vocabulary dataset](images/frontend_backend_2.jpg)
 
 ![A "Front End SLAM" block (feature extraction, submaps, sensor processing, motion estimation) producing a pose, and a separate "Backend SLAM" block (loop closure, graph optimization, global map optimization) producing a map](images/frontend_backend_3.jpg)
 
@@ -31,11 +31,11 @@ Camera images
      ↓
 Feature detection
      ↓
-Feature matching / tracking
+Feature matching/tracking
      ↓
 Motion estimation
      ↓
-Measurements / constraints
+Measurements/constraints
      ↓
   Back-end
 ```
@@ -43,10 +43,10 @@ Measurements / constraints
 Typical front-end tasks:
 
 - **Feature extraction** - ORB, FAST, SIFT, etc.
-- **Feature tracking / matching**
+- **Feature tracking/matching**
 - **Data association** - determining that a feature in frame $k$ is the same physical point seen in frame $k+1$
 - **Visual odometry**
-- **Depth estimation / triangulation** - see [frontend/triangulation_pnp.md](frontend/triangulation_pnp.md) for the actual math, plus its inverse problem, Perspective-n-Point (PnP), which estimates the pose from known points
+- **Depth estimation/triangulation** - see [frontend/triangulation_pnp.md](frontend/triangulation_pnp.md) for the actual math, plus its inverse problem, Perspective-n-Point (PnP), which estimates the pose from known points
 - **Keyframe selection**
 - **Loop-closure detection**
 
@@ -107,7 +107,7 @@ Common back-end techniques include:
 - **[Nonlinear least squares](optimization/nonlinear_least_square.md)**
 - **[Gauss-Newton](optimization/gauss_newton.md)**
 - **[Levenberg-Marquardt](optimization/levenberg_marquardt.md)**
-- **[iSAM / incremental optimization](optimization/isam_optimization.md)**
+- **[iSAM/incremental optimization](optimization/isam_optimization.md)**
 
 ---
 
@@ -148,7 +148,7 @@ It generates a constraint between the *non-consecutive* poses $x_0$ and $x_4$: a
 
 The **back-end then optimizes the entire trajectory** so that all constraints are satisfied as well as possible.
 
-In practice, "loop closure" really spans both stages: the front-end / place-recognition module detects the candidate match, while the back-end verifies it and folds it into the global optimization - which is why some of the diagrams above draw the "loop closure" box on the back-end side instead.
+In practice, "loop closure" really spans both stages: the front-end/place-recognition module detects the candidate match, while the back-end verifies it and folds it into the global optimization - which is why some of the diagrams above draw the "loop closure" box on the back-end side instead.
 
 That's why you can think of:
 
@@ -166,7 +166,7 @@ That's why you can think of:
 | Input              | Raw sensor data                                  | Measurements/constraints                |
 | Output             | Features, matches, relative poses, loop closures | Optimized poses/map                     |
 | Typical algorithms | Feature tracking, VO, matching                   | BA, pose graph, factor graph            |
-| Focus              | Local / sequential                               | Global / accumulated                    |
+| Focus              | Local/sequential                               | Global/accumulated                    |
 | Question           | "What happened?"                                 | "What is the best overall explanation?" |
 
 ---
@@ -204,7 +204,7 @@ A useful mental model is:
 ## 6. References
 
 1. Cadena, C., Carlone, L., Carrillo, H., Latif, Y., Scaramuzza, D., Neira, J., Reid, I., & Leonard, J. J. (2016). *Past, Present, and Future of Simultaneous Localization and Mapping: Toward the Robust-Perception Age*. IEEE Transactions on Robotics, 32(6), 1309–1332. https://doi.org/10.1109/TRO.2016.2624754 - the standard survey that frames the front-end/back-end split used throughout this doc (§1, §2, §4).
-2. Grisetti, G., Kümmerle, R., Stachniss, C., & Burgard, W. (2010). *A Tutorial on Graph-Based SLAM*. IEEE Intelligent Transportation Systems Magazine, 2(4), 31–43. https://doi.org/10.1109/MITS.2010.939925 - the back-end / pose-graph optimization tutorial behind §2 and §4.
+2. Grisetti, G., Kümmerle, R., Stachniss, C., & Burgard, W. (2010). *A Tutorial on Graph-Based SLAM*. IEEE Intelligent Transportation Systems Magazine, 2(4), 31–43. https://doi.org/10.1109/MITS.2010.939925 - the back-end/pose-graph optimization tutorial behind §2 and §4.
 3. Mur-Artal, R., Montiel, J. M. M., & Tardós, J. D. (2015). *ORB-SLAM: A Versatile and Accurate Monocular SLAM System*. IEEE Transactions on Robotics, 31(5), 1147–1163. https://doi.org/10.1109/TRO.2015.2463671 - a concrete worked system pairing an ORB-feature front-end with a local-BA + pose-graph back-end, behind §1's ORB mention and §3's loop-closure walkthrough.
 4. Gálvez-López, D., & Tardós, J. D. (2012). *Bags of Binary Words for Fast Place Recognition in Image Sequences*. IEEE Transactions on Robotics, 28(5), 1188–1197. https://doi.org/10.1109/TRO.2012.2197158 - the DBoW2 place-recognition method behind §3's claim that loop-closure *detection* is a front-end (place-recognition) task.
 5. Chen, W., Shang, G., Ji, A., Zhou, C., Wang, X., Xu, C., Li, Z., & Hu, K. (2022). *An Overview on Visual SLAM: From Tradition to Semantic*. Remote Sensing, 14(13), 3010. https://doi.org/10.3390/rs14133010 - the original source of the diagram in `images/frontend_backend_1.jpg` (see Image sources below).

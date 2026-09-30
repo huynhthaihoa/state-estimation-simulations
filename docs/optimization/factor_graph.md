@@ -13,7 +13,7 @@ For SLAM:
 - **Factors** = measurements/constraints
   → odometry, camera observations, IMU measurements, GPS, loop closures, etc.
 
-![A bipartite factor graph for a SLAM-style problem: robot poses x0..xn connected by odometry-measurement factors u1..un, with landmarks l1, l2 connected to poses via landmark-measurement factors m1..m4, plus a small "variable node / factor node" legend](../images/factor_graph_1.jpg)
+![A bipartite factor graph for a SLAM-style problem: robot poses x0..xn connected by odometry-measurement factors u1..un, with landmarks l1, l2 connected to poses via landmark-measurement factors m1..m4, plus a small "variable node/factor node" legend](../images/factor_graph_1.jpg)
 
 ![A pose-graph diagram (in Korean) with keyframe poses P0..P6, a black PriorFactor on P0, blue BetweenFactors along the chain, a red BetweenFactor (loop closure) between P0 and P5, and green UnaryFactors on P5](../images/factor_graph_2.jpg)
 
@@ -372,7 +372,7 @@ and updates:
 
 $$X \leftarrow X \oplus\Delta X$$
 
-For poses, that $\oplus$ is often implemented using **[Lie algebra](../foundations/lie_algebra.md) / SE(3)**.
+For poses, that $\oplus$ is often implemented using **[Lie algebra](../foundations/lie_algebra.md)/$`SE(3)`$**.
 
 Put together, the pieces above connect like this:
 
@@ -381,7 +381,7 @@ Factor graph
      ↓
 Nonlinear least squares
      ↓
-Gauss–Newton / Levenberg–Marquardt
+Gauss–Newton/Levenberg–Marquardt
      ↓
 Linearization
      ↓
@@ -503,7 +503,7 @@ And this gives you a very useful hierarchy:
 
 > **Nonlinear least squares** = mathematical formulation
 
-> **Gauss–Newton / LM** = optimization method
+> **Gauss–Newton/LM** = optimization method
 
 > **Lie algebra** = convenient way to optimize poses on SE(3)
 
@@ -519,7 +519,7 @@ That is the conceptual bridge connecting essentially all the SLAM topics covered
 
 ### Image sources
 
-<!-- 1. `images/factor_graph_1.jpg` - originally cited as https://ieeexplore.ieee.org/document/910572 (IEEE document 910572, i.e., Reference 1 above). **This citation is incorrect.** The paper was downloaded in full and every figure inspected; none of them show robot poses, landmarks, "Odometry measurement"/"Landmark measurement" labels, or the "Bipartite graph with variable nodes and factor nodes" legend seen in this image - the paper's figures are all abstract coding-theory examples ($x_1,\dots,x_5$ with generic factors $f_A,\dots,f_E$), Tanner graphs, trellises, and a scalar Kalman-filter derivation. A plausible alternative family of sources (Dellaert & Kaess's SLAM tutorials, which use this exact "Odometry measurement" / "Landmark measurement" phrasing with toy robot/furniture photos) was checked and did not match either - their version uses photographs, not the abstract $x_0,\dots,x_n$ / $l_1, l_2$ circles seen here. The true source of this image is **unidentified**; do not cite IEEE document 910572 for it. -->
+<!-- 1. `images/factor_graph_1.jpg` - originally cited as https://ieeexplore.ieee.org/document/910572 (IEEE document 910572, i.e., Reference 1 above). **This citation is incorrect.** The paper was downloaded in full and every figure inspected; none of them show robot poses, landmarks, "Odometry measurement"/"Landmark measurement" labels, or the "Bipartite graph with variable nodes and factor nodes" legend seen in this image - the paper's figures are all abstract coding-theory examples ($x_1,\dots,x_5$ with generic factors $f_A,\dots,f_E$), Tanner graphs, trellises, and a scalar Kalman-filter derivation. A plausible alternative family of sources (Dellaert & Kaess's SLAM tutorials, which use this exact "Odometry measurement"/"Landmark measurement" phrasing with toy robot/furniture photos) was checked and did not match either - their version uses photographs, not the abstract $x_0,\dots,x_n$/$l_1, l_2$ circles seen here. The true source of this image is **unidentified**; do not cite IEEE document 910572 for it. -->
 2. `images/factor_graph_2.jpg` - originally cited as https://engcang.github.io/gtsam_tutorial.html, match for the second pose-graph figure on that page (image file `/assets/img/posts/230715_gtsam/graph2.png`), a Korean-language GTSAM tutorial blog post by Eungchang Mason Lee (page title "GTSAM 튜토리얼 | Eungchang Mason Lee").
 3. `images/factor_graph_3.jpg` - originally cited as https://www.mdpi.com/2079-9292/12/13/2925, match for Figure 1 of Reference 3 above (downloaded directly from MDPI's own PDF host, since the MDPI article page itself returns HTTP 403 to automated fetches).
 4. `images/factor_graph_4.jpg` - originally cited as https://cmsc426.github.io/gtsam/, match for the image `/assets/sfm/gtsam9.png` embedded on that page, part of the University of Maryland CMSC426 (Computer Vision) course's "Structure from Motion" lecture notes.

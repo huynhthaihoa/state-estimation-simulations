@@ -149,7 +149,7 @@ In practice, PnP almost always runs inside **RANSAC**, because some 2D-3D matche
 
 ## 6. One-sentence summary
 
-> **Triangulation and PnP are the same reprojection problem run in opposite directions - one holds poses fixed to solve for a point, the other holds several known points fixed to solve for a pose - and this repo solves both the same way: a closed-form linear guess (ray intersection / DLT) followed by a few Gauss-Newton iterations, guarded against the same sign/reflection ambiguity in both directions.**
+> **Triangulation and PnP are the same reprojection problem run in opposite directions - one holds poses fixed to solve for a point, the other holds several known points fixed to solve for a pose - and this repo solves both the same way: a closed-form linear guess (ray intersection/DLT) followed by a few Gauss-Newton iterations, guarded against the same sign/reflection ambiguity in both directions.**
 
 ---
 

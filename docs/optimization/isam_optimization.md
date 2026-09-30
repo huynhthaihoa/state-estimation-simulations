@@ -1,4 +1,4 @@
-# iSAM / incremental optimization
+# iSAM/incremental optimization
 
 Instead of solving the entire factor graph from scratch every time a new measurement arrives, update the existing solution intelligently.
 
@@ -325,7 +325,7 @@ $$P(x_t \mid z_{1:t})$$
 
 ---
 
-### iSAM / smoothing
+### iSAM/smoothing
 
 Instead:
 
@@ -363,7 +363,7 @@ You can now connect your previous topics like this:
           │                     │
       Filtering             Smoothing
           │                     │
-       EKF / KF           Factor graph
+       EKF/KF              Factor graph
                                 │
                        Nonlinear optimization
                                 │
@@ -371,7 +371,7 @@ You can now connect your previous topics like this:
                     │                      │
                   Batch              Incremental
                     │                      │
-             Gauss-Newton            iSAM / iSAM2
+             Gauss-Newton            iSAM/iSAM2
              Levenberg-Marquardt
 ```
 
@@ -392,7 +392,7 @@ Gauss-Newton
  ↓
 Factorization
  ↓
-iSAM / iSAM2
+iSAM/iSAM2
 ```
 
 ---

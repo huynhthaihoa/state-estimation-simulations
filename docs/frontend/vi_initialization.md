@@ -83,6 +83,6 @@ Conceptual only - there is no accompanying script for this doc. Unlike `triangul
 
 ## 7. References
 
-1. Qin, T., & Shen, S. (2017). *Robust Initialization of Monocular Visual-Inertial Estimation on Aerial Robots*. IROS 2017, 4225-4232. https://doi.org/10.1109/IROS.2017.8206284 - the source of the linear gyro-bias / gravity-scale-velocity alignment pipeline in §2.
+1. Qin, T., & Shen, S. (2017). *Robust Initialization of Monocular Visual-Inertial Estimation on Aerial Robots*. IROS 2017, 4225-4232. https://doi.org/10.1109/IROS.2017.8206284 - the source of the linear gyro-bias/gravity-scale-velocity alignment pipeline in §2.
 2. Qin, T., Li, P., & Shen, S. (2018). *VINS-Mono: A Robust and Versatile Monocular Visual-Inertial State Estimator*. IEEE Transactions on Robotics, 34(4), 1004-1020. https://doi.org/10.1109/TRO.2018.2853729 - the full system this initialization pipeline bootstraps; already cited in [filtering_smoothing.md §12](../filtering_smoothing.md#12-references) and [marginalization.md §11](../optimization/marginalization.md#11-references).
 3. Campos, C., Montiel, J. M. M., & Tardós, J. D. (2020). *Inertial-Only Optimization for Visual-Inertial Initialization*. ICRA 2020, 51-57. https://doi.org/10.1109/ICRA40945.2020.9197334 - ORB-SLAM3's nonlinear MAP-estimation alternative to §2's closed-form pipeline, named in §3's contrast.

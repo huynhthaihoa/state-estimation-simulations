@@ -390,7 +390,7 @@ A useful hierarchy:
 
 In SLAM, you'll frequently encounter:
 
-**Gauss-Newton / Levenberg-Marquardt + sparse linear solver**
+**Gauss-Newton/Levenberg-Marquardt + sparse linear solver**
 
 because SLAM naturally produces large, sparse least-squares problems.
 

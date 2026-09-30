@@ -709,7 +709,7 @@ SLAM
  ├── Filtering
  │     └── EKF-SLAM
  │
- └── Optimization / Smoothing
+ └── Optimization/Smoothing
        │
        ├── Pose Graph Optimization
        │

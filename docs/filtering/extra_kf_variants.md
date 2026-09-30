@@ -92,7 +92,7 @@ UKF can be attractive when:
 
 The cost: it evaluates the model $2n+1$ times per step instead of once, which adds up for high-dimensional states.
 
-See `run_ukf` in [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/pointcloud_pose_tracking.py) / [`use_manif/pointcloud_pose_tracking.py`](../../use_manif/pointcloud_pose_tracking.py) for a runnable manifold-UKF implementation of this idea.
+See `run_ukf` in [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/pointcloud_pose_tracking.py)/[`use_manif/pointcloud_pose_tracking.py`](../../use_manif/pointcloud_pose_tracking.py) for a runnable manifold-UKF implementation of this idea.
 
 ---
 
@@ -413,7 +413,7 @@ This is very important for **offline SLAM and trajectory estimation**. [filterin
 
 ---
 
-## 11. Multi-rate / asynchronous Kalman filtering
+## 11. Multi-rate/asynchronous Kalman filtering
 
 Suppose you have:
 
@@ -477,7 +477,7 @@ Understand:
 
 ↓
 
-#### 3. Error-State EKF / ESKF
+#### 3. Error-State EKF/ESKF
 
 Understand:
 
@@ -554,7 +554,7 @@ IMU → KF/EKF/ESKF/IEKF → current state
 
 You maintain a state estimate recursively.
 
-### Optimization / smoothing
+### Optimization/smoothing
 
 ```text
            ┌────── camera ───────┐
@@ -572,7 +572,7 @@ Examples include:
 
 - Bundle Adjustment
 - Factor Graphs
-- iSAM / iSAM2
+- iSAM/iSAM2
 - GTSAM-style smoothing
 - pose-graph optimization
 

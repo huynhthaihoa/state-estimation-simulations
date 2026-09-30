@@ -8,7 +8,7 @@
 
 ## 1. Start with the problem
 
-In SLAM / [bundle adjustment](bundle_adjustment.md) / [factor graphs](factor_graph.md), we usually have:
+In SLAM/[bundle adjustment](bundle_adjustment.md)/[factor graphs](factor_graph.md), we usually have:
 
 ```math
 \min_x \sum_i \|e_i(x)\|^2
@@ -434,7 +434,7 @@ LM
       ↓
 Solve for Δx
       ↓
-Update poses / landmarks
+Update poses/landmarks
       ↓
 Repeat
 ```
@@ -532,7 +532,7 @@ Batch optimization
 
 Incremental optimization
        │
-       └── iSAM / iSAM2
+       └── iSAM/iSAM2
 ```
 
 ---
@@ -558,5 +558,5 @@ Every LM solver here uses §12's Marquardt form, $(H + \lambda\,\text{diag}(H))\
 
 1. Levenberg, K. (1944). *A Method for the Solution of Certain Non-Linear Problems in Least Squares*. Quarterly of Applied Mathematics, 2(2), 164–168. https://doi.org/10.1090/qam/10666 - the original damped least-squares method behind §4's $(J^\top J+\lambda I)\Delta x=-J^\top e$.
 2. Marquardt, D. W. (1963). *An Algorithm for Least-Squares Estimation of Nonlinear Parameters*. Journal of the Society for Industrial and Applied Mathematics, 11(2), 431–441. https://doi.org/10.1137/0111030 - the scale-invariant diagonal-damping variant $D=\text{diag}(J^\top J)$ behind §12.
-3. Triggs, B., McLauchlan, P. F., Hartley, R. I., & Fitzgibbon, A. W. (2000). *Bundle Adjustment - A Modern Synthesis*. In Vision Algorithms: Theory and Practice (LNCS vol. 1883, pp. 298–372). Springer. https://doi.org/10.1007/3-540-44480-7_21 - the reprojection-error / bundle-adjustment application of LM behind §9.
+3. Triggs, B., McLauchlan, P. F., Hartley, R. I., & Fitzgibbon, A. W. (2000). *Bundle Adjustment - A Modern Synthesis*. In Vision Algorithms: Theory and Practice (LNCS vol. 1883, pp. 298–372). Springer. https://doi.org/10.1007/3-540-44480-7_21 - the reprojection-error/bundle-adjustment application of LM behind §9.
 4. Dellaert, F., & Kaess, M. (2017). *Factor Graphs for Robot Perception*. Foundations and Trends in Robotics, 6(1–2), 1–139. https://doi.org/10.1561/2300000043 - general reference for the factor-graph formulation behind §1 and §10.

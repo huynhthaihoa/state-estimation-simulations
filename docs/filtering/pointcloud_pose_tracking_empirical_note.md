@@ -281,7 +281,7 @@ EKF vs IEKF: max pos diff = 3.2e-15 m                                     max ro
 EKF vs UKF : max pos diff = 1.445e-03 m (at k = 1)  final pos diff = 3.8e-06 m   max rot diff = 6.3e-02 deg
 ```
 
-The UKF gap is real and structural, not floating-point noise, but *where* it happens matters. The maximum sits at $k = 1$, the first update, when every filter is correcting the initial pose error ($\sigma_0 = 0.1$, so a correction of order 0.1 m / 0.1 rad): that's the largest correction in the run, and §3.2's second-order term scales with the size of the correction. Once the filters have converged the two agree far more closely: at the final pose the difference is 3.8e-6 m, about 0.1% of the final position error (0.0031 m, the same for both). The same pattern holds for seeds 1 and 2 (maximum at $k = 1$ each time). The "Final / RMS errors" table the script prints only shows 3-4 decimal places, which is why EKF, IEKF and UKF look identical there.
+The UKF gap is real and structural, not floating-point noise, but *where* it happens matters. The maximum sits at $k = 1$, the first update, when every filter is correcting the initial pose error ($\sigma_0 = 0.1$, so a correction of order 0.1 m/0.1 rad): that's the largest correction in the run, and §3.2's second-order term scales with the size of the correction. Once the filters have converged the two agree far more closely: at the final pose the difference is 3.8e-6 m, about 0.1% of the final position error (0.0031 m, the same for both). The same pattern holds for seeds 1 and 2 (maximum at $k = 1$ each time). The "Final/RMS errors" table the script prints only shows 3-4 decimal places, which is why EKF, IEKF and UKF look identical there.
 
 ### 3.4 How the gap moves as the step size changes
 
@@ -306,7 +306,7 @@ Three things show up:
 - **From $\Delta t = 0.02$ upward, the steady-state gap grows with $\Delta t$**, as the mechanism predicts, for position and rotation alike.
 - **Below $\Delta t = 0.02$ it grows again**, to 2.6e-4 m at $\Delta t = 0.001$. This is not floating-point precision. It comes from `unscented_sigma_offsets` ([`utils.py`](../../utils.py)), which adds a fixed $10^{-9} I$ to $P$ before taking its Cholesky factor. As $\Delta t$ shrinks, so does $Q = \Delta t^2 Q_{\text{rate}}$ and with it the converged $P$, until that fixed term is no longer small next to $P$ and visibly widens the sigma points. Setting it to $10^{-15}$ or $0$ (a local experiment; the code still uses $10^{-9}$) drops the gap at $\Delta t = 0.001$ from 2.8e-4 m to 4.2e-6 m, with $\sigma_0 = 0.01$. So the small-$`\Delta t`$ rise is an artifact of a numerical-safety constant, not of the EKF/UKF mechanisms.
 
-Seeds 1 and 2 show the same pattern (steady state at $\Delta t = 0.001 / 0.02 / 0.1 / 0.4$: 2.3e-4 / 5.1e-6 / 2.4e-5 / 7.8e-4 m and 2.8e-4 / 6.0e-6 / 2.0e-5 / 3.9e-4 m).
+Seeds 1 and 2 show the same pattern (steady state at $\Delta t = 0.001/0.02/0.1/0.4$: 2.3e-4/5.1e-6/2.4e-5/7.8e-4 m and 2.8e-4/6.0e-6/2.0e-5/3.9e-4 m).
 
 ### 3.5 What actually differs: a small accuracy gap, and a real cost gap
 
@@ -343,7 +343,7 @@ EKF vs VKF: max pos diff = 1.349e-02 m (at k = 1)   final pos diff = 1.4e-03 m  
 
 Vanilla KF's maximum is also at the first update, and about 9x UKF's. The bigger difference is at the end: after convergence UKF agrees with EKF to micrometers, while vanilla KF is still 1.4 mm away, about 45% of the final error.
 
-The script's own printed "Final / RMS errors" table shows how easy this is to miss at a glance: at default args, EKF's final rot/pos reads `0.289 deg / 0.0031 m` against vanilla KF's `0.314 deg / 0.0026 m`, which looks like noise at 3-4 decimal places. Vanilla KF happens to land slightly closer to the truth in position at this particular final pose, but it follows a different trajectory, not the same one with rounding.
+The script's own printed "Final/RMS errors" table shows how easy this is to miss at a glance: at default args, EKF's final rot/pos reads `0.289 deg/0.0031 m` against vanilla KF's `0.314 deg/0.0026 m`, which looks like noise at 3-4 decimal places. Vanilla KF happens to land slightly closer to the truth in position at this particular final pose, but it follows a different trajectory, not the same one with rounding.
 
 ### 4.4 How the gap moves as the step size changes
 
@@ -362,7 +362,7 @@ dt      first 1 s (m)   after 1 s (m)   after 1 s, rot (deg)
 0.40    4.6e-03         9.1e-03         2.3e+00
 ```
 
-- **The steady-state position gap shrinks roughly in proportion to $\Delta t$**, from 9.1e-3 m at $\Delta t = 0.4$ to 5.0e-5 m at $\Delta t = 0.001$, monotonically. That's mechanism 1, the truncated motion step, whose accumulated error over a fixed duration scales with $\Delta t$. Seeds 1 and 2 agree (5.5e-5 / 8.9e-4 / 3.3e-3 / 1.4e-2 m and 5.2e-5 / 8.8e-4 / 3.6e-3 / 1.3e-2 m at $\Delta t = 0.001 / 0.02 / 0.1 / 0.4$).
+- **The steady-state position gap shrinks roughly in proportion to $\Delta t$**, from 9.1e-3 m at $\Delta t = 0.4$ to 5.0e-5 m at $\Delta t = 0.001$, monotonically. That's mechanism 1, the truncated motion step, whose accumulated error over a fixed duration scales with $\Delta t$. Seeds 1 and 2 agree (5.5e-5/8.9e-4/3.3e-3/1.4e-2 m and 5.2e-5/8.8e-4/3.6e-3/1.3e-2 m at $\Delta t = 0.001/0.02/0.1/0.4$).
 - **The steady-state rotation gap grows fast at large $\Delta t$** (0.14° → 0.62° → 2.3° from $\Delta t = 0.1$ to 0.4), consistent with the per-step truncation error growing with the per-step rotation.
 - **The first-second gap is large and irregular at every $\Delta t$** (3e-3 to 2e-2 m). That's the initial correction, and it's consistent with the ambient-space linearization and the SVD re-projection (mechanisms 2 and 3) doing the most damage when the correction is large (not isolated separately here). Reporting only the maximum over the whole run would mix this transient into the step-size trend and hide it.
 

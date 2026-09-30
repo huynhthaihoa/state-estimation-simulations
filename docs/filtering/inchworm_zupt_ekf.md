@@ -147,11 +147,11 @@ A consistent 2-DoF filter averages $\text{NEES} = 2$; for an average over 500 tr
 
 **Why every variant is overconfident: the ramps.** The truth has no random disturbance at all. Its only departure from the filters' constant-velocity model is the ramp acceleration, $`v_{\text{extend}}/t_{\text{ramp}} = 0.5\,\text{m/s}^2`$, which is $3.3\times$ the assumed $`\sigma_{\text{process}} = 0.15\,\text{m/s}^2`$ (§2). Two checks at seed 0 confirm this is the whole story:
 
-| Setting | `never` anchor / cruise | `phase_conditional` anchor / cruise |
+| Setting | `never` anchor/cruise | `phase_conditional` anchor/cruise |
 | --- | --- | --- |
-| Defaults | 6.0 / 10.8 | 6.1 / 16.4 |
-| No motion ($`v_{\text{extend}} = 0`$) | 1.1 / 1.0 | 0.8 / 0.7 |
-| $`\sigma_{\text{process}} = 0.5\,\text{m/s}^2`$ (covers the ramps) | 1.4 / 1.6 | 0.9 / 1.7 |
+| Defaults | 6.0/10.8 | 6.1/16.4 |
+| No motion ($`v_{\text{extend}} = 0`$) | 1.1/1.0 | 0.8/0.7 |
+| $`\sigma_{\text{process}} = 0.5\,\text{m/s}^2`$ (covers the ramps) | 1.4/1.6 | 0.9/1.7 |
 
 With no motion, every variant is at or below 2 (conservative, since the filters assume noise the truth doesn't have). With $\sigma_{\text{process}}$ large enough to cover the ramps, `never` and `phase_conditional` are both consistent.
 

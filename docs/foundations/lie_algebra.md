@@ -439,7 +439,7 @@ You might ask:
 
 You can, but Euler angles have problems:
 
-- singularities / gimbal lock
+- singularities/gimbal lock
 - awkward composition
 - coordinate-dependent behavior
 - derivatives can become problematic
@@ -504,7 +504,7 @@ In one sentence:
 For SLAM, a useful mental picture is:
 
 ```text
-             GLOBAL / ACTUAL STATE
+              GLOBAL/ACTUAL STATE
                    Lie Group
                       SE(3)
                         ●

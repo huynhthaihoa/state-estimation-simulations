@@ -239,7 +239,7 @@ Factor graph
      ↓
 Sparse matrix
      ↓
-Cholesky / QR
+Cholesky/QR
      ↓
 Bayes tree
 ```
@@ -540,7 +540,7 @@ measurements + loop closures
    continuously optimize
 ```
 
-So iSAM2 is an **incremental smoothing / optimization** approach.
+So iSAM2 is an **incremental smoothing/optimization** approach.
 
 It retains historical variables and constraints.
 

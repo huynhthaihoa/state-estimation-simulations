@@ -26,7 +26,7 @@ The fundamental difference is:
 
 > **Estimate the current state using everything available up to now.**
 
-### Optimization / Smoothing
+### Optimization/Smoothing
 
 > **Estimate a whole trajectory by jointly considering many states and measurements, including information that may arrive later.**
 
@@ -325,7 +325,7 @@ That's smoothing.
 
 This gives us a useful trade-off:
 
-|                    | Filtering                      | Optimization / Smoothing                   |
+|                    | Filtering                      | Optimization/Smoothing                   |
 | ------------------ | ------------------------------ | ------------------------------------------ |
 | Main question      | Where am I **now**?            | Where was I **throughout the trajectory**? |
 | State maintained   | Current belief                 | Many historical states                     |
@@ -336,7 +336,7 @@ This gives us a useful trade-off:
 | Memory             | Lower                          | Higher                                     |
 | Online operation   | Excellent                      | Possible, but needs management             |
 | Global consistency | Harder                         | Stronger                                   |
-| Typical idea       | EKF-SLAM                       | Pose graph/factor graph / BA             |
+| Typical idea       | EKF-SLAM                       | Pose graph/factor graph/BA             |
 
 **A caveat on cost**: "filtering is cheaper" holds for small, fixed-size problems, but it inverts at scale. EKF-SLAM keeps a *dense* joint covariance, so every update costs roughly $O(n^2)$ in the number of landmarks (Dissanayake et al., 2001). Sparse factor-graph smoothing exploits the sparsity of the graph instead. With an incremental solver such as iSAM2 (Kaess et al., 2012), an odometry measurement only re-eliminates a small part of the Bayes tree near the newest pose. There is no guaranteed bound, though: a loop closure can force re-elimination of most or all of the tree, and the cost of that step depends on the fill-in of the sparse factorization. This repo's [`bayes_tree_construction.py`](../use_numpy/bayes_tree_construction.py) shows both cases on a 16-node square loop: an odometry edge affects 2 of 16 variables, while a loop-closure edge affects all 16 (see [`bayes_tree.md` §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo)). The defensible claim is therefore that *most* updates in a typical SLAM graph (mostly odometry, occasionally a loop closure) are cheap under iSAM2, while dense filtering pays $O(n^2)$ on every update. That is why large-scale SLAM moved from EKF-SLAM toward factor-graph smoothing.
 
@@ -412,7 +412,7 @@ measurements ──────►│  FILTER  │──────► current 
 
 The past gets **compressed**.
 
-### Smoothing / optimization
+### Smoothing/optimization
 
 ```text
 measurements
@@ -471,7 +471,7 @@ A rough map is:
                            smoothing   smoothing
                                │           │
                                ▼           ▼
-                         Factor graphs / Optimization
+                         Factor graphs/Optimization
 ```
 
 (KF and EKF stay in the dense, recursive filtering loop; fixed-lag and full smoothing are the methods usually solved via sparse factor-graph optimization.)
@@ -480,10 +480,10 @@ Examples you'll encounter:
 
 - **EKF-SLAM** → filtering
 - **MSCKF** → an EKF-based filter for visual-inertial estimation (a sliding window of poses, landmarks marginalized out rather than kept in the state)
-- **VINS-Mono / VINS-Fusion** → nonlinear optimization + sliding window
+- **VINS-Mono/VINS-Fusion** → nonlinear optimization + sliding window
 - **ORB-SLAM** → heavily optimization-based
 - **GTSAM-based systems** → factor-graph optimization
-- **iSAM / iSAM2** → incremental smoothing/optimization
+- **iSAM/iSAM2** → incremental smoothing/optimization
 
 (See [optimization/marginalization.md](optimization/marginalization.md) for the actual mechanics of how a state gets marginalized out and why that's what makes a bounded sliding window possible.)
 

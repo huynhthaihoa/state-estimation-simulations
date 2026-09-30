@@ -409,7 +409,7 @@ Optimization distributes that error.
 A typical pipeline looks roughly like:
 
 ```text
-Camera / LiDAR / IMU
+Camera/LiDAR/IMU
         │
         ▼
  Front-end estimation
@@ -529,7 +529,7 @@ If you remember only one thing:
 
 > **Pose-graph optimization is like taking a trajectory made of slightly inaccurate pieces, connecting those pieces with constraints - including loop closures - and then moving the poses around until the entire graph becomes as geometrically consistent as possible.**
 
-There's also a particularly important connection worth making explicit: **PGO is essentially a sparse nonlinear least-squares problem over poses on $SE(2)$ or $SE(3)$**. Once you understand that, the next natural step is understanding **why we need Lie groups / Lie algebra and how Gauss–Newton or Levenberg–Marquardt actually moves the poses during optimization**.
+There's also a particularly important connection worth making explicit: **PGO is essentially a sparse nonlinear least-squares problem over poses on $SE(2)$ or $SE(3)$**. Once you understand that, the next natural step is understanding **why we need Lie groups/Lie algebra and how Gauss–Newton or Levenberg–Marquardt actually moves the poses during optimization**.
 
 ---
 
@@ -600,7 +600,7 @@ The global optimization minimizes the sum of squared Mahalanobis distances over 
 
 Standard vector updates ${T_i \leftarrow T_i + \Delta x_i}$ break the matrix constraints of ${\mathrm{SE}(3)}$ (e.g., $R_i$ will cease to be orthogonal). Updates are applied using the exponential map ${\mathrm{Exp}: \mathbb{R}^6 \to \mathrm{SE}(3)}$ via local perturbations ${\boldsymbol{\xi}_i \in \mathbb{R}^6}$ acting on the tangent space.
 
-#### Local Perturbation Model (Left / Right Multiplication)
+#### Local Perturbation Model (Left/Right Multiplication)
 
 Applying a local perturbation $`{\boldsymbol{\xi}_i = \left[ \boldsymbol{\rho}^\top \;\; \boldsymbol{\phi}^\top \right]^\top \in \mathbb{R}^6}`$ to state $T_i$:
 
@@ -683,7 +683,7 @@ Larger $\lambda$ shrinks the step toward (diagonally scaled) gradient descent: s
 
 `--damping` (default 0.01) is only the starting $\lambda$.
 
-### 15.6 Retraction / State Update
+### 15.6 Retraction/State Update
 
 Once the increment vector ${\boldsymbol{\delta}^*}$ is computed, the system updates the trajectory states on the ${\mathrm{SE}(3)}$ manifold:
 
@@ -843,8 +843,8 @@ s_{ij} = \min\left(1, \; \frac{2 \Phi}{\Phi + e_{ij}^2}\right)
 | **Standard $L_2$** | Unbounded Quadratic ($e^2$) | Constant ($1.0$) | **None** (1 outlier ruins the map) |
 | **Huber** | Unbounded Linear ($\delta e$) | $\propto \frac{1}{e}$ | **Low/Moderate** (Dampens, but still pulls graph) |
 | **Cauchy** | Logarithmic ($\ln e^2$) | $\propto \frac{1}{e^2}$ | **High** |
-| **DCS** | Saturation / Bounded ($=\Phi$, see below) | $\propto \frac{1}{e^4}$ | **Very High** (Effectively turns off bad edges) |
-| **Geman-McClure** | Saturation / Bounded | $\propto \frac{1}{(1 + e^2)^2}$ | **Very High** |
+| **DCS** | Saturation/Bounded ($=\Phi$, see below) | $\propto \frac{1}{e^4}$ | **Very High** (Effectively turns off bad edges) |
+| **Geman-McClure** | Saturation/Bounded | $\propto \frac{1}{(1 + e^2)^2}$ | **Very High** |
 
 Note the distinction in the first column - but be careful what "DCS's cost" actually means here, since it's easy to under-count it. $s_{ij}^2 e_{ij}^2 = \frac{4\Phi^2 e^2}{(\Phi+e^2)^2}$ is only the *first* term of DCS's true objective - DCS comes from Switchable Constraints' augmented cost $\Psi(s, e) = s^2e^2 + \Phi(s-1)^2$ (the second term is the prior that keeps the switch $s$ near $1$ unless the data really justifies turning an edge off), and DCS's whole point is a closed-form $s$ that approximates the optimal solve of that *joint* cost, not $s^2e^2$ alone. Substituting $s=\frac{2\Phi}{\Phi+e^2}$ into the *full* $\Psi(s,e)$ (for $e^2>\Phi$) and simplifying: $s^2e^2 + \Phi(s-1)^2 = \frac{4\Phi^2e^2 + \Phi(\Phi-e^2)^2}{(\Phi+e^2)^2} = \frac{\Phi\left[4\Phi e^2 + (\Phi-e^2)^2\right]}{(\Phi+e^2)^2} = \frac{\Phi(\Phi+e^2)^2}{(\Phi+e^2)^2} = \Phi$ - a **constant**, independent of $e$, for every $e^2>\Phi$. So DCS's actual cost doesn't decay back to $0$ as $e\to\infty$ - it **saturates** at exactly $\Phi$, immediately upon crossing the threshold (a flatter, even more abrupt saturation than Geman-McClure's asymptotic approach to $1$). This is also the source of the DCS/Geman-McClure equivalence result (MacTavish & Barfoot, 2015): both cost functions saturate rather than diverge or decay, which is exactly why both make sense as $\frac{1}{e^4}$-weight, redescending M-estimators, and why both carry the same "Graduated Non-Convexity" caveat below.
 

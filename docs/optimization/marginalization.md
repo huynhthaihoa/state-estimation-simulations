@@ -10,7 +10,7 @@ This builds directly on two things you've already seen:
 
 ## 1. The problem sliding-window smoothing needs to solve
 
-Full batch optimization (plain [bundle_adjustment.md](bundle_adjustment.md) / [pose_graph_optimization.md](pose_graph_optimization.md)) keeps every pose ever seen in the optimization forever - the problem grows without bound as the robot keeps moving. [isam2_optimization.md](isam2_optimization.md) fixes the *recompute* cost (only touch the part of the Bayes tree a new factor actually affects) but not the *memory* cost - every variable is still in the graph, just efficiently re-solved.
+Full batch optimization (plain [bundle_adjustment.md](bundle_adjustment.md)/[pose_graph_optimization.md](pose_graph_optimization.md)) keeps every pose ever seen in the optimization forever - the problem grows without bound as the robot keeps moving. [isam2_optimization.md](isam2_optimization.md) fixes the *recompute* cost (only touch the part of the Bayes tree a new factor actually affects) but not the *memory* cost - every variable is still in the graph, just efficiently re-solved.
 
 A real-time VIO/VI-SLAM front-end (MSCKF, VINS-Mono, OKVIS) often can't afford either: fixed onboard memory, fixed per-frame compute budget, running forever. The fix is to actively **forget** old states - but forgetting a pose's *variable* while keeping the *information* it contributed is exactly what marginalization does.
 
@@ -40,7 +40,7 @@ That's marginalization. `bayes_tree.md` uses this step to build a *solve order* 
 
 ## 3. Three flavors of elimination, compared
 
-| | Structural (BA landmarks) | Solve-order (Bayes tree / iSAM2) | Temporal (this doc) |
+| | Structural (BA landmarks) | Solve-order (Bayes tree/iSAM2) | Temporal (this doc) |
 |---|---|---|---|
 | What's eliminated | 3D landmarks | any variable, in a chosen order | the oldest pose/state in the window |
 | Is it recoverable? | Yes - back-substitution recovers it | Yes - it stays in the graph, and is re-eliminated whenever a later update affects it | **No** - gone for good |
