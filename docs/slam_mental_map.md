@@ -37,8 +37,8 @@ Several docs already draw a partial map of their own corner. Treat those as zoom
 │            │                                           │                  │
 │   KF → EKF → IEKF                          factor graph = NLS problem     │
 │   UKF · ESKF · MSCKF                       PGO · BA · IMU factors         │
-│   hybrid resets · ZUPT · shaped Q          GN / LM         (batch)        │
-│                                            iSAM / iSAM2    (incremental)  │
+│   hybrid resets · ZUPT · shaped Q          GN/LM         (batch)        │
+│                                            iSAM/iSAM2    (incremental)  │
 │                                            marginalization (bounded)      │
 └─────────────────────────────────┬─────────────────────────────────────────┘
                                   │
@@ -89,7 +89,7 @@ Three questions organize the whole map:
 ## 3. Front-end: from raw sensors to constraints
 
 ```text
- camera images ──► features / matching ──► relative motion  T_ij ─────────┐
+ camera images ──► features/matching ──► relative motion  T_ij ─────────┐
                            │                                              │
                            ├──► triangulation   (known poses → 3D point)  │
                            ├──► PnP             (known 3D points → pose)  ├──► constraints
@@ -172,7 +172,7 @@ Smoothing keeps past states as variables and re-solves them jointly. The chain f
               normal equations  H Δx = -b      ◄── LM adds damping λ to H
                     │
   LINEAR            ▼
-  ALGEBRA     sparse Cholesky / QR  (ordering controls fill-in)
+  ALGEBRA     sparse Cholesky/QR  (ordering controls fill-in)
                     │
                     ▼
               retract: x ← x ⊞ Δx, repeat until converged
@@ -182,7 +182,7 @@ Smoothing keeps past states as variables and re-solves them jointly. The chain f
       BATCH     INCREMENTAL                BOUNDED
     re-solve    update the previous       keep a window,
     everything  factorization             marginalize the rest
-     (GN/LM)    (iSAM → iSAM2)            (sliding window / fixed lag)
+     (GN/LM)    (iSAM → iSAM2)            (sliding window/fixed lag)
 ```
 
 ### 5.1 The problem
@@ -228,7 +228,7 @@ Every estimator here that faces a nonlinear model, except the sigma-point UKF an
 
 ```text
   EKF predict/update ─┐
-  GN / LM step ───────┤
+  GN/LM step ───────┤
   IMU bias correction ┼──►  f(x + Δx) ≈ f(x) + J Δx   (jacobian.md)
   saltation matrix ───┤
   marginalization ────┘     ...and the linearization point matters (FEJ, relinearization)
@@ -245,7 +245,7 @@ The same question appears on both branches: in which frame, and on which space, 
 
 ### 6.3 Variable elimination: one operation, three uses
 
-The Schur complement / variable elimination shows up three times with three different purposes ([marginalization.md §3](optimization/marginalization.md#3-three-flavors-of-elimination-compared)):
+The Schur complement/variable elimination shows up three times with three different purposes ([marginalization.md §3](optimization/marginalization.md#3-three-flavors-of-elimination-compared)):
 
 ```text
                     variable elimination (Schur complement)
@@ -271,7 +271,7 @@ Loop closure is the event that separates SLAM from odometry, and every layer has
 | PGO | The drift conflict is spread over the whole loop | [pose_graph_optimization.md §5](optimization/pose_graph_optimization.md#5-pose-graph-optimization-resolves-the-conflict), [§10](optimization/pose_graph_optimization.md#10-why-loop-closure-is-so-powerful) |
 | Robust costs | A false closure is down-weighted | [pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures) |
 | iSAM | The new row sweeps through the factorization and causes fill-in; a batch relinearize-and-reorder step cleans it up | [isam_optimization.md §6](optimization/isam_optimization.md#6-but-what-about-loop-closure) |
-| Bayes tree / iSAM2 | The affected path reaches much further toward the root | [bayes_tree.md §8](optimization/bayes_tree.md#8-even-more-interesting-loop-closure), [isam2_optimization.md §9](optimization/isam2_optimization.md#9-but-what-about-loop-closure) |
+| Bayes tree/iSAM2 | The affected path reaches much further toward the root | [bayes_tree.md §8](optimization/bayes_tree.md#8-even-more-interesting-loop-closure), [isam2_optimization.md §9](optimization/isam2_optimization.md#9-but-what-about-loop-closure) |
 | Local vs. global BA | Global BA only helps once a loop (or absolute sensor) adds new information | [bundle_adjustment.md §13](optimization/bundle_adjustment.md#13-local-vs-global-bundle-adjustment-real-systems) |
 
 ### 6.5 Consistency, not just accuracy
@@ -288,7 +288,7 @@ Several findings in this repo show that the estimate that is closest on average 
 | `robot_imu_simulation.py` | Front-end → back-end | IMU dead reckoning + GN position correction | [imu_preintegration.md §7](optimization/imu_preintegration.md#7-what-the-accompanying-scripts-actually-do-and-dont) |
 | `imu_preintegration.py` | Front-end → back-end | Preintegrated IMU edge + bias Jacobians | [imu_preintegration.md](optimization/imu_preintegration.md) |
 | `pnp_estimation.py` | Front-end | Pose from known 3D points | [triangulation_pnp.md §3](frontend/triangulation_pnp.md#3-pnp-as-the-inverse-problem) |
-| `pointcloud_pose_tracking.py` | Back-end, both branches | EKF / IEKF / UKF / vanilla KF vs. batch GN | [pointcloud_pose_tracking_empirical_note.md](filtering/pointcloud_pose_tracking_empirical_note.md) |
+| `pointcloud_pose_tracking.py` | Back-end, both branches | EKF/IEKF/UKF/vanilla KF vs. batch GN | [pointcloud_pose_tracking_empirical_note.md](filtering/pointcloud_pose_tracking_empirical_note.md) |
 | `saltation_matrix_ekf.py` | Back-end, filtering | Hybrid resets | [hybrid_saltation_ekf.md](filtering/hybrid_saltation_ekf.md) |
 | `inchworm_zupt_ekf.py` | Back-end, filtering | Phase-gated ZUPT | [inchworm_zupt_ekf.md](filtering/inchworm_zupt_ekf.md) |
 | `friction_anisotropic_ekf.py` | Back-end, filtering | Heading-dependent $Q$ | [friction_anisotropic_ekf.md](filtering/friction_anisotropic_ekf.md) |
