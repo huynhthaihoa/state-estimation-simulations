@@ -43,7 +43,7 @@ That's marginalization. `bayes_tree.md` uses this step to build a *solve order* 
 | | Structural (BA landmarks) | Solve-order (Bayes tree/iSAM2) | Temporal (this doc) |
 |---|---|---|---|
 | What's eliminated | 3D landmarks | any variable, in a chosen order | the oldest pose/state in the window |
-| Is it recoverable? | Yes - back-substitution recovers it | Yes - it stays in the graph, and is re-eliminated whenever a later update affects it | **No** - gone for good |
+| Is it recoverable? | **Yes** - back-substitution recovers it | **Yes** - it stays in the graph, and is re-eliminated whenever a later update affects it | **No** - gone for good |
 | Why eliminate it | Landmarks outnumber cameras; cheap to invert | Reuse most of the last solve; minimize fill-in | Bound memory/compute to a fixed window size |
 | Where it's covered | [bundle_adjustment.md §12](bundle_adjustment.md#12-block-sparsity-and-the-schur-complement) | [bayes_tree.md](bayes_tree.md), [isam2_optimization.md](isam2_optimization.md) | §4-§7 below |
 
