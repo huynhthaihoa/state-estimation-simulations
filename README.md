@@ -28,7 +28,7 @@ Each `use_manif/<name>.py` is the manifpy counterpart of `use_numpy/<name>.py` o
 - The **factor-graph/smoothing** family: NLS, Gauss-Newton, Levenberg-Marquardt, factor graphs,
 pose-graph optimization, bundle adjustment, sparse Cholesky factorization, IMU preintegration, iSAM/iSAM2, elimination and Bayes trees, marginalization
 
-Start at [docs/README.md](docs/README.md) for the full index, or [docs/frontend_backend.md](docs/frontend_backend.md)/[docs/filtering_smoothing.md](docs/filtering_smoothing.md) for the two entry-point overviews.
+Start at [docs/README.md](docs/README.md) for the full index, or [docs/frontend_backend.md](docs/frontend_backend.md)/[docs/filtering_smoothing.md](docs/filtering_smoothing.md) for the two entry-point overviews, then [docs/slam_mental_map.md](docs/slam_mental_map.md) to see every doc and script placed on one map.
 
 ## C. Library structure
 

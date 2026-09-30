@@ -6,6 +6,7 @@ Conceptual/pedagogical notes on the state-estimation and SLAM ideas behind the c
 
 - [frontend_backend.md](frontend_backend.md): the **front-end**/**back-end** split in SLAM; the widest-angle overview of a SLAM pipeline.
 - [filtering_smoothing.md](filtering_smoothing.md): **filtering** (EKF-style) vs. **optimization/smoothing** (factor-graph-style) as the two general strategies for state estimation; the other natural entry point, and the one that motivates why both the `filtering/` and `optimization/` groups below exist.
+- [slam_mental_map.md](slam_mental_map.md): every doc and script in this repo placed on one map (foundations → front-end → back-end, filtering and smoothing), with the ideas that cut across branches and suggested reading paths. Read it after the two docs above, or come back to it whenever you lose track of where a topic fits.
 - [glossary.md](glossary.md): one- or two-sentence definitions of the terms shared across these docs, each linked to the section that explains it.
 
 ## [`foundations/`](foundations/) - Reusable math, not SLAM-specific

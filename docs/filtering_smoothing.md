@@ -487,6 +487,8 @@ Examples you'll encounter:
 
 (See [optimization/marginalization.md](optimization/marginalization.md) for the actual mechanics of how a state gets marginalized out and why that's what makes a bounded sliding window possible.)
 
+This is one corner of the repo-wide map in [slam_mental_map.md](slam_mental_map.md), which places every doc and script on one picture.
+
 ---
 
 ## 11. And this matters a lot for SLAM + state estimation for resource-constrained robots with discontinuous/hybrid motion

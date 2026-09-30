@@ -32,6 +32,8 @@ Standard KF  ┌───┴───────┐
 
 And then there are variants dealing with **noise, time, robustness, and computational constraints**.
 
+This is one corner of the repo-wide map in [slam_mental_map.md](../slam_mental_map.md), which places every doc and script on one picture.
+
 ---
 
 ## 1. Unscented Kalman Filter (UKF)

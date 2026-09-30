@@ -521,6 +521,8 @@ If you remember only three things:
 
 That mental model will make **Bayes trees and iSAM2** much easier to understand.
 
+This is one corner of the repo-wide map in [slam_mental_map.md](../slam_mental_map.md), which places every doc and script on one picture.
+
 ---
 
 ## 12. References

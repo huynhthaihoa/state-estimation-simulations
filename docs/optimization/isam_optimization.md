@@ -395,6 +395,8 @@ Factorization
 iSAM/iSAM2
 ```
 
+This is one corner of the repo-wide map in [slam_mental_map.md](../slam_mental_map.md), which places every doc and script on one picture.
+
 ---
 
 ## 12. The most intuitive way to remember iSAM

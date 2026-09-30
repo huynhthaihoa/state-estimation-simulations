@@ -583,6 +583,8 @@ iSAM/iSAM2
 Incremental smoothing
 ```
 
+This is one corner of the repo-wide map in [slam_mental_map.md](../slam_mental_map.md), which places every doc and script on one picture.
+
 ---
 
 ## 16. The one thing to remember
