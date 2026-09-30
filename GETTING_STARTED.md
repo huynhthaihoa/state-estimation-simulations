@@ -4,13 +4,14 @@ A suggested reading-and-running order through this repo, for anyone arriving fre
 
 Before starting, follow [README.md § D. Installation](README.md#d-installation) to get `uv sync` working. Every script below is invoked the same way: `uv run python use_numpy/<script>.py [flags]` - the full flag list for each one lives in [README.md § E. Library guideline](README.md#e-library-guideline); this guide only links to the relevant numbered entry there rather than repeating it.
 
-Once you've been through all nine phases, [`docs/README.md`](docs/README.md) is the fuller index to come back to for non-linear reference use.
+Once you've been through all nine phases, [`docs/README.md`](docs/README.md) is the fuller index to come back to for non-linear reference use, and [`docs/slam_mental_map.md`](docs/slam_mental_map.md) shows where each phase you've done sits in the overall picture.
 
 ---
 
 ## Phase 0 - Orient yourself (read only)
 
 - [`docs/frontend_backend.md`](docs/frontend_backend.md) and [`docs/filtering_smoothing.md`](docs/filtering_smoothing.md) - the two "big picture" docs. The second matters most: it names the repo's central fork - **filtering** (recursive, Kalman-style) vs. **optimization/smoothing** (factor-graph-style) - which is exactly how the rest of this repo is organized.
+- [`docs/slam_mental_map.md`](docs/slam_mental_map.md) §1 only - the one-diagram overview of how every doc and script fits together. Skim it for the layout; the later sections lean on terms the phases below introduce, so come back to them once you're done.
 - [`docs/foundations/lie_algebra.md`](docs/foundations/lie_algebra.md) - the single most load-bearing prerequisite in the whole repo: why orientation/pose live on $SO(3)$/$`SE(3)`$ and get updated via $\text{Exp}$/$`\text{Log}`$ instead of flat-vector addition. Every script depends on this.
 - [`docs/foundations/quaternion.md`](docs/foundations/quaternion.md) - quaternions as the other common 3D-orientation representation, alongside the rotation-matrix convention `lie_algebra.md` and this repo's own state representations otherwise use. Several `use_manif/` scripts do construct a `manif.SO3`/`manif.SE3` object from a quaternion under the hood (`euler_to_quat_xyzw`, an intermediate step, not the state representation itself) - this doc is the background for why that conversion looks the way it does.
 - [`docs/foundations/jacobian.md`](docs/foundations/jacobian.md) - what a Jacobian is, and its §11 (left/right Jacobians) for later.
