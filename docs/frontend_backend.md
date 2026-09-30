@@ -134,10 +134,10 @@ So the estimated trajectory drifts, and the final pose does not land back on A:
 
 ```text
      A ───── B
-               \
-   A′            C
-     \          /
-      D ───────
+              \
+    A′         \
+     \          \
+      D ─────────C
 ```
 
 Call the poses $x_0$ (A), $x_1$ (B), $x_2$ (C), $x_3$ (D) and $x_4$ (A′, the estimate of the final pose). The step D → A′ is just another odometry constraint. When the robot is back at A, the **front-end detects a loop closure**:
