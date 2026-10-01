@@ -606,8 +606,8 @@ def pose_errors(T_true_list, T_est_list):
         T_true_list: list of true poses (4,4)
         T_est_list: list of estimated poses (4,4)
     Returns:
-        rot_err: (N,) array of rotation errors (deg)
-        pos_err: (N,) array of position errors (m)
+        rot_err: (N+1,) array of rotation errors (deg), one per pose
+        pos_err: (N+1,) array of position errors (m), one per pose
     """
     n = len(T_true_list)
     rot_err, pos_err = np.zeros(n), np.zeros(n)

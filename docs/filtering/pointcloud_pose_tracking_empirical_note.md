@@ -241,7 +241,10 @@ There is no line search or Levenberg-Marquardt schedule. It starts from the dead
 
 #### Error metrics (`pose_errors`, `rotation_geodesic_error`)
 
-The rotation error is the angle of $`W = R^\top \hat R`$, computed as $`\mathrm{atan2}(s, c)`$ in degrees, with $`c = (\mathrm{tr}\,W - 1)/2`$ and $s$ the norm of $W$'s skew part, $`\tfrac12 \lVert (W - W^\top)^\vee \rVert`$. Unlike $\arccos(c)$, this stays accurate for tiny angles, down to round-off. The position error is $\lVert t - \hat t \rVert$. "Final" is the last pose, and "RMS" is over all $N+1$ poses, including $k = 0$.
+- The **rotation error** is the angle $\theta$ of the relative rotation $`W = R^\top \hat R`$, in degrees. It is computed as $`\mathrm{atan2}(s, c)`$, where $`c = (\mathrm{tr}\,W - 1)/2 = \cos\theta`$ is read off the symmetric part of $W$ and $`s = \tfrac12 \lVert (W - W^\top)^\vee \rVert = \sin\theta`$ off its skew part. Unlike $\arccos(c)$, this stays accurate for tiny angles, down to round-off. The `use_manif` version computes the same angle as $`\lVert \hat R\ \text{rminus}\ R \rVert`$, and manif's $SO(3)$ $\mathrm{Log}$ also uses `atan2`, so the same accuracy holds there.
+- The **position error** is $\lVert t - \hat t \rVert$.
+
+"Final" is the error in the last pose, whereas "RMS" is calculated over all $N+1$ poses, including $k = 0$. At $k = 0$ the five recursive methods (dead reckoning, EKF, IEKF, UKF, vanilla KF) all still sit at the initial guess, so they share the same initial error in their RMS, while batch GN already re-optimizes $T_0$. Small RMS gaps between GN and the recursive filters therefore partly reflect this difference at $k = 0$.
 
 
 ---
