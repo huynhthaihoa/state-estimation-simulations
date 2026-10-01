@@ -27,6 +27,10 @@ Preintegration solves both:
 
 - It tracks, *as it integrates*, a set of **bias-sensitivity Jacobians** that let that bundle be corrected for a bias change with one matrix-vector multiply instead of a full re-integration - solving **Problem B**.
 
+![Two panels from imu_preintegration.py's defaults: 100 IMU samples between keyframes i and j integrated once into a single preintegrated factor between x_i and x_j with its rotation, velocity and position change, and a bar chart contrasting re-integrating all 100 samples after a bias update with one first-order Jacobian correction that lands within 2.3e-6 m of it](../../assets/imu_preintegration_concept.png)
+
+*Figure: problems A and B at `use_numpy/imu_preintegration.py`'s defaults, plotted by `uv run python assets/make_figures.py imu_preintegration_concept`.*
+
 ---
 
 ## 2. The analogy: a trip summary, not a replayed dashcam
@@ -124,6 +128,10 @@ A full VIO (Visual-Inertial Odometry)/VI-SLAM back-end (GTSAM's `CombinedImuFact
 ![Two panels from imu_preintegration.py: the preintegrated position change built up sample by sample from keyframe i to keyframe j, and a log-scale bar chart comparing how much a bias update changes each preintegrated quantity with the error of the first-order Jacobian correction against a full re-integration](../../assets/imu_preintegration.png)
 
 *Figure: `use_numpy/imu_preintegration.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py imu_preintegration`.*
+
+![Two panels from robot_imu_simulation.py: one second of the timeline, with 100 IMU dead-reckoning steps followed by one position-only Gauss-Newton fix, and the 3-by-6 position Jacobian at the final estimate, whose rotation block equals R and whose three angular columns are exactly zero](../../assets/robot_imu_tracking_concept.png)
+
+*Figure: why the 1 Hz fix in `use_numpy/robot_imu_simulation.py` never corrects orientation (Jacobian from `position_observation_jacobian` at the end of a 10 s run, seed 0), plotted by `uv run python assets/make_figures.py robot_imu_tracking_concept`.*
 
 ![Two panels from robot_imu_simulation.py run for 10 s: position error just before and just after each 1 Hz position fix, and orientation error growing throughout because a position-only fix cannot correct rotation](../../assets/robot_imu_tracking.png)
 

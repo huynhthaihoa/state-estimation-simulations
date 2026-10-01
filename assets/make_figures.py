@@ -1,5 +1,6 @@
 """Generates one illustrative figure per simulation, from the simulations' own
-output, into assets/<name>.png.
+output, into assets/<name>.png, plus a setup figure (<name>_concept) for each
+of the three hybrid-filtering docs.
 
 Nothing here re-implements an estimator: every trajectory, error and NEES
 curve comes from calling the functions in use_numpy/ exactly the way each
@@ -22,7 +23,7 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.patches import Ellipse
+from matplotlib.patches import Ellipse, FancyArrowPatch, Rectangle
 from matplotlib.ticker import FuncFormatter, LogLocator
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -223,7 +224,7 @@ def fig_imu_preintegration():
     ax_b.set(yscale="log", ylim=(1e-6, 20), title="Bias update: Jacobian correction vs. full re-integration")
     ax_b.legend(loc="upper left")
     finish(fig, "imu_preintegration", "IMU preintegration with bias Jacobians",
-           "Script defaults (this demo integrates body-velocity samples, not accelerations); the bias update is "
+           "Script defaults (--linear-vel is a body-frame acceleration, integrated twice); the bias update is "
            f"applied as 1 Jacobian correction instead of re-integrating {hz} samples")
 
 
@@ -278,7 +279,7 @@ def fig_bundle_adjustment():
     rng = np.random.default_rng(SEED)
     K = (800.0, 800.0, 320.0, 240.0)
     T_true, P_all = m.generate_ground_truth_scene(8, 60, 5.0, 180.0, 2.0, rng)
-    P_true, obs = m.build_observations(T_true, P_all, K, 1.0, 70.0, 2, rng)
+    P_true, obs = m.build_observations(T_true, P_all, K, 1.0, 2, rng)
     T_init, P_init = m.perturb_initial_guess(T_true, P_true, 0.1, 0.3, rng)
     P_lo = quiet(m.run_ba_landmarks_only, T_init, P_init, obs, K, 1e-6, 30)
     T_po = quiet(m.run_ba_poses_only, T_init, P_init, obs, K, 1e-6, 30)
@@ -319,7 +320,7 @@ def fig_bundle_adjustment():
     ax_b.set(yscale="log", ylim=(1e-3, 1e5), title="RMS error by method (after similarity alignment)")
     ax_b.legend(loc="upper center", ncol=2)
     finish(fig, "bundle_adjustment", "Bundle adjustment: joint camera-pose and landmark refinement",
-           "Synthetic scene, cameras on an arc looking inward, 70° field of view, 1 px pixel noise; seed 0, script defaults")
+           "Synthetic scene, cameras on an arc looking inward, 640×480 image (f = 800 px), 1 px pixel noise; seed 0, script defaults")
 
 
 def fig_bundle_adjustment_advanced():
@@ -329,8 +330,8 @@ def fig_bundle_adjustment_advanced():
     K = (800.0, 800.0, 320.0, 240.0)
     n_kf = 50
     T_true = m.generate_ground_truth_trajectory(n_kf, 15.0, 90.0)
-    P_all = m.generate_landmark_corridor(T_true, 8, 2.0, 1.0, np.random.default_rng(SEED))
-    P_true, obs = m.build_observations(T_true, P_all, K, 1.0, 70.0, 6.0, 3, np.random.default_rng(SEED))
+    P_all = m.generate_landmark_corridor(T_true, 8, 2.0, 1.0, np.random.default_rng(SEED), extend_ahead=6.0)
+    P_true, obs = m.build_observations(T_true, P_all, K, 1.0, 6.0, 3, np.random.default_rng(SEED))
     by_kf = m.group_observations_by_keyframe(obs, n_kf)
     common = (T_true, by_kf, K, 0.02, 3, 2, 6, 8)
     T_loc, _, h_loc = quiet(m.run_incremental_local_ba, *common, False, 1e-6, 15, np.random.default_rng(SEED), 20)
@@ -675,7 +676,8 @@ def fig_pnp_estimation():
                     width=0.005, label=f"reprojection residual ×{mag}, {name} pose (RMS {reproj:.2f} px)")
     outside = int(np.sum((z[:, 0] < 0) | (z[:, 0] > 640) | (z[:, 1] < 0) | (z[:, 1] > 480)))
     print(f"    {outside} of {len(z)} observed pixels fall outside the 640x480 frame")
-    ax_i.set(title=f"Image plane: {len(P_list)} matches, {outside} outside the 640×480 frame (gray)", xlabel="u (px)",
+    frame_note = f", {outside} outside the 640×480 frame (gray)" if outside else " in the 640×480 frame (gray)"
+    ax_i.set(title=f"Image plane: {len(P_list)} matches{frame_note}", xlabel="u (px)",
              ylabel="v (px)", xlim=(min(-30, z[:, 0].min() - 60), max(670, z[:, 0].max() + 60)),
              ylim=(max(510, z[:, 1].max() + 60), min(-30, z[:, 1].min() - 60)))
     ax_i.set_aspect("equal")
@@ -731,6 +733,769 @@ def fig_sliding_window_marginalization():
            "older ones into a prior; seed 0, script defaults")
 
 
+# --------------------------------------------------------------------------- concept illustrations
+# Setup/mechanism figures for the top of each hybrid-filtering doc (no estimator runs). Same rule as
+# above: every curve and number comes from the scripts' own functions at their defaults; the only
+# non-data choice is the friction ellipses' visual magnification, which the figure states.
+
+def cov_ellipse(ax, center, cov, scale, **kw):
+    """Draws the 1-sigma ellipse of a 2x2 covariance, magnified by `scale`."""
+    vals, vecs = np.linalg.eigh(cov)
+    angle = np.degrees(np.arctan2(vecs[1, 1], vecs[0, 1]))
+    ax.add_patch(Ellipse(center, 2 * scale * np.sqrt(vals[1]), 2 * scale * np.sqrt(vals[0]),
+                         angle=angle, **kw))
+
+
+def arrow(ax, p, q, color, lw=1.6, style="-|>", ms=12, **kw):
+    ax.add_patch(FancyArrowPatch(p, q, arrowstyle=style, mutation_scale=ms, color=color, lw=lw, **kw))
+
+
+def fig_friction_anisotropic_ekf_concept():
+    """friction_anisotropic_ekf.py: the slip ellipse is body-fixed, so it turns with the robot."""
+    import friction_anisotropic_ekf as m
+
+    duration, dt, v_cmd = 20.0, 0.05, 0.2
+    omega = 2.0 * np.pi / duration  # script default: exactly one loop over the run
+    s_grip, s_slip = 0.02, 0.1
+    r = v_cmd / omega
+
+    # commanded arc, from the script's own exact propagator, starting at the script's x0 = 0
+    n = int(duration / dt)
+    x = np.zeros(3)
+    path = [x]
+    for _ in range(n):
+        x, _ = m.exact_arc_step(x, v_cmd, omega, dt)
+        path.append(x)
+    path = np.array(path)
+    theta_ref = path[0, 2]  # what fixed_anisotropic is stuck with (0.0)
+
+    fig, (ax_b, ax_w, ax_q) = plt.subplots(1, 3, figsize=(15, 5.6),
+                                           gridspec_kw={"width_ratios": [0.8, 1.25, 1.1]})
+
+    # (a) body frame: the pad is part of the robot
+    ax_b.set_aspect("equal")
+    ax_b.add_patch(Rectangle((-0.55, -0.35), 1.1, 0.7, fc="#e8eef6", ec="#5b6b7f", lw=1.4))
+    for k in np.linspace(-0.45, 0.45, 10):  # scales run along the body axis
+        ax_b.plot([-0.45, 0.45], [k * 0.62, k * 0.62], color="#aab7c6", lw=0.8)
+    Qb = np.diag([s_grip ** 2, s_slip ** 2])
+    cov_ellipse(ax_b, (0, 0), Qb, 5.0, fc=C["orange"], alpha=0.35, ec=C["orange"], lw=1.6)
+    arrow(ax_b, (0, 0), (0.95, 0), TRUTH, lw=2)
+    ax_b.text(0.97, 0.05, "forward\n(heading θ)", fontsize=9, va="bottom")
+    arrow(ax_b, (-0.62, -0.72), (0.62, -0.72), C["green"], style="<|-|>")
+    ax_b.text(0, -0.84, f"grip axis: σ_grip = {s_grip}", color=C["green"], ha="center", va="top", fontsize=9.5)
+    arrow(ax_b, (-0.75, -0.55), (-0.75, 0.55), C["red"], style="<|-|>")
+    ax_b.text(-0.82, 0, f"slip axis: σ_slip = {s_slip}", color=C["red"], rotation=90, ha="right",
+              va="center", fontsize=9.5)
+    ax_b.set(xlim=(-1.25, 1.6), ylim=(-1.45, 0.9), title="(a) Body frame: pad is part of the robot")
+    ax_b.axis("off")
+    ax_b.text(0.02, -0.02, "slip noise is drawn in this frame\n→ its ellipse is fixed to the body",
+              transform=ax_b.transAxes, fontsize=9, color="#555555")
+
+    # (b) world frame: one loop, true slip ellipse turns, the fixed one does not
+    ax_w.set_aspect("equal")
+    ax_w.plot(path[:, 0], path[:, 1], color=TRUTH, lw=1.6, label=f"commanded arc (r = v/ω = {r:.3f} m)")
+    ell_scale = 0.9  # visual magnification (1-sigma of slip speed, m/s → drawn as m)
+    for t_s in np.arange(0.0, duration, 2.5):
+        k = int(round(t_s / dt))
+        p, th = path[k, 0:2], path[k, 2]
+        cov_ellipse(ax_w, p, m.anisotropic_Q_pos(theta_ref, s_grip, s_slip, 1.0), ell_scale,
+                    fc="none", ec=C["red"], lw=1.3, ls="--")
+        cov_ellipse(ax_w, p, m.anisotropic_Q_pos(th, s_grip, s_slip, 1.0), ell_scale,
+                    fc=C["orange"], alpha=0.45, ec=C["orange"], lw=1.2)
+        arrow(ax_w, p, p + 0.13 * np.array([np.cos(th), np.sin(th)]), TRUTH, lw=1.4, ms=9)
+        ax_w.text(p[0] + 0.07 * np.cos(th - np.pi / 2) * 2.2, p[1] + 0.07 * np.sin(th - np.pi / 2) * 2.2,
+                  f"{np.degrees(th):.0f}°", fontsize=8, ha="center", va="center", color="#444444")
+    ax_w.plot([], [], color=C["orange"], lw=6, alpha=0.5, label="true slip ellipse (turns with heading)")
+    ax_w.plot([], [], color=C["red"], ls="--", label="fixed_anisotropic Q (stuck at θ₀ = 0°)")
+    ax_w.set(title="(b) World frame: one full loop, ω = 2π/T", xlabel="x (m)", ylabel="y (m)",
+             xlim=(-0.95, 0.95), ylim=(-0.25, 1.5))
+    ax_w.legend(loc="center", fontsize=7.5, frameon=False)
+
+    # (c) the three q_policies at heading 90°, where the fixed one is worst
+    k90 = int(round((np.pi / 2) / omega / dt))
+    th90 = path[k90, 2]
+    true_cov = m.anisotropic_Q_pos(th90, s_grip, s_slip, 1.0)
+    policies = [
+        ("isotropic", m.isotropic_Q_pos(s_grip, s_slip, 1.0), PRIOR, "same total variance,\nno direction"),
+        ("fixed_anisotropic", m.anisotropic_Q_pos(theta_ref, s_grip, s_slip, 1.0), C["red"],
+         "right shape,\nrotated 90° wrong"),
+        ("heading_aware", m.anisotropic_Q_pos(th90, s_grip, s_slip, 1.0), C["blue"],
+         "right shape,\nright orientation"),
+    ]
+    ax_q.set_aspect("equal")
+    for i, (name, Q, col, note) in enumerate(policies):
+        cx = i * 0.3
+        cov_ellipse(ax_q, (cx, 0), true_cov, 1.2, fc=C["orange"], alpha=0.35, ec="none")
+        cov_ellipse(ax_q, (cx, 0), Q, 1.2, fc="none", ec=col, lw=2)
+        arrow(ax_q, (cx, -0.02), (cx, 0.06), TRUTH, lw=1.2, ms=8)
+        ax_q.text(cx, 0.17, name, ha="center", fontsize=9, fontweight="bold", color=col)
+        ax_q.text(cx, -0.17, note, ha="center", va="top", fontsize=8.5, color="#444444")
+    ax_q.set(xlim=(-0.15, 0.75), ylim=(-0.38, 0.22),
+             title=f"(c) Filter Q at heading {np.degrees(th90):.0f}° (t = {k90 * dt:.0f} s)")
+    ax_q.axis("off")
+    ax_q.text(0.0, -0.02, "filled: true slip covariance    outline: the filter's Q\n"
+              "worst mismatch at 90° / 270°, aligned again at 180°",
+              transform=ax_q.transAxes, fontsize=8.5, color="#555555")
+
+    finish(fig, "friction_anisotropic_ekf_concept", "Friction-anisotropic pad: the noise ellipse turns with the robot",
+              f"friction_anisotropic_ekf.py defaults: v = {v_cmd} m/s, ω = 2π/{duration:.0f} s, "
+              f"σ_grip = {s_grip}, σ_slip = {s_slip} m/s. Ellipses drawn at 1σ, magnified ×{ell_scale} "
+              f"in (b); the {s_slip / s_grip:.0f}:1 axis ratio is exact.", bottom=0.03)
+
+
+def fig_inchworm_zupt_ekf_concept():
+    """inchworm_zupt_ekf.py: known anchor/extend schedule, and when each variant applies ZUPT."""
+    import inchworm_zupt_ekf as m
+
+    dt, t_a, t_e, t_r, v_e = 0.05, 1.0, 1.0, 0.2, 0.1
+    duration = 6.0  # 3 gait cycles of the default schedule (the script runs 10 s)
+    x_true, _, is_anchor, _ = m.generate_ground_truth_and_data(duration, dt, t_a, t_e, t_r, v_e, 0.0,
+                                                               np.random.default_rng(0))
+    t = np.arange(len(x_true)) * dt
+    tf = np.linspace(0, duration, 1201)
+    v_fine = np.array([m.true_velocity(s, t_a, t_e, t_r, v_e) for s in tf])
+    p_fine = np.concatenate([[0.0], np.cumsum(0.5 * (v_fine[1:] + v_fine[:-1]) * np.diff(tf))])
+
+    fig, axes = plt.subplots(3, 1, figsize=(13, 7.6), sharex=True,
+                             gridspec_kw={"height_ratios": [1.0, 1.0, 0.85]})
+    ax_p, ax_v, ax_z = axes
+
+    def phases(ax, label=False):
+        period = t_a + t_e
+        for c0 in np.arange(0, duration, period):
+            ax.axvspan(c0, c0 + t_a, color=C["green"], alpha=0.12, lw=0)
+            for a, b in [(c0 + t_a, c0 + t_a + t_r), (c0 + period - t_r, c0 + period)]:
+                ax.axvspan(a, b, color=C["gold"], alpha=0.18, lw=0)
+            if label:
+                ax.text(c0 + t_a / 2, 1.02, "ANCHOR", transform=ax.get_xaxis_transform(),
+                        ha="center", fontsize=9, color=C["green"], fontweight="bold")
+                ax.text(c0 + t_a + t_e / 2, 1.02, "EXTEND", transform=ax.get_xaxis_transform(),
+                        ha="center", fontsize=9, color="#a67c00", fontweight="bold")
+
+    phases(ax_p, label=True)
+    ax_p.plot(tf, p_fine, color=TRUTH, lw=2.2)
+    ax_p.set(ylabel="p (m)", title="")
+    ax_p.text(0.005, 0.8, "position: a staircase - it holds its new value while anchored",
+              transform=ax_p.transAxes, fontsize=9.5, color="#444444")
+
+    phases(ax_v)
+    ax_v.plot(tf, v_fine, color=TRUTH, lw=2.2)
+    ax_v.set(ylabel="v (m/s)", ylim=(-0.02, 0.17))
+    c0 = t_a
+    ax_v.annotate("", (c0, 0.113), (c0 + t_r, 0.113), arrowprops=dict(arrowstyle="<->", lw=1))
+    ax_v.text(c0 + t_r + 0.03, 0.111, f"t_ramp = {t_r} s", ha="left", fontsize=8.5)
+    ax_v.annotate("", (c0, 0.145), (c0 + t_e, 0.145), arrowprops=dict(arrowstyle="<->", lw=1))
+    ax_v.text(c0 + t_e / 2, 0.149, f"t_extend = {t_e} s", ha="center", fontsize=8.5)
+    ax_v.annotate("", (0, 0.145), (t_a, 0.145), arrowprops=dict(arrowstyle="<->", lw=1))
+    ax_v.text(t_a / 2, 0.149, f"t_anchor = {t_a} s", ha="center", fontsize=8.5)
+    ax_v.text(c0 + t_e / 2, v_e - 0.012, f"v_extend\n= {v_e} m/s", ha="center", va="top", fontsize=8.5)
+    ax_v.set_title("velocity: a continuous trapezoid - ramps, no instantaneous jump", loc="left",
+                   fontsize=10, fontweight="normal")
+
+    phases(ax_z)
+    rows = [("never", np.zeros_like(is_anchor), PRIOR),
+            ("always", np.ones_like(is_anchor), C["red"]),
+            ("phase_conditional", is_anchor, C["blue"])]
+    for i, (name, on, col) in enumerate(rows):
+        y = 2 - i
+        ax_z.scatter(t[on], np.full(on.sum(), y), marker="|", s=90, color=col, lw=1.4)
+        ax_z.text(-0.08, y, name, ha="right", va="center", fontsize=9.5, color=col, fontweight="bold")
+    ax_z.text(duration + 0.05, 1, "wrong: tells the filter\nv = 0 while it moves", va="center",
+              fontsize=8.5, color=C["red"])
+    ax_z.text(duration + 0.05, 0, "right: only when the known\nschedule says anchored", va="center",
+              fontsize=8.5, color=C["blue"])
+    ax_z.set(ylim=(-0.6, 2.6), yticks=[], xlabel="time (s)", xlim=(0, duration))
+    ax_z.set_title(f"ZUPT (v = 0 pseudo-measurement) ticks, dt = {dt} s  "
+                   "- all variants also get a position measurement every tick",
+                   loc="left", fontsize=10, fontweight="normal")
+    ax_z.grid(False)
+
+    for ax in axes:
+        ax.set_xlim(0, duration)
+    ax_z.axvspan(0, 0, color=C["green"], alpha=0.3, label="anchor: truly v = 0")
+    ax_z.axvspan(0, 0, color=C["gold"], alpha=0.35, label="ramp up / down")
+    ax_z.legend(loc="upper center", bbox_to_anchor=(0.5, -0.45), ncol=2)
+
+    finish(fig, "inchworm_zupt_ekf_concept", "Inchworm gait: a known anchor/extend schedule gates the ZUPT",
+              "inchworm_zupt_ekf.py defaults, first 3 of the run's 5 cycles; curves from "
+              "true_velocity / generate_ground_truth_and_data. State x = [p, v].", bottom=0.02)
+
+
+def bounce_path(x0, e, g, t_end, n=2000):
+    """Dense exact samples of the hybrid flow via the script's own flow/crossing_time/reset_map."""
+    import saltation_matrix_ekf as m
+    ts = np.linspace(0, t_end, n)
+    out, events = [], []
+    x, t0 = x0.copy(), 0.0
+    tau = m.crossing_time(x, g)
+    for s in ts:
+        while tau is not None and t0 + tau <= s:
+            x, _ = m.flow(x, tau, g)
+            t0 += tau
+            events.append((t0, x.copy()))
+            x = m.reset_map(x, e)
+            tau = m.crossing_time(x, g)
+        xs, _ = m.flow(x, s - t0, g)
+        out.append(xs)
+    return ts, np.array(out), events
+
+
+def fig_saltation_matrix_ekf_concept():
+    """saltation_matrix_ekf.py: the hybrid system, and why the reset Jacobian alone misses the timing shift."""
+    import saltation_matrix_ekf as m
+
+    # (a)/(b): the script's default true trajectory
+    duration, e, g, h0, vh = 5.0, 0.85, 9.81, 5.0, [1.0, 0.5]
+    x0 = np.array([0.0, 0.0, h0, vh[0], vh[1], 0.0])
+    ts, xs, events = bounce_path(x0, e, g, duration)
+
+    # (c): hybrid_saltation_ekf.md §3 worked example
+    xw = np.array([0.0, 0.0, 5.0, 0.0, 0.0, -2.0])
+    dx = np.array([0.0, 0.0, 0.05, 0.0, 0.0, 0.0])
+    ew, T = 0.5, 1.0
+    tw, xa, ev_a = bounce_path(xw, ew, g, T, 4000)
+    _, xb, ev_b = bounce_path(xw + dx, ew, g, T, 4000)
+    t_star, x_minus = ev_a[0]
+    Phi_b = m.flow(xw, t_star, g)[1]
+    Phi_a = m.flow(m.reset_map(x_minus, ew), T - t_star, g)[1]
+    d_naive = Phi_a @ m.reset_jacobian(ew) @ Phi_b @ dx
+    d_salt = Phi_a @ m.saltation_matrix(x_minus, ew, g) @ Phi_b @ dx
+    d_true = xb[-1] - xa[-1]
+
+    fig = plt.figure(figsize=(15, 6.2))
+    gs = fig.add_gridspec(2, 3, width_ratios=[1.15, 1.0, 0.95])
+    ax_p = fig.add_subplot(gs[0, 0])
+    ax_v = fig.add_subplot(gs[1, 0], sharex=ax_p)
+    ax_z = fig.add_subplot(gs[:, 1])
+    ax_t = fig.add_subplot(gs[:, 2])
+
+    t_ev = [te for te, _ in events]
+    ax_p.plot(ts, xs[:, 2], color=C["blue"], lw=2)
+    ax_p.scatter(t_ev, np.zeros(len(t_ev)), color=C["red"], zorder=3, s=22, label="guard: p_z = 0, falling")
+    ax_p.set(ylabel="p_z (m)", title=f"(a) Default run: drop from {h0:.0f} m, e = {e}")
+    ax_p.legend(loc="upper right")
+    ax_v.plot(ts, xs[:, 5], color=C["orange"], lw=2)
+    for te, xm in events:
+        ax_v.plot([te, te], [xm[5], -e * xm[5]], color=C["red"], lw=1, ls=":")
+    ax_v.set(xlabel="time (s)", ylabel="v_z (m/s)")
+    ax_v.text(0.99, 0.05, "flow: v̇_z = −g   reset: v_z⁺ = −e·v_z⁻\n(p, v_x, v_y unchanged at the jump)",
+              transform=ax_v.transAxes, ha="right", fontsize=8.5, color="#444444")
+    ax_p.tick_params(labelbottom=False)
+    ax_p.text(0.99, 0.62, f"v_x, v_y = {vh[0]}, {vh[1]} m/s throughout\nfirst impact t = {t_ev[0]:.3f} s",
+              transform=ax_p.transAxes, ha="right", fontsize=8.5, color="#444444")
+
+    ax_z.plot(tw, xa[:, 2], color=TRUTH, lw=1.8, label="A: nominal, p_z0 = 5 m")
+    ax_z.plot(tw, xb[:, 2], color=C["purple"], lw=1.8, ls="--", label="B: 5 cm higher")
+    ax_z.axvline(T, color="#777777", lw=1)
+    ax_z.set(xlim=(0.6, 1.02), ylim=(-0.1, 2.3), xlabel="time (s)", ylabel="p_z (m)",
+             title="(b) Why timing matters: two balls, one bounce")
+    ax_z.text(T - 0.005, 2.05, "compare at\nfixed T = 1 s", ha="right", fontsize=8.5)
+    t_b = ev_b[0][0]
+    ax_z.annotate(f"B lands {1e3 * (t_b - t_star):.1f} ms later,\nfaster ({-ev_b[0][1][5]:.3f} vs "
+                  f"{-x_minus[5]:.3f} m/s)", (t_star, 0.0), (0.845, 1.35), fontsize=8.5,
+                  arrowprops=dict(arrowstyle="->", lw=0.8))
+    ax_z.legend(loc="upper left")
+
+    ax_t.axis("off")
+    rows = [("", "Δv_z(T) (m/s)", "Δp_z(T) (m)"),
+            ("naive  Φ·DR·Φ", f"{d_naive[5]:+.4f}", f"{d_naive[2]:+.4f}"),
+            ("saltation  Φ·Ξ·Φ", f"{d_salt[5]:+.4f}", f"{d_salt[2]:+.4f}"),
+            ("true (re-simulated)", f"{d_true[5]:+.4f}", f"{d_true[2]:+.4f}")]
+    cols = [TRUTH, C["red"], C["blue"], TRUTH]
+    for i, (a, b, c) in enumerate(rows):
+        y = 0.86 - 0.1 * i
+        w = "bold" if i == 0 else "normal"
+        ax_t.text(0.0, y, a, fontsize=10, color=cols[i], fontweight="bold")
+        ax_t.text(0.58, y, b, fontsize=10, ha="right", fontweight=w)
+        ax_t.text(0.97, y, c, fontsize=10, ha="right", fontweight=w)
+    ax_t.set_title("(c) Effect of δp_z = +5 cm at T", loc="left")
+    ax_t.text(0.0, 0.42,
+              "DR (reset Jacobian) has no notion of time: it\n"
+              "carries the 5 cm offset through the bounce and\n"
+              "predicts no velocity change.\n\n"
+              "Ξ (saltation matrix) adds how the offset shifts\n"
+              "the contact time - which here is the entire\n"
+              "effect, and flips the sign of Δp_z.",
+              fontsize=9.5, color="#444444", va="top")
+    ax_t.text(0.0, 0.0, f"inputs from hybrid_saltation_ekf.md §3: x₀ = (0,0,5,0,0,−2),\n"
+              f"e = {ew}, g = {g}; nominal impact t* = {t_star:.3f} s",
+              fontsize=8, color="#777777")
+
+    finish(fig, "saltation_matrix_ekf_concept", "Bouncing point mass: a hybrid system, and the saltation correction",
+              "State x = (p, v) ∈ ℝ⁶, flow ẋ = (v, 0, 0, −g), guard g(x) = p_z, reset v_z ↦ −e·v_z. "
+              "All curves and numbers from saltation_matrix_ekf.py's flow / crossing_time / reset_map / "
+              "saltation_matrix.")
+    print(f"    naive dv={d_naive[5]:+.4f} dp={d_naive[2]:+.4f} | salt dv={d_salt[5]:+.4f} dp={d_salt[2]:+.4f} "
+          f"| true dv={d_true[5]:+.4f} dp={d_true[2]:+.4f} | t*={t_star:.4f} dt_b={1e3*(t_b-t_star):.2f}ms")
+
+
+def fig_imu_preintegration_concept():
+    """imu_preintegration.py: why preintegrate - fewer factors (problem A) and cheap bias updates (problem B)."""
+    import imu_preintegration as m
+
+    hz = 100
+    b_g, b_a = np.array([0.01, -0.01, 0.02]), np.array([0.05, 0.0, -0.05])
+    a_cmd, w_cmd = np.array([1.0, 0.1, 0.0]), np.array([0.0, 0.0, 0.5])
+    b_g_new, b_a_new = np.array([0.008, -0.009, 0.018]), np.array([0.045, 0.002, -0.048])
+    dt = 1.0 / hz
+
+    bundle = m.PreintegratedIMUBundle(b_g, b_a)
+    for _ in range(hz):
+        bundle.integrate_measurement(a_cmd + b_a, w_cmd + b_g, dt)
+    _, _, c_p = bundle.get_corrected_measurement(b_g_new, b_a_new)
+    ref = m.PreintegratedIMUBundle(b_g_new, b_a_new)
+    for _ in range(hz):
+        ref.integrate_measurement(a_cmd + b_a, w_cmd + b_g, dt)
+    yaw = np.degrees(np.arccos(np.clip((np.trace(bundle.delta_R) - 1) / 2, -1, 1)))
+
+    fig, (ax, ax_b) = plt.subplots(1, 2, figsize=(14, 5.0), gridspec_kw={"width_ratios": [1.45, 1]})
+
+    # (a) problem A: 100 samples between two keyframes become one factor
+    t = np.arange(1, hz) * dt
+    ax.vlines(t, 2.85, 3.15, color=C["orange"], lw=1)
+    ax.text(-0.03, 3.0, f"IMU samples\n({hz} Hz)", ha="right", va="center", fontsize=9.5)
+    for x, lbl in [(0.0, "i"), (1.0, "j")]:
+        ax.scatter([x], [3.0], marker="s", s=90, color=TRUTH, zorder=3)
+        ax.text(x, 3.35, f"keyframe {lbl}", ha="center", fontsize=9.5)
+        ax.plot([x, x], [2.75, 1.25], color="#bbbbbb", lw=0.8, ls=":")
+    ax.annotate("", (0.5, 1.45), (0.5, 2.65), arrowprops=dict(arrowstyle="-|>", lw=1.4, color="#555555"))
+    ax.text(0.52, 2.05, f"integrate once\n({hz} micro-steps)", fontsize=9, color="#555555", va="center")
+    ax.plot([0, 1], [1.0, 1.0], color=C["blue"], lw=2)
+    for x, lbl in [(0.0, "x_i"), (1.0, "x_j")]:
+        ax.scatter([x], [1.0], s=420, color="white", edgecolor=TRUTH, lw=1.6, zorder=3)
+        ax.text(x, 1.0, lbl, ha="center", va="center", fontsize=9.5, zorder=4)
+    ax.scatter([0.5], [1.0], marker="s", s=150, color=C["blue"], zorder=3)
+    ax.text(0.5, 0.72, f"one preintegrated factor:  ΔR = {yaw:.1f}° yaw,  "
+            f"|Δv| = {np.linalg.norm(bundle.delta_v):.3f} m/s,  |Δp| = {np.linalg.norm(bundle.delta_p):.3f} m",
+            ha="center", va="top", fontsize=9.5, color=C["blue"])
+    ax.set(xlim=(-0.25, 1.1), ylim=(0.3, 3.7), title="(a) Problem A: too many samples → one factor per keyframe pair")
+    ax.axis("off")
+
+    # (b) problem B: a bias update without touching the raw samples
+    ax_b.barh([1, 0], [hz, 1], color=[C["orange"], C["green"]], height=0.5)
+    ax_b.set_yticks([1, 0], [f"re-integrate all {hz}\nsamples with new bias", "first-order correction\nΔ + J·δb"])
+    ax_b.set_xlabel("integration steps / matrix-vector products after a bias update")
+    ax_b.text(hz + 2, 1, f"Δp = {np.round(ref.delta_p, 4)}", va="center", fontsize=8.5)
+    ax_b.text(3, 0, f"Δp = {np.round(c_p, 4)}\n(differs by {np.linalg.norm(c_p - ref.delta_p):.1e} m)",
+              va="center", fontsize=8.5)
+    ax_b.set(xlim=(0, hz * 1.75), title="(b) Problem B: the bias changes every optimizer iteration")
+    ax_b.grid(axis="y", visible=False)
+
+    finish(fig, "imu_preintegration_concept", "IMU preintegration: what it saves",
+           f"imu_preintegration.py defaults: 1 s at {hz} Hz, commanded acceleration {a_cmd.tolist()} m/s², "
+           f"turn rate {w_cmd[2]} rad/s, then the script's default bias update")
+
+
+def fig_robot_imu_tracking_concept():
+    """robot_imu_simulation.py: the 1 Hz fix reads position only, so its Jacobian cannot touch orientation."""
+    import robot_imu_simulation as m
+
+    seconds, pos_std = 10, 0.05
+    T_true, T_est, pre, post = quiet(m.run_simulation, 0.01, seconds, 4, 1e-6, 10, 1.0, 0.5, pos_std,
+                                     np.eye(3) / pos_std ** 2, np.random.default_rng(SEED))
+    J = m.position_observation_jacobian(T_est)
+
+    fig, (ax_t, ax_j) = plt.subplots(1, 2, figsize=(13.5, 4.8), gridspec_kw={"width_ratios": [1.35, 1]})
+
+    # (a) one second of the timeline
+    ax_t.vlines(np.arange(100) / 100, 1.85, 2.15, color=C["orange"], lw=1)
+    ax_t.text(-0.03, 2.0, "IMU twist\n(100 Hz)", ha="right", va="center", fontsize=9.5)
+    ax_t.text(0.5, 2.3, "dead reckoning: T ← T·Exp(ξ̃·dt), position and orientation both drift",
+              ha="center", fontsize=9)
+    ax_t.scatter([1.0], [1.0], marker="D", s=90, color=C["green"], zorder=3)
+    ax_t.text(-0.03, 1.0, "position fix\n(1 Hz)", ha="right", va="center", fontsize=9.5)
+    ax_t.text(0.97, 0.72, f"z = p_true + noise (σ = {pos_std * 100:.0f} cm per axis)\n"
+              "Gauss-Newton on r = z − p_est\n→ position pulled back, orientation untouched",
+              ha="right", va="top", fontsize=9, color=C["green"])
+    ax_t.annotate("", (1.0, 1.12), (1.0, 1.8), arrowprops=dict(arrowstyle="-|>", color="#777777"))
+    ax_t.set(xlim=(-0.32, 1.08), ylim=(0.0, 2.6), title="(a) One second: 100 IMU steps, then one fix")
+    ax_t.axis("off")
+    ax_t.text(0.0, 0.0, f"at the end of {seconds} s: position error {post[-1] * 100:.1f} cm after the fix, "
+              "orientation drift never corrected", transform=ax_t.transAxes, fontsize=8.5, color="#555555")
+
+    # (b) the Jacobian itself, at the run's final estimate
+    ax_j.imshow(np.abs(J), cmap="Blues", vmin=0, vmax=np.abs(J).max() * 1.8)
+    for (r, c), v in np.ndenumerate(J):
+        ax_j.text(c, r, f"{v:.2f}" if v else "0", ha="center", va="center", fontsize=9,
+                  color="#999999" if not v else TRUTH)
+    ax_j.set_xticks(range(6), ["v_x", "v_y", "v_z", "ω_x", "ω_y", "ω_z"])
+    ax_j.set_yticks(range(3), ["p_x", "p_y", "p_z"])
+    ax_j.axvline(2.5, color=TRUTH, lw=1.5)
+    ax_j.grid(False)
+    ax_j.set_title("(b) ∂p/∂ξ = [R | 0] at the final estimate")
+    ax_j.set_xlabel("R_est (rotation of the estimate)          exactly 0: a GN step can never reach ω", fontsize=9.5)
+
+    finish(fig, "robot_imu_tracking_concept", "Why a position-only fix cannot correct orientation",
+           f"robot_imu_simulation.py: Jacobian from position_observation_jacobian at the final pose of a {seconds} s "
+           "run (seed 0, other settings default); ξ = [v, ω], right perturbation T·Exp(ξ)")
+
+
+def fig_pose_tracking_concept():
+    """pointcloud_pose_tracking.py: one rigid point cloud, observed as z = T·p + noise; world vs body residual."""
+    import pointcloud_pose_tracking as m
+    from lie_utils import se3_exp
+
+    duration, dt, n_points = 5.0, 0.1, 20
+    vel_std, gyro_std, point_std, init_std = 0.05, 0.02, 0.03, 0.1
+    rng = np.random.default_rng(SEED)
+    body, T_true, u_meas, z = m.generate_ground_truth_and_data(duration, dt, n_points, vel_std, gyro_std, point_std, rng)
+    T_init = T_true[0] @ se3_exp(rng.normal(0.0, init_std, 6))
+    T_dr = m.run_dead_reckoning(T_init, u_meas, dt)
+    k = 10
+    T_pred = T_dr[k]
+    pred_world, _ = m.observation_model(T_pred, body)
+    R, t = T_pred[0:3, 0:3], T_pred[0:3, 3]
+    z_body = (z[k] - t) @ R  # T_pred^-1 · z, row-wise
+
+    fig, (ax_w, ax_r, ax_b) = plt.subplots(1, 3, figsize=(15, 5.4), gridspec_kw={"width_ratios": [1.25, 1, 1]})
+
+    # (a) the same rigid cloud carried along the true trajectory
+    ax_w.plot(*xy_of(T_true), color=TRUTH, lw=1.6, label="true trajectory")
+    for kk, col in [(0, C["blue"]), (len(T_true) - 1, C["purple"])]:
+        pts, _ = m.observation_model(T_true[kk], body)
+        ax_w.scatter(pts[:, 0], pts[:, 1], s=14, color=col, alpha=0.8, label=f"true cloud T·p at t = {kk * dt:.1f} s")
+    ax_w.scatter([T_true[k][0, 3]], [T_true[k][1, 3]], marker="*", s=160, color=C["red"], zorder=3,
+                 label=f"t = {k * dt:.1f} s, zoomed in (b)/(c)")
+    ax_w.set(title=f"(a) {n_points} body points, carried rigidly by T", xlabel="x (m)", ylabel="y (m)")
+    ax_w.axis("equal")
+    legend_below(ax_w, ncol=2)
+
+    # (b) world-frame residual (EKF)
+    ax_r.scatter(pred_world[:, 0], pred_world[:, 1], s=18, facecolor="none", edgecolor=PRIOR, label="prediction T_pred·p")
+    ax_r.scatter(z[k][:, 0], z[k][:, 1], s=14, color=C["red"], label=f"measurement z (σ = {point_std * 100:.0f} cm)")
+    for a, b in zip(pred_world, z[k]):
+        ax_r.plot([a[0], b[0]], [a[1], b[1]], color=C["red"], lw=0.7, alpha=0.6)
+    ax_r.set(title="(b) EKF: r = z − T_pred·p (world frame)", xlabel="x (m)", ylabel="y (m)")
+    ax_r.axis("equal")
+    legend_below(ax_r, ncol=2)
+
+    # (c) body-frame residual (IEKF)
+    ax_b.scatter(body[:, 0], body[:, 1], s=18, facecolor="none", edgecolor=PRIOR, label="known body points p")
+    ax_b.scatter(z_body[:, 0], z_body[:, 1], s=14, color=C["green"], label="T_pred⁻¹·z")
+    for a, b in zip(body, z_body):
+        ax_b.plot([a[0], b[0]], [a[1], b[1]], color=C["green"], lw=0.7, alpha=0.6)
+    ax_b.set(title="(c) IEKF: r = T_pred⁻¹·z − p (body frame)", xlabel="body x (m)", ylabel="body y (m)")
+    ax_b.axis("equal")
+    legend_below(ax_b, ncol=2)
+    lw_, lb_ = np.linalg.norm(z[k] - pred_world, axis=1), np.linalg.norm(z_body - body, axis=1)
+    ax_b.text(0.02, 0.98, f"same residual lengths (max diff {np.abs(lw_ - lb_).max():.0e} m),\n"
+              "only rotated by R_pred: same information, different frame",
+              transform=ax_b.transAxes, fontsize=8.5, color="#555555", va="top")
+
+    finish(fig, "pose_tracking_concept", "Point-cloud pose tracking: one measurement, two residual frames",
+           f"pointcloud_pose_tracking.py defaults, seed 0; x-y projection. (b)/(c) at t = {k * dt:.1f} s with the "
+           "twist-only prediction (run_dead_reckoning from the perturbed initial pose) as T_pred", bottom=0.06)
+
+
+def fig_bundle_adjustment_concept():
+    """bundle_adjustment.py: one landmark's bundle of rays, before and after joint BA."""
+    import bundle_adjustment as m
+
+    rng = np.random.default_rng(SEED)
+    K = (800.0, 800.0, 320.0, 240.0)
+    T_true, P_all = m.generate_ground_truth_scene(8, 60, 5.0, 180.0, 2.0, rng)
+    P_true, obs = m.build_observations(T_true, P_all, K, 1.0, 2, rng)
+    T_init, P_init = m.perturb_initial_guess(T_true, P_true, 0.1, 0.3, rng)
+    T_ba, P_ba = quiet(m.run_bundle_adjustment, T_init, P_init, obs, K, 0.1, 1.0, 1e-6, 30)
+    T_ba, P_ba = m.align_reconstruction_to_ground_truth(T_true, T_ba, P_ba)
+
+    counts = np.bincount([j for _, j, _ in obs], minlength=len(P_true))
+    lm = int(np.argmax(counts))
+    rays = [(i, zij) for i, j, zij in obs if j == lm]
+
+    def ray(T, zij):
+        d = T[0:3, 0:3] @ np.array([(zij[0] - K[2]) / K[0], (zij[1] - K[3]) / K[1], 1.0])
+        return T[0:3, 3], d / np.linalg.norm(d)
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 6.0), sharex=True, sharey=True)
+    for ax, T_list, P_list, title in [(axes[0], T_init, P_init, "(a) Initial guess: the rays do not meet"),
+                                      (axes[1], T_ba, P_ba, "(b) After joint BA: one bundle, one point")]:
+        P = np.asarray(P_list)
+        ax.scatter(P[:, 0], P[:, 1], s=8, color=PRIOR, alpha=0.5, label="all landmark estimates")
+        for i, zij in rays:
+            c, d = ray(T_list[i], zij)
+            L = np.linalg.norm(P_true[lm] - T_true[i][0:3, 3]) * 1.25
+            ax.plot([c[0], c[0] + L * d[0]], [c[1], c[1] + L * d[1]], color=C["orange"], lw=1.1)
+            ax.scatter([c[0]], [c[1]], marker="s", s=36, color=C["blue"], zorder=3)
+        ax.scatter([P_true[lm][0]], [P_true[lm][1]], marker="*", s=200, color=TRUTH, zorder=4, label="true landmark")
+        ax.scatter([P[lm][0]], [P[lm][1]], marker="o", s=60, facecolor="none", edgecolor=C["red"], lw=1.8,
+                   zorder=4, label="its current estimate P_j")
+        ax.set(title=title, xlabel="x (m)")
+        ax.set_aspect("equal")
+    axes[0].set_ylabel("y (m)")
+    axes[0].plot([], [], color=C["orange"], label="ray through each measured pixel z_ij")
+    axes[0].scatter([], [], marker="s", color=C["blue"], label="camera estimates T_i")
+    fig.legend(*axes[0].get_legend_handles_labels(), loc="lower center", ncol=3, fontsize=8.5)
+
+    finish(fig, "bundle_adjustment_concept", "Why it is called bundle adjustment",
+           f"bundle_adjustment.py defaults, seed 0, top view: rays through landmark {lm}'s {len(rays)} measured "
+           "pixels; (b) after joint BA + alignment", bottom=0.08)
+
+
+def fig_bundle_adjustment_advanced_concept():
+    """bundle_adjustment_advanced.py: the covisibility graph and one Local BA window, as the solver built them."""
+    import bundle_adjustment_advanced as m
+
+    K = (800.0, 800.0, 320.0, 240.0)
+    n_kf, k_show = 50, 30
+    T_true = m.generate_ground_truth_trajectory(n_kf, 15.0, 90.0)
+    P_all = m.generate_landmark_corridor(T_true, 8, 2.0, 1.0, np.random.default_rng(SEED), extend_ahead=6.0)
+    P_true, obs = m.build_observations(T_true, P_all, K, 1.0, 6.0, 3, np.random.default_rng(SEED))
+    by_kf = m.group_observations_by_keyframe(obs, n_kf)
+
+    # Record the windows exactly as run_incremental_local_ba builds them (no re-implementation).
+    windows, original = {}, m.build_active_window
+    def recorder(k, shared_count, *rest):
+        out = original(k, shared_count, *rest)
+        windows[k] = (out, dict(shared_count))
+        return out
+    m.build_active_window = recorder
+    try:
+        _, _, hist = quiet(m.run_incremental_local_ba, T_true, by_kf, K, 0.02, 3, 2, 6, 8, True, 1e-6, 15,
+                           np.random.default_rng(SEED), 20)
+    finally:
+        m.build_active_window = original
+    (active, fixed, points), shared = windows[k_show]
+
+    fig, (ax_w, ax_c, ax_n) = plt.subplots(1, 3, figsize=(15, 5.6), gridspec_kw={"width_ratios": [1.2, 1, 1]})
+
+    # (a) the window at keyframe k_show, drawn at ground-truth positions
+    pos = np.array([T[0:3, 3] for T in T_true])
+    ax_w.scatter(P_true[:, 0], P_true[:, 1], s=5, color=PRIOR, alpha=0.35, label="landmarks")
+    ax_w.scatter(P_true[points, 0], P_true[points, 1], s=10, color=C["green"], label=f"active landmarks ({len(points)})")
+    ax_w.plot(pos[:k_show + 1, 0], pos[:k_show + 1, 1], "o", ms=3, color="#bbbbbb", label="other keyframes so far")
+    groups = [(sorted(fixed), C["orange"], f"fixed anchors of this window ({len(fixed)})"),
+              (active[1:], C["blue"], f"active covisible neighbours ({len(active) - 1})"),
+              ([k_show], C["red"], f"new keyframe {k_show}"), ([0, 1], TRUTH, "permanently fixed keyframes 0, 1")]
+    for idx, col, lbl in groups:
+        ax_w.plot(pos[idx, 0], pos[idx, 1], "o", ms=6, color=col, label=lbl)
+    ax_w.set(title=f"(a) Window when keyframe {k_show} arrives", xlabel="x (m)", ylabel="y (m)")
+    ax_w.set(xlim=(P_true[:, 0].min() - 1, P_true[:, 0].max() + 1),
+             ylim=(min(P_true[:, 1].min(), pos[:, 1].min()) - 1, P_true[:, 1].max() + 1))
+    ax_w.set_aspect("equal", adjustable="box")
+    ax_w.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), fontsize=8, frameon=False)
+
+    # (b) covisibility: shared landmark counts between keyframes so far
+    C_mat = np.zeros((k_show + 1, k_show + 1))
+    for key, c in shared.items():
+        a, b = key
+        if a <= k_show and b <= k_show:
+            C_mat[a, b] = C_mat[b, a] = c
+    im = ax_c.imshow(np.where(C_mat > 0, C_mat, np.nan), cmap="Blues", interpolation="nearest")
+    for i in active:
+        ax_c.add_patch(Rectangle((i - 0.5, k_show - 0.5), 1, 1, fill=False, ec=C["red"], lw=1.4))
+    fig.colorbar(im, ax=ax_c, fraction=0.046, pad=0.03, label="shared landmarks")
+    ax_c.set(title="(b) Covisibility graph (banded, not dense)", ylabel="keyframe")
+    ax_c.grid(False)
+    ax_c.set_xlabel(f"keyframe\nred: keyframe {k_show}'s chosen neighbours (≥ 2 shared, strongest {len(active) - 1})")
+
+    # (c) window size stays bounded as the map grows
+    ax_n.plot(hist["local_step"], hist["n_active_kf"], color=C["blue"], lw=1.6, label="active keyframes (cap 6)")
+    ax_n.plot(hist["local_step"], hist["n_fixed_kf"], color=C["orange"], lw=1.6, label="fixed keyframes")
+    ax_n.plot(hist["local_step"], np.array(hist["local_step"]) + 1, color=PRIOR, ls="--", lw=1.2,
+              label="all keyframes so far (Global BA)")
+    ax_n.set(title="(c) Window size per Local BA call", xlabel="new keyframe", ylabel="keyframes in the problem")
+    empty = [k for k in range(n_kf) if not by_kf[k]]
+    if empty:
+        ax_n.annotate(f"keyframes {empty[0]}-{empty[-1]} observe no landmarks\n(end of the corridor): empty window",
+                      (empty[0], 0.5), (24, 22), fontsize=8.5, color="#555555", arrowprops=dict(arrowstyle="->", lw=0.8))
+    ax_n.legend(loc="upper left")
+
+    finish(fig, "bundle_adjustment_advanced_concept", "Local BA: a bounded window picked from the covisibility graph",
+           "bundle_adjustment_advanced.py defaults, seed 0; windows recorded from run_incremental_local_ba's own "
+           "build_active_window calls")
+
+
+def fig_pose_graph_incremental_concept():
+    """pose_graph_incremental.py: what one Givens row insertion touches in R, odometry edge vs loop closure."""
+    import pose_graph_incremental as m
+    from utils import qr_insert_row
+
+    rng = np.random.default_rng(SEED)
+    gt = m.generate_ground_truth_trajectory(2.0, 2)  # 8-pose square: small enough to read R entry by entry
+    n = len(gt)
+    odo, loop = m.simulate_noisy_edges(gt, 0.05, 0.01, 0.5, rng)
+    x_lin = m.run_dead_reckoning(gt[0], odo)
+    info, anchor = np.eye(6), 1e6
+    sqrt_info = np.linalg.cholesky(info).T
+
+    R, d = m.full_relinearize(x_lin[:n - 1], odo[:n - 2], [], info, anchor)
+    dof = 6 * n
+    R_a, d_a = np.zeros((dof, dof)), np.zeros(dof)
+    R_a[:dof - 6, :dof - 6], d_a[:dof - 6] = R, d
+
+    def insert(R0, d0, edge):
+        R1, d1 = R0.copy(), d0.copy()
+        A, b = m.edge_whitened_block(edge[0], edge[1], edge[2], x_lin[:n], dof, sqrt_info)
+        for r in range(6):
+            qr_insert_row(R1, d1, A[r], b[r])
+        return R1, d1
+
+    R_b, d_b = insert(R_a, d_a, odo[n - 2])
+    R_c, _ = insert(R_b, d_b, loop[0])
+    R_full, _ = m.full_relinearize(x_lin[:n], odo[:n - 1], [], info, anchor)
+    match = np.abs(np.abs(R_b) - np.abs(R_full)).max()
+
+    def show(ax, R_new, R_old, title):
+        nz, changed = np.abs(R_new) > 1e-12, np.abs(R_new - R_old) > 1e-12
+        img = np.ones((dof, dof, 3))
+        img[nz] = (0.75, 0.85, 0.95)
+        img[changed] = (0.82, 0.29, 0.36)
+        ax.imshow(img, interpolation="nearest")
+        for k in range(1, n):
+            ax.axhline(6 * k - 0.5, color="#dddddd", lw=0.5)
+            ax.axvline(6 * k - 0.5, color="#dddddd", lw=0.5)
+        ax.set_xticks([6 * k + 2.5 for k in range(n)], [f"x{k}" for k in range(n)], fontsize=8)
+        ax.set_yticks([6 * k + 2.5 for k in range(n)], [f"x{k}" for k in range(n)], fontsize=8)
+        ax.grid(False)
+        ax.set_title(title, fontsize=10.5)
+        ax.set_xlabel(f"{changed.sum()} of {nz.sum()} nonzeros changed" if R_old is not None else "")
+        return changed.sum()
+
+    fig, axes = plt.subplots(1, 3, figsize=(14.5, 5.6))
+    show(axes[0], R_a, R_a, f"(a) R after {n - 1} poses (chain)")
+    axes[0].set_xlabel(f"{(np.abs(R_a) > 1e-12).sum()} nonzeros; new pose x{n - 1} = empty block")
+    show(axes[1], R_b, R_a, f"(b) + odometry edge x{n - 2}→x{n - 1}: 6 Givens rows")
+    show(axes[2], R_c, R_b, f"(c) + loop closure x{loop[0][0]}→x{loop[0][1]}: same insertion")
+    axes[0].scatter([], [], marker="s", color=(0.75, 0.85, 0.95), label="nonzero, unchanged")
+    axes[0].scatter([], [], marker="s", color=(0.82, 0.29, 0.36), label="changed by this insertion")
+    fig.legend(*axes[0].get_legend_handles_labels(), loc="lower center", ncol=2, bbox_to_anchor=(0.5, 0.0))
+
+    finish(fig, "pose_graph_incremental_concept", "Incremental square-root SAM: what one new edge costs",
+           f"full_relinearize / edge_whitened_block / qr_insert_row on an {n}-pose square, seed 0; "
+           f"(b) matches a from-scratch QR to {match:.0e}", bottom=0.1)
+
+
+def fig_sliding_window_marginalization_concept():
+    """sliding_window_marginalization.py: the window slides, and each dropped pose becomes one prior block."""
+    import sliding_window_marginalization as m
+
+    info, window = np.eye(6), 10
+    gt = m.generate_ground_truth_trajectory(2.0, nodes_per_side=4)
+    n = len(gt)
+    odo, _ = m.simulate_noisy_edges(gt, 0.05, 0.01, loop_noise_scale=1.0, rng=np.random.default_rng(SEED))
+
+    # Record what run_sliding_window_pose_graph actually does (no re-implementation).
+    sizes, margs = [], []
+    orig_solve, orig_marg = m.solve_to_convergence, m.marginalize_oldest
+    def rec_solve(x_window, *a):
+        sizes.append(len(x_window))
+        return orig_solve(x_window, *a)
+    def rec_marg(*a):
+        margs.append(a)
+        return orig_marg(*a)
+    m.solve_to_convergence, m.marginalize_oldest = rec_solve, rec_marg
+    try:
+        m.run_sliding_window_pose_graph(gt, odo, info, window, 1e6, 1e-6, 10)
+    finally:
+        m.solve_to_convergence, m.marginalize_oldest = orig_solve, orig_marg
+
+    fig, (ax_w, ax_h, ax_n) = plt.subplots(1, 3, figsize=(15, 5.4), gridspec_kw={"width_ratios": [1.15, 1, 1]})
+
+    # (a) window membership after each new pose (window always ends at the newest pose)
+    img = np.ones((n - 1, n, 3))
+    for row, (k, L) in enumerate(zip(range(1, n), sizes)):
+        img[row, :k - L + 1] = (0.80, 0.80, 0.80)
+        img[row, k - L + 1:k + 1] = (0.75, 0.85, 0.95)
+        img[row, k] = (0.82, 0.29, 0.36)
+    ax_w.imshow(img, interpolation="nearest", aspect="auto", extent=(-0.5, n - 0.5, n - 0.5, 0.5))
+    ax_w.set(title=f"(a) The window slides (size {window})", xlabel="pose index", ylabel="after adding pose k")
+    ax_w.grid(False)
+    for col, lbl in [((0.80, 0.80, 0.80), "marginalized (frozen)"), ((0.75, 0.85, 0.95), "live in the window"),
+                     ((0.82, 0.29, 0.36), "newest pose")]:
+        ax_w.scatter([], [], marker="s", s=60, color=col, label=lbl)
+    legend_below(ax_w, ncol=3)
+
+    def spy(ax, args, title, note):
+        H, _ = m.assemble_window_system(*args)
+        img = np.ones(H.shape + (3,))
+        img[np.abs(H) > 1e-12] = (0.75, 0.85, 0.95)
+        img[0:6, 0:6][np.abs(H[0:6, 0:6]) > 1e-12] = (0.82, 0.29, 0.36)
+        ax.imshow(img, interpolation="nearest")
+        nb = H.shape[0] // 6
+        ax.set_xticks([6 * b + 2.5 for b in range(nb)], [f"w{b}" for b in range(nb)], fontsize=8)
+        ax.set_yticks([6 * b + 2.5 for b in range(nb)], [f"w{b}" for b in range(nb)], fontsize=8)
+        ax.grid(False)
+        ax.set_title(title, fontsize=10.5)
+        ax.set_xlabel(note, fontsize=9)
+
+    spy(ax_h, margs[0], "(b) H of the full window, before the first drop",
+        "red: oldest pose x_a (window slot w0), about to be eliminated\nblock-tridiagonal: x_a touches only w1")
+    spy(ax_n, margs[1], "(c) H of the next window",
+        "red: the new prior on the new oldest pose,\nΛ_bb(edge ab) − Λ_ba Λ_aa⁻¹ Λ_ab: one block, no fill-in")
+
+    finish(fig, "sliding_window_marginalization_concept", "Sliding-window marginalization: drop a pose, keep its information",
+           f"sliding_window_marginalization.py, {n}-pose square (nodes_per_side 4), window {window}, seed 0; "
+           "windows and H recorded from run_sliding_window_pose_graph's own calls", bottom=0.04)
+
+
+def fig_pnp_estimation_concept():
+    """pnp_estimation.py + bundle_adjustment_advanced.py: triangulation and PnP as mirror-image ray problems."""
+    import bundle_adjustment_advanced as ba
+    import pnp_estimation as m
+
+    K = (800.0, 800.0, 320.0, 240.0)
+
+    # (a) triangulation: known cameras, unknown point -- bundle_adjustment_advanced.py's triangulate_landmark /
+    # refine_landmark_gn on bundle_adjustment.py's wide-baseline arc (its forward-moving corridor has rays too
+    # close to parallel to read in a top view)
+    import bundle_adjustment as bscene
+    rng_a = np.random.default_rng(SEED)
+    T_cam, P_all = bscene.generate_ground_truth_scene(8, 60, 5.0, 180.0, 2.0, rng_a)
+    P_true, obs = bscene.build_observations(T_cam, P_all, K, 1.0, 2, rng_a)
+    lm = int(np.argmax(np.bincount([j for _, j, _ in obs], minlength=len(P_true))))
+    seen = [(i, z) for i, j, z in obs if j == lm]
+    T_obs, z_obs = [T_cam[i] for i, _ in seen], [z for _, z in seen]
+    P0 = ba.triangulate_landmark(T_obs, z_obs, K)
+    P_ref = ba.refine_landmark_gn(T_obs, z_obs, P0, K, 1e-6, 15)
+
+    # (b) PnP: known points, unknown camera (pnp_estimation.py's scene and functions, as in fig_pnp_estimation)
+    rng = np.random.default_rng(SEED)
+    T_true, P_list = m.generate_scene(20, K, rng)
+    z_list = [m.camera_project(T_true, P, K)[0] + rng.normal(0.0, 1.0, 2) for P in P_list]
+    T_dlt = m.linear_pnp_dlt(P_list, z_list, K)
+    T_gn = m.refine_pose_gn(T_dlt, P_list, z_list, K, 1e-8, 20)
+
+    fig, (ax_t, ax_p) = plt.subplots(1, 2, figsize=(13, 5.4))
+
+    for T, z in zip(T_obs, z_obs):
+        c = T[0:3, 3]
+        d = T[0:3, 0:3] @ np.array([(z[0] - K[2]) / K[0], (z[1] - K[3]) / K[1], 1.0])
+        L = np.linalg.norm(P_true[lm] - c) * 1.25 / np.linalg.norm(d)
+        ax_t.plot([c[0], c[0] + L * d[0]], [c[1], c[1] + L * d[1]], color=C["orange"], lw=1)
+        ax_t.scatter(*c[0:2], marker="s", s=40, color=TRUTH, zorder=3)
+    ax_t.scatter(*P_true[lm][0:2], marker="*", s=220, color=TRUTH, zorder=4, label="true point")
+    ax_t.scatter(*P0[0:2], marker="o", s=70, facecolor="none", edgecolor=C["orange"], lw=1.8, zorder=4,
+                 label=f"closed-form ray intersection ({np.linalg.norm(P0 - P_true[lm]) * 100:.1f} cm off)")
+    ax_t.scatter(*P_ref[0:2], marker="x", s=70, color=C["blue"], lw=2, zorder=5,
+                 label=f"Gauss-Newton refined ({np.linalg.norm(P_ref - P_true[lm]) * 100:.1f} cm off)")
+    ax_t.scatter([], [], marker="s", color=TRUTH, label=f"known cameras ({len(T_obs)})")
+    ax_t.set(title="(a) Triangulation: known cameras → unknown point", xlabel="x (m)", ylabel="y (m)")
+    ax_t.set_aspect("equal", adjustable="datalim")
+    legend_below(ax_t, ncol=1)
+
+    R0, t0 = T_true[0:3, 0:3], T_true[0:3, 3]
+    in_cam = lambda X: R0.T @ (X - t0)  # drawn in the true camera's own x-z plane
+    for P in P_list:
+        q = in_cam(P)
+        ax_p.plot([q[0], 0.0], [q[2], 0.0], color=C["orange"], lw=0.8)
+        ax_p.scatter(q[0], q[2], s=16, color=C["green"], zorder=3)
+    ax_p.scatter(0, 0, marker="*", s=220, color=TRUTH, zorder=4, label="true camera centre")
+    for T, mk, col, name in [(T_dlt, "o", C["orange"], "linear DLT"), (T_gn, "x", C["blue"], "Gauss-Newton refined")]:
+        q = in_cam(T[0:3, 3])
+        style = dict(color=col) if mk == "x" else dict(facecolor="none", edgecolor=col)
+        ax_p.scatter(q[0], q[2], marker=mk, s=70, lw=1.8, zorder=5, **style,
+                     label=f"{name} ({np.linalg.norm(T[0:3, 3] - t0) * 100:.1f} cm off)")
+    ax_p.scatter([], [], s=16, color=C["green"], label=f"known 3D points ({len(P_list)})")
+    ax_p.set(title="(b) PnP: known points → unknown camera", xlabel="camera x (m)", ylabel="camera z, depth (m)")
+    ax_p.set_aspect("equal", adjustable="datalim")
+    legend_below(ax_p, ncol=1)
+
+    finish(fig, "pnp_estimation_concept", "Triangulation and PnP: the same rays, solved for opposite unknowns",
+           f"(a) triangulate_landmark / refine_landmark_gn on bundle_adjustment.py's scene, landmark {lm}, top view; "
+           "(b) pnp_estimation.py, true camera's x-z plane; seed 0", bottom=0.04)
+
+
 FIGURES = {
     "pose_tracking": fig_pose_tracking,
     "robot_imu_tracking": fig_robot_imu_tracking,
@@ -746,6 +1511,17 @@ FIGURES = {
     "bayes_tree_construction": fig_bayes_tree_construction,
     "pnp_estimation": fig_pnp_estimation,
     "sliding_window_marginalization": fig_sliding_window_marginalization,
+    "friction_anisotropic_ekf_concept": fig_friction_anisotropic_ekf_concept,
+    "inchworm_zupt_ekf_concept": fig_inchworm_zupt_ekf_concept,
+    "saltation_matrix_ekf_concept": fig_saltation_matrix_ekf_concept,
+    "imu_preintegration_concept": fig_imu_preintegration_concept,
+    "robot_imu_tracking_concept": fig_robot_imu_tracking_concept,
+    "pose_tracking_concept": fig_pose_tracking_concept,
+    "bundle_adjustment_concept": fig_bundle_adjustment_concept,
+    "bundle_adjustment_advanced_concept": fig_bundle_adjustment_advanced_concept,
+    "pose_graph_incremental_concept": fig_pose_graph_incremental_concept,
+    "sliding_window_marginalization_concept": fig_sliding_window_marginalization_concept,
+    "pnp_estimation_concept": fig_pnp_estimation_concept,
 }
 
 

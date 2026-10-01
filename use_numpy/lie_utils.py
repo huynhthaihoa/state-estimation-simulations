@@ -54,14 +54,20 @@ def so3_right_jacobian(omega):
 def rotation_geodesic_error(R_a, R_b):
     """
     Angle (rad) of the relative rotation between two rotation matrices.
+    Uses atan2(sin, cos) rather than arccos(cos): arccos has a precision
+    floor of ~sqrt(2*eps) ~ 2e-8 rad near zero (its derivative blows up at
+    1), whereas the skew part of R gives the sine to full relative
+    precision, so tiny angles come out right instead of as 0 or 2.1e-8.
     Arguments:
         R_a: first rotation matrix (numpy array)
         R_b: second rotation matrix (numpy array)
     Returns:
         angle: angle (rad) of the relative rotation
     """
-    c = (np.trace(R_a.T @ R_b) - 1.0) / 2.0
-    return np.arccos(np.clip(c, -1.0, 1.0))
+    W = R_a.T @ R_b
+    c = (np.trace(W) - 1.0) / 2.0
+    s = 0.5 * np.linalg.norm([W[2, 1] - W[1, 2], W[0, 2] - W[2, 0], W[1, 0] - W[0, 1]])
+    return np.arctan2(s, c)
 
 
 def se3_exp(xi):

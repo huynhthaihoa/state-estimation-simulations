@@ -101,19 +101,22 @@ def test_camera_project_matches_pinhole_formula(ba):
 # compute_visibility
 # ---------------------------------------------------------------------------
 
-def test_compute_visibility_front_behind_and_fov(ba):
+def test_compute_visibility_front_behind_and_image_bounds(ba):
     T_cam = np.eye(4)  # camera at origin, looking toward +z
+    # K = (800, 800, 320, 240): a 640x480 image, ~44 x 33 degree field of view
     P_front_center = np.array([0.0, 0.0, 5.0])   # dead ahead -> visible
     P_behind = np.array([0.0, 0.0, -5.0])         # negative depth -> not visible
-    P_outside_fov = np.array([10.0, 0.0, 5.0])    # wide angle -> not visible
+    P_near_edge = np.array([1.5, 0.0, 5.0])       # u = 560 px, inside the image -> visible
+    P_off_image = np.array([3.0, 0.0, 5.0])       # u = 800 px: inside a 70-degree cone, outside the image -> not visible
 
-    P_true = np.stack([P_front_center, P_behind, P_outside_fov])
-    pairs = ba.compute_visibility([T_cam], P_true, fov_deg=60.0)
+    P_true = np.stack([P_front_center, P_behind, P_near_edge, P_off_image])
+    pairs = ba.compute_visibility([T_cam], P_true, K)
 
     assert (0, 0) in pairs
     assert (0, 1) not in pairs
-    assert (0, 2) not in pairs
-    assert len(pairs) == 1
+    assert (0, 2) in pairs
+    assert (0, 3) not in pairs
+    assert len(pairs) == 2
 
 
 # ---------------------------------------------------------------------------
@@ -124,14 +127,14 @@ def test_build_observations_raises_on_min_observations_below_2(ba):
     rng = np.random.default_rng(0)
     T_true, P_true = ba.generate_ground_truth_scene(6, 20, 5.0, 180.0, 2.0, rng)
     with pytest.raises(ValueError):
-        ba.build_observations(T_true, P_true, K, 1.0, 70.0, 1, rng)
+        ba.build_observations(T_true, P_true, K, 1.0, 1, rng)
 
 
 def test_build_observations_drops_underobserved_landmarks(ba):
     rng = np.random.default_rng(1)
     T_true, P_true = ba.generate_ground_truth_scene(6, 40, 5.0, 180.0, 2.0, rng)
     min_observations = 3
-    P_kept, observations = ba.build_observations(T_true, P_true, K, 1.0, 70.0, min_observations, rng)
+    P_kept, observations = ba.build_observations(T_true, P_true, K, 1.0, min_observations, rng)
 
     counts = {}
     for i, j, z in observations:
@@ -174,7 +177,7 @@ def small_scene(ba):
         landmark_spread=2.0, rng=rng)
     pixel_noise_std = 1.0
     P_true, observations = ba.build_observations(
-        T_true, P_true_all, K, pixel_noise_std, fov_deg=70.0, min_observations=3, rng=rng)
+        T_true, P_true_all, K, pixel_noise_std, min_observations=3, rng=rng)
     pose_noise_std = 0.05
     T_init, P_init = ba.perturb_initial_guess(
         T_true, P_true, pose_noise_std=pose_noise_std, landmark_noise_std=0.2, rng=rng)

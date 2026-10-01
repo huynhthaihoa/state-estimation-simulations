@@ -69,7 +69,7 @@ The biggest single payoff script in the repo lives here.
 
 **Read:** `bundle_adjustment.md` §13 (Local vs. Global BA, already covered in Phase 6).
 
-**Run:** [README.md §7](README.md#7-local--global-bundle-adjustment-bounded-windows-vs-whole-map-re-solves) - [`use_numpy/bundle_adjustment_advanced.py`](use_numpy/bundle_adjustment_advanced.py) - bounded local windows plus periodic Global BA, cheirality guards, LM-with-step-rejection. Try the `--arc-span-deg 350` loop-closure variant afterward to see Global BA actually earn its keep.
+**Run:** [README.md §7](README.md#7-local--global-bundle-adjustment-bounded-windows-vs-whole-map-re-solves) - [`use_numpy/bundle_adjustment_advanced.py`](use_numpy/bundle_adjustment_advanced.py) - bounded local windows plus periodic Global BA, cheirality guards, LM-with-step-rejection. Try the `--arc-span-deg 350 --n-keyframes 190` loop-closure variant afterward to see Global BA actually earn its keep.
 
 ## Phase 8 - Incremental solving (the iSAM lineage)
 

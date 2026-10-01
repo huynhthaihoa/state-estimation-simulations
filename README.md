@@ -55,7 +55,7 @@ timing/peak-memory measurement helper every script's benchmark printout uses).
 - [pose_graph.py](use_numpy/pose_graph.py): a small closed-loop 3D pose-graph relaxation (odometry drift + one loop closure), jointly optimized via Levenberg-Marquardt, reusing the same `lie_utils.py` $SE(3)$ $Exp$/$`Log`$/inverse-right-Jacobian/adjoint math as `pointcloud_pose_tracking.py`.
 - [pose_graph_incremental.py](use_numpy/pose_graph_incremental.py): the [iSAM](docs/optimization/isam_optimization.md) counterpart to `pose_graph.py`'s batch solver - a longer loop streams in one node at a time, and an incremental square-root-SAM solver (Givens-rotation QR row insertion via `qr_insert_row` in `utils.py`, plus periodic/loop-closure-triggered full relinearization) is timed against a from-scratch batch re-solve at every step.
 - [bayes_tree_construction.py](use_numpy/bayes_tree_construction.py): builds the elimination tree underlying the [Bayes tree](docs/optimization/bayes_tree.md) `iSAM2` relies on (one node per variable, not merged into cliques) - symbolic variable elimination (`symbolic_eliminate` in `utils.py`) over the same square-loop pose-graph topology, then a root-ward affected-path query (`bayes_tree_affected_path`) contrasting a local odometry edge against the loop-closure edge. Pure index/graph bookkeeping, no pose math at all, so there's no `use_manif/` counterpart - the result would be structurally identical either way.
-- [bundle_adjustment.py](use_numpy/bundle_adjustment.py): jointly refines camera poses **and** 3D landmarks against pinhole reprojection error - cameras on an arc around a landmark cluster, with a field-of-view cutoff so not every camera observes every landmark. Compares three solvers: **landmarks-only refinement** and **poses-only refinement** (independent $3\times3$/$`6 \times6`$ GN solves, each a "fix one side" strawman) against **full joint bundle adjustment** (coupled dense GN over poses + landmarks, gauge-fixed with a prior factor on the first two camera poses, then [Umeyama-aligned](docs/foundations/umeyama_alignment.md) to ground truth before reporting absolute error, since monocular BA only recovers the scene up to an unknown similarity transform).
+- [bundle_adjustment.py](use_numpy/bundle_adjustment.py): jointly refines camera poses **and** 3D landmarks against pinhole reprojection error - cameras on an arc around a landmark cluster, and a landmark counts as observed only if it projects inside the image, so not every camera observes every landmark. Compares three solvers: **landmarks-only refinement** and **poses-only refinement** (independent $3\times3$/$`6 \times6`$ GN solves, each a "fix one side" strawman) against **full joint bundle adjustment** (coupled dense GN over poses + landmarks, gauge-fixed with a prior factor on the first two camera poses, then [Umeyama-aligned](docs/foundations/umeyama_alignment.md) to ground truth before reporting absolute error, since monocular BA only recovers the scene up to an unknown similarity transform).
 - [bundle_adjustment_advanced.py](use_numpy/bundle_adjustment_advanced.py): Local **and** Global bundle adjustment, run back to back for direct comparison - the real-time-system-behavior counterpart to `bundle_adjustment.py`'s single-batch scene. A camera moves keyframe-by-keyframe along a forward-facing arc through a landmark corridor instead of sitting on a static ring; a covisibility graph builds incrementally, and every new keyframe triggers a bounded local Gauss-Newton/Levenberg-Marquardt solve over an active window (new keyframe + covisible neighbors, with every other observing keyframe held fixed as a rigid anchor), while a periodic Global BA pass jointly re-solves the whole map so far for contrast. Keyframes 0/1 are hard-fixed forever as the gauge anchor - no prior factor needed, unlike `bundle_adjustment.py`, since a hard anchor already pins the gauge with no residual freedom left to constrain. Guards against Gauss-Newton divergence (Levenberg-Marquardt damping) and the classic point-behind-camera reflection ambiguity (`passes_cheirality`/`cull_invalid_points`) that a weakly-constrained, forward-motion scene can hit but `bundle_adjustment.py`'s densely-observed toy scene never does.
 - [pnp_estimation.py](use_numpy/pnp_estimation.py): Perspective-n-Point (PnP) - triangulation's inverse ([docs/frontend/triangulation_pnp.md](docs/frontend/triangulation_pnp.md)): given known 3D points and their observed pixels, recovers the unknown camera pose via a closed-form linear DLT initial guess (specialized to known intrinsics), then a few Gauss-Newton iterations against the true reprojection error. No `use_manif/` counterpart (single-implementation, like `bayes_tree_construction.py`).
 - [saltation_matrix_ekf.py](use_numpy/saltation_matrix_ekf.py): a bouncing point mass ([docs/filtering/hybrid_saltation_ekf.md](docs/filtering/hybrid_saltation_ekf.md)) tracked through discrete ground-contact events by a naive EKF (reset-Jacobian-only covariance handling) vs. a saltation-matrix-corrected EKF, plus a Monte Carlo NEES consistency check, and `--detect-time-bias`/`--detect-time-noise-std` params quantifying what happens once contact-detection timing itself is uncertain (doc §8). Plain $\mathbb{R}^6$ state (position/velocity, no rotation) - no `use_manif/` counterpart, for the same reason as `bayes_tree_construction.py`.
@@ -259,7 +259,7 @@ uv run python use_numpy/pose_graph.py --side-length 2.0 --pos-noise-std 0.05 --r
 
 #### Purpose
 
-`n_cameras` cameras are placed on a horizontal arc around a cluster of `n_landmarks` 3D landmarks, each looking inward via a look-at rotation. A camera field-of-view cutoff means not every camera observes every landmark (landmarks seen by fewer than `--min-observations` cameras are dropped as not triangulable) - this is `docs/optimization/bundle_adjustment.md`'s observed set ${\mathcal{O}}$, a real strict subset of all camera-landmark pairs, not "every camera sees everything." Every camera pose and every landmark is perturbed from ground truth to build a noisy initial guess, then three solvers are compared:
+`n_cameras` cameras are placed on a horizontal arc around a cluster of `n_landmarks` 3D landmarks, each looking inward via a look-at rotation. A landmark counts as observed only if it lies in front of a camera and projects inside its image, so not every camera observes every landmark (landmarks seen by fewer than `--min-observations` cameras are dropped as not triangulable) - this is `docs/optimization/bundle_adjustment.md`'s observed set ${\mathcal{O}}$, a real strict subset of all camera-landmark pairs, not "every camera sees everything." Every camera pose and every landmark is perturbed from ground truth to build a noisy initial guess, then three solvers are compared:
 
 - **Landmarks-only refinement**: poses held fixed at their noisy initial guess, only landmarks refined (the "cameras are correct" strawman) - decouples into independent $3\times3$ Gauss-Newton solves per landmark (classic triangulation from known poses).
 - **Poses-only refinement**: landmarks held fixed, only poses refined (the "points are correct" strawman) - decouples into independent $6\times6$ Gauss-Newton solves per camera (classic PnP-style resection).
@@ -278,7 +278,7 @@ Camera-pose Jacobians come from a hand-derived closed form ($\partial p_c/\parti
 #### Usage
 
 ```
-uv run python use_numpy/bundle_adjustment.py --n-cameras 8 --n-landmarks 60 --camera-radius 5.0 --arc-span-deg 180 --landmark-spread 2.0 --fov-deg 70 --image-width 640 --image-height 480 --focal-length 800 --pose-noise-std 0.1 --landmark-noise-std 0.3 --pixel-noise-std 1.0 --min-observations 2 --gn-tol 1e-6 --gn-max-iters 30 --seed 0 --out out.png
+uv run python use_numpy/bundle_adjustment.py --n-cameras 8 --n-landmarks 60 --camera-radius 5.0 --arc-span-deg 180 --landmark-spread 2.0 --image-width 640 --image-height 480 --focal-length 800 --pose-noise-std 0.1 --landmark-noise-std 0.3 --pixel-noise-std 1.0 --min-observations 2 --gn-tol 1e-6 --gn-max-iters 30 --seed 0 --out out.png
 ```
 
 - `--n-cameras`: number of cameras placed on the arc (default `8`)
@@ -286,8 +286,7 @@ uv run python use_numpy/bundle_adjustment.py --n-cameras 8 --n-landmarks 60 --ca
 - `--camera-radius`: radius of the camera arc, centered on the landmark centroid, m (default `5.0`)
 - `--arc-span-deg`: total angular span of the camera arc, deg (default `180`)
 - `--landmark-spread`: half-width of the cube landmarks are sampled in, m (default `2.0`)
-- `--fov-deg`: camera full field-of-view angle; controls which landmarks each camera observes, deg (default `70`)
-- `--image-width`, `--image-height`: image size in pixels, sets `cx`/`cy` (default `640`/`480`)
+- `--image-width`, `--image-height`: image size in pixels; sets `cx`/`cy` and which points are in view (default `640`/`480`)
 - `--focal-length`: shared `fx=fy` focal length in pixels (default `800`)
 - `--pose-noise-std`: std-dev of the se3 twist used to perturb the initial camera-pose guess, mixed m/rad (default `0.1`)
 - `--landmark-noise-std`: std-dev of the Gaussian offset used to perturb the initial landmark guess, m (default `0.3`)
@@ -322,7 +321,7 @@ Both solvers share one Levenberg-Marquardt core (`run_windowed_gn_lm`): a step i
 #### Usage
 
 ```
-uv run python use_numpy/bundle_adjustment_advanced.py --n-keyframes 50 --path-radius 15.0 --arc-span-deg 90 --landmarks-per-keyframe 8 --lateral-spread 2.0 --vertical-spread 1.0 --fov-deg 70 --max-view-range 6.0 --image-width 640 --image-height 480 --focal-length 800 --min-observations 3 --min-shared-for-covisibility 2 --max-window-keyframes 6 --global-ba-interval 8 --relative-pose-noise-std 0.02 --pixel-noise-std 1.0 --gn-tol 1e-6 --gn-max-iters 15 --seed 0 --out out.png
+uv run python use_numpy/bundle_adjustment_advanced.py --n-keyframes 50 --path-radius 15.0 --arc-span-deg 90 --landmarks-per-keyframe 8 --lateral-spread 2.0 --vertical-spread 1.0 --max-view-range 6.0 --image-width 640 --image-height 480 --focal-length 800 --min-observations 3 --min-shared-for-covisibility 2 --max-window-keyframes 6 --global-ba-interval 8 --relative-pose-noise-std 0.02 --pixel-noise-std 1.0 --gn-tol 1e-6 --gn-max-iters 15 --seed 0 --out out.png
 ```
 
 - `--n-keyframes`: number of keyframes along the path (default `50`)
@@ -330,9 +329,8 @@ uv run python use_numpy/bundle_adjustment_advanced.py --n-keyframes 50 --path-ra
 - `--arc-span-deg`: total angular span of the path, deg (default `90`)
 - `--landmarks-per-keyframe`: landmarks scattered per keyframe station (default `8`)
 - `--lateral-spread`, `--vertical-spread`: half-width of the lateral/vertical landmark offset, m (default `2.0`/`1.0`)
-- `--fov-deg`: camera full field-of-view angle, deg (default `70`)
 - `--max-view-range`: maximum camera-to-landmark detection range, m - bounds covisibility to nearby keyframes (default `6.0`)
-- `--image-width`, `--image-height`: image size in pixels, sets `cx`/`cy` (default `640`/`480`)
+- `--image-width`, `--image-height`: image size in pixels; sets `cx`/`cy` and which points are in view (default `640`/`480`)
 - `--focal-length`: shared `fx=fy` focal length in pixels (default `800`)
 - `--min-observations`: minimum observing keyframes before a landmark is triangulated; must be `>= 2` (default `3`)
 - `--min-shared-for-covisibility`: minimum shared-landmark count for a covisibility edge between two keyframes (default `2`)
@@ -347,13 +345,13 @@ uv run python use_numpy/bundle_adjustment_advanced.py --n-keyframes 50 --path-ra
 
 #### Loop closure example
 
-The default `--arc-span-deg 90` path never revisits a place, so Global BA never gets a genuinely new constraint. Pushing the span close to 360 degrees (at the *same* `--n-keyframes 50` - no other change needed) swings the path's end back within view range of its own start, so a late keyframe re-observes an early landmark - a real loop closure, picked up automatically by the same covisibility/window/Global-BA code with zero logic changes:
+The default `--arc-span-deg 90` path never revisits a place, so Global BA never gets a genuinely new constraint. Pushing the span close to 360 degrees swings the path's end back within view range of its own start, so a late keyframe re-observes an early landmark - a real loop closure, picked up automatically by the same covisibility/window/Global-BA code with zero logic changes. Raise `--n-keyframes` with the span so the keyframe spacing stays at the default run's ~0.5 m (190 for 350 degrees); at 50 keyframes the spacing grows to ~1.9 m and too few landmarks get triangulated for the closure to register:
 
 ```
-uv run python use_numpy/bundle_adjustment_advanced.py --arc-span-deg 350 --seed 0 --out loop_closure.png
+uv run python use_numpy/bundle_adjustment_advanced.py --arc-span-deg 350 --n-keyframes 190 --seed 0 --out loop_closure.png
 ```
 
-This prints an extra line (in place of the "never revisits" caveat) identifying exactly which keyframe closed the loop and against which earlier one, plus the measured trajectory-RMS improvement once the next Global BA pass exploits it, and adds a labeled green "Loop closure" marker to the drift plot at that keyframe.
+This prints an extra line (in place of the "never revisits" caveat) identifying exactly which keyframe closed the loop and against which earlier one, plus the measured trajectory-RMS change once the next Global BA pass exploits it (at seed 0: 37.25 m → 12.02 m; over seeds 0-4 that one pass ranges from −68% to +54%, but Local+Global ends below Local-only on all five, see [bundle_adjustment.md §13](docs/optimization/bundle_adjustment.md#13-local-vs-global-bundle-adjustment-real-systems)), and adds a labeled green "Loop closure" marker to the drift plot at that keyframe.
 
 ### 8. Incremental (square-root SAM) vs. batch pose-graph solving
 

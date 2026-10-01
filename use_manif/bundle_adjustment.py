@@ -121,17 +121,22 @@ def camera_project(T, P, K, with_jacobians=False):
     return pixel, J_pose, J_point
 
 
-def compute_visibility(T_true, P_true, fov_deg):
+def compute_visibility(T_true, P_true, K):
     """For each (camera, landmark) pair, decides whether the landmark is
-    observed: in front of the camera and within its field of view.
+    observed: in front of the camera and projecting inside the image. The
+    image is (2*cx) x (2*cy) pixels -- main() builds K with the principal
+    point at the image center -- so the field of view follows from the
+    intrinsics rather than from a separate angle that could disagree with
+    them (an earlier 70-degree cone admitted ~37% of default observations
+    outside a 640x480 image whose f=800 field of view is ~44 x 33 degrees).
     Arguments:
         T_true: list of ground-truth camera poses (manif.SE3)
         P_true: (n_landmarks, 3) array of ground-truth landmark positions
-        fov_deg: full field-of-view angle (deg)
+        K: (fx, fy, cx, cy) camera intrinsics
     Returns:
         pairs: list of (cam_idx, landmark_idx) visible pairs
     """
-    half_fov_cos = np.cos(np.radians(fov_deg) / 2.0)
+    fx, fy, cx, cy = K
     pairs = []
     for i, T in enumerate(T_true):
         R, t = T.rotation(), T.translation()
@@ -140,13 +145,13 @@ def compute_visibility(T_true, P_true, fov_deg):
             z = p_c[2]
             if z <= 0:
                 continue
-            cos_angle = z / np.linalg.norm(p_c)
-            if cos_angle >= half_fov_cos:
+            u, v = fx * p_c[0] / z + cx, fy * p_c[1] / z + cy
+            if 0.0 <= u < 2.0 * cx and 0.0 <= v < 2.0 * cy:
                 pairs.append((i, j))
     return pairs
 
 
-def build_observations(T_true, P_true, K, pixel_noise_std, fov_deg, min_observations, rng):
+def build_observations(T_true, P_true, K, pixel_noise_std, min_observations, rng):
     """Determines visibility, drops landmarks seen by fewer than
     min_observations cameras (not triangulable -- a single 2D observation
     only constrains a ray through 3D space, so min_observations must be
@@ -159,7 +164,6 @@ def build_observations(T_true, P_true, K, pixel_noise_std, fov_deg, min_observat
         P_true: (n_landmarks_all, 3) array of ground-truth landmark positions
         K: (fx, fy, cx, cy) camera intrinsics
         pixel_noise_std: std-dev of Gaussian pixel noise (px)
-        fov_deg: full field-of-view angle (deg)
         min_observations: minimum number of observing cameras a landmark
                            needs to be kept (must be >= 2)
         rng: numpy random number generator
@@ -171,7 +175,7 @@ def build_observations(T_true, P_true, K, pixel_noise_std, fov_deg, min_observat
         raise ValueError(f"min_observations must be >= 2 (a landmark needs >= 2 views to be "
                           f"triangulable), got {min_observations}")
 
-    raw_pairs = compute_visibility(T_true, P_true, fov_deg)
+    raw_pairs = compute_visibility(T_true, P_true, K)
 
     observers = {}
     for i, j in raw_pairs:
@@ -482,11 +486,10 @@ def main():
     parser.add_argument("--camera-radius", type=float, default=5.0, help="Radius of the camera arc, centered on the landmark centroid (m)")
     parser.add_argument("--arc-span-deg", type=float, default=180.0, help="Total angular span of the camera arc (deg)")
     parser.add_argument("--landmark-spread", type=float, default=2.0, help="Half-width of the cube landmarks are sampled in (m)")
-    parser.add_argument("--fov-deg", type=float, default=70.0, help="Camera full field-of-view angle; controls which landmarks each camera observes (deg)")
     parser.add_argument("--min-observations", type=int, default=2, help="Minimum number of observing cameras a landmark needs to be kept (must be >= 2, since a landmark needs >= 2 views to be triangulable)")
 
-    parser.add_argument("--image-width", type=int, default=640, help="Image width in pixels (sets cx)")
-    parser.add_argument("--image-height", type=int, default=480, help="Image height in pixels (sets cy)")
+    parser.add_argument("--image-width", type=int, default=640, help="Image width in pixels (sets cx and which points are in view)")
+    parser.add_argument("--image-height", type=int, default=480, help="Image height in pixels (sets cy and which points are in view)")
     parser.add_argument("--focal-length", type=float, default=800.0, help="Shared fx=fy focal length in pixels")
 
     parser.add_argument("--pose-noise-std", type=float, default=0.1, help="Std-dev of the se3 twist used to perturb the initial camera-pose guess (mixed m/rad)")
@@ -510,7 +513,7 @@ def main():
         args.n_cameras, args.n_landmarks, args.camera_radius, args.arc_span_deg, args.landmark_spread, rng)
 
     P_true, observations = build_observations(
-        T_true, P_true_all, K, args.pixel_noise_std, args.fov_deg, args.min_observations, rng)
+        T_true, P_true_all, K, args.pixel_noise_std, args.min_observations, rng)
     n_landmarks = len(P_true)
 
     print(f"Generated {args.n_cameras} cameras, {n_landmarks} triangulable landmarks "

@@ -79,13 +79,15 @@ def camera_project(T, P, K, with_jacobians=False):
 
 def generate_scene(n_points, K, rng):
     """A random ground-truth camera pose plus n_points random 3D points,
-    sampled directly in front of it (camera-frame z in [3, 8]) so every
-    point is guaranteed positive-depth by construction.
+    sampled directly in front of it (camera-frame x, y in [-2, 2], z in
+    [3, 8]) so every point is guaranteed positive-depth by construction. A
+    draw that would project outside the (2*cx) x (2*cy) image (main() puts
+    the principal point at the image center) is redrawn: at the defaults
+    the box above is wider than the f=800 field of view, and an earlier
+    version kept ~20% of its correspondences off-image.
     Arguments:
         n_points: number of 3D-2D correspondences to generate
-        K: (fx, fy, cx, cy) camera intrinsics (unused here, kept for a
-           uniform generate_scene(n_points, K, rng) signature alongside the
-           rest of this codebase's scene generators)
+        K: (fx, fy, cx, cy) camera intrinsics, used for the in-image check
         rng: numpy random number generator
     Returns:
         T_true: ground-truth camera pose, camera-to-world (4,4)
@@ -97,10 +99,13 @@ def generate_scene(n_points, K, rng):
     T_true[0:3, 0:3] = R_true
     T_true[0:3, 3] = t_true
 
+    fx, fy, cx, cy = K
     P_list = []
-    for _ in range(n_points):
+    while len(P_list) < n_points:
         p_c = np.array([rng.uniform(-2.0, 2.0), rng.uniform(-2.0, 2.0), rng.uniform(3.0, 8.0)])
-        P_list.append(R_true @ p_c + t_true)
+        u, v = fx * p_c[0] / p_c[2] + cx, fy * p_c[1] / p_c[2] + cy
+        if 0.0 <= u < 2.0 * cx and 0.0 <= v < 2.0 * cy:
+            P_list.append(R_true @ p_c + t_true)
     return T_true, P_list
 
 
@@ -216,8 +221,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
 
     parser.add_argument("--n-points", type=int, default=20, help="Number of 3D-2D correspondences")
-    parser.add_argument("--image-width", type=int, default=640, help="Image width in pixels (sets cx)")
-    parser.add_argument("--image-height", type=int, default=480, help="Image height in pixels (sets cy)")
+    parser.add_argument("--image-width", type=int, default=640, help="Image width in pixels (sets cx and which points are in view)")
+    parser.add_argument("--image-height", type=int, default=480, help="Image height in pixels (sets cy and which points are in view)")
     parser.add_argument("--focal-length", type=float, default=800.0, help="Shared fx=fy focal length in pixels")
     parser.add_argument("--pixel-noise-std", type=float, default=1.0, help="Std-dev of Gaussian pixel noise (px)")
 

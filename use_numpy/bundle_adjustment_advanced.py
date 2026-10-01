@@ -75,11 +75,11 @@ On an open (non-looping) path -- the default --arc-span-deg 90 -- a
 periodic Global BA pass has no genuinely *new* geometric constraint to
 exploit beyond what the overlapping local windows already used -- that
 only comes from revisiting a place (loop closure) or an absolute
-measurement. Comparing the two runs here shows the default seed doing well
-(Global BA beating Local-only by 18% RMS trajectory error), but that's not
-the typical case: a wider sweep across seeds (see this module's own tests)
-shows Global BA is close to a wash against Local-only overall -- a roughly
-50% per-seed win rate, with the *median* difference near zero either way --
+measurement. Comparing the two runs here, the default seed happens to show
+Global BA *losing* (27% higher final RMS trajectory error than Local-only),
+but no single seed is typical: a wider sweep across seeds (see this
+module's own tests) shows Global BA is close to a wash against Local-only
+overall -- 6 of 15 per-seed wins, with the *median* difference near zero --
 not a reliable "helps on most noise draws" story. A handful of individual
 seeds also diverge to thousands of meters in *either* run mode (a rare bad
 local minimum in the windowed GN solve that neither mode is protected
@@ -91,7 +91,10 @@ covisibility bookkeeping below, build_active_window, and run_global_ba are
 already general (none of them assume temporal locality). It only needs the
 *geometry* to revisit a place: passing --arc-span-deg close to 360 (e.g.
 350) makes the path's end swing back within view range of its own start,
-so a late keyframe re-observes a landmark last seen by an early one. This
+so a late keyframe re-observes a landmark last seen by an early one. Keep
+the keyframe spacing too (--n-keyframes 190 for 350 degrees, matching the
+default run's ~0.5 m): at 50 keyframes the spacing grows to ~1.9 m and too
+few landmarks are seen by enough keyframes to be triangulated. This
 is detected automatically (loop_closure_min_gap below) and reported/plotted
 when it happens -- see run_incremental_local_ba's loop_closure_keyframe.
 See also docs/optimization/bundle_adjustment.md Section 13's pointer to "loop closure +
@@ -141,7 +144,8 @@ def generate_ground_truth_trajectory(n_keyframes, path_radius, arc_span_deg):
     return T_true
 
 
-def generate_landmark_corridor(T_true, n_landmarks_per_keyframe, lateral_spread, vertical_spread, rng):
+def generate_landmark_corridor(T_true, n_landmarks_per_keyframe, lateral_spread, vertical_spread, rng,
+                              extend_ahead=0.0):
     """Scatters landmarks near the path centerline: n_landmarks_per_keyframe
     per keyframe station, offset along the local right/up/forward axes.
     Because the offsets are small relative to the whole path, a landmark is
@@ -154,14 +158,27 @@ def generate_landmark_corridor(T_true, n_landmarks_per_keyframe, lateral_spread,
         lateral_spread: half-width of the lateral (right-axis) offset (m)
         vertical_spread: half-width of the vertical (up-axis) offset (m)
         rng: numpy random number generator
+        extend_ahead: also place stations this far (m) past the last
+            keyframe, continuing the path by repeating its last relative
+            motion, so the final keyframes have landmarks ahead of them like
+            every other keyframe (main() passes max_view_range; without
+            this the last keyframes see nothing). Their landmarks are drawn
+            after the keyframe stations', so the latter are unchanged.
     Returns:
-        P_true: (n_keyframes * n_landmarks_per_keyframe, 3) array of ground-truth landmark positions
+        P_true: ((n_keyframes + n_extra_stations) * n_landmarks_per_keyframe, 3) array of
+            ground-truth landmark positions
     """
     positions = np.array([T[0:3, 3] for T in T_true])
     spacing = np.linalg.norm(positions[1] - positions[0]) if len(positions) > 1 else 1.0
 
+    stations = list(T_true)
+    if extend_ahead > 0.0 and len(T_true) > 1:
+        step = np.linalg.inv(T_true[-2]) @ T_true[-1]
+        for _ in range(int(np.ceil(extend_ahead / spacing))):
+            stations.append(stations[-1] @ step)
+
     landmarks = []
-    for T in T_true:
+    for T in stations:
         cam_pos, R = T[0:3, 3], T[0:3, 0:3]
         right, up, forward = R[:, 0], R[:, 1], R[:, 2]
         for _ in range(n_landmarks_per_keyframe):
@@ -208,24 +225,27 @@ def camera_project(T, P, K, with_jacobians=False):
     return pixel, J_pose, J_point
 
 
-def compute_visibility(T_true, P_true, fov_deg, max_view_range):
+def compute_visibility(T_true, P_true, K, max_view_range):
     """For each (keyframe, landmark) pair, decides whether the landmark is
-    observed: in front of the camera, within its field of view, and within
-    max_view_range -- a real feature detector only resolves a landmark out
-    to some finite range, and without this cutoff a forward-facing camera
-    looking straight down a corridor sees nearly every landmark from nearly
-    every keyframe (it's within the FOV cone for the whole approach), which
-    destroys the locality that makes covisibility graphs and bounded local
-    windows meaningful in the first place.
+    observed: in front of the camera, projecting inside the image, and
+    within max_view_range -- a real feature detector only resolves a
+    landmark out to some finite range, and without this cutoff a
+    forward-facing camera looking straight down a corridor sees nearly
+    every landmark from nearly every keyframe (it stays in view for the
+    whole approach), which destroys the locality that makes covisibility
+    graphs and bounded local windows meaningful in the first place. The
+    image is (2*cx) x (2*cy) pixels (main() puts the principal point at the
+    image center), so the field of view follows from K, as in
+    bundle_adjustment.compute_visibility.
     Arguments:
         T_true: list of ground-truth camera poses (4,4)
         P_true: (n_landmarks, 3) array of ground-truth landmark positions
-        fov_deg: full field-of-view angle (deg)
+        K: (fx, fy, cx, cy) camera intrinsics
         max_view_range: maximum camera-to-landmark distance at which a landmark is detectable (m)
     Returns:
         pairs: list of (keyframe_idx, landmark_idx) visible pairs
     """
-    half_fov_cos = np.cos(np.radians(fov_deg) / 2.0)
+    fx, fy, cx, cy = K
     pairs = []
     for i, T in enumerate(T_true):
         R, t = T[0:3, 0:3], T[0:3, 3]
@@ -234,16 +254,15 @@ def compute_visibility(T_true, P_true, fov_deg, max_view_range):
             z = p_c[2]
             if z <= 0:
                 continue
-            range_ = np.linalg.norm(p_c)
-            if range_ > max_view_range:
+            if np.linalg.norm(p_c) > max_view_range:
                 continue
-            cos_angle = z / range_
-            if cos_angle >= half_fov_cos:
+            u, v = fx * p_c[0] / z + cx, fy * p_c[1] / z + cy
+            if 0.0 <= u < 2.0 * cx and 0.0 <= v < 2.0 * cy:
                 pairs.append((i, j))
     return pairs
 
 
-def build_observations(T_true, P_true, K, pixel_noise_std, fov_deg, max_view_range, min_observations, rng):
+def build_observations(T_true, P_true, K, pixel_noise_std, max_view_range, min_observations, rng):
     """Determines visibility, drops landmarks seen by fewer than
     min_observations keyframes over the *whole* trajectory (never
     triangulable, so they're never promoted to a map point -- exactly like
@@ -254,7 +273,6 @@ def build_observations(T_true, P_true, K, pixel_noise_std, fov_deg, max_view_ran
         P_true: (n_landmarks_all, 3) array of ground-truth landmark positions
         K: (fx, fy, cx, cy) camera intrinsics
         pixel_noise_std: std-dev of Gaussian pixel noise (px)
-        fov_deg: full field-of-view angle (deg)
         max_view_range: maximum camera-to-landmark detection range (m)
         min_observations: minimum number of observing keyframes a landmark needs to be kept (must be >= 2)
         rng: numpy random number generator
@@ -267,7 +285,7 @@ def build_observations(T_true, P_true, K, pixel_noise_std, fov_deg, max_view_ran
         raise ValueError(f"min_observations must be >= 2 (a landmark needs >= 2 views to be "
                           f"triangulable), got {min_observations}")
 
-    raw_pairs = compute_visibility(T_true, P_true, fov_deg, max_view_range)
+    raw_pairs = compute_visibility(T_true, P_true, K, max_view_range)
 
     observers = {}
     for i, j in raw_pairs:
@@ -813,11 +831,10 @@ def main():
     parser.add_argument("--landmarks-per-keyframe", type=int, default=8, help="Landmarks scattered per keyframe station")
     parser.add_argument("--lateral-spread", type=float, default=2.0, help="Half-width of the lateral landmark offset (m)")
     parser.add_argument("--vertical-spread", type=float, default=1.0, help="Half-width of the vertical landmark offset (m)")
-    parser.add_argument("--fov-deg", type=float, default=70.0, help="Camera full field-of-view angle (deg)")
     parser.add_argument("--max-view-range", type=float, default=6.0, help="Maximum camera-to-landmark detection range (m) -- bounds covisibility to nearby keyframes, like a real feature detector's effective range")
 
-    parser.add_argument("--image-width", type=int, default=640, help="Image width in pixels (sets cx)")
-    parser.add_argument("--image-height", type=int, default=480, help="Image height in pixels (sets cy)")
+    parser.add_argument("--image-width", type=int, default=640, help="Image width in pixels (sets cx and which points are in view)")
+    parser.add_argument("--image-height", type=int, default=480, help="Image height in pixels (sets cy and which points are in view)")
     parser.add_argument("--focal-length", type=float, default=800.0, help="Shared fx=fy focal length in pixels")
 
     parser.add_argument("--min-observations", type=int, default=3, help="Minimum number of observing keyframes a landmark needs to be kept/triangulated (must be >= 2)")
@@ -841,9 +858,10 @@ def main():
 
     T_true = generate_ground_truth_trajectory(args.n_keyframes, args.path_radius, args.arc_span_deg)
     P_true_all = generate_landmark_corridor(
-        T_true, args.landmarks_per_keyframe, args.lateral_spread, args.vertical_spread, np.random.default_rng(args.seed))
+        T_true, args.landmarks_per_keyframe, args.lateral_spread, args.vertical_spread, np.random.default_rng(args.seed),
+        extend_ahead=args.max_view_range)
     P_true, observations = build_observations(
-        T_true, P_true_all, K, args.pixel_noise_std, args.fov_deg, args.max_view_range, args.min_observations,
+        T_true, P_true_all, K, args.pixel_noise_std, args.max_view_range, args.min_observations,
         np.random.default_rng(args.seed))
     observations_by_keyframe = group_observations_by_keyframe(observations, args.n_keyframes)
 
@@ -877,9 +895,10 @@ def main():
     if lc_keyframe is None:
         print("(This path never revisits a place -- no loop closure -- so periodic Global BA has no "
               "genuinely new constraint to exploit, only a joint re-solve of the same information; "
-              "across a wider seed sweep it's close to a wash against Local-only here (~50% per-seed "
-              "win rate, median difference near zero), not a reliable win the way an actual loop "
-              "closure is. Pass --arc-span-deg close to 360 to make the path loop back and trigger one.)")
+              "across a wider seed sweep it's close to a wash against Local-only here (6 of 15 per-seed "
+              "wins in this module's tests, median difference near zero), not a reliable win the way an actual loop "
+              "closure is. Pass --arc-span-deg 350 --n-keyframes 190 to make the path loop back, at the same "
+              "keyframe spacing, and trigger one.)")
     else:
         lc_partner = hist_hybrid["loop_closure_partner"]
         idx_at_lc = hist_hybrid["traj_step"].index(lc_keyframe)

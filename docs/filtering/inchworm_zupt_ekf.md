@@ -32,6 +32,10 @@ During release and extend, none of these holds. Three caveats keep this honest:
 
 This doc works through the simplest concrete version of that idea, using [`inchworm_zupt_ekf.py`](../../use_numpy/inchworm_zupt_ekf.py)'s 1D crawling point mass as the toy problem.
 
+![Three rows from inchworm_zupt_ekf.py's defaults over three gait cycles: position as a staircase that holds its value while anchored, velocity as a continuous trapezoid labelled with t_anchor, t_extend, t_ramp and v_extend, and the ticks where the never, always and phase_conditional variants apply a zero-velocity update](../../assets/inchworm_zupt_ekf_concept.png)
+
+*Figure: the gait schedule at `use_numpy/inchworm_zupt_ekf.py`'s defaults, plotted by `uv run python assets/make_figures.py inchworm_zupt_ekf_concept`.*
+
 **Scope, stated up front**: this is deliberately a small slice of the real idea. It models translation only - zero-velocity updates (ZUPT), not the full zero-angular-rate/orientation story (ZARU) - since that needs an orientation state this toy doesn't carry. It also assumes the gait schedule (when anchor/extend happen) is *known*, not detected. That second question - what happens once the schedule itself is uncertain - is exactly the subject of [`hybrid_saltation_ekf.md` §8](hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter), which this doc leans on rather than repeating.
 
 ---

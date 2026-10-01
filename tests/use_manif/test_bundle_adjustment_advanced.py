@@ -39,19 +39,19 @@ def test_generate_landmark_corridor_shape(bundle_adjustment_advanced):
 
 
 # ---------------------------------------------------------------------------
-# compute_visibility (front/behind/FOV/range)
+# compute_visibility (front/behind/image bounds/range)
 # ---------------------------------------------------------------------------
 
-def test_compute_visibility_respects_fov_and_max_range(bundle_adjustment_advanced):
+def test_compute_visibility_respects_image_bounds_and_max_range(bundle_adjustment_advanced):
     baa = bundle_adjustment_advanced
     T_cam = manif.SE3.Identity()  # camera at origin, looking toward +z
-    P_near_center = np.array([0.0, 0.0, 3.0])     # in front, in FOV, within range
+    P_near_center = np.array([0.0, 0.0, 3.0])     # in front, inside the image, within range
     P_behind = np.array([0.0, 0.0, -3.0])          # negative depth
-    P_too_far = np.array([0.0, 0.0, 20.0])         # in front & in FOV but beyond max_view_range
-    P_outside_fov = np.array([10.0, 0.0, 3.0])     # in front, within range, outside FOV cone
+    P_too_far = np.array([0.0, 0.0, 20.0])         # in front & inside the image but beyond max_view_range
+    P_off_image = np.array([1.8, 0.0, 3.0])        # in front, within range, inside a 70-degree cone, but u = 800 px > 640
 
-    P_true = np.stack([P_near_center, P_behind, P_too_far, P_outside_fov])
-    pairs = baa.compute_visibility([T_cam], P_true, fov_deg=60.0, max_view_range=6.0)
+    P_true = np.stack([P_near_center, P_behind, P_too_far, P_off_image])
+    pairs = baa.compute_visibility([T_cam], P_true, K, max_view_range=6.0)
 
     assert pairs == [(0, 0)]
 
@@ -66,7 +66,7 @@ def test_build_observations_raises_on_min_observations_below_2(bundle_adjustment
     rng = np.random.default_rng(0)
     P_true = baa.generate_landmark_corridor(T_true, 5, 2.0, 1.0, rng)
     with pytest.raises(ValueError):
-        baa.build_observations(T_true, P_true, K, 1.0, 70.0, 6.0, 1, rng)
+        baa.build_observations(T_true, P_true, K, 1.0, 6.0, 1, rng)
 
 
 def test_build_observations_drops_underobserved_landmarks(bundle_adjustment_advanced):
@@ -75,7 +75,7 @@ def test_build_observations_drops_underobserved_landmarks(bundle_adjustment_adva
     rng = np.random.default_rng(1)
     P_all = baa.generate_landmark_corridor(T_true, 5, 2.0, 1.0, rng)
     min_observations = 3
-    P_kept, observations = baa.build_observations(T_true, P_all, K, 1.0, 70.0, 6.0, min_observations, rng)
+    P_kept, observations = baa.build_observations(T_true, P_all, K, 1.0, 6.0, min_observations, rng)
 
     counts = {}
     for i, j, z in observations:
@@ -232,7 +232,7 @@ def test_run_global_ba_reduces_reprojection_rms(bundle_adjustment_advanced):
     T_true = baa.generate_ground_truth_trajectory(n_keyframes, 15.0, 90.0)
     rng = np.random.default_rng(7)
     P_all = baa.generate_landmark_corridor(T_true, 10, 2.0, 1.0, rng)
-    P_true, observations = baa.build_observations(T_true, P_all, K, 1.0, 70.0, 8.0, 2, rng)
+    P_true, observations = baa.build_observations(T_true, P_all, K, 1.0, 8.0, 2, rng)
     assert len(observations) > 0  # sanity: this scene must actually produce triangulable landmarks
 
     observers_by_landmark = {}
@@ -273,7 +273,7 @@ def _run_pair(baa, seed, n_keyframes=12):
     P_all = baa.generate_landmark_corridor(T_true, n_landmarks_per_keyframe=10, lateral_spread=2.0,
                                             vertical_spread=1.0, rng=np.random.default_rng(seed))
     P_true, observations = baa.build_observations(
-        T_true, P_all, K, pixel_noise_std=1.0, fov_deg=70.0, max_view_range=8.0,
+        T_true, P_all, K, pixel_noise_std=1.0, max_view_range=8.0,
         min_observations=2, rng=np.random.default_rng(seed))
     assert len(observations) > 0
 
@@ -308,21 +308,36 @@ def test_global_ba_does_not_regress_local_only_in_aggregate(bundle_adjustment_ad
     # a >=60% per-seed win rate, on the theory that Global BA "helps on most
     # noise draws" here. That 5-seed sample cleared the bar at an exact 3/5 --
     # one of those wins by a 0.0009 m margin -- but it wasn't representative:
-    # over this 15-seed sweep the win rate is close to a coin flip (8/15 at
-    # the time of writing), and an occasional seed diverges to 1000s of
-    # meters in *either* run mode (a rare bad local minimum in the windowed
-    # GN solve that neither mode is protected from; currently seed 12, at
-    # ~27,000 m Local-only and ~12,900 m Local + Global BA). Before
-    # refine_landmark_gn stopped at camera-plane crossings, the two backends
-    # also disagreed seed by seed (use_numpy's seed 1 diverged, use_manif's
-    # seed 11 crashed with a singular solve); they now agree to ~1e-4 m. A
+    # over this 15-seed sweep the win rate is close to a coin flip (6/15 at
+    # the time of writing, with in-image visibility), and an occasional seed
+    # diverges to 1000s of meters in *either* run mode (a rare bad local
+    # minimum in the windowed GN solve that neither mode is protected from;
+    # currently seed 5, at ~72,000 m Local-only and ~74,000 m Local + Global
+    # BA). Before refine_landmark_gn stopped at camera-plane crossings, the
+    # two backends also disagreed seed by seed (use_numpy's seed 1 diverged,
+    # use_manif's seed 11 crashed with a singular solve); they now agree to
+    # ~1e-5 relative. A
     # per-seed win-count assertion over a small, fixed seed set is fragile by
     # construction. The median of (hybrid - local) is robust to both the
     # sampling noise and the rare divergent outliers, and sits very close to
-    # 0 (-0.0005 m at the time of writing: a wash, not a reliable win) -- so
+    # 0 (+0.06 m at the time of writing: a wash, not a reliable win) -- so
     # this checks Global BA isn't a *systematic* regression against
     # Local-only, without overclaiming an improvement the data doesn't
     # actually support.
     assert median_diff <= 1.0, (
         f"Median (hybrid - local) RMS trajectory error over {len(seeds)} seeds was "
         f"{median_diff:.4f} m, past the generous 1.0 m regression tolerance: {results}")
+
+
+def test_generate_landmark_corridor_extend_ahead_keeps_stations_and_feeds_last_keyframes(bundle_adjustment_advanced):
+    baa = bundle_adjustment_advanced
+    # Default scene: without extend_ahead the last keyframes observe no landmarks at all.
+    T_true = baa.generate_ground_truth_trajectory(50, 15.0, 90.0)
+    P_plain = baa.generate_landmark_corridor(T_true, 8, 2.0, 1.0, np.random.default_rng(0))
+    P_ext = baa.generate_landmark_corridor(T_true, 8, 2.0, 1.0, np.random.default_rng(0), extend_ahead=6.0)
+    assert len(P_ext) > len(P_plain)
+    assert np.array_equal(P_ext[:len(P_plain)], P_plain)  # keyframe stations' draws unchanged
+
+    _, observations = baa.build_observations(T_true, P_ext, K, 1.0, 6.0, 3, np.random.default_rng(0))
+    by_kf = baa.group_observations_by_keyframe(observations, 50)
+    assert all(len(obs) > 0 for obs in by_kf)

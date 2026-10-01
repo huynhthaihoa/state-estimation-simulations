@@ -25,6 +25,10 @@ Four ways to turn a predicted pose + point-cloud measurement into a correction:
 
 EKF and IEKF are two algebraically related ways of *linearizing the same model*; UKF instead avoids linearizing it altogether. That difference in kind is exactly why the first pair can be proven identical while the third can only be shown to be *close*. Vanilla KF (§4) is a different move again - not a different linearization or a different sampling scheme, but a different *state representation* entirely.
 
+![Three panels from pointcloud_pose_tracking.py's defaults: the same 20-point body cloud carried rigidly along the true trajectory, the world-frame EKF residual between the measured points and the twist-only prediction T_pred·p at t = 1 s, and the same residuals pulled into the body frame as T_pred⁻¹·z − p for the IEKF, with identical lengths](../../assets/pose_tracking_concept.png)
+
+*Figure: the setup and the two residual frames at `use_numpy/pointcloud_pose_tracking.py`'s defaults (seed 0), plotted by `uv run python assets/make_figures.py pose_tracking_concept`.*
+
 ![Two panels from pointcloud_pose_tracking.py at its defaults: the x-y trajectories of ground truth, dead reckoning and five estimators (EKF, invariant EKF, UKF, vanilla KF, batch Gauss-Newton), and each one's position error over time on a log scale](../../assets/pose_tracking.png)
 
 *Figure: `use_numpy/pointcloud_pose_tracking.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py pose_tracking`.*

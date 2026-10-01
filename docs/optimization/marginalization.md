@@ -141,6 +141,10 @@ Because the window never grows past a fixed size, both the per-step optimization
 
 This is precisely what `filtering_smoothing.md §10`'s "fixed-lag smoothing" box and its MSCKF/VINS-Mono bullets refer to - MSCKF keeps a sliding window of camera poses and marginalizes a landmark's constraint into them once triangulated (see [kf_ekf_iekf.md](../filtering/kf_ekf_iekf.md)'s MSCKF paragraph); VINS-Mono keeps a sliding window of keyframes and marginalizes the oldest one using exactly the Schur-complement step in §4 - though, per §6's correction, without FEJ.
 
+![Three panels from sliding_window_marginalization.py on a 16-pose square with a 10-pose window: window membership after each new pose, the window's block-tridiagonal information matrix with the oldest pose's block about to be eliminated, and the next window's matrix where that information lands as one prior block on the new oldest pose](../../assets/sliding_window_marginalization_concept.png)
+
+*Figure: windows and information matrices recorded from `use_numpy/sliding_window_marginalization.py`'s own `run_sliding_window_pose_graph` calls (16 poses, window 10, seed 0), plotted by `uv run python assets/make_figures.py sliding_window_marginalization_concept`.*
+
 ---
 
 ## 8. What this repo implements

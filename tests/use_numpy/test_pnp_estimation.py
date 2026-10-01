@@ -54,3 +54,15 @@ def test_generate_scene_reproducible_with_same_seed(pnp_estimation):
     assert np.array_equal(T1, T2)
     for p1, p2 in zip(P1, P2):
         assert np.array_equal(p1, p2)
+
+
+def test_generate_scene_points_project_inside_the_image(pnp_estimation):
+    # The sampling box is wider than the default field of view; off-image
+    # draws must be redrawn, so every correspondence is a real pixel.
+    K = (800.0, 800.0, 320.0, 240.0)
+    for seed in range(5):
+        T_true, P_list = pnp_estimation.generate_scene(50, K, np.random.default_rng(seed))
+        assert len(P_list) == 50
+        for P in P_list:
+            u, v = pnp_estimation.camera_project(T_true, P, K)[0]
+            assert 0.0 <= u < 640.0 and 0.0 <= v < 480.0

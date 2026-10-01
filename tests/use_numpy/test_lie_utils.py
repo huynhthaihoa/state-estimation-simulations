@@ -221,3 +221,14 @@ def test_compute_se3_inv_right_jacobian_near_zero_theta_has_no_nan(lie_utils):
     assert np.all(np.isfinite(J_inv))
     Jr = lie_utils.se3_right_jacobian(xi)
     assert np.allclose(Jr @ J_inv, np.eye(6), atol=1e-4)
+
+
+def test_rotation_geodesic_error_resolves_tiny_angles(lie_utils):
+    # arccos(cos) cannot resolve angles below ~2e-8 rad; the atan2 form must.
+    R = lie_utils.so3_exp(np.array([0.3, -0.2, 0.5]))
+    for angle in [1e-12, 1e-9, 1e-6]:
+        axis = np.array([1.0, 2.0, -0.5]) / np.linalg.norm([1.0, 2.0, -0.5])
+        R2 = R @ lie_utils.so3_exp(angle * axis)
+        assert np.isclose(lie_utils.rotation_geodesic_error(R, R2), angle, rtol=1e-3, atol=0.0)
+    R_pi = R @ lie_utils.so3_exp(np.array([0.0, 0.0, np.pi - 1e-9]))
+    assert np.isclose(lie_utils.rotation_geodesic_error(R, R_pi), np.pi - 1e-9, atol=1e-7)
