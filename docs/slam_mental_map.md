@@ -37,8 +37,8 @@ Several docs already draw a partial map of their own corner. Treat those as zoom
 │            │                                           │                  │
 │   KF → EKF → IEKF                          factor graph = NLS problem     │
 │   UKF · ESKF · MSCKF                       PGO · BA · IMU factors         │
-│   hybrid resets · ZUPT · shaped Q          GN/LM         (batch)        │
-│                                            iSAM/iSAM2    (incremental)  │
+│   hybrid resets · ZUPT · shaped Q          GN/LM         (batch)          │
+│                                            iSAM/iSAM2    (incremental)    │
 │                                            marginalization (bounded)      │
 └─────────────────────────────────┬─────────────────────────────────────────┘
                                   │
@@ -89,7 +89,7 @@ Three questions organize the whole map:
 ## 3. Front-end: from raw sensors to constraints
 
 ```text
- camera images ──► features/matching ──► relative motion  T_ij ─────────┐
+ camera images ──► features/matching ──► relative motion  T_ij ───────────┐
                            │                                              │
                            ├──► triangulation   (known poses → 3D point)  │
                            ├──► PnP             (known 3D points → pose)  ├──► constraints
@@ -228,7 +228,7 @@ Every estimator here that faces a nonlinear model, except the sigma-point UKF an
 
 ```text
   EKF predict/update ─┐
-  GN/LM step ───────┤
+  GN/LM step ─────────┤
   IMU bias correction ┼──►  f(x + Δx) ≈ f(x) + J Δx   (jacobian.md)
   saltation matrix ───┤
   marginalization ────┘     ...and the linearization point matters (FEJ, relinearization)
