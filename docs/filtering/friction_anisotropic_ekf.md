@@ -2,7 +2,7 @@
 
 ## Intuition
 
-"Anisotropic friction" means a surface grips well along one axis and slides easily along the perpendicular one. The classic biological example is a snake's belly scales, which slide easily along the body and grip sideways (Hu et al. 2009). This doc's pad is set up the other way round: it grips along its forward axis and slips sideways, as in the drawing below. Which axis is which doesn't matter to the argument; swapping them only rotates the noise ellipse by 90°.
+"Anisotropic friction" means **a surface grips well along one axis and slides easily along the perpendicular one**. The classic biological example is a snake's belly scales, which slide easily along the body and grip sideways (Hu et al. 2009). This doc's pad is set up the other way round: it grips along its forward axis and slips sideways, as in the drawing below. Which axis is which doesn't matter to the argument; swapping them only rotates the noise ellipse by 90°.
 
 ```text
         low-friction (slide) axis
