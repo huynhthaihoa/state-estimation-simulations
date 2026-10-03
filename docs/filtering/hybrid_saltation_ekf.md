@@ -39,9 +39,32 @@ A **hybrid dynamical system** alternates **continuous flow** with **instantaneou
 - **State**: $x = (p, v) \in \mathbb{R}^6$ with $p, v \in \mathbb{R}^3$ - a point mass's position and velocity, plain $\mathbb{R}^6$ (no rotation, unlike most scripts in this repo).
 - **Flow**: $`\dot x = f(x) = \begin{bmatrix} v \\ (0,0,-g) \end{bmatrix}`$ - ordinary free-fall, affine in $x$ (linear plus a constant gravity term), so it can be integrated exactly.
 - **Guard**: $g(x) = p_z$. (The letter $g$ does double duty in this doc, following the saltation-matrix literature: $g(x)$ and its gradient $Dg$ are the guard, while a bare $g$ in the dynamics, as in $\tfrac12 g t^2$, is gravity, $9.81\ \text{m/s}^2$.) The system jumps whenever a falling trajectory reaches $g(x) = 0$ (touches the ground). Its gradient $Dg = \partial g/\partial x$ - which shows up throughout this doc, starting in §2 - is the constant row vector $(0,0,1,0,0,0)$ here: it just picks out the $p_z$ component.
-- **Reset map**: $R(x)$, applied at the guard - here, $`v_z \mapsto -e\,v_z`$ (an inelastic bounce with restitution $e$), position and horizontal velocity untouched. Throughout this doc, a superscript $-$/$`+`$ on a state or vector field (e.g. $x^{-}$, $f^{-}$, $x^{+}$, $f^{+}$) means "evaluated just before/after the reset."
+- **Reset map**: $R(x)$, applied at the guard - here, $`v_z \mapsto -e\,v_z`$ (an inelastic bounce with restitution $e$), position and horizontal velocity untouched. Throughout this doc, a superscript $-$/$`+`$ on a state, vector field or covariance (e.g. $x^{-}$, $f^{-}$, $x^{+}$, $f^{+}$, $P^{-}$, $P^{+}$) means "evaluated just before/after the reset" - see the notation table below.
 
 This is the textbook canonical example (the word "saltation" is Latin for "leaping"), and it is the simplest possible analog of a foot-strike/ground-contact impact - a discrete velocity reset at a discrete contact event - without $SE(3)$'s rotational complexity layered on top.
+
+**Notation used throughout this doc.** Several letters mean something different here than in the rest of the repo, or mean two things within this doc; the table settles each one.
+
+| Symbol | Meaning |
+|---|---|
+| $x = (p, v)$ | State: position $p$ and velocity $v$, each in $\mathbb{R}^3$. |
+| $f(x)$ | The continuous flow (free fall). |
+| $g(x) = p_z$, $Dg$ | The guard and its gradient, the row vector $(0,0,1,0,0,0)$. A bare $g$ in the dynamics is gravity, $9.81\ \text{m/s}^2$. |
+| $R(x)$, $DR$ | The reset map and its Jacobian, $\text{diag}(1,1,1,1,1,-e)$. Not a rotation, and not a measurement-noise covariance (that is $R_z$). |
+| $e$ | Coefficient of restitution. |
+| $x^{-}$, $x^{+}$ | The state just before and just after the bounce, with $x^{+} = R(x^{-})$. **Never** before/after a measurement update in this doc. |
+| $f^{-}$, $f^{+}$ | The flow evaluated at $x^{-}$ and at $x^{+}$. |
+| $P^{-}$, $P^{+}$ | The covariance just before and just after the bounce. |
+| $`t^{*}`$, $\delta t$ | The nominal trajectory's crossing time, and how much later (or earlier) a perturbed trajectory crosses. |
+| $\tau$, $`\tau_{\text{detect}}`$ | The crossing time `crossing_time` finds within a tick, and the time the bounce is applied once §8's detection error is added. |
+| $\Phi$ | A flow Jacobian $\partial x'/\partial x$: $\Phi(h)$ over an interval $h$ (§1.1), $`\Phi_{\text{before}}`$/$`\Phi_{\text{after}}`$ on either side of a bounce (§3-§4). In §4, $\Phi(x, s)$ is the flow map itself and $D_1\Phi$ its Jacobian. |
+| $\Xi$ | The saltation matrix (§4's boxed formula). |
+| $`\Xi_{\text{own-time}}`$ | §4's event-to-event variant, correct for a different question. |
+| $a \otimes b$ | Outer product: a column vector times a row vector, giving a matrix. |
+| $Q(h)$, $`\sigma_{\text{imp}}`$ | Process noise over an interval $h$, and the impact-noise floor added at each bounce. |
+| $z$, $H$, $R_z$, $S$, $K$ | Position measurement, its Jacobian, its noise covariance, the innovation covariance, and the Kalman gain (§1.1). |
+| $`x_{k\|k-1}`$, $`P_{k\|k-1}`$ / $`x_{k\|k}`$, $`P_{k\|k}`$ | The estimate before and after tick $k$'s measurement update. |
+| $p$, $S(t)$ in §4 | A perturbation parameter (not position) and the trajectory's sensitivity to it (not the innovation covariance). |
 
 ### 1.1 The filter math, concretely
 
@@ -86,15 +109,15 @@ Two things are easy to miss here. First, $Q$ is added once per sub-interval, not
 **Position update** (`measurement_update`). A direct noisy position reading, $z = p + n$:
 
 ```math
-H = \begin{bmatrix} I_3 & 0_3 \end{bmatrix}, \qquad R = \sigma_z^2\,I_3, \qquad
-S = H P^{-} H^\top + R, \qquad K = P^{-} H^\top S^{-1}
+H = \begin{bmatrix} I_3 & 0_3 \end{bmatrix}, \qquad R_z = \sigma_z^2\,I_3, \qquad
+S = H P_{k|k-1} H^\top + R_z, \qquad K = P_{k|k-1} H^\top S^{-1}
 ```
 
 ```math
-x^{+} = x^{-} + K\,(z - H x^{-}), \qquad P^{+} = (I - K H)\,P^{-}
+x_{k|k} = x_{k|k-1} + K\,(z - H x_{k|k-1}), \qquad P_{k|k} = (I - K H)\,P_{k|k-1}
 ```
 
-The covariance uses the plain $(I - KH)P^{-}$ form, not the Joseph form. The default is $\sigma_z = 0.03$ m (`--pos-noise-std`).
+Here $`x_{k|k-1}, P_{k|k-1}`$ are the output of this tick's hybrid predict and $`x_{k|k}, P_{k|k}`$ the updated estimate. The other filtering docs write these as $x^{-}/x^{+}$, but in this doc $-$/$`+`$ is reserved for the bounce, and $R$ for the reset map ($R_z$ is `measurement_update`'s `R` argument). The covariance uses the plain $`(I - KH)P_{k|k-1}`$ form, not the Joseph form. The default is $\sigma_z = 0.03$ m (`--pos-noise-std`).
 
 **Ground truth and Monte Carlo setup.** The true trajectory (`generate_ground_truth_and_data`) is `step_hybrid` itself with zero process noise and zero covariance, so it follows the same bounce and resting rules as the filters. The dead-reckoning baseline (`run_dead_reckoning`) runs the same noise-free propagation from the perturbed initial guess, with no updates. `run_monte_carlo_consistency` draws, in each trial, a fresh initial guess $`x_0 = x_{\text{true},0} + \text{diag}(\sigma_0)\,n`$ with $n \sim \mathcal{N}(0, I_6)$ and fresh measurement noise. It starts both filters from
 
