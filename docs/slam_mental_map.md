@@ -1,6 +1,6 @@
 # SLAM mental map
 
-This doc places every other doc in this folder, and every script in [`use_numpy/`](../use_numpy/)/[`use_manif/`](../use_manif/), on one map. It adds no new theory; each node points to the doc section that explains it.
+This doc places every other doc in this folder, and every script in [`use_numpy/`](../use_numpy/)/[`use_manif/`](../use_manif/), on one map. It adds no new theory; each node points to the doc section that explains it. For short definitions of the terms used here, see [glossary.md](glossary.md).
 
 Several docs already draw a partial map of their own corner. Treat those as zoom-ins of this one:
 
