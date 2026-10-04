@@ -4,11 +4,12 @@ exactly stationary) / extend (moving at a constant commanded speed) gait
 cycle, with a *known, deterministic* phase schedule -- the simplest possible
 model of the observation that the anchored/dwell portion of an inchworm
 cycle is, by definition, stationary. State `x = [p, v]`, plain
-R^2 -- deliberately scoped down to translation-only (no ZARU/orientation/
-accel-bias: those need an orientation state this toy doesn't carry) and a
-known schedule (phase-*detection* uncertainty is a separate, already-studied
-problem -- see docs/filtering/hybrid_saltation_ekf.md's §8 for what happens
-once the transition time itself is uncertain).
+R^2 -- deliberately scoped down to translation-only (no ZARU or
+accel-bias: those need gyro-bias, accel-bias and orientation states this toy
+doesn't carry) and a known schedule (phase-*detection* uncertainty is a
+separate, already-studied problem -- see
+docs/filtering/hybrid_saltation_ekf.md's §8 for what happens once the
+transition time itself is uncertain).
 
 Unlike saltation_matrix_ekf.py, this is *not* a discontinuous-state-reset
 problem: nothing here needs a guard, a reset map, or a saltation matrix. The

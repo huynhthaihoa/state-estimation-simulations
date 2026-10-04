@@ -36,7 +36,7 @@ This doc works through the simplest concrete version of that idea, using [`inchw
 
 *Figure: the gait schedule at `use_numpy/inchworm_zupt_ekf.py`'s defaults, plotted by `uv run python assets/make_figures.py inchworm_zupt_ekf_concept`.*
 
-**Scope, stated up front**: this is deliberately a small slice of the real idea. It models translation only - zero-velocity updates (ZUPT), not the full zero-angular-rate/orientation story (ZARU) - since that needs an orientation state this toy doesn't carry. It also assumes the gait schedule (when anchor/extend happen) is *known*, not detected. That second question - what happens once the schedule itself is uncertain - is exactly the subject of [`hybrid_saltation_ekf.md` §8](hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter), which this doc leans on rather than repeating.
+**Scope, stated up front**: this is deliberately a small slice of the real idea. It models translation only - zero-velocity updates (ZUPT), not the zero-angular-rate update (ZARU), which needs gyro-bias and orientation states this toy doesn't carry. It also assumes the gait schedule (when anchor/extend happen) is *known*, not detected. That second question - what happens once the schedule itself is uncertain - is exactly the subject of [`hybrid_saltation_ekf.md` §8](hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter), which this doc leans on rather than repeating.
 
 ---
 
@@ -180,4 +180,4 @@ This toy's `never`/`always`/`phase_conditional` split is a minimal stand-in for 
 
 ## 5. References
 
-1. Foxlin, E. (2005). *Pedestrian Tracking with Shoe-Mounted Inertial Sensors*. IEEE Computer Graphics and Applications, 25(6), 38-46. https://doi.org/10.1109/MCG.2005.140 - the original zero-velocity-update (ZUPT) technique this doc's `never`/`always`/`phase_conditional` split is built around, there gated by a stance-phase detector rather than this toy's known anchor/extend schedule.
+1. Foxlin, E. (2005). *Pedestrian Tracking with Shoe-Mounted Inertial Sensors*. IEEE Computer Graphics and Applications, 25(6), 38-46. https://doi.org/10.1109/MCG.2005.140 - the paper that popularized zero-velocity updates (ZUPT) for foot-mounted inertial navigation (the technique itself was already used in vehicle inertial navigation) - the basis of this doc's `never`/`always`/`phase_conditional` split, there gated by a stance-phase detector rather than this toy's known anchor/extend schedule.
