@@ -155,8 +155,8 @@ def se3_log(T):
         omega_skew_sq = np.dot(omega_skew, omega_skew)
         V_inv = I3 - 0.5 * omega_skew + (1.0 / (theta ** 2) - (1.0 + np.cos(theta)) / (2.0 * theta * np.sin(theta))) * omega_skew_sq
 
-    rho = np.dot(V_inv, t)
-    return np.concatenate([rho, omega])
+    v = np.dot(V_inv, t)
+    return np.concatenate([v, omega])
 
 
 def se3_inv(T):
@@ -190,22 +190,22 @@ def se3_adjoint(T):
     Adj[3:6, 3:6] = R
     return Adj
 
-def compute_so3_inv_right_jacobian(theta_vec):
+def compute_so3_inv_right_jacobian(omega):
     """
     Computes the 3x3 inverse right Jacobian of SO(3).
     Arguments:
-        theta_vec: 3D vector (numpy array)
+        omega: 3-vector (numpy array)
     Returns:
         3x3 inverse right Jacobian (numpy array)
     """
-    theta = np.linalg.norm(theta_vec)
+    theta = np.linalg.norm(omega)
     I3 = np.eye(3)
     if theta < 1e-6:
-        return I3 + 0.5 * skew(theta_vec) + (1.0 / 12.0) * np.dot(skew(theta_vec), skew(theta_vec))
-    theta_skew = skew(theta_vec)
-    theta_skew_sq = np.dot(theta_skew, theta_skew)
+        return I3 + 0.5 * skew(omega) + (1.0 / 12.0) * np.dot(skew(omega), skew(omega))
+    omega_skew = skew(omega)
+    omega_skew_sq = np.dot(omega_skew, omega_skew)
     coeff = (1.0 / (theta ** 2)) - ((1.0 + np.cos(theta)) / (2.0 * theta * np.sin(theta)))
-    return I3 + 0.5 * theta_skew + coeff * theta_skew_sq
+    return I3 + 0.5 * omega_skew + coeff * omega_skew_sq
 
 
 def se3_ad(xi):
@@ -265,7 +265,7 @@ def compute_se3_inv_right_jacobian(error_vector):
     construction, rather than a second, independently-derived closed form
     that could silently drift out of sync with it.
     Arguments:
-        error_vector: 6-vector [rho, theta_vec] (numpy array)
+        error_vector: 6-vector [v,omega] (numpy array)
     Returns:
         6x6 inverse right Jacobian (numpy array)
     """

@@ -576,15 +576,15 @@ $${r_{ij}(X) = \left( \log \left( \tilde{T}_{ij}^{-1} T_i^{-1} T_j \right) \righ
 
 The residual vector:
 
-$${r_{ij} = \left[ \boldsymbol{\rho}_{ij}^\top \theta_{ij}^\top \right]^\top}$$
+$${r_{ij} = \left[ \mathbf{v}_{ij}^\top \;\; \boldsymbol{\omega}_{ij}^\top \right]^\top}$$
 
 captures 3D translational error:
 
-$${\boldsymbol{\rho}_{ij}}$$
+$${\mathbf{v}_{ij}}$$
 
 and rotational error:
 
-$${\theta_{ij}}$$
+$${\boldsymbol{\omega}_{ij}}$$
 
 ### 15.3 Objective Function
 
@@ -602,17 +602,17 @@ Standard vector updates ${T_i \leftarrow T_i + \Delta x_i}$ break the matrix con
 
 #### Local Perturbation Model (Left/Right Multiplication)
 
-Applying a local perturbation $`{\boldsymbol{\xi}_i = \left[ \boldsymbol{\rho}^\top \;\; \boldsymbol{\phi}^\top \right]^\top \in \mathbb{R}^6}`$ to state $T_i$:
+Applying a local perturbation $`{\boldsymbol{\xi}_i = \left[ \mathbf{v}^\top \;\; \boldsymbol{\omega}^\top \right]^\top \in \mathbb{R}^6}`$ (translation $\mathbf{v}$ first, then rotation $\boldsymbol{\omega}$) to state $T_i$:
 
 $${T_i \oplus \boldsymbol{\xi}_i = T_i \cdot \mathrm{Exp}(\boldsymbol{\xi}_i)}$$
 
 where ${\mathrm{Exp}(\boldsymbol{\xi}) = \exp(\boldsymbol{\xi}^\wedge) \in \mathrm{SE}(3)}$, and ${(\cdot)^\wedge}$ maps a 6D vector to a ${4 \times 4}$ Lie algebra element ${\mathfrak{se}(3)}$:
 
 ```math
-{\boldsymbol{\xi}^\wedge = \begin{bmatrix} \boldsymbol{\phi}^\wedge & \boldsymbol{\rho} \\ 
-\mathbf{0}^\top & 0 \end{bmatrix}, \quad \text{with } \boldsymbol{\phi}^\wedge = \begin{bmatrix} 0 & -\phi_z & \phi_y \\ 
-\phi_z & 0 & -\phi_x \\ 
--\phi_y & \phi_x & 0 \end{bmatrix} \in \mathfrak{so}(3)}
+{\boldsymbol{\xi}^\wedge = \begin{bmatrix} \boldsymbol{\omega}^\wedge & \mathbf{v} \\ 
+\mathbf{0}^\top & 0 \end{bmatrix}, \quad \text{with } \boldsymbol{\omega}^\wedge = \begin{bmatrix} 0 & -\omega_z & \omega_y \\ 
+\omega_z & 0 & -\omega_x \\ 
+-\omega_y & \omega_x & 0 \end{bmatrix} \in \mathfrak{so}(3)}
 ```
 
 #### First-Order Taylor Expansion
@@ -695,7 +695,7 @@ This iteration repeats until the accepted step is small, ${\Vert{}\boldsymbol{\d
 
 ### 15.7 The solver, concretely
 
-The whole solver is `run_pose_graph_optimization` in [`use_numpy/pose_graph.py`](../../use_numpy/pose_graph.py). It works on $4 \times 4$ pose matrices $X_k$. Tangent vectors are ordered translation first, $`\boldsymbol{\xi} = [\mathbf{v}^\top \;\; \boldsymbol{\omega}^\top]^\top`$, the same order as §15.4's $`[\boldsymbol{\rho}^\top \;\; \boldsymbol{\phi}^\top]^\top`$. The code numbers nodes from 0, while §15.1 numbers them from 1. Below, $X$ is §15's $T$ and $Z_{ij}$ is §15's ${\tilde{T}_{ij}}$.
+The whole solver is `run_pose_graph_optimization` in [`use_numpy/pose_graph.py`](../../use_numpy/pose_graph.py). It works on $4 \times 4$ pose matrices $X_k$. Tangent vectors are ordered translation first, $`\boldsymbol{\xi} = [\mathbf{v}^\top \;\; \boldsymbol{\omega}^\top]^\top`$, the same notation as §15.4. The code numbers nodes from 0, while §15.1 numbers them from 1. Below, $X$ is §15's $T$ and $Z_{ij}$ is §15's ${\tilde{T}_{ij}}$.
 
 ![Two panels from pose_graph.py: the four-pose square loop with ground truth, drifting odometry, the optimized estimate and the loop-closure edge, and each pose's position error before and after optimization](../../assets/pose_graph.png)
 
