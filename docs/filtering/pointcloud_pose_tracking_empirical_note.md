@@ -59,7 +59,9 @@ Q = Q_{\text{tangent}} = \Delta t^2\, Q_{\text{rate}}, \qquad
 R_{\text{diag}} = \sigma_p^2 I_{3M}
 ```
 
-The factor $\Delta t^2$ appears because the noise is on the twist *rate*, while `motion_model` consumes the increment $u\Delta t$. Every method starts from the same guess, $`T_0^{\text{est}} = T_0\,\mathrm{Exp}(\varepsilon)`$ with $\varepsilon \sim \mathcal N(0, \sigma_0^2 I_6)$, and $P_0 = \sigma_0^2 I_6$.
+The factor $\Delta t^2$ appears because the noise is on the twist *rate*, while `motion_model` consumes the increment $u\Delta t$. Scaling a random vector by a constant scales its covariance by that constant squared: $`\mathrm{Cov}(n_k\Delta t) = \Delta t^2\,\mathrm{Cov}(n_k)`$. This is not the textbook $`Q \approx Q_c\,\Delta t`$, which discretizes continuous white noise with spectral density $Q_c$. The generator instead draws a fresh $n_k$ with a fixed standard deviation at every step, so $\Delta t^2$ is the matched choice, not a bug. One consequence: over a fixed duration $N\Delta t$, the summed increment noise has variance (to first order, per axis) $`N\,\Delta t^2\sigma^2 = (N\Delta t)\,\Delta t\,\sigma^2`$. A smaller `--dt` at the same `--vel-noise-std`/`--gyro-noise-std` therefore also means less dead-reckoning drift, not just finer sampling.
+
+Every method starts from the same guess, $`T_0^{\text{est}} = T_0\,\mathrm{Exp}(\varepsilon)`$ with $\varepsilon \sim \mathcal N(0, \sigma_0^2 I_6)$, and $P_0 = \sigma_0^2 I_6$.
 
 | Argument | Symbol | Default |
 | --- | --- | --- |
