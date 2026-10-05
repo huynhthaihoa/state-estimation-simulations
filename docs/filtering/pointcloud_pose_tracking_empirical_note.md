@@ -455,3 +455,7 @@ Vanilla KF's divergence (§4) doesn't belong on this isotropy spectrum at all - 
 ## 6. References
 
 1. Julier, S. J., & Uhlmann, J. K. (1997). *A New Extension of the Kalman Filter to Nonlinear Systems*. Proceedings of SPIE, 3068 (Signal Processing, Sensor Fusion, and Target Recognition VI), 182-193. - the original unscented transform/UKF this doc's §3 empirically compares against EKF/IEKF.
+
+### Further reading
+
+- Lee, D., Jung, M., Yang, W., & Kim, A. (2024). *LiDAR Odometry Survey: Recent Advancements and Remaining Challenges*. Intelligent Service Robotics, 17(2), 95-118. https://doi.org/10.1007/s11370-024-00515-8 - a survey of the problem this benchmark deliberately skips. Here every measured point $z_i$ arrives already paired with its body point $p_i$; a real LiDAR odometry pipeline has to find those correspondences (scan matching) before any filter or optimizer sees a residual.

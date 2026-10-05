@@ -537,3 +537,7 @@ And that distinction is one of the most useful conceptual foundations for unders
 6. Mourikis, A. I., & Roumeliotis, S. I. (2007). *A Multi-State Constraint Kalman Filter for Vision-Aided Inertial Navigation*. ICRA 2007, 3565–3572. https://doi.org/10.1109/ROBOT.2007.364024 - the MSCKF reference in §10.
 7. Qin, T., Li, P., & Shen, S. (2018). *VINS-Mono: A Robust and Versatile Monocular Visual-Inertial State Estimator*. IEEE Transactions on Robotics, 34(4), 1004–1020. https://doi.org/10.1109/TRO.2018.2853729 - the VINS-Mono/VINS-Fusion reference in §10.
 8. Mur-Artal, R., Montiel, J. M. M., & Tardós, J. D. (2015). *ORB-SLAM: A Versatile and Accurate Monocular SLAM System*. IEEE Transactions on Robotics, 31(5), 1147–1163. https://doi.org/10.1109/TRO.2015.2463671 - the ORB-SLAM reference in §10.
+
+### Further reading
+
+- Awesome Legged Robot Localization and Mapping (GitHub list maintained by KwanWaiPang). https://github.com/KwanWaiPang/Awesome-Legged-Robot-Localization-and-Mapping - a curated, ongoing list of localization and mapping work on legged robots, where §11's contact-driven, discontinuous motion shows up in practice. A link collection, not a peer-reviewed source.
