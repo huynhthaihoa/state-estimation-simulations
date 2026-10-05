@@ -338,7 +338,12 @@ This gives us a useful trade-off:
 | Global consistency | Harder                         | Stronger                                   |
 | Typical idea       | EKF-SLAM                       | Pose graph/factor graph/BA             |
 
-**A caveat on cost**: "filtering is cheaper" holds for small, fixed-size problems, but it inverts at scale. EKF-SLAM keeps a *dense* joint covariance, so every update costs roughly $O(n^2)$ in the number of landmarks (Dissanayake et al., 2001). Sparse factor-graph smoothing exploits the sparsity of the graph instead. With an incremental solver such as iSAM2 (Kaess et al., 2012), an odometry measurement only re-eliminates a small part of the Bayes tree near the newest pose. There is no guaranteed bound, though: a loop closure can force re-elimination of most or all of the tree, and the cost of that step depends on the fill-in of the sparse factorization. This repo's [`bayes_tree_construction.py`](../use_numpy/bayes_tree_construction.py) shows both cases on a 16-node square loop: an odometry edge affects 2 of 16 variables, while a loop-closure edge affects all 16 (see [`bayes_tree.md` §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo)). The defensible claim is therefore that *most* updates in a typical SLAM graph (mostly odometry, occasionally a loop closure) are cheap under iSAM2, while dense filtering pays $O(n^2)$ on every update. That is why large-scale SLAM moved from EKF-SLAM toward factor-graph smoothing.
+**A caveat on cost**: "filtering is cheaper" holds for small, fixed-size problems, but it inverts at scale.
+- **EKF-SLAM** keeps a *dense* joint covariance, so every update costs roughly $O(n^2)$ in the number of landmarks (Dissanayake et al., 2001).
+- **Sparse factor-graph smoothing** exploits the sparsity of the graph instead. With an incremental solver such as iSAM2 (Kaess et al., 2012), an odometry measurement only re-eliminates a small part of the Bayes tree near the newest pose.
+- **There is no guaranteed bound, though**: a loop closure can force re-elimination of most or all of the tree, and the cost of that step depends on the fill-in of the sparse factorization. This repo's [`bayes_tree_construction.py`](../use_numpy/bayes_tree_construction.py) shows both cases on a 16-node square loop: an odometry edge affects 2 of 16 variables, while a loop-closure edge affects all 16 (see [`bayes_tree.md` §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo)).
+
+The defensible claim is therefore that *most* updates in a typical SLAM graph (mostly odometry, occasionally a loop closure) are cheap under iSAM2, while dense filtering pays $O(n^2)$ on every update. That is why large-scale SLAM moved from EKF-SLAM toward factor-graph smoothing.
 
 ---
 

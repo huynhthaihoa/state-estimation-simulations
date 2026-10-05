@@ -59,7 +59,13 @@ VINS-Mono, for example, checks for sufficient parallax and IMU excitation and si
 
 ## 3. Why this has to be linear at all
 
-Every other estimator in this doc set (§1's list) linearizes *around* an existing decent guess and takes a Gauss-Newton/Levenberg-Marquardt step from there. Initialization can't quite do that at the very start - there is no existing guess to linearize around yet, for scale or gravity in particular. That's why both steps above are deliberately solved as a **closed-form linear system** rather than an iterative nonlinear one: it's a robust, cheap way to get *some* usable estimate before anything trustworthy exists to seed an iterative solve. It isn't the only tool real systems use, though - VINS-Mono's own gravity-refinement step (Step 2 above) is itself a short iterative loop over the tangent-plane reparameterization, not a single closed-form solve, and ORB-SLAM3 replaces this whole two-step linear pipeline with a single nonlinear MAP (maximum a posteriori) optimization instead (Campos et al., 2020 - see References). The closed-form approach here is the classic, simplest baseline, not the only viable design.
+Every other estimator in this doc set (§1's list) linearizes *around* an existing decent guess and takes a Gauss-Newton/Levenberg-Marquardt step from there. Initialization can't quite do that at the very start - there is no existing guess to linearize around yet, for scale or gravity in particular. That's why both steps above are deliberately solved as a **closed-form linear system** rather than an iterative nonlinear one: a robust, cheap way to get *some* usable estimate before anything trustworthy exists to seed an iterative solve.
+
+It isn't the only tool real systems use, though:
+- VINS-Mono's own gravity-refinement step (Step 2 above) is itself a short iterative loop over the tangent-plane reparameterization, not a single closed-form solve.
+- ORB-SLAM3 replaces this whole two-step linear pipeline with a single nonlinear MAP (maximum a posteriori) optimization instead (Campos et al., 2020 - see References).
+
+The closed-form approach here is the classic, simplest baseline, not the only viable design.
 
 ---
 

@@ -33,7 +33,10 @@ This doc works through the simplest concrete version of that point, using [`fric
 
 *Figure: the setup at `use_numpy/friction_anisotropic_ekf.py`'s defaults, plotted by `uv run python assets/make_figures.py friction_anisotropic_ekf_concept`. Ellipses are enlarged to be visible; their 5:1 axis ratio is exact.*
 
-**This isn't new theory** - it's a direct application of an argument this repo already made, just applied on the other side of the filter. [`pointcloud_pose_tracking_empirical_note.md`](pointcloud_pose_tracking_empirical_note.md) §2/§5 (terms in the [glossary](../glossary.md#1-geometry-and-lie-groups)) established that a noise ellipsoid fixed in an object's own frame looks anisotropic-and-rotating once expressed in the world frame, and that what actually matters is whether the filter's noise model tracks that rotation - not "rigid vs. non-rigid." That note was about *measurement* noise in a point-cloud registration EKF/IEKF. This script is the first to apply the identical argument to *process* noise for a robot that's actually moving and turning, and deliberately stays an ordinary EKF throughout - no new IEKF/Lie-group derivation, since the question here is purely "does $Q$'s shape track heading," not a linearization-frame question.
+**This isn't new theory** - it's a direct application of an argument this repo already made, just on the other side of the filter:
+- [`pointcloud_pose_tracking_empirical_note.md`](pointcloud_pose_tracking_empirical_note.md) §2/§5 (terms in the [glossary](../glossary.md#1-geometry-and-lie-groups)) established that a noise ellipsoid fixed in an object's own frame looks anisotropic-and-rotating once expressed in the world frame, and that what actually matters is whether the filter's noise model tracks that rotation - not "rigid vs. non-rigid." That note was about *measurement* noise in a point-cloud registration EKF/IEKF.
+- This script is the first to apply the identical argument to *process* noise, for a robot that's actually moving and turning.
+- It deliberately stays an ordinary EKF throughout - no new IEKF/Lie-group derivation, since the question here is purely "does $Q$'s shape track heading," not a linearization-frame question.
 
 **Scope, stated up front**: heading itself is exact and noise-free, driven only by a known, constant commanded turn rate. Only the *position* picks up random friction-anisotropic slip. This isolates the one question this script is about (does the process-noise ellipse's orientation track heading correctly) from a second one (heading estimation itself), which this toy deliberately doesn't touch.
 
@@ -105,7 +108,7 @@ R(\theta_Q)^\top \Delta t^2,
 R(\theta_Q) = \begin{bmatrix} \cos\theta_Q & -\sin\theta_Q \\ \sin\theta_Q & \cos\theta_Q \end{bmatrix}
 ```
 
-The $\Delta t^2$ converts a slip-velocity standard deviation (m/s) into a per-tick position variance (m²). This is a simple heuristic scaling (the script's comments flag it as one), not the $\sigma^2\Delta t$ of continuous-time white noise; it's a tuning choice, not what this doc studies. Written out, with $a = \sigma_{\text{grip}}^2 \Delta t^2$, $b = \sigma_{\text{slip}}^2 \Delta t^2$, $c = \cos\theta_Q$ and $s = \sin\theta_Q$:
+The $\Delta t^2$ converts a slip-velocity standard deviation (m/s) into a per-tick position variance (m²). It matches the simulator exactly: `generate_ground_truth_and_data` adds slip of $\sigma\,\Delta t$ each tick, so this is the true slip covariance, not a tuned guess. The simplification is in the simulator itself, which uses a fixed per-tick std instead of continuous-time white noise ($\sigma^2\Delta t$); see [pointcloud_pose_tracking_empirical_note.md §1.1](pointcloud_pose_tracking_empirical_note.md#11-the-filter-math-concretely) for what that changes. Written out, with $a = \sigma_{\text{grip}}^2 \Delta t^2$, $b = \sigma_{\text{slip}}^2 \Delta t^2$, $c = \cos\theta_Q$ and $s = \sin\theta_Q$:
 
 ```math
 Q_{\text{pos}}^{\text{aniso}}(\theta_Q) =
@@ -203,7 +206,10 @@ The position part follows the ellipse mismatch exactly: it peaks at 90° and 270
 
 ## 4. Takeaway for a real friction-anisotropic contact model
 
-Both findings point the same direction for modeling a friction-anisotropic pad's slip in a real filter: the noise model needs to track the *current* heading, not just "know" the pad is anisotropic in the abstract. Getting the shape right but the orientation wrong (`fixed_anisotropic`) isn't a small, forgivable approximation. It's dramatically worse than the naive isotropic fallback in every bin, because it makes a confident, specific directional claim that's false most of the time. That claim does the most damage at a 90° mismatch (§3), and the damage outlasts the mismatch through the heading estimate. The safe fallback, if heading-tracking isn't available for some reason, is to not claim a direction at all (`isotropic`) rather than claim the wrong one.
+Both findings point the same way for modeling a friction-anisotropic pad's slip in a real filter: **the noise model needs to track the *current* heading**, not just "know" the pad is anisotropic in the abstract.
+- Getting the shape right but the orientation wrong (`fixed_anisotropic`) isn't a small, forgivable approximation. It's dramatically worse than the naive isotropic fallback in every bin, because it makes a confident, specific directional claim that's false most of the time.
+- That claim does the most damage at a 90° mismatch (§3), and the damage outlasts the mismatch through the heading estimate.
+- If heading-tracking isn't available for some reason, the safe fallback is to not claim a direction at all (`isotropic`) rather than claim the wrong one.
 
 ---
 

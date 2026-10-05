@@ -624,7 +624,9 @@ The right measure of coupling falls out of Section 12. After the Schur complemen
 - **Active points**: every 3D point observed by an active keyframe.
 - **Fixed keyframes**: other keyframes that also see an active point, held fixed as rigid anchors.
 
-**Fixed, not marginalized.** The fixed keyframes do two jobs. They pin the gauge, so the window can't slide, rotate or rescale as a whole (Section 14), and their observations of the active points add constraints. But fixing a pose means treating it as exactly known, which throws its uncertainty away. The alternative is to *marginalize* the border instead, keeping what it knew as a prior on the window ([marginalization.md §2](marginalization.md#2-marginalization-keep-the-information-drop-the-variable)), as sliding-window visual-inertial estimators such as OKVIS and VINS-Mono do. That keeps the information, but the prior is dense ([marginalization.md §5](marginalization.md#5-the-fill-in-consequence)) and its linearization point is frozen, which causes the consistency problem in [marginalization.md §6](marginalization.md#6-the-consistency-gotcha-why-fej-exists). ORB-SLAM takes the cheaper route: fix the border, accept the drift that causes, and correct the drift when it closes a loop.
+**Fixed, not marginalized.** The fixed keyframes do two jobs: they pin the gauge, so the window can't slide, rotate or rescale as a whole (Section 14), and their observations of the active points add constraints. But fixing a pose means treating it as exactly known, which throws its uncertainty away. Two ways to handle the border:
+- **Marginalize it**, keeping what it knew as a prior on the window ([marginalization.md §2](marginalization.md#2-marginalization-keep-the-information-drop-the-variable)), as sliding-window visual-inertial estimators such as OKVIS and VINS-Mono do. That keeps the information, but the prior is dense ([marginalization.md §5](marginalization.md#5-the-fill-in-consequence)) and its linearization point is frozen, which causes the consistency problem in [marginalization.md §6](marginalization.md#6-the-consistency-gotcha-why-fej-exists).
+- **Fix it** - ORB-SLAM's cheaper route: accept the drift that causes, and correct the drift when it closes a loop.
 
 ### 13.3 What Local BA can't fix, and what can
 
@@ -637,7 +639,12 @@ Only new information cures the second part: a **loop closure** (seeing a place a
 
 ### 13.4 Global BA in practice (COLMAP)
 
-Offline SfM pipelines sacrifice real-time speed for maximum accuracy. As COLMAP incrementally registers new images, it runs a local BA around each newly registered image. Once the model has grown by a set percentage, it re-optimizes **every** camera and **every** point jointly in one large least-squares problem, then uses the resulting global residuals to prune bad matches and re-triangulate points - something a local window can never do, since it never sees the whole map at once. The cost is that even after the Schur complement from Section 12, the reduced camera-only system still grows cubically with the number of camera poses - and assembling that Schur complement in the first place costs roughly linear time in the number of points/observations - so this can only run periodically or as a final step, not every frame.
+Offline SfM pipelines sacrifice real-time speed for maximum accuracy. COLMAP, for example:
+- runs a local BA around each newly registered image as it incrementally registers new images;
+- once the model has grown by a set percentage, re-optimizes **every** camera and **every** point jointly in one large least-squares problem;
+- then uses the resulting global residuals to prune bad matches and re-triangulate points - something a local window can never do, since it never sees the whole map at once.
+
+The cost is that even after the Schur complement from Section 12, the reduced camera-only system still grows cubically with the number of camera poses - and assembling that Schur complement in the first place costs roughly linear time in the number of points/observations - so this can only run periodically or as a final step, not every frame.
 
 ### 13.5 Choosing between them
 
@@ -663,14 +670,21 @@ Use **Global BA** for offline reconstruction - meshes, NeRF/Gaussian-Splatting i
 **What it doesn't confirm:** a reliable accuracy payoff from Global BA on this small scene.
 
 - **Open path (default):** the default seed happens to look like a loss for Global BA (final RMS trajectory error 2.1359 m Local-only → 2.7124 m Local+Global, +27%), and no single seed is representative. The 15-seed sweep in the script's regression test (a smaller 12-keyframe scene) gives 6/15 wins and a median difference of +0.06 m; a 20-seed sweep at the script's defaults gives 11/20 wins and a median of −0.02 m. That's a wash either way, plus an occasional seed that diverges to thousands of meters in *either* mode from a rare bad local minimum in the windowed GN/LM solve.
-- **Loop closure** (`--arc-span-deg 350 --n-keyframes 190`): the path swings back within view of its start, and the script reports `Loop closure detected at keyframe K ...`. No code changes are needed, because the covisibility bookkeeping, window builder and Global BA solve don't assume temporal locality; the extra keyframes only keep the default run's ~0.5 m spacing (at 50 keyframes it grows to ~1.9 m, and too few landmarks get triangulated for the closure to register). Over seeds 0-4 the closure is detected on all 5 paths (keyframes 183-186). The Global BA pass right after it ranges from a 68% improvement (default seed: 37.25 m → 12.02 m) to a 54% regression, but by the end of the run Local+Global beats Local-only on all 5 seeds (default seed: 13.46 m → 10.43 m). The closure adds one genuinely new kind of constraint; what it is worth depends on how far the map has drifted by then.
+- **Loop closure** (`--arc-span-deg 350 --n-keyframes 190`): the path swings back within view of its start, and the script reports `Loop closure detected at keyframe K ...`.
+  - No code changes are needed, because the covisibility bookkeeping, window builder and Global BA solve don't assume temporal locality. The extra keyframes only keep the default run's ~0.5 m spacing (at 50 keyframes it grows to ~1.9 m, and too few landmarks get triangulated for the closure to register).
+  - Over seeds 0-4 the closure is detected on all 5 paths (keyframes 183-186).
+  - The Global BA pass right after it ranges from a 68% improvement (default seed: 37.25 m → 12.02 m) to a 54% regression, but by the end of the run Local+Global beats Local-only on all 5 seeds (default seed: 13.46 m → 10.43 m).
+  - The closure adds one genuinely new kind of constraint; what it is worth depends on how far the map has drifted by then.
 
 So judge Global BA's benefit here from the aggregate statistics, not from any single run's printed numbers.
 
 **Why Global BA rarely helps on the open path.** §13.3 predicts the answer: most of the error is the kind Global BA can't see. A one-off check over seeds 0-4 at the script's defaults (not part of the test suite) confirms this, and finds a second, script-specific error source:
 
 - **Most of the final error is one transform of the whole map.** Aligning each final trajectory to ground truth with a single similarity transform (Umeyama, Section 14) removes 47-97% of the Local-only RMS position error over keyframes 2-49 (default seed: 1.27 m → 0.44 m). What remains - the inconsistency Global BA can actually fix - is small.
-- **That transform has two parts.** One is an orientation drift of up to ~7° (0.6-7.2°), which stays even with a perfect anchor: §13.3's unobservable drift. The other is a scale error set by the gauge anchor. Keyframes 0 and 1 are hard-fixed, and keyframe 1 keeps its noisy front-end pose, so their ~0.5 m baseline fixes the whole map's scale, off by up to 35% (fitted scale 0.67-1.35). Re-running with keyframe 1 fixed at its true pose brings the scale within 3% of correct on four of the five seeds (the default seed stays at 1.25) and lowers the median final Local-only error from 3.12 m to 1.33 m. The mean doesn't improve, because seed 3 falls into a mirrored local minimum (a 171° orientation offset) once the anchor changes.
+- **That transform has two parts:**
+  - **Orientation drift** of up to ~7° (0.6-7.2°), which stays even with a perfect anchor: §13.3's unobservable drift.
+  - **Scale error** set by the gauge anchor. Keyframes 0 and 1 are hard-fixed, and keyframe 1 keeps its noisy front-end pose, so their ~0.5 m baseline fixes the whole map's scale, off by up to 35% (fitted scale 0.67-1.35).
+  - Re-running with keyframe 1 fixed at its true pose brings the scale within 3% of correct on four of the five seeds (the default seed stays at 1.25) and lowers the median final Local-only error from 3.12 m to 1.33 m. The mean doesn't improve, because seed 3 falls into a mirrored local minimum (a 171° orientation offset) once the anchor changes.
 - **Global BA can make the scale worse.** On seed 2 with the noisy anchor, Global BA pulls the rest of the map into agreement with the wrong baseline: the fitted scale goes from 0.89 to 0.67 and the final error from 3.12 m to 9.55 m. With keyframe 1 at its true pose, the same seed improves instead (1.33 m → 0.70 m).
 
 (Final errors are the script's own metric, RMS over the last 10 keyframes; the alignment figures use keyframes 2-49 on both sides.)

@@ -146,12 +146,12 @@ def generate_ground_truth_and_data(duration, dt, v_cmd, omega_cmd, sigma_grip, s
     noisy position measurements a tracker would actually receive.
 
     The slip disturbance is drawn in the pad's own body frame each tick --
-    `N(0, diag(sigma_grip^2, sigma_slip^2)) * dt` (the same "simple
-    heuristic, std times dt" scaling as saltation_matrix_ekf.
-    process_noise_covariance, not textbook continuous white noise -- flagged
-    there as a deliberate simplification, and reused here for the same
-    reason: this script's process-noise scaling convention is a tuning knob,
-    not the object of study) -- then rotated into world coordinates by the
+    `N(0, diag(sigma_grip^2, sigma_slip^2)) * dt` (a fixed per-tick std
+    scaled by dt, not textbook continuous white noise -- a deliberate
+    simplification, not the object of study; the filter's Q_pos uses the
+    same scaling, so it matches this slip exactly, unlike
+    saltation_matrix_ekf.process_noise_covariance, whose ground truth has
+    no process noise) -- then rotated into world coordinates by the
     *true* heading at that instant before being added to position. Heading
     itself is exact/noise-free, driven only by the known commanded omega_cmd
     -- an explicit simplification that isolates the position-slip-anisotropy

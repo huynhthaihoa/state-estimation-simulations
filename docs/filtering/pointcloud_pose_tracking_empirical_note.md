@@ -59,7 +59,24 @@ Q = Q_{\text{tangent}} = \Delta t^2\, Q_{\text{rate}}, \qquad
 R_{\text{diag}} = \sigma_p^2 I_{3M}
 ```
 
-The factor $\Delta t^2$ appears because the noise is on the twist *rate*, while `motion_model` consumes the increment $u\Delta t$. Scaling a random vector by a constant scales its covariance by that constant squared: $`\mathrm{Cov}(n_k\Delta t) = \Delta t^2\,\mathrm{Cov}(n_k)`$. This is not the textbook $`Q \approx Q_c\,\Delta t`$, which discretizes continuous white noise with spectral density $Q_c$. The generator instead draws a fresh $n_k$ with a fixed standard deviation at every step, so $\Delta t^2$ is the matched choice, not a bug. One consequence: over a fixed duration $N\Delta t$, the summed increment noise has variance (to first order, per axis) $`N\,\Delta t^2\sigma^2 = (N\Delta t)\,\Delta t\,\sigma^2`$. A smaller `--dt` at the same `--vel-noise-std`/`--gyro-noise-std` therefore also means less dead-reckoning drift, not just finer sampling.
+**Why $\Delta t^2$.** A velocity error held for one step becomes a pose error: 0.05 m/s for 0.1 s is 0.005 m.
+
+- Std scales with $\Delta t$, so covariance scales with $\Delta t^2$: $`\mathrm{Cov}(n_k\Delta t) = \Delta t^2\,\mathrm{Cov}(n_k)`$.
+- The same factor turns $`(\text{m/s})^2`$, $`(\text{rad/s})^2`$ into the pose's m², rad².
+
+**Smaller `--dt` → less drift.** Independent step errors partly cancel, so the total grows like $`\sqrt{N}`$, not $N$. A 10× smaller step means 10× smaller errors but only $`\sqrt{10}`$× more accumulated error from the extra steps. With the defaults ($\sigma_v$ = 0.05 m/s, 5 s, velocity noise only, first order):
+
+| `--dt` | $N$ | Per step | Accumulated, $`\sqrt{N}\,\sigma_v\Delta t`$ |
+| --- | --- | --- | --- |
+| 0.1 s | 50 | 0.005 m | ≈ 0.035 m |
+| 0.01 s | 500 | 0.0005 m | ≈ 0.011 m |
+
+**Why not the textbook $`Q \approx Q_c\,\Delta t`$.** It depends on how the sensor behaves:
+
+- **This simulator**: every reading has the same std, however fast you sample → $\Delta t^2$, the matched choice here (not a bug).
+- **Continuous white noise** (how IMU datasheets specify it, per $`\sqrt{\text{Hz}}`$): faster sampling means noisier readings, std $`\propto 1/\sqrt{\Delta t}`$ → $Q \propto \Delta t$, and drift doesn't depend on `--dt`.
+
+So this simulator makes a smaller `--dt` look better than real hardware would.
 
 Every method starts from the same guess, $`T_0^{\text{est}} = T_0\,\mathrm{Exp}(\varepsilon)`$ with $\varepsilon \sim \mathcal N(0, \sigma_0^2 I_6)$, and $P_0 = \sigma_0^2 I_6$.
 
@@ -325,7 +342,10 @@ EKF vs IEKF: max pos diff = 1.6e-14 m                                     max ro
 EKF vs UKF : max pos diff = 1.445e-03 m (at k = 1)  final pos diff = 3.8e-06 m   max rot diff = 6.3e-02 deg
 ```
 
-The UKF gap is real and structural, not floating-point noise, but *where* it happens matters. The maximum sits at $k = 1$, the first update, when every filter is correcting the initial pose error ($\sigma_0 = 0.1$, so a correction of order 0.1 m/0.1 rad): that's the largest correction in the run, and §3.2's second-order term scales with the size of the correction. Once the filters have converged the two agree far more closely: at the final pose the difference is 3.8e-6 m, about 0.1% of the final position error (0.0031 m, the same for both). The same pattern holds for seeds 1 and 2 (maximum at $k = 1$ each time). The "Final/RMS errors" table the script prints only shows 3-4 decimal places, which is why EKF, IEKF and UKF look identical there.
+The UKF gap is real and structural, not floating-point noise, but *where* it happens matters:
+- **The maximum sits at $k = 1$**, the first update, when every filter is correcting the initial pose error ($\sigma_0 = 0.1$, so a correction of order 0.1 m/0.1 rad). That's the largest correction in the run, and §3.2's second-order term scales with the size of the correction. The same pattern holds for seeds 1 and 2 (maximum at $k = 1$ each time).
+- **Once the filters have converged, they agree far more closely**: at the final pose the difference is 3.8e-6 m, about 0.1% of the final position error (0.0031 m, the same for both).
+- The "Final/RMS errors" table the script prints only shows 3-4 decimal places, which is why EKF, IEKF and UKF look identical there.
 
 ### 3.4 How the gap moves as the step size changes
 
@@ -354,7 +374,10 @@ Seeds 1 and 2 show the same pattern (steady state at $\Delta t = 0.001/0.02/0.1/
 
 ### 3.5 What actually differs: a small accuracy gap, and a real cost gap
 
-Unlike EKF vs. IEKF (§2.4, speed only, zero accuracy difference), UKF's disagreement with EKF/IEKF is a genuine (if tiny) accuracy difference in *both* directions - it's not that UKF is strictly more correct here, since both are approximations to the true nonlinear posterior for different reasons (EKF's is a linearization error; UKF's is the additive-noise simplification of §3.2's point 1, combined with a finite, unscented-only sample of the nonlinearity). What is unambiguous is the cost: `run_ukf` calls `motion_model` and `observation_model` $2n+1 = 13$ times per step (sigma points for $n=6$), redrawing a fresh set for the update, versus one Jacobian-inclusive call each for EKF/IEKF - measured at roughly 5-13x the per-step wall-clock time of EKF/IEKF on this benchmark, for an accuracy difference that (per §3.3) matters mainly during the initial correction and is about 0.1% of the final error once converged, at this problem's scale of nonlinearity.
+Unlike EKF vs. IEKF (§2.4, speed only, zero accuracy difference), UKF's disagreement with EKF/IEKF is a genuine (if tiny) accuracy difference in *both* directions:
+- **Neither is strictly more correct.** Both approximate the true nonlinear posterior, for different reasons: EKF's is a linearization error; UKF's is the additive-noise simplification of §3.2's point 1, combined with a finite, unscented-only sample of the nonlinearity.
+- **The cost is unambiguous.** `run_ukf` calls `motion_model` and `observation_model` $2n+1 = 13$ times per step (sigma points for $n=6$), redrawing a fresh set for the update, versus one Jacobian-inclusive call each for EKF/IEKF - measured at roughly 5-13x the per-step wall-clock time of EKF/IEKF on this benchmark.
+- **The gain is small**: the accuracy difference (per §3.3) matters mainly during the initial correction and is about 0.1% of the final error once converged, at this problem's scale of nonlinearity.
 
 ---
 
