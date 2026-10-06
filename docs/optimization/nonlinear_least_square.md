@@ -6,7 +6,7 @@ We have several imperfect measurements, and we want to find the unknown paramete
 
 ## 1. Start with ordinary least squares
 
-Suppose you want to fit a line to measurements:
+Suppose we want to fit a line to measurements:
 
 ```text
        •
@@ -15,92 +15,52 @@ Suppose you want to fit a line to measurements:
 ──────────────
 ```
 
-You have measurements:
-
-$$(t_i,y_i)$$
-
-and assume:
-
-$$y = at+b$$
-
-The unknowns are:
+We have measurements $`(t_i,y_i)`$ and assume $`y = at+b`$. The unknowns are:
 
 ```math
 x=\begin{bmatrix} a \\ 
 b \end{bmatrix}
 ```
 
-(Naming the data's independent variable $t$ rather than $x$ is deliberate - $x$ is about to be reused, throughout the rest of this doc and everywhere it's cited elsewhere, for the *unknown parameter vector* being solved for, not a per-measurement input. Keeping the two visually distinct here avoids exactly the collision that would otherwise happen in the next line.)
+(We call the data's input $t$ because $x$ is reserved for the *unknown parameter vector*.)
 
-For each measurement, there is an error:
+Each measurement has an error:
 
 $$e_i = y_i-(at_i+b)$$
 
-We don't want to make **one particular error** zero.
-
-We want to make **all errors collectively small**.
-
-So we minimize:
+We don't want to zero **one particular error**; we want **all errors collectively small**. So we minimize:
 
 $$\boxed{\min_{a,b}\sum_i e_i^2}$$
 
-That's **least squares**.
+That's **least squares**. (§4 adds a factor $`\tfrac12`$ in front; it doesn't change the minimizer, and later sections drop it again.)
 
 ---
 
 ## 2. Why square the errors?
 
-Suppose the errors are:
+Take errors $`[1,-2,3]`$:
 
-$$[1,-2,3]$$
+- Plain sum: $`1-2+3=2`$, so positive and negative errors cancel.
+- Squares: $`1^2+(-2)^2+3^2=14`$, so every error contributes positively.
 
-If we simply sum them:
+Absolute values, $`\sum_i|e_i|`$, would also stop the cancelling, so why squares? Two reasons:
 
-$$1-2+3=2$$
+- **Easy to solve.** Once we linearize $e$ (§7), each step is a linear least-squares problem with a closed-form solution (normal equations, §8). $`|e|`$ has a kink at zero and no such structure.
+- **Statistically right.** For Gaussian measurement noise, minimizing squared error gives the maximum-likelihood estimate, which is also why §12's weights are $`W_i=\Sigma_i^{-1}`$.
 
-positive and negative errors cancel.
-
-Instead:
-
-$$1^2+(-2)^2+3^2=14$$
-
-Now every error contributes positively.
-
-Absolute values, $\sum_i|e_i|$, would also stop the cancelling, so why squares specifically? Two reasons. Squares are smooth everywhere, while $|e|$ has a kink at zero, and that smoothness is what lets Gauss-Newton linearize the problem (§7). And when the measurement noise is Gaussian, minimizing squared error gives the maximum-likelihood estimate - which is also why §12's weights turn out to be $W_i=\Sigma_i^{-1}$.
-
-So:
-
-$$\boxed{\text{total error}=\sum_i e_i^2}$$
+So $`\text{total error}=\sum_i e_i^2`$.
 
 ---
 
 ## 3. Then what makes it "nonlinear"?
 
-Here's the important distinction.
-
 ### Linear least squares
 
-Suppose:
-
-$$e_i = y_i-(at_i+b)$$
-
-The unknowns $a,b$ appear linearly.
-
-That's a **linear least-squares** problem.
-
----
+With $`e_i = y_i-(at_i+b)`$ the unknowns $a,b$ appear linearly: a **linear least-squares** problem.
 
 ### Nonlinear least squares
 
-Suppose instead:
-
-$$y = ae^{bt}$$
-
-Then:
-
-$$e_i=y_i-ae^{bt_i}$$
-
-Now $b$ appears inside an exponential.
+Suppose instead $`y = ae^{bt}`$. Then $`e_i=y_i-ae^{bt_i}`$, and $b$ sits inside an exponential.
 
 Or in SLAM:
 
@@ -112,11 +72,7 @@ where:
 - $X_i$ = 3D landmark
 - $\pi$ = camera projection
 
-The relationship between the unknowns and measurements is nonlinear.
-
-Therefore:
-
-$$\boxed{\text{Nonlinear least squares}}$$
+The relationship between unknowns and measurements is nonlinear, so this is **nonlinear least squares**.
 
 ---
 
@@ -143,9 +99,7 @@ x_2\\
 x_n \end{bmatrix}
 ```
 
-contains the unknowns.
-
-Think of:
+contains the unknowns. The pipeline from unknowns to cost:
 
 ```text
 Unknowns
@@ -169,9 +123,7 @@ Total cost
 
 ## 5. SLAM example
 
-Suppose a camera observes a landmark.
-
-We have:
+Suppose a camera observes a landmark:
 
 ```text
           Landmark
@@ -183,19 +135,11 @@ We have:
    T
 ```
 
-We know the image measurement:
-
-$$z$$
-
-We predict where the landmark should appear:
-
-$$\hat z=\pi(TX)$$
-
-Therefore the reprojection error is:
+We know the image measurement $`z`$ and predict where the landmark should appear, $`\hat z=\pi(TX)`$. The reprojection error is:
 
 $$\boxed{e(T,X)=z-\pi(TX)}$$
 
-And we want:
+and we want:
 
 ```math
 \boxed{\min_{T,X}\|z-\pi(TX)\|^2}
@@ -213,53 +157,21 @@ This is exactly the kind of problem encountered in **[bundle adjustment](bundle_
 
 ## 6. Why not solve it directly?
 
-Here's the fundamental problem.
-
-For a simple linear equation:
-
-$$Ax=b$$
-
-we can solve directly using linear algebra.
-
-But our SLAM problem looks more like:
-
-$$e(x)=z-f(x)$$
-
-where $f(x)$ is nonlinear.
-
-For example:
+A linear equation $`Ax=b`$ can be solved directly with linear algebra. Our SLAM problem looks more like $`e(x)=z-f(x)`$ with $f$ nonlinear, for example (here $x$ is a scalar input):
 
 ```math
 f(x)=\begin{bmatrix} \sin x\\ e^x\\ x^2 \end{bmatrix}
 ```
 
-There's generally no simple closed-form solution for:
-
-```math
-\min_x\|e(x)\|^2
-```
-
-So we use an iterative strategy.
+There is generally no closed-form solution for $`\min_x\|e(x)\|^2`$, so we iterate.
 
 ---
 
 ## 7. The key trick: make the nonlinear problem locally linear
 
-This is where the **Jacobian** enters.
+This is where the **Jacobian** enters. At the current estimate $`x_k`$ we use a first-order Taylor expansion of the residual:
 
-Suppose we're currently at:
-
-$$x_k$$
-
-We approximate the nonlinear residual using a first-order Taylor expansion:
-
-$$e(x_k+\Delta x)\approx e(x_k)+J\Delta x$$
-
-where:
-
-$$J=\frac{\partial e}{\partial x}$$
-
-is the Jacobian.
+$$e(x_k+\Delta x)\approx e(x_k)+J\Delta x,\qquad J=\frac{\partial e}{\partial x}$$
 
 Visually:
 
@@ -304,23 +216,21 @@ After linearization:
 \min_{\Delta x}\|e+J\Delta x\|^2
 ```
 
-Now this is a **linear least-squares problem**.
-
-We can solve it using the normal equations:
+This is a **linear least-squares problem**, solved by the normal equations:
 
 $$\boxed{J^\top J\Delta x=-J^\top e}$$
 
-Then update:
+Then update, and repeat:
 
 $$\boxed{x_{k+1}=x_k+\Delta x}$$
 
-And repeat.
+(For poses, $+$ becomes $\oplus$, a retraction onto the pose manifold.)
 
 ---
 
 ## 9. This is exactly where [Gauss–Newton](gauss_newton.md) comes from
 
-So the relationship is:
+The whole chain:
 
 ```text
 Nonlinear least squares
@@ -340,57 +250,25 @@ Update x
 Repeat
 ```
 
-Therefore:
-
-> **Gauss–Newton is an algorithm for solving nonlinear least-squares problems.**
-
-This distinction is important.
-
-**NLS is the problem.**
-
-**Gauss–Newton is one method for solving it.**
+> **NLS is the problem. Gauss–Newton is one method for solving it.**
 
 ---
 
 ## 10. Where [Levenberg–Marquardt](levenberg_marquardt.md) fits
 
-Now its role becomes much clearer.
-
-NLS gives us:
-
-```math
-\min_x\|e(x)\|^2
-```
-
-Gauss–Newton gives:
-
-$$J^\top J\Delta x=-J^\top e$$
-
-But GN can sometimes take bad steps.
-
-LM modifies it:
+- NLS gives the problem $`\min_x\|e(x)\|^2`$.
+- Gauss–Newton gives the step $`J^\top J\Delta x=-J^\top e`$, which can occasionally be a bad step.
+- LM damps it:
 
 $$\boxed{(J^\top J+\lambda I)\Delta x=-J^\top e}$$
 
-So:
-
-```text
-                NLS problem
-                     │
-                     ↓
-               Linearization
-                     │
-          ┌──────────┴──────────┐
-          ↓                     ↓
-    Gauss–Newton              LM
-    JᵀJ Δx=-Jᵀe       (JᵀJ+λI)Δx=-Jᵀe
-```
+Both share the same linearization (§9); they differ only in the damping term. Marquardt's variant, $`\lambda\,\mathrm{diag}(J^\top J)`$ in place of $`\lambda I`$, is what this repo's solvers use (`use_numpy/pose_graph.py` solves `np.linalg.solve(H + lam * np.diag(diag_H), g)`); see [levenberg_marquardt.md §10](levenberg_marquardt.md#10-marquardts-scaling).
 
 ---
 
 ## 11. Now connect this to [factor graphs](factor_graph.md)
 
-Suppose your SLAM graph contains:
+Suppose our SLAM graph contains:
 
 ```text
 x0 ─── x1 ─── x2
@@ -398,23 +276,17 @@ x0 ─── x1 ─── x2
 l0     l1     l2
 ```
 
-Each factor provides a residual:
-
-$$e_1(x),e_2(x),e_3(x),...$$
-
-The entire problem becomes:
+Each factor provides a residual $`e_1(x),e_2(x),e_3(x),\dots`$, so the entire problem becomes:
 
 ```math
 \boxed{\min_x \sum_i \|e_i(x)\|^2}
 ```
 
-That's **nonlinear least squares**.
-
-So a factor graph is essentially a structured way of saying:
+That's **nonlinear least squares**. A factor graph is a structured way of saying:
 
 > "Here are all my variables and all the residuals connecting them."
 
-Then an optimizer such as GN or LM tries to solve the resulting NLS problem.
+An optimizer such as GN or LM then solves the resulting NLS problem.
 
 ---
 
@@ -429,29 +301,23 @@ consumer GPS fix → good to about ±5 m
 RTK-GPS fix      → good to about ±2 cm
 ```
 
-(Ranking different *kinds* of sensor this way doesn't work - a camera measures pixels, an IMU measures rates. That's why each measurement carries its own covariance $\Sigma_i$, in its own units.)
+(Covariances let us compare sensors with different units: a camera measures pixels, an IMU measures rates, so each measurement carries its own $\Sigma_i$.)
 
-We can weight their residuals:
+We weight the residuals:
 
 $$\boxed{\min_x \sum_i e_i(x)^\top W_i e_i(x)}$$
 
-where $W_i$ represents how much we trust measurement $i$.
+where $W_i$ says how much we trust measurement $i$. For Gaussian noise $`W_i=\Sigma_i^{-1}`$, with $\Sigma_i$ the covariance.
 
-For Gaussian noise:
-
-$$W_i=\Sigma_i^{-1}$$
-
-where $\Sigma_i$ is the covariance. ($W_i$ here is the same quantity as the **information matrix** $\Omega_k$ used from [factor_graph.md §4](factor_graph.md#4-optimization-means-minimizing-all-those-errors) onward - both are $\Sigma^{-1}$ for a factor's measurement; this doc introduces the idea with $W_i$, factor_graph.md and everything downstream of it (including [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md)) use $\Omega$.)
-
-So a useful interpretation is:
+($W_i$ is the same quantity as the **information matrix** $\Omega_k$ used from [factor_graph.md §4](factor_graph.md#4-optimization-means-minimizing-all-those-errors) onward, including in [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md); this doc uses $W_i$, those use $\Omega$.)
 
 > **NLS doesn't just minimize errors; weighted NLS minimizes errors according to how trustworthy each measurement is.**
 
 ---
 
-## 13. A really intuitive example
+## 13. A worked example: three sensors
 
-Imagine three sensors estimate your position.
+Suppose three sensors estimate our position.
 
 ```text
 Sensor A:  10.0 m
@@ -459,27 +325,17 @@ Sensor B:  10.5 m
 Sensor C:   9.8 m
 ```
 
-You don't know the true position.
-
-Instead of choosing one:
-
-```text
-10.0
-10.5
- 9.8
-```
-
-you find the position $x$ that minimizes:
+We don't know the true position, and instead of choosing one reading we find the $x$ that minimizes:
 
 $$(x-10.0)^2+(x-10.5)^2+(x-9.8)^2$$
 
-The solution is a compromise: the average, $x = 10.1$ m.
+The solution is a compromise: the average, $`x = 10.1`$ m.
 
-Now imagine Sensor B is much noisier:
+If Sensor B is much noisier, we down-weight it:
 
 $$(x-10.0)^2+0.1(x-10.5)^2+(x-9.8)^2$$
 
-Now Sensor B has less influence, and the solution moves toward A and C: $x = (10.0 + 0.1\cdot 10.5 + 9.8)/2.1 \approx 9.93$ m.
+B now has less influence and the solution moves toward A and C: $`x = (10.0 + 0.1\cdot 10.5 + 9.8)/2.1 \approx 9.93`$ m.
 
 That's the intuition behind weighted least squares in SLAM.
 
@@ -487,35 +343,19 @@ That's the intuition behind weighted least squares in SLAM.
 
 ## 14. Why SLAM naturally becomes NLS
 
-This is the really important insight.
-
-Almost every SLAM sensor gives you a statement like:
+Almost every SLAM sensor gives a statement like:
 
 > **"Given these states, I should have observed this measurement."**
 
-For example:
+| Sensor | Residual |
+|---|---|
+| Odometry | $`e_{odom}(X_i,X_j)`$ |
+| IMU | $`e_{imu}(X_i,X_j,v_i,v_j,b_i,b_j)`$ |
+| Camera | $`e_{cam}(X_i,L_j)`$ |
+| GPS | $`e_{gps}(X_i)`$ |
+| Loop closure | $`e_{loop}(X_i,X_j)`$ |
 
-### Odometry
-
-$$e_{odom}(X_i,X_j)$$
-
-### IMU
-
-$$e_{imu}(X_i,X_j,v_i,v_j,b_i,b_j)$$
-
-### Camera
-
-$$e_{cam}(X_i,L_j)$$
-
-### GPS
-
-$$e_{gps}(X_i)$$
-
-### Loop closure
-
-$$e_{loop}(X_i,X_j)$$
-
-Put everything together (each term weighted by its $W_i$ as in §12, left out here for readability):
+Putting everything together (each term weighted by its $W_i$ as in §12, left out here for readability):
 
 ```math
 \boxed{
@@ -536,7 +376,7 @@ That is one giant **nonlinear least-squares problem**.
 
 ## 15. Your SLAM mental map
 
-At this point, the concepts above organize into a mental map like this:
+The concepts above organize into one map:
 
 ```text
                          SLAM
@@ -554,34 +394,27 @@ At this point, the concepts above organize into a mental map like this:
               ↓                       ↓
         Gauss–Newton           Levenberg–Marquardt
               │                       │
-          fast/local             damped/robust
+          fast/local             damped/safer
               │                       │
               └───────────┬───────────┘
                           ↓
                   Iterative optimization
 ```
 
-Two ways to solve it:
+The step rule (GN or LM) and the solve strategy (batch or incremental) are separate axes. Both strategies start from the same NLS problem:
 
 ```text
 Factor graph
      ↓
 NLS problem
      ↓
-   GN/LM
-     ↓
-Batch optimization
-
-        OR
-
-Factor graph
-     ↓
-Incremental factorization
-     ↓
-iSAM/iSAM2
-     ↓
-Incremental smoothing
+┌────┴───────────────────────┐
+↓                            ↓
+Batch: re-solve everything   Incremental: re-solve only
+with GN/LM                   what changed (iSAM/iSAM2)
 ```
+
+See [levenberg_marquardt.md §11](levenberg_marquardt.md#11-where-lm-fits) for how the two axes combine.
 
 This is one corner of the repo-wide map in [slam_mental_map.md](../slam_mental_map.md), which places every doc and script on one picture.
 
@@ -589,7 +422,7 @@ This is one corner of the repo-wide map in [slam_mental_map.md](../slam_mental_m
 
 ## 16. The one thing to remember
 
-**Nonlinear least squares is not an optimizer. It's the mathematical problem you're trying to solve.**
+**Nonlinear least squares is not an optimizer. It's the mathematical problem we're trying to solve.**
 
 $$
 \boxed{
@@ -599,13 +432,13 @@ $$
 
 Then:
 
-- **[Jacobian](../foundations/jacobian.md)** → tells you how residuals change when variables move.
+- **[Jacobian](../foundations/jacobian.md)** → tells us how residuals change when variables move.
 - **[Gauss–Newton](gauss_newton.md)** → linearizes NLS and solves for a step.
 - **[Levenberg–Marquardt](levenberg_marquardt.md)** → GN + damping for safer steps.
 - **[Factor graph](factor_graph.md)** → organizes variables and residuals.
 - **[iSAM/iSAM2](isam_optimization.md)** → solves/updates the factor-graph NLS problem incrementally.
 
-That distinction - **problem formulation vs optimization algorithm** - is one of the most useful things to keep straight when learning SLAM.
+Keeping **problem formulation vs optimization algorithm** straight is one of the most useful habits in SLAM.
 
 ---
 

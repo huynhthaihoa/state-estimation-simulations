@@ -33,11 +33,10 @@ Section 12). Worked out by hand before writing this script: under that
 order, the loop-closure edge connects the *first*-eliminated node (the
 deepest possible leaf) to the root, so the resulting tree is a straight
 chain (constant-size-2 separators throughout, per this script's own printed
-"Largest separator" line -- not "ever-growing" as an earlier version of this
-docstring claimed), and the loop closure invalidates the *entire* chain --
-the worst case iSAM2's constrained reordering (CCOLAMD) exists specifically to
-avoid. That worst case isn't hidden here; it's the whole point of the
-comparison this script prints and plots.
+"Largest separator" line), and the loop closure invalidates the *entire*
+chain -- the case where a fixed ordering hurts most; iSAM2 additionally
+reorders the affected part (CCOLAMD) to limit fill-in. That case isn't hidden
+here; it's the whole point of the comparison this script prints and plots.
 
 This implements the Bayes tree's *symbolic construction* and *affected-
 region query* only: no numeric fluid-relinearization solve (that is
@@ -178,8 +177,8 @@ def main():
           f"{len(affected_odom)}/{n_poses} variables ({100 * len(affected_odom) / n_poses:.1f}%)")
     print(f"Affected region if loop-closure edge {loop_edge} arrives:     "
           f"{len(affected_loop)}/{n_poses} variables ({100 * len(affected_loop) / n_poses:.1f}%)")
-    print("\nSame fixed elimination order, wildly different cost: this is exactly why real "
-          "iSAM2 needs dynamic reordering (CCOLAMD) instead of a fixed one -- not implemented "
+    print("\nSame fixed elimination order, wildly different cost: real iSAM2 also "
+          "reorders variables (CCOLAMD) instead of keeping a fixed order -- not implemented "
           "here, see docs/optimization/isam2_optimization.md Section 12.")
 
     pos = layout_tree(children, root)

@@ -2,16 +2,14 @@
 
 ## 1. The core idea
 
-Think of a **factor graph** as a way to represent:
+A **factor graph** represents:
 
-> **"What unknowns do I have, and what pieces of evidence tell me about those unknowns?"**
+> **"What unknowns do we have, and what pieces of evidence tell us about them?"**
 
-For SLAM:
+It is a bipartite graph with two kinds of nodes (§6 spells out the distinction):
 
-- **Variables** = things we don't know
-  → robot poses, landmarks, sensor biases, etc.
-- **Factors** = measurements/constraints
-  → odometry, camera observations, IMU measurements, GPS, loop closures, etc.
+- **Variables** = things we don't know: robot poses, landmarks, sensor biases, etc.
+- **Factors** = measurements/constraints: odometry, camera observations, IMU, GPS, loop closures, etc.
 
 ![A bipartite factor graph for a SLAM-style problem: robot poses x0..xn connected by odometry-measurement factors u1..un, with landmarks l1, l2 connected to poses via landmark-measurement factors m1..m4, plus a small "variable node/factor node" legend](../images/factor_graph_1.jpg)
 
@@ -23,9 +21,9 @@ For SLAM:
 
 ![A four-layer factor graph for 2D robot localization: landmarks L0-L2 at top connected via bearing factors to poses P0-P2, which are in turn chained together by odometry factors](../images/factor_graph_5.jpg)
 
-*These diagrams are illustrative sketches pulled from different tutorials/papers - see [Image sources](#image-sources) below for exactly which claim is confirmed vs. still unverified.*
+*These diagrams are illustrative sketches from different tutorials/papers; [Image sources](#image-sources) lists which attributions are confirmed and which source is unidentified.*
 
-For example:
+A text sketch of the same idea:
 
 ```text
         landmark l1
@@ -38,15 +36,14 @@ Pose x0 ●─────────● x1 ──────● x2
          odometry
 ```
 
-The circles are **variables**.
-
-The connections are **factors**.
+- The circles are **variables**.
+- In this sketch each labelled line stands for a **factor** joining the variables it touches (a binary factor). The images above draw factors as their own nodes (dots or squares), which is how a unary factor such as a prior or GPS fix fits in: it touches just one variable.
 
 ---
 
 ## 2. Why do we need it?
 
-Suppose your robot moves:
+Suppose the robot moves:
 
 ```text
 x0 → x1 → x2 → x3
@@ -62,25 +59,18 @@ x3 is 1m ahead of x2
 
 But every measurement has error.
 
-If you simply integrate the odometry's own numbers above (each step reported as "1m ahead"):
-
-$$\text{estimated position} \approx 3.00\ \text{m}$$
-
-Maybe the real motion, though, was:
+Integrating the odometry's own numbers (each step reported as "1m ahead") gives an estimate of $`3.00`$ m. Maybe the real motion, though, was:
 
 ```text
 x0  →  x1  →  x2  →  x3
   1.02   0.97    1.05 m
 ```
 
-$$\text{real position} \approx 3.04\ \text{m}$$
+so the real position is about $`3.04`$ m. Zero-mean per-step errors partly cancel, but nothing corrects them, so on average the drift keeps growing (like $`\sqrt n`$ for $n$ independent steps). Here the estimate (3.00 m) and the real position (3.04 m) diverge.
 
-Integrating noisy per-step measurements never magically cancels their errors, so the estimate (3.00 m) and the real position (3.04 m) diverge - you accumulate error.
-
-> **Note**: each of those per-step measurements ($x_1$ is 1m ahead of $x_0$, etc.) is what **odometry** actually provides - an estimate of the robot's *incremental* change in pose between two nearby moments, from onboard motion sensors (wheel encoders, IMU, visual odometry, ...).
-> - **Dead reckoning** is chaining ("integrating") a sequence of these incremental measurements to track pose relative to a starting point, the way the `3.00 m` estimate above was computed.
-> - Every measurement carries a small error and dead reckoning sums them with no correction, so the drift grows unboundedly the longer you integrate - exactly the problem the loop closure below fixes.
-> - The term is also used more loosely for propagating a known motion *model* forward from an initial guess without looking at any measurements (e.g. the `saltation_matrix_ekf.py` baseline in the README) - the same "no correction" idea, with the same growing error.
+> **Note**: each per-step measurement ($x_1$ is 1m ahead of $x_0$, etc.) is **odometry**: an estimate of the *incremental* pose change from onboard motion sensors (wheel encoders, IMU, visual odometry, ...).
+> - **Dead reckoning** chains ("integrates") these increments to track pose from a starting point, as the `3.00 m` estimate above was computed. With no correction, drift grows the longer we integrate; the loop closure below fixes exactly that.
+> - The term is also used for propagating a motion *model* with no measurements (e.g. the `saltation_matrix_ekf.py` baseline in the README): same "no correction" idea, same growing error.
 
 Now imagine that at $x_3$ the camera re-observes a landmark it first saw from $x_0$. Recognizing a previously seen place like this is a **loop closure**, and it gives a direct measurement between $x_0$ and $x_3$ - say, 3.03 m:
 
@@ -106,25 +96,13 @@ so that **all measurements are as consistent as possible**.
 
 That's the essence of factor-graph optimization.
 
+Worked number: the optimizer only sees the measurements, the three 1 m odometry steps and the 3.03 m loop closure (the true 1.02/0.97/1.05 m are unknown to it). Weighting all four equally, least squares lengthens each step by $`0.0075`$ m to 1.0075 m, so $`x_3 = 3.0225`$ m: a compromise between the odometry's 3.00 m and the loop closure's 3.03 m, and closer to the true 3.04 m than odometry alone.
+
 ---
 
 ## 3. A factor is basically an error function
 
-This is the most important mathematical intuition.
-
-Suppose we have two poses:
-
-$$
-X_i,\ X_j
-$$
-
-and odometry gives us a measured relative transformation:
-
-$$
-Z_{ij}
-$$
-
-We can calculate what the relative transformation *would be* according to our current estimates:
+Suppose we have two poses $`X_i, X_j`$, and odometry gives a measured relative transformation $`Z_{ij}`$. We can calculate what the relative transformation *would be* according to our current estimates:
 
 $$
 \hat Z_{ij}=X_i^{-1}X_j
@@ -165,21 +143,7 @@ x0 ── odometry ── x1 ── odometry ── x2
  └──────────── loop closure ────────┘
 ```
 
-We have three errors:
-
-$$
-e_{01}(x_0,x_1)
-$$
-
-$$
-e_{12}(x_1,x_2)
-$$
-
-$$
-e_{02}(x_0,x_2)
-$$
-
-The optimizer tries to find poses that minimize:
+We have three errors, $`e_{01}(x_0,x_1)`$, $`e_{12}(x_1,x_2)`$ and $`e_{02}(x_0,x_2)`$, and the optimizer looks for poses that minimize:
 
 ```math
 \boxed{
@@ -198,9 +162,9 @@ e_k^\top\Omega_k e_k
 }
 $$
 
-where $\Omega_k$ is the **information matrix** - the same quantity [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty) calls $W_i$; both are $\Sigma^{-1}$ for a factor's measurement; this doc's $\Omega$ notation is what everything built on top of it (including [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md)) uses from here on.
+where $\Omega_k=\Sigma_k^{-1}$ is the **information matrix** (called $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty); downstream docs such as [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md) use $\Omega$).
 
-> **Note**: $\Omega_k$ is the inverse of that measurement's covariance, $\Omega_k = \Sigma_k^{-1}$ - a precise sensor (small $\Sigma_k$) inverts to a *large* $\Omega_k$, so its error counts more in the sum, while a noisy sensor (large $\Sigma_k$) inverts to a *small* $\Omega_k$ and gets down-weighted. The term $e_k^\top\Omega_k e_k$ is a **Mahalanobis distance** - see the [glossary](../glossary.md#2-uncertainty-and-probability) for the definition and the isotropic special case where it collapses to plain squared error divided by a constant.
+> **Note**: a precise sensor (small $\Sigma_k$) gives a *large* $\Omega_k$, so its error counts more in the sum; a noisy sensor (large $\Sigma_k$) gives a *small* $\Omega_k$ and is down-weighted. The term $e_k^\top\Omega_k e_k$ is a **squared Mahalanobis distance** - see the [glossary](../glossary.md#2-uncertainty-and-probability) for the definition and the isotropic special case where it collapses to plain squared error divided by a constant.
 
 So:
 
@@ -210,9 +174,7 @@ So:
 
 ## 5. Why call it a "graph"?
 
-Because the problem naturally looks like a graph.
-
-For example:
+The problem naturally looks like a graph. Below, each labelled line is a factor joining the variables it touches (the images in §1 draw factors as nodes instead):
 
 ```text
 VARIABLES
@@ -247,19 +209,15 @@ x0          x1          x2
     l0          l1
 ```
 
-Every measurement becomes a **factor connecting the variables it depends on**.
-
-This is extremely powerful because the graph tells you the **structure of the estimation problem**.
+Every measurement becomes a **factor connecting the variables it depends on**, so the graph shows the **structure of the estimation problem**.
 
 ---
 
 ## 6. The really important distinction: variable vs factor
 
-This is worth memorizing.
-
 ### Variable
 
-Something you're trying to estimate:
+Something we're trying to estimate:
 
 - $x_0$ = robot pose
 - $x_1$ = robot pose
@@ -291,17 +249,13 @@ For example:
        robot pose   landmark
 ```
 
-The camera measurement doesn't directly "set" $x_1$ or $l_0$.
-
-Instead it says:
+The camera measurement doesn't directly "set" $x_1$ or $l_0$. Instead it says:
 
 > "$`x_1`$ and $l_0$ should satisfy this observation."
 
 ---
 
 ## 7. Factor graph vs pose graph
-
-This distinction is particularly important for SLAM.
 
 A **[pose graph](pose_graph_optimization.md)** might look like:
 
@@ -314,7 +268,7 @@ x0 ── x1 ── x2 ── x3
 Usually:
 
 - nodes = robot poses
-- edges = relative pose constraints
+- edges = relative pose constraints (each edge is a binary factor between two poses)
 
 A **factor graph** is more general:
 
@@ -361,21 +315,15 @@ But the errors are nonlinear because poses involve rotations and transformations
 
 So we linearize:
 
-$$e(X+\Delta X)\approx e(X)+J\Delta X$$
+$$e(X\oplus\Delta X)\approx e(X)+J\Delta X$$
 
-Then **[Gauss–Newton](gauss_newton.md)** solves:
+Then **[Gauss–Newton](gauss_newton.md)** solves (every factor's error stacked into $e$, its $\Omega_i$ blocks into $\Omega$):
 
 ```math
 J^\top \Omega J\,\Delta X = -J^\top \Omega\, e
 ```
 
-with every factor's error stacked into $e$, and its $\Omega_i$ blocks into $\Omega$.
-
-and updates:
-
-$$X \leftarrow X \oplus\Delta X$$
-
-For poses, that $\oplus$ is often implemented using **[Lie algebra](../foundations/lie_algebra.md)/$`SE(3)`$**.
+and updates $`X \leftarrow X \oplus\Delta X`$. For poses, that $\oplus$ is often implemented using **[Lie algebra](../foundations/lie_algebra.md)/$`SE(3)`$**.
 
 Put together, the pieces above connect like this:
 
@@ -397,27 +345,19 @@ Repeat
 
 ---
 
-## 9. A very intuitive analogy
+## 9. An analogy: people locating objects
 
-Imagine several people trying to reconstruct the position of objects in a room.
-
-You don't know where anything is.
-
-But people give you statements:
+Imagine several people reconstructing the positions of objects in a room. We don't know where anything is, but people give us statements:
 
 > Person A: "B is approximately 2 meters east of me."
 
 > Person B: "C is approximately 1 meter north of me."
 
-> Person C: "I can see the same object that A sees."
+> Person C: "The lamp is 3 m west of me."
 
 > GPS: "A is approximately here."
 
-Each statement becomes a **factor**.
-
-You now have a giant network of constraints.
-
-Your job is:
+Each statement becomes a **factor**, and together they form a giant network of constraints. Our job is:
 
 > **Move all the unknown positions around until the entire network of statements is as consistent as possible.**
 
@@ -425,9 +365,7 @@ That's factor-graph optimization.
 
 ---
 
-## 10. The key SLAM insight
-
-The beautiful thing about this approach is that **measurements don't have to be perfect**.
+## 10. Measurements don't have to be perfect
 
 Suppose:
 
@@ -442,9 +380,7 @@ IMU says:
 x1 should be somewhere else┘
 ```
 
-The optimizer doesn't necessarily choose one measurement.
-
-It finds the configuration that provides the **best global compromise**, weighted by measurement uncertainty.
+The optimizer doesn't choose one measurement. It finds the configuration with the **best overall compromise**, weighted by measurement uncertainty (a local optimum, so it relies on a good initial guess).
 
 And when a loop closure arrives:
 
@@ -470,9 +406,7 @@ That's why graph optimization is so effective for SLAM.
 
 ---
 
-## 11. One mental model to remember
-
-If you remember only one picture, remember this:
+## 11. The one picture to remember
 
 ```text
           MEASUREMENTS
@@ -490,13 +424,11 @@ x0 ●──────●──────●──────● x3
  └────── loop closure ─────┘
 ```
 
-**Variables are what you want to know.**
+- **Variables** are what we want to know.
+- **Factors** are what our sensors tell us.
+- **Optimization** finds the variable values that best satisfy all factors simultaneously.
 
-**Factors are what your sensors tell you.**
-
-**Optimization finds the variable values that best satisfy all factors simultaneously.**
-
-And this gives you a very useful hierarchy:
+The hierarchy:
 
 > **SLAM** = estimation problem
 
@@ -510,7 +442,7 @@ And this gives you a very useful hierarchy:
 
 > **Lie algebra** = convenient way to optimize poses on SE(3)
 
-That is the conceptual bridge connecting essentially all the SLAM topics covered in this doc set.
+That is the conceptual bridge connecting the optimization-based SLAM topics in this doc set.
 
 ---
 
@@ -522,7 +454,7 @@ That is the conceptual bridge connecting essentially all the SLAM topics covered
 
 ### Image sources
 
-<!-- 1. `images/factor_graph_1.jpg` - originally cited as https://ieeexplore.ieee.org/document/910572 (IEEE document 910572, i.e., Reference 1 above). **This citation is incorrect.** The paper was downloaded in full and every figure inspected; none of them show robot poses, landmarks, "Odometry measurement"/"Landmark measurement" labels, or the "Bipartite graph with variable nodes and factor nodes" legend seen in this image - the paper's figures are all abstract coding-theory examples ($x_1,\dots,x_5$ with generic factors $f_A,\dots,f_E$), Tanner graphs, trellises, and a scalar Kalman-filter derivation. A plausible alternative family of sources (Dellaert & Kaess's SLAM tutorials, which use this exact "Odometry measurement"/"Landmark measurement" phrasing with toy robot/furniture photos) was checked and did not match either - their version uses photographs, not the abstract $x_0,\dots,x_n$/$l_1, l_2$ circles seen here. The true source of this image is **unidentified**; do not cite IEEE document 910572 for it. -->
+1. `images/factor_graph_1.jpg` - **source unidentified.** It was originally cited as IEEE document 910572 (Reference 1 above), but that citation is incorrect: none of the paper's figures (abstract coding-theory factor graphs, Tanner graphs, trellises, a scalar Kalman-filter derivation) show robot poses, landmarks or this legend. Dellaert & Kaess's SLAM tutorials use similar "Odometry measurement"/"Landmark measurement" wording but with photographs, so they did not match either. Do not cite IEEE 910572 for this image.
 2. `images/factor_graph_2.jpg` - originally cited as https://engcang.github.io/gtsam_tutorial.html, match for the second pose-graph figure on that page (image file `/assets/img/posts/230715_gtsam/graph2.png`), a Korean-language GTSAM tutorial blog post by Eungchang Mason Lee (page title "GTSAM 튜토리얼 | Eungchang Mason Lee").
 3. `images/factor_graph_3.jpg` - originally cited as https://www.mdpi.com/2079-9292/12/13/2925, match for Figure 1 of Reference 3 above (downloaded directly from MDPI's own PDF host, since the MDPI article page itself returns HTTP 403 to automated fetches).
 4. `images/factor_graph_4.jpg` - originally cited as https://cmsc426.github.io/gtsam/, match for the image `/assets/sfm/gtsam9.png` embedded on that page, part of the University of Maryland CMSC426 (Computer Vision) course's "Structure from Motion" lecture notes.

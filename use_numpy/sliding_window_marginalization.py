@@ -1,9 +1,7 @@
 '''
-Gives docs/optimization/marginalization.md its first accompanying script --
-its own §8 names this exact gap: "there is no accompanying script... a
-reader wanting to exercise §4 for real would extend [pose_graph_incremental.
-py] to marginalize its oldest node once a fixed window size is exceeded."
-This is that extension, addressing a resource-constrained-deployment concern:
+Accompanying script for docs/optimization/marginalization.md (described in
+its §8): it extends pose_graph_incremental.py to marginalize the oldest node
+once a fixed window size is exceeded, so §4's math runs for real. It addresses a resource-constrained-deployment concern:
 algorithm-level efficiency (sparse factor graphs, hierarchical pose pruning)
 on commodity embedded hardware, where a concrete memory budget like GAP9's
 <500kB target is a useful stress test -- this script demonstrates the
@@ -26,9 +24,9 @@ see below for why) and two solvers process the same stream:
     connected to. The marginal is represented as a genuine prior factor (a
     frozen reference pose + information matrix, re-linearized against the
     *current* estimate every solve, exactly like an ordinary edge) rather
-    than a frozen linear term -- the textbook-correct way real systems
-    (GTSAM included) represent a marginal, and the only representation that
-    stays correct as the surviving poses keep moving across later windows.
+    than a frozen linear term -- one valid representation (an alternative
+    to storing a fixed linear factor), which re-linearizes as the surviving
+    poses keep moving across later windows.
 
 Deliberately a pure odometry chain, no loop closures: the oldest pose in a
 chain window is connected to exactly one surviving neighbor, so

@@ -4,19 +4,9 @@
 
 **iSAM2 = Incremental Smoothing and Mapping 2**
 
-The easiest way to think about it is:
+> **iSAM2 continuously solves a SLAM optimization problem without restarting from scratch every time a new measurement arrives.**
 
-> **iSAM2 is a way to continuously solve a SLAM optimization problem without starting the whole optimization from scratch every time a new sensor measurement arrives.**
-
-Imagine your robot has estimated:
-
-```text
-Pose 1 → Pose 2 → Pose 3 → Pose 4
-  ↓        ↓        ↓        ↓
-  x1       x2       x3       x4
-```
-
-Then the robot moves one more step:
+Suppose the robot has estimated four poses, then moves one more step:
 
 ```text
 Pose 1 → Pose 2 → Pose 3 → Pose 4 → Pose 5
@@ -24,50 +14,33 @@ Pose 1 → Pose 2 → Pose 3 → Pose 4 → Pose 5
   x1       x2       x3       x4       x5
 ```
 
-A naive optimizer might say:
-
-> "New information! Let's optimize $x_1$, $x_2$, $x_3$, $x_4$, $x_5$ all over again."
-
-That's expensive.
-
-**iSAM2 says:**
-
-> "Most of the previous solution is still good. I'll update only the parts that actually need significant changes."
-
-That's the core intuition.
+- **Naive optimizer:** "New information! Let's optimize $x_1, \ldots, x_5$ all over again." That is expensive.
+- **iSAM2:** "Most of the previous solution is still good. I'll update only the parts that actually need significant changes."
 
 ---
 
-## 2. First remember what normal SLAM optimization does
+## 2. Recap: what normal SLAM optimization does
 
-Suppose your robot has poses:
-
-$$x_1,x_2,x_3,x_4$$
-
-and measurements between them:
-
-$$z_{12},z_{23},z_{34}$$
-
-Your factor graph looks like:
+Take four poses $x_1, x_2, x_3, x_4$ and measurements $z_{12}, z_{23}, z_{34}$ between them:
 
 ```text
 x1 ─── x2 ─── x3 ─── x4
    z12    z23    z34
 ```
 
-You want to find the poses that best explain all measurements:
+We want the poses that best explain all measurements:
 
 ```math
 X^*=\arg\min_X \sum_i \|r_i(X)\|^2
 ```
 
-For example, each odometry measurement says roughly how far the robot moved between two poses. The true step was 1 m each time, but every measurement carries a little noise:
+Each odometry measurement says roughly how far the robot moved. The true step was 1 m each time, but every measurement carries a little noise:
 
 ```text
 x1 ── 1.02 m ── x2 ── 0.97 m ── x3 ── 1.05 m ── x4
 ```
 
-On its own, this chain has nothing to reconcile: placing the poses exactly 1.02, 0.97 and 1.05 m apart satisfies every measurement perfectly, with zero residual. Optimization only has real work to do once a measurement is **redundant** - say a second sensor measures the distance from $x_1$ to $x_4$ directly:
+On its own, this chain has nothing to reconcile: placing the poses exactly 1.02, 0.97 and 1.05 m apart satisfies every measurement with zero residual. Optimization only has real work once a measurement is **redundant**, say a second sensor measures the distance from $x_1$ to $x_4$ directly:
 
 ```text
 x1 ── 1.02 m ── x2 ── 0.97 m ── x3 ── 1.05 m ── x4
@@ -75,142 +48,61 @@ x1 ── 1.02 m ── x2 ── 0.97 m ── x3 ── 1.05 m ── x4
 └─────────────────── 2.90 m ────────────────────┘
 ```
 
-The chain adds up to 3.04 m, but the direct measurement says 2.90 m. They can't all be exactly right, so optimization finds the set of poses that makes **all measurements reasonably happy at the same time**, weighting each one by how much it's trusted.
+The chain adds up to 3.04 m, but the direct measurement says 2.90 m. They can't all be exactly right, so optimization finds the poses that make **all measurements reasonably happy at once**, weighting each by how much it is trusted.
 
 ---
 
 ## 3. The problem with doing this repeatedly
 
-Now imagine a robot running at 10 Hz.
-
-Every time a new measurement arrives:
+A robot running at 10 Hz grows the graph with every measurement:
 
 ```text
 t1: x1
 t2: x1 → x2
 t3: x1 → x2 → x3
-t4: x1 → x2 → x3 → x4
 ...
 t1000: 1000 poses
 ```
 
-If you use batch optimization:
-
-```text
-new measurement
-      ↓
-optimize EVERYTHING
-      ↓
-new measurement
-      ↓
-optimize EVERYTHING
-      ↓
-new measurement
-      ↓
-optimize EVERYTHING
-```
-
-The computational cost becomes increasingly painful.
-
-This is where **iSAM** and then **iSAM2** come in.
+Batch optimization re-solves the whole graph after every new measurement ("new measurement → optimize EVERYTHING → repeat"), so the cost keeps growing with the trajectory. **iSAM** and then **iSAM2** avoid this.
 
 ---
 
 ## 4. iSAM's basic idea
 
-iSAM stands for:
+iSAM (incremental Smoothing and Mapping) does not re-solve all variables each time. It **reuses the previous factorization**.
 
-> **incremental Smoothing and Mapping**
-
-Instead of repeatedly solving:
-
-$$\text{all variables}$$
-
-it tries to **reuse the previous factorization**.
-
-Remember the Gauss-Newton step you learned:
-
-$$H\Delta x=-g$$
-
-where
-
-$$H=J^\top J$$
-
-and then we solve this linear system.
-
-In batch SLAM:
+Each solve is a Gauss-Newton step $H\Delta x=-g$ with $H=J^\top J$ (see [`gauss_newton.md`](gauss_newton.md)):
 
 ```text
-Factor graph
-     ↓
-Jacobian J
-     ↓
-H = JᵀJ
-     ↓
-Factorize H
-     ↓
-solve Δx
+Factor graph → Jacobian J → H = JᵀJ → Factorize H → solve Δx
 ```
 
-The expensive part is often the **factorization**.
-
-When a new pose arrives, most of the old information hasn't changed.
-
-So why throw away the old factorization?
-
-**iSAM tries to reuse it.**
+The expensive part is often the **factorization**. When a new pose arrives, most of the old information hasn't changed, so **iSAM keeps the old factorization and updates it**.
 
 ---
 
 ## 5. Think of it like editing a huge spreadsheet
 
-Imagine you have a huge spreadsheet:
+A spreadsheet has 100,000 rows and we change one cell. We don't delete it and rebuild everything; we update the affected calculations. iSAM2 applies the same philosophy to SLAM:
 
 ```text
-100,000 rows
-```
-
-You change one cell.
-
-Would you:
-
-> Delete the entire spreadsheet and rebuild it?
-
-No.
-
-You would update the affected calculations.
-
-iSAM2 applies a similar philosophy to SLAM.
-
-```text
-Old solution
-     ↓
-new measurement
-     ↓
-identify affected variables
-     ↓
-update those parts
-     ↓
-reuse everything else
+Old solution → new measurement → identify affected variables → update those parts → reuse everything else
 ```
 
 ---
 
 ## 6. But what makes iSAM2 special?
 
-This is where **iSAM2** improves upon the original iSAM.
-
-The key concepts are:
+iSAM2 improves on the original iSAM with three ideas:
 
 1. **Bayes tree** (§7-§9)
 2. **Selective relinearization** (§10-§11)
 3. **Variable reordering** (§12)
 
-These three ideas are the heart of iSAM2.
-
 ### 6.1 iSAM vs. iSAM2, side by side
 
-iSAM2 solves the same problem as iSAM, on the same factorization: iSAM's square-root information matrix $R$ and iSAM2's Bayes tree hold the same numbers, just organized differently. What changes is how much each one can do *incrementally*:
+iSAM2 solves the same problem as iSAM, on the same factorization: iSAM's square-root information matrix $R$ and iSAM2's Bayes tree hold the same numbers (for the same variable ordering and linearization point), just organized differently. What changes is how much each one can do *incrementally*:
 
 | | iSAM (Kaess et al. 2008) | iSAM2 (Kaess et al. 2012) |
 | --- | --- | --- |
@@ -222,9 +114,9 @@ iSAM2 solves the same problem as iSAM, on the same factorization: iSAM's square-
 | Updating the estimate | Back-substitution through $R$ | Starts at the root and stops in branches where the changes are negligible (§13) |
 | Periodic batch steps | Required: the only way to relinearize and reorder | None |
 
-One idea sits behind every row. In matrix form, iSAM can't cheaply tell which part of $R$ a relinearization or a reordering would touch, so it periodically does both for everything. The Bayes tree makes those dependencies explicit - each clique knows its parent - so iSAM2 can redo exactly the affected part at every step, and never needs a batch step.
+One idea sits behind every row. In matrix form, iSAM can't cheaply tell which part of $R$ a relinearization or a reordering would touch, so it periodically does both for everything. The Bayes tree makes those dependencies explicit (each clique knows its parent), so iSAM2 can redo exactly the affected part at every step and never needs a batch step.
 
-This repo implements the iSAM column ([`isam_optimization.md` §14](isam_optimization.md#14-where-this-is-implemented-in-this-repo)) and only the tree-building part of the iSAM2 column (§19).
+This repo implements the iSAM column minus COLAMD reordering, with loop closures handled by a full rebuild ([`isam_optimization.md` §14](isam_optimization.md#14-where-this-is-implemented-in-this-repo)), and only the tree-building part of the iSAM2 column (§19).
 
 ---
 
@@ -250,50 +142,25 @@ This doc only needs that one-sentence version. For the full mechanism - how elim
 
 ---
 
-## 8. Here's the really useful intuition
+## 8. Intuition: only the part near the new variable changes
 
-Suppose your robot adds a new pose:
-
-```text
-x1 ─ x2 ─ x3 ─ x4 ─ x5
-```
-
-and receives a new measurement involving:
+The robot adds $x_5$ and receives a measurement involving it. Usually the new information mainly affects the solution around $x_5$, so iSAM2 conceptually touches only the top of the tree instead of recomputing everything. Schematically (the newest variable lives at the root, §12):
 
 ```text
-x5
+Before:                           After the update:
+
+   [x4]  ← root                      [x4 x5]  ← re-eliminated root, now with x5
+    │                                 │
+ [x1 x2 x3]  ← old, reused         [x1 x2 x3]  ← old, reused
 ```
 
-Usually, the new information primarily affects the part of the solution around $x_5$.
-
-So iSAM2 might conceptually do:
-
-```text
-             OLD
-        ┌─────────────┐
-        │ x1 x2 x3 x4 │
-        └─────────────┘
-                 \
-                  x5 ← NEW
-```
-
-Instead of:
-
-```text
-x1 x2 x3 x4 x5
- \  \  \  \ /
-   RECOMPUTE ALL
-```
-
-it updates only the relevant part of the Bayes tree.
+Batch optimization would instead recompute all of $x_1, \ldots, x_5$.
 
 ---
 
 ## 9. But what about loop closure?
 
-This is where things get interesting.
-
-Suppose your robot drives around:
+Suppose the robot drives around:
 
 ```text
 x1 ─ x2 ─ x3
@@ -301,11 +168,7 @@ x1 ─ x2 ─ x3
 x6 ─ x5 ─ x4
 ```
 
-The robot realizes:
-
-> "Wait! $x_6$ is actually close to $x_1$."
-
-So you add a loop-closure factor:
+It realizes: "Wait! $x_6$ is actually close to $x_1$." We add a loop-closure factor:
 
 ```text
 x1 ─ x2 ─ x3
@@ -315,71 +178,27 @@ x6 ─ x5 ─ x4
 ┆ = new loop-closure factor (x6 ↔ x1)
 ```
 
-Now the new measurement can affect **many old poses**.
-
-iSAM2 recognizes this.
-
-It doesn't blindly update only $x_6$.
-
-Instead, it identifies the affected region of the Bayes tree and redoes the necessary computation.
-
-So:
+The new measurement can now affect **many old poses**. iSAM2 doesn't blindly update only $x_6$; it identifies the affected region of the Bayes tree and redoes that computation:
 
 ```text
-normal odometry
-      ↓
-small affected region
-      ↓
-small update
+normal odometry → small affected region → small update
+
+loop closure    → large affected region → larger update
 ```
 
-but:
-
-```text
-loop closure
-      ↓
-large affected region
-      ↓
-larger update
-```
-
-This is one reason iSAM2 works well for real-time SLAM.
+Ordinary updates are small and loop closures are the occasional large ones, which is a big part of why iSAM2 suits real-time SLAM.
 
 ---
 
 ## 10. Selective relinearization
 
-This is another very important idea.
+A nonlinear problem $f(x)$ is approximated around the current estimate:
 
-Remember nonlinear optimization:
-
-$$f(x)$$
-
-We approximate it around the current estimate:
-
-$$f(x+\Delta x) \approx f(x)+J\Delta x$$
-
-But if $x$ changes significantly, the Jacobian $J$ becomes outdated.
-
-So periodically we need:
-
-```text
-old estimate
-    ↓
-relinearize
-    ↓
-new Jacobians
-    ↓
-optimize again
+```math
+f(x+\Delta x) \approx f(x)+J\Delta x
 ```
 
-The naive approach would relinearize **everything**.
-
-iSAM2 asks:
-
-> "Which variables actually moved enough that their linearization is no longer accurate?"
-
-For example:
+If $x$ changes significantly, the Jacobian $J$ becomes outdated and we must relinearize (new Jacobians, then optimize again). The naive approach relinearizes **everything**. iSAM2 asks: "Which variables actually moved enough that their linearization is no longer accurate?"
 
 ```text
 x1   x2   x3   x4   x5
@@ -389,82 +208,51 @@ small small small BIG small
        relinearize
 ```
 
-Only the important variables need relinearization.
+Only the important variables are relinearized. This is **selective relinearization**.
 
-This is called **selective relinearization**.
-
-It isn't free for that one variable, though. Relinearizing $x_4$ changes every factor that touches $x_4$, so every Bayes-tree clique containing $x_4$ - and everything on the path from there up to the root - has to be re-eliminated, exactly as if a new factor had arrived there (§8-§9). In iSAM2 (Kaess et al. 2012), a variable counts as having moved "enough" when its change from the point it was last linearized at exceeds a threshold. The variables marked this way, together with the ones touched by new factors, make up the affected region of each update.
+It isn't free for that one variable, though. Relinearizing $x_4$ changes every factor that touches $x_4$, so every Bayes-tree clique containing $x_4$, and everything on the path from there up to the root, has to be re-eliminated, exactly as if a new factor had arrived there (§8-§9). In iSAM2 (Kaess et al. 2012), a variable counts as having moved "enough" when its change from the point it was last linearized at exceeds a threshold. The variables marked this way, together with the ones touched by new factors, make up the affected region of each update.
 
 ---
 
-## 11. Why is that powerful?
+## 11. Why selective updates pay off
 
-Imagine a SLAM graph containing 10,000 poses.
-
-After a new measurement, maybe only $50$ variables have changed significantly.
-
-A batch optimizer might effectively reconsider all 10,000.
-
-iSAM2 tries to focus computation on the affected portion.
-
-Conceptually:
+Take a SLAM graph with 10,000 poses. After a new measurement, maybe only 50 variables have changed significantly. A batch optimizer might effectively reconsider all 10,000, while iSAM2 focuses on the affected portion:
 
 ```text
-Batch optimization
+Batch optimization          iSAM2
 
-████████████████████████████████
-████████████████████████████████
-████████████████████████████████
-
-
-iSAM2
-
-████
-  ███
-    ██
-       █
+████████████████████████    ████
+████████████████████████      ███
+████████████████████████        ██
+                                   █
 ```
 
-Obviously the exact computational behavior depends on the graph and ordering, but that's the intuition.
+The exact behavior depends on the graph and ordering, but that is the intuition.
 
 ---
 
 ## 12. Variable ordering is also crucial
 
-Remember sparse Cholesky?
-
-The amount of computation depends heavily on **variable ordering**.
-
-The order decides two things at once:
+The amount of computation in sparse Cholesky depends heavily on **variable ordering**, which decides two things at once:
 
 - **Fill-in**: how dense the factorization gets ([sparse_cholesky_factorization.md](sparse_cholesky_factorization.md)).
 - **Where each variable sits in the Bayes tree.** The last variable eliminated becomes the root, and an update's affected region is the path from the touched cliques up to the root (§8-§9).
 
 A fixed order can be fine for one and terrible for the other. This repo's own example ([bayes_tree.md §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo)) eliminates a square loop of 16 poses oldest first. Fill-in stays small (no separator larger than 2), but the tree comes out as a single chain with the first pose at the bottom, so a loop closure touching the first pose invalidates all 16 variables.
 
-iSAM2 therefore reorders as it goes. Each time it re-eliminates the affected part of the tree, it picks a new order for just those variables with **constrained COLAMD (CCOLAMD)**: a fill-reducing ordering, constrained so that the variables touched by the newest factors are eliminated last. They end up near the root, where the next measurement - which usually involves the same recent variables - disturbs only a few cliques.
-
-Very roughly:
+iSAM2 therefore reorders as it goes. Each time it re-eliminates the affected part of the tree, it picks a new order for just those variables with **constrained COLAMD (CCOLAMD)**: a fill-reducing ordering, constrained so that the variables touched by the newest factors are eliminated last. They end up near the root, where the next measurement (which usually involves the same recent variables) disturbs only a few cliques.
 
 ```text
-new measurement
-      ↓
-affected variables
-      ↓
-reorder them
-      ↓
-re-eliminate affected region
-      ↓
-update Bayes tree
+new measurement → affected variables → reorder them → re-eliminate affected region → update Bayes tree
 ```
 
-This keeps both the fill-in and the next update small.
+This aims to keep both the fill-in and the next update small.
 
 ---
 
 ## 13. The complete iSAM2 picture
 
-Now put everything together. One iSAM2 update, following Algorithm 1 of Kaess et al. (2012):
+Putting everything together, one iSAM2 update (simplified from Algorithm 1 of Kaess et al. 2012):
 
 ```text
              new measurements
@@ -496,41 +284,19 @@ Now put everything together. One iSAM2 update, following Algorithm 1 of Kaess et
            updated SLAM state ──► wait for the next measurements
 ```
 
-Everything below the removed top of the tree is reused untouched.
+Everything below the removed top of the tree keeps its factorization untouched (its estimates can still be updated in step 6).
 
 ---
 
 ## 14. iSAM2 vs EKF
 
-This distinction is particularly useful for understanding modern SLAM systems.
-
-### EKF-SLAM
-
-Think:
-
-> "I maintain my current estimate and uncertainty, and update it when a measurement arrives."
+**EKF-SLAM** is fundamentally a **filtering** approach: "I maintain my current estimate and uncertainty, and update it when a measurement arrives." Old information is compressed into the current state.
 
 ```text
-prediction
-    ↓
-measurement
-    ↓
-EKF update
-    ↓
-new estimate
+prediction → measurement → EKF update → new estimate
 ```
 
-It is fundamentally a **filtering** approach.
-
-Old information is compressed into the current state.
-
----
-
-### iSAM2
-
-Think:
-
-> "I keep the history and continuously optimize it."
+**iSAM2** is an **incremental smoothing/optimization** approach: "I keep the history and continuously optimize it." It retains historical variables and constraints.
 
 ```text
 x1 ─ x2 ─ x3 ─ x4 ─ x5
@@ -540,15 +306,9 @@ measurements + loop closures
    continuously optimize
 ```
 
-So iSAM2 is an **incremental smoothing/optimization** approach.
-
-It retains historical variables and constraints.
-
 ---
 
 ## 15. iSAM2 vs batch optimization
-
-This is probably the most intuitive comparison:
 
 |                        | Batch optimization    | iSAM2                |
 | ---------------------- | --------------------- | -------------------- |
@@ -561,63 +321,22 @@ This is probably the most intuitive comparison:
 | Loop closure           | Full re-solve, same as any other step | Large affected region; can approach a full re-solve (§9, §19) |
 | Real-time suitability  | Lower                 | Higher               |
 
-The key difference isn't that iSAM2 uses a fundamentally different SLAM objective.
-
-It's mostly about **how intelligently it updates the solution**.
+The key difference isn't a different SLAM objective; it is **how intelligently the solution is updated**.
 
 ---
 
-## 16. A very simple analogy
+## 16. Ordinary measurement vs. loop closure, in spreadsheet terms
 
-Imagine you're solving a giant jigsaw puzzle.
+Continuing the spreadsheet of §5:
 
-### Batch optimization
-
-Every time someone gives you a new puzzle piece:
-
-> "Let's throw away our current arrangement and solve the entire puzzle again."
-
-### iSAM2
-
-Instead:
-
-> "Where does this new piece connect?"
-
-Then:
-
-```text
-new piece
-   ↓
-find affected region
-   ↓
-rearrange that region
-   ↓
-keep the rest
-```
-
-If someone gives you a **loop-closure piece**, it may force you to rearrange a much larger region.
-
-That's essentially the spirit of iSAM2.
+- **Ordinary measurement:** like changing one cell. We find the few formulas that depend on it and recompute only those.
+- **Loop-closure measurement:** like changing a cell that many formulas depend on. A much larger region must be recomputed, but still not the whole sheet.
 
 ---
 
-## 17. One subtle but important point
+## 17. A common misconception: iSAM2 only optimizes the newest pose
 
-Don't think:
-
-> **iSAM2 only optimizes the newest pose.**
-
-That's not correct.
-
-It maintains a **global smoothing solution**.
-
-If a loop closure says:
-
-$$
-x_{100} \approx x_1
-$$
-
-then the correction can propagate backward through the trajectory:
+That is not correct. iSAM2 maintains a **global smoothing solution**. If a loop closure says $x_{100} \approx x_1$, the correction can propagate backward through the trajectory, so old poses can change:
 
 ```text
 x1 ← x2 ← x3 ← ... ← x100
@@ -625,19 +344,13 @@ x1 ← x2 ← x3 ← ... ← x100
 └──── loop closure ────┘
 ```
 
-So old poses can change.
-
 The cleverness is that iSAM2 determines **which parts need computational attention** rather than blindly recomputing the entire problem.
 
 ---
 
 ## 18. The one-sentence mental model
 
-If you remember only one thing:
-
 > **iSAM2 is an incremental nonlinear least-squares solver for SLAM that maintains a Bayes-tree factorization and efficiently updates only the parts of the solution affected by new information.**
-
-And the three ideas to remember, plus what they add up to, are:
 
 **Bayes tree + selective relinearization + variable reordering → incremental update**
 

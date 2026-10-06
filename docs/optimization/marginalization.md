@@ -2,9 +2,9 @@
 
 Marginalizing a variable means permanently removing it from the optimization while keeping everything it taught you about its neighbors, packaged as one new prior factor - so a real-time estimator can bound its problem size without lying to itself about what it used to know.
 
-This builds directly on two things you've already seen:
-- **Variable elimination** from [`elimination_tree.md`](elimination_tree.md) ("eliminate $x_1$ → its info gets summarized into a new constraint on $x_2$") - this doc reuses that exact mechanic for a different purpose.
-- **Sparsity and full vs. fixed-lag smoothing** from [filtering_smoothing.md §9-10](../filtering_smoothing.md#9-the-precise-distinction) (filtering marginalizes old information, smoothing keeps it) - this doc is the missing mechanical middle ground the diagram there only names.
+This doc builds on two earlier ones:
+- **Variable elimination** from [`bayes_tree.md`](bayes_tree.md) §3 ("eliminate $x_1$ → its info gets summarized into a new constraint on $x_2$"). We reuse that mechanic for a different purpose.
+- **Full vs. fixed-lag smoothing** from [filtering_smoothing.md §9](../filtering_smoothing.md#9-the-precise-distinction) (filtering marginalizes old information, smoothing keeps it). This doc is the mechanical middle ground the diagram there only names.
 
 ---
 
@@ -12,13 +12,13 @@ This builds directly on two things you've already seen:
 
 Full batch optimization (plain [bundle_adjustment.md](bundle_adjustment.md)/[pose_graph_optimization.md](pose_graph_optimization.md)) keeps every pose ever seen in the optimization forever - the problem grows without bound as the robot keeps moving. [isam2_optimization.md](isam2_optimization.md) fixes the *recompute* cost (only touch the part of the Bayes tree a new factor actually affects) but not the *memory* cost - every variable is still in the graph, just efficiently re-solved.
 
-A real-time VIO/VI-SLAM front-end (MSCKF, VINS-Mono, OKVIS) often can't afford either: fixed onboard memory, fixed per-frame compute budget, running forever. The fix is to actively **forget** old states - but forgetting a pose's *variable* while keeping the *information* it contributed is exactly what marginalization does.
+A real-time VIO/VI-SLAM front-end (MSCKF, VINS-Mono, OKVIS) can't afford either: fixed onboard memory, fixed per-frame compute, running forever. We must **forget** old states, but forget the *variable* while keeping the *information* it contributed. That is marginalization.
 
 ---
 
 ## 2. Marginalization: keep the information, drop the variable
 
-Recall the elimination picture from `bayes_tree.md §3`:
+The elimination picture from `bayes_tree.md §3`:
 
 ```text
 Before:
@@ -34,7 +34,7 @@ Eliminate x1:
     from x1
 ```
 
-That's marginalization. `bayes_tree.md` uses this step to build a *solve order* - $x_1$ is eliminated, but conceptually every variable gets eliminated eventually, and nothing is thrown away for good (§3 below makes this precise). Sliding-window smoothing uses the *identical* elimination math for the opposite reason: to throw $x_1$ away **permanently**, on purpose, because it's the oldest pose in the window and the estimator will never touch it again.
+That is marginalization. `bayes_tree.md` uses it to build a *solve order*, where nothing is thrown away for good. We use the same step to drop $x_1$ **permanently**, on purpose: it is the oldest pose in the window and the estimator will never touch it again.
 
 ---
 
@@ -47,13 +47,18 @@ That's marginalization. `bayes_tree.md` uses this step to build a *solve order* 
 | Why eliminate it | Landmarks outnumber cameras; cheap to invert | Reuse most of the last solve; minimize fill-in | Bound memory/compute to a fixed window size |
 | Where it's covered | [bundle_adjustment.md §12](bundle_adjustment.md#12-block-sparsity-and-the-schur-complement) | [bayes_tree.md](bayes_tree.md), [isam2_optimization.md](isam2_optimization.md) | §4-§7 below |
 
-The math (§4) is the same Schur-complement elimination in all three rows. What differs is only what happens to the eliminated variable afterward.
+The math (§4) is the same Schur-complement elimination in all three rows. Only the fate of the eliminated variable differs.
 
 ---
 
 ## 4. The math: turning an eliminated pose into a prior
 
-Suppose the current window has poses $x_a$ (the oldest, about to be dropped) and $x_b$ (everything still connected to it - odometry neighbors, and any landmark/IMU-bias variables it shares factors with). After linearization, the joint Gaussian is described by an information matrix $\Lambda$ and information vector $\eta$, partitioned to match:
+**A two-variable example first.** Take $`\Lambda = \begin{bmatrix} 2 & -1 \\ -1 & 2 \end{bmatrix}`$ and drop the first variable:
+- Naively keeping only the second diagonal entry says the surviving variable has information 2.
+- The Schur correction subtracts what $x_1$ borrowed from it: $`\Lambda' = 2 - (-1)(1/2)(-1) = 1.5`$.
+- Check: $`\Sigma = \Lambda^{-1} = \begin{bmatrix} 2/3 & 1/3 \\ 1/3 & 2/3 \end{bmatrix}`$, so the marginal variance of the second variable is $`2/3 = 1/1.5`$. The correction is exactly what marginalizing means.
+
+In general, suppose the current window has poses $x_a$ (the oldest, about to be dropped) and $x_b$ (everything still connected to it - odometry neighbors, and any landmark/IMU-bias variables it shares factors with). After linearization, the joint Gaussian is described by an information matrix $\Lambda$ and information vector $\eta$, partitioned to match:
 
 ```math
 \Lambda = \begin{bmatrix} \Lambda_{aa} & \Lambda_{ab} \\ \Lambda_{ba} & \Lambda_{bb} \end{bmatrix}, \qquad \eta = \begin{bmatrix} \eta_a \\ 
@@ -68,24 +73,11 @@ $$
 
 One precision point: here $\Lambda$ and $\eta$ are built only from the factors that touch $x_a$. Factors among the $x_b$ variables alone stay in the graph unchanged, so if their contribution to $\Lambda_{bb}$ were also folded into the prior, it would be counted twice. §8.1 shows how the script does this.
 
-$(\Lambda_b', \eta_b')$ is a brand-new **prior factor** over exactly the variables $x_a$ used to connect to - nothing else. It gets inserted into the graph like any other factor:
+$(\Lambda_b', \eta_b')$ is a brand-new **prior factor** over exactly the variables $x_a$ used to connect to. It enters the graph like any other factor, as in the §2 diagram with $x_a = x_1$: $x_a$ disappears and the summarized information sits on its former neighbors.
 
-```text
-Before marginalization:
-
-x_a ──odom── x_b ──odom── x_c
- │
- └──landmark/IMU-bias factors
-
-After marginalizing x_a:
-
-            x_b ──odom── x_c
-             ↑
-        new prior factor
-     (Λ_b', η_b'), no x_a left
-```
-
-The critical difference from BA's version of this trick: BA computes $\Lambda_b'$ *only to solve the reduced system faster*, then back-substitutes to recover $x_a$'s optimal value from $x_b$'s. Here there is no back-substitution step - $x_a$ is never coming back. That's what makes this *temporal* marginalization rather than a solver optimization.
+The difference from BA's version of this trick:
+- BA computes $\Lambda_b'$ *only to solve the reduced system faster*, then back-substitutes to recover $x_a$ from $x_b$.
+- Here there is no back-substitution: $x_a$ is never coming back. That is what makes this *temporal* marginalization rather than a solver optimization.
 
 ---
 
@@ -105,27 +97,27 @@ Before:                  After eliminating x_a:
  through x_a)                  directly connected)
 ```
 
-This is exactly the **fill-in** phenomenon that [elimination_tree.md §9](elimination_tree.md#9-why-ordering-matters-so-much) shows the elimination order can control, and that iSAM2's reordering ([isam2_optimization.md §12](isam2_optimization.md#12-variable-ordering-is-also-crucial)) exists to keep small. The difference here: sliding-window marginalization doesn't get to choose an elimination order to minimize fill-in - it must always eliminate the oldest pose, whatever it happens to be connected to. This is a real, accepted cost of the sliding-window approach (not a bug to fix), and it's why sliding-window systems keep the window itself small - a bigger window means a more richly-connected pose to eventually eliminate, and a denser resulting prior.
+This is the **fill-in** that [elimination_tree.md §9](elimination_tree.md#9-why-ordering-matters-so-much) shows the elimination order can control, and that iSAM2's reordering ([isam2_optimization.md §12](isam2_optimization.md#12-variable-ordering-is-also-crucial)) keeps small. Sliding-window marginalization has no such choice: we always eliminate the oldest pose, whatever it is connected to. That cost is accepted, and it is why systems keep the window small: a bigger window costs $O(W^3)$ per step, and the dense prior can span more states.
 
 ---
 
 ## 6. The consistency gotcha: why FEJ exists
 
-One subtlety worth flagging, not deriving in full: $(\Lambda_b', \eta_b')$ is computed by linearizing around whatever the *current* estimates of $x_a$ and $x_b$ happened to be at the moment of marginalization. That linearization point is then frozen into the prior forever. But the surviving variables in $x_b$ keep getting relinearized at new estimates on every later optimizer iteration - at a *different* point than the one the frozen prior was built from.
+$(\Lambda_b', \eta_b')$ is computed by linearizing at the *current* estimates of $x_a$ and $x_b$ at the moment of marginalization. That linearization point is then frozen into the prior's $\Lambda_b'$ and $\eta_b'$. The surviving variables in $x_b$ keep being relinearized at new estimates on every later iteration, at a *different* point from the one the prior was built at. (This repo's prior differs: it re-linearizes its Jacobian at every solve, and only $\Omega$ and $X_{\text{ref}}$ are frozen; see §8.)
 
 This mismatch injects spurious information into directions of the state that should be unobservable (the same class of problem [kf_ekf_iekf.md §2](../filtering/kf_ekf_iekf.md#2-extended-kalman-filter-the-world-is-nonlinear-so-ill-approximate-it-locally) describes for plain EKF-SLAM), making the estimator overconfident.
 
-The standard fix is **First-Estimate Jacobians (FEJ)**: once a variable has contributed to a marginalization, all *future* Jacobians involving it are evaluated at that same first-linearization point, not the newest estimate - trading a small amount of accuracy for provable consistency. Who uses it is narrower than "MSCKF and VINS-Mono both use this," though:
-- The original MSCKF (Mourikis & Roumeliotis, 2007) predates FEJ - it was added in the later MSCKF 2.0 (Li & Mourikis, 2012/2013).
-- VINS-Mono's own paper explicitly says its linearization-point handling is *not* FEJ, arguing the inconsistency FEJ targets isn't critical enough in their VIO setting to justify it.
+The standard fix is **First-Estimate Jacobians (FEJ)**: once a variable has contributed to a marginalization, all *future* Jacobians involving it are evaluated at that same first-linearization point, not the newest estimate. The linearized system then keeps the correct unobservable directions, which markedly improves consistency. Who uses it:
+- The original MSCKF (Mourikis & Roumeliotis, 2007) predates FEJ. It was added in the later MSCKF 2.0 (Li & Mourikis, 2012/2013).
+- VINS-Mono does not use FEJ. Its §VI-D notes that marginalization fixes linearization points early, which may give suboptimal estimates, and argues that since small drift is acceptable for VIO, the negative impact is not critical.
 
-See Huang, Mourikis & Roumeliotis (2009) in the references below for the FEJ derivation itself - it isn't reproduced here.
+See Huang, Mourikis & Roumeliotis (2009) in the references below for the FEJ derivation itself - we don't reproduce it here.
 
 ---
 
 ## 7. Sliding-window and fixed-lag smoothing: the payoff
 
-This is the strategy `filtering_smoothing.md §10`'s diagram names but doesn't mechanize - now it can be stated as a loop:
+`filtering_smoothing.md §10`'s diagram names this strategy; here it is as a loop:
 
 ```text
 new keyframe/measurement arrives
@@ -143,9 +135,13 @@ add its variables + factors to the window
         repeat
 ```
 
-Because the window never grows past a fixed size, both the per-step optimization cost and memory stay **bounded by the window size** (for $W$ poses in the window, a dense solve takes $O(W^3)$ time and $O(W^2)$ memory), independent of how long the robot has been running - the property full batch smoothing doesn't have (unbounded) and iSAM2 doesn't quite give you either (iSAM2 is bounded by how much of the Bayes tree a new factor *changes*, not by a fixed window - a loop closure can still touch a large chunk of history, per `isam2_optimization.md §9`).
+The window never grows past a fixed size, so cost and memory stay **bounded by the window size**, independent of run time. For $W$ poses, a dense solve takes $O(W^3)$ time and $O(W^2)$ memory.
+- Full batch smoothing is unbounded.
+- iSAM2 is bounded by how much of the Bayes tree a new factor *changes*, not by a fixed window. A loop closure can still touch a large chunk of history (`isam2_optimization.md §9`).
 
-This is precisely what `filtering_smoothing.md §10`'s "fixed-lag smoothing" box and its MSCKF/VINS-Mono bullets refer to - MSCKF keeps a sliding window of camera poses and marginalizes a landmark's constraint into them once triangulated (see [kf_ekf_iekf.md](../filtering/kf_ekf_iekf.md)'s MSCKF paragraph); VINS-Mono keeps a sliding window of keyframes and marginalizes the oldest one using exactly the Schur-complement step in §4 - though, per §6's correction, without FEJ.
+This is what `filtering_smoothing.md §10`'s "fixed-lag smoothing" box and its MSCKF/VINS-Mono bullets refer to:
+- MSCKF keeps a sliding window of camera poses and marginalizes a landmark's constraint into them once triangulated (see [kf_ekf_iekf.md](../filtering/kf_ekf_iekf.md)'s MSCKF paragraph).
+- VINS-Mono keeps a sliding window of keyframes and marginalizes the oldest one with the Schur-complement step in §4, without FEJ (§6).
 
 ![Three panels from sliding_window_marginalization.py on a 16-pose square with a 10-pose window: window membership after each new pose, the window's block-tridiagonal information matrix with the oldest pose's block about to be eliminated, and the next window's matrix where that information lands as one prior block on the new oldest pose](../../assets/sliding_window_marginalization_concept.png)
 
@@ -155,17 +151,17 @@ This is precisely what `filtering_smoothing.md §10`'s "fixed-lag smoothing" box
 
 ## 8. What this repo implements
 
-[`sliding_window_marginalization.py`](../../use_numpy/sliding_window_marginalization.py) implements this: it streams a chain of odometry edges one node at a time, keeps at most `window_size` poses live in memory, and marginalizes the oldest one out via §4's Schur complement whenever a new node would exceed that.
-- **The marginal is a genuine prior factor** - a frozen reference pose plus an information matrix, re-linearized against the *current* estimate every solve, exactly like an ordinary edge - rather than a frozen linear term. That is the only representation that stays correct as the surviving poses keep moving across later windows.
+[`sliding_window_marginalization.py`](../../use_numpy/sliding_window_marginalization.py) streams a chain of odometry edges one node at a time, keeps at most `window_size` poses live in memory, and marginalizes the oldest one out via §4's Schur complement whenever a new node would exceed that.
+- **The marginal is a genuine prior factor** - a frozen reference pose plus an information matrix, re-linearized against the *current* estimate every solve, exactly like an ordinary edge - rather than a frozen linear term. This is one valid representation (an alternative to storing a fixed linear factor) and it keeps the prior consistent as the surviving poses move across later windows.
 - **It keeps §4's $\Lambda_b'$ as the prior's information matrix, but does not store $\eta_b'$.** Instead, the prior is anchored at a frozen reference pose, so its linear term is zero at the moment it is created. That is exact only when $\eta_b' = 0$, and it is here: see §8.1.
 
-Two deliberate scope choices, both flagged directly in the script:
-- **Pure odometry chain, no loop closures.** The oldest pose in a chain window is connected to exactly one surviving neighbor, so marginalizing it produces a *provably unary* prior - verified directly by a test that checks the Schur-complement correction term is exactly zero everywhere outside that one block. §5's fill-in problem (a real cost once a marginalized node has *multiple* neighbors - a landmark, an IMU-bias variable, or a loop closure) is a genuinely different problem, already covered by [`bayes_tree.md`](bayes_tree.md)/[`isam2_optimization.md`](isam2_optimization.md) and by `pose_graph_incremental.py`'s own loop-closure handling; this script isolates the memory-*bounding* property alone.
-- **No First-Estimate Jacobians (§6).** Every pose's Jacobian, including the prior factor's own, is re-evaluated at its newest estimate on every solve - the textbook source of the mild overconfidence FEJ exists to fix. Not implemented here, the same way `pose_graph_incremental.py` explicitly flags what it doesn't implement relative to iSAM2.
+Two deliberate scope choices, both flagged in the script:
+- **Pure odometry chain, no loop closures.** The oldest pose in a chain window is connected to exactly one surviving neighbor, so marginalizing it produces a *provably unary* prior - verified directly by a test that checks the Schur-complement correction term is zero (to 1e-8) everywhere outside that one block. §5's fill-in appears once a marginalized node has *multiple* neighbors (a landmark, an IMU-bias variable, a loop closure). That is a different problem, covered by [`bayes_tree.md`](bayes_tree.md)/[`isam2_optimization.md`](isam2_optimization.md) and by `pose_graph_incremental.py`'s loop-closure handling. This script isolates the memory-*bounding* property alone.
+- **No First-Estimate Jacobians (§6).** Every pose's Jacobian, including the prior factor's own, is re-evaluated at its newest estimate on every solve, the textbook source of the mild overconfidence FEJ fixes. Like `pose_graph_incremental.py` with iSAM2, the script flags what it omits.
 
 ### 8.1 The math, concretely
 
-Poses $X_k$ are $4 \times 4$ SE(3) matrices, and tangent vectors follow the repo's `[vx, vy, vz, wx, wy, wz]` order. Every window is solved by plain Gauss-Newton over two factor types. Both are linearized at the current estimate on every iteration, and there are no First-Estimate Jacobians.
+Poses $X_k$ are $4 \times 4$ SE(3) matrices, and tangent vectors follow the repo's `[vx, vy, vz, wx, wy, wz]` order. We solve every window by plain Gauss-Newton over two factor types, both linearized at the current estimate on every iteration (no First-Estimate Jacobians).
 
 **Odometry edge** (`linearize_edge`, reused from `pose_graph_incremental.py`). Here $\mathcal{J}_r^{-1}$ is the inverse right Jacobian of SE(3) (`compute_se3_inv_right_jacobian`) and $\mathrm{Ad}$ is the adjoint:
 
@@ -209,13 +205,13 @@ Taking $\Lambda_{bb}$ from the full $H$ instead would also include the b–c edg
 
 The solve therefore never exceeds `window_size` poses, so `max_dof` is capped at 6 × `window_size`. A marginalized pose keeps the estimate it had when it was dropped.
 
-**Baseline** (`run_full_batch_growing`). For $k = 1 \dots n$, the baseline re-solves the whole graph of the first $k$ poses from scratch. It uses `pose_graph.run_pose_graph_optimization` with `damping=0.0`, starting from dead reckoning from the first ground-truth pose, with node 0 anchored by $10^6 I$ inside that function. Its `max_dof` is $6n$.
+**Baseline** (`run_full_batch_growing`). For $k = 1 \dots n$, the baseline re-solves the whole graph of the first $k$ poses from scratch. It uses `pose_graph.run_pose_graph_optimization` (adaptive Levenberg-Marquardt starting at λ = 0, via `damping=0.0`), starting from dead reckoning from the first ground-truth pose, with node 0 anchored by $10^6 I$ inside that function. Its `max_dof` is $6n$.
 
 **Defaults:** `--window-size 10`; `--nodes-per-side-sweep 2 4 8 16 32 64` (8 to 256 poses); `--side-length 2.0` m; `--pos-noise-std 0.05` m; `--rot-noise-std 0.01` rad; `--anchor-weight 1e6`; `--gn-tol 1e-6`; `--gn-max-iters 10`; `--seed 0`.
 
 ---
 
-## 9. Empirical verification: bounded vs. unbounded, for real
+## 9. Empirical verification: bounded vs. unbounded
 
 `sliding_window_marginalization.py` compares this bounded approach against `run_full_batch_growing` - the unbounded baseline that re-solves the entire graph from scratch at every new node, exactly the strategy §1 opens with. Since output bookkeeping (final pose estimates for every node, kept only for this script's own error reporting) is unavoidably $O(n)$ for *both* approaches alike, the metric that actually isolates the algorithmic claim is the size of the largest dense information matrix either one ever assembles and solves - reported here as `max_dof`, with an approximate byte count for holding that matrix densely ($`\text{max\_dof}^2 \times 8`$ bytes, float64):
 
@@ -230,7 +226,7 @@ The solve therefore never exceeds `window_size` poses, so `max_dof` is capped at
 
 Two measurements, only one of them deterministic:
 - **Memory (`max_dof`)**: full-batch's system size grows linearly with trajectory length (so its dense-matrix memory grows *quadratically* - visible directly in the table, roughly $4\times$ per doubling of length) and never stops. Sliding-window's caps at exactly $`6 \times \text{window\_size}`$ the moment the window first fills, and never moves again, confirmed identically across multiple seeds (`max_dof` depends only on trajectory length and `window_size`, not on the noise realization). Only the `max_dof` column above is deterministic.
-- **Average per-step wall-clock time** tells the same story less starkly, and its absolute values depend on the machine and its load. One run gave full-batch 1.5 ms → 61 ms as length grows 8 → 256, and sliding-window 1.6 ms → 7.0 ms. A later run on a different machine state gave full-batch 2.4 ms → 317 ms and sliding-window 0.78 ms → 3.8 ms. In both runs, sliding-window time flattens once trajectories exceed `window_size`, while full-batch time keeps growing.
+- **Average per-step wall-clock time** tells the same story less starkly, and absolute values depend on the machine and its load. One run gave full-batch 1.5 ms → 61 ms as length grows 8 → 256, and sliding-window 1.6 ms → 7.0 ms. A later run on a different machine state gave full-batch 2.4 ms → 317 ms and sliding-window 0.78 ms → 3.8 ms. In both runs, sliding-window time flattens once trajectories exceed `window_size`, while full-batch time keeps growing.
 
 ![Three panels from sliding_window_marginalization.py: largest information-matrix size, time per new pose and RMS position error against trajectory length from 8 to 256 poses, for a full batch re-solve and a 10-pose sliding window](../../assets/sliding_window_marginalization.png)
 
@@ -238,16 +234,16 @@ Two measurements, only one of them deterministic:
 
 **Accuracy is identical here, but that's guaranteed by the setup, not evidence that marginalization loses nothing.**
 - Final RMS position error is the same for full-batch and sliding-window at every trajectory length.
-- The reason is stronger than "no future edge reaches back": in a pure odometry chain with a single anchor there are no redundant measurements, so every factor can be satisfied exactly, and the least-squares optimum *is* the dead-reckoned trajectory. Both solvers return exactly that - checked directly at seed 0, both match dead reckoning with a maximum difference of 0.0 at 8, 16 and 32 poses.
-- So any correct solver would tie: this comparison can't reveal whether marginalization throws information away, and the figure's accuracy panel is simply dead-reckoning error. The memory bound above is the real result.
+- The reason is the one in §8.1 (all residuals are zero): the least-squares optimum *is* the dead-reckoned trajectory. Both solvers return exactly that. Checked at seed 0, both match dead reckoning with a maximum difference of 0.0 at 8, 16 and 32 poses.
+- So any correct solver would tie. The comparison can't reveal whether marginalization throws information away, and the figure's accuracy panel is simply dead-reckoning error. The memory bound above is the real result.
 
-The same scope is why §6's FEJ subtlety is silent here: FEJ protects against *inconsistency* that only shows up once a later loop closure or shared landmark reconnects to something already marginalized, which this script's pure-chain scope never triggers. A version of this script with loop closures is what would actually test accuracy. It would be expected to show both §5's fill-in cost and a real (if likely small) accuracy gap from skipping FEJ - a natural further extension, not implemented here.
+The same scope silences §6's FEJ subtlety here: the inconsistency only shows up once a later loop closure or shared landmark reconnects to something already marginalized. A version with loop closures would actually test accuracy, and would be expected to show §5's fill-in cost and a real (if likely small) accuracy gap from skipping FEJ. That extension is not implemented.
 
 ---
 
 ## 10. One-sentence summary
 
-> **Marginalization is the same variable-elimination step `bayes_tree.md` uses to build a solve order, aimed instead at permanently discarding an old state - turning it into a dense prior factor over whatever it was still connected to, which is exactly the trick that lets sliding-window/fixed-lag smoothers (MSCKF, VINS-Mono) run in bounded memory and time forever, at the cost of a fill-in penalty and a consistency subtlety that a later fix (FEJ, §6) targets but that full-batch and iSAM2 never have to deal with in the first place.**
+> **Marginalization is the variable-elimination step from `bayes_tree.md`, used to permanently discard an old state.** It turns that state into a dense prior over whatever it was still connected to. That lets sliding-window/fixed-lag smoothers (MSCKF, VINS-Mono) run in bounded memory and time forever. The price is fill-in (§5) and a consistency subtlety (FEJ, §6) that full-batch and iSAM2 never face.
 
 ---
 
@@ -256,5 +252,5 @@ The same scope is why §6's FEJ subtlety is silent here: FEJ protects against *i
 1. Sibley, G., Matthies, L., & Sukhatme, G. (2010). *Sliding Window Filter with Application to Planetary Landing*. Journal of Field Robotics, 27(5), 587-608. https://doi.org/10.1002/rob.20360 - the sliding-window/delayed-state-marginalization formulation behind §4 and §7.
 2. Huang, G. P., Mourikis, A. I., & Roumeliotis, S. I. (2009). *A First-Estimates Jacobian EKF for Improving SLAM Consistency*. In Experimental Robotics: The Eleventh International Symposium (pp. 373-382). Springer. https://doi.org/10.1007/978-3-642-00196-3_43 - the FEJ fix behind §6.
 3. Mourikis, A. I., & Roumeliotis, S. I. (2007). *A Multi-State Constraint Kalman Filter for Vision-Aided Inertial Navigation*. ICRA 2007, 3565-3572. https://doi.org/10.1109/ROBOT.2007.364024 - the original MSCKF reference in §7 (predates FEJ, per §6), already cited in [filtering_smoothing.md §12](../filtering_smoothing.md#12-references).
-4. Qin, T., Li, P., & Shen, S. (2018). *VINS-Mono: A Robust and Versatile Monocular Visual-Inertial State Estimator*. IEEE Transactions on Robotics, 34(4), 1004-1020. https://doi.org/10.1109/TRO.2018.2853729 - the VINS-Mono reference in §7, already cited in [filtering_smoothing.md §12](../filtering_smoothing.md#12-references). Its own §III-C explicitly discusses why it does not adopt FEJ.
-5. Li, M., & Mourikis, A. I. (2013). *High-Precision, Consistent EKF-Based Visual-Inertial Odometry*. The International Journal of Robotics Research, 32(6), 690-711. https://doi.org/10.1177/0278364913481251 - the later MSCKF revision (sometimes called "MSCKF 2.0") that adds FEJ, referenced in §6's correction.
+4. Qin, T., Li, P., & Shen, S. (2018). *VINS-Mono: A Robust and Versatile Monocular Visual-Inertial State Estimator*. IEEE Transactions on Robotics, 34(4), 1004-1020. https://doi.org/10.1109/TRO.2018.2853729 - the VINS-Mono reference in §7, already cited in [filtering_smoothing.md §12](../filtering_smoothing.md#12-references). Its §VI-D notes that marginalization fixes linearization points early and argues the impact is not critical for VIO (no FEJ).
+5. Li, M., & Mourikis, A. I. (2013). *High-Precision, Consistent EKF-Based Visual-Inertial Odometry*. The International Journal of Robotics Research, 32(6), 690-711. https://doi.org/10.1177/0278364913481251 - the later MSCKF revision (sometimes called "MSCKF 2.0") that adds FEJ, referenced in §6.

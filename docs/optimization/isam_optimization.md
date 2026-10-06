@@ -13,9 +13,7 @@ t0       t1       t2       t3
 x0 ───── x1 ───── x2 ───── x3
 ```
 
-At every timestep, you receive new measurements.
-
-A traditional **batch** approach might do:
+At every timestep we receive new measurements. A traditional **batch** approach does:
 
 ```text
 Measurement at t0
@@ -35,21 +33,13 @@ Measurement at t3
 Optimize x0, x1, x2, x3
 ```
 
-So every time a new measurement arrives, you potentially solve the **whole problem again**.
-
-For a large SLAM system:
-
-```text
-x0 x1 x2 ... x1000
-```
-
-re-solving everything repeatedly becomes expensive.
+Every new measurement potentially triggers a solve of the **whole problem again**. With $x_0, \ldots, x_{1000}$, re-solving everything repeatedly becomes expensive.
 
 ---
 
 ## 2. The incremental idea
 
-Instead:
+The incremental approach:
 
 ```text
 Old solution
@@ -81,13 +71,11 @@ Don't throw everything away!
 Just update the existing solution.
 ```
 
-This is the fundamental idea behind **iSAM (incremental Smoothing and Mapping)**.
+This is the fundamental idea behind **iSAM (incremental Smoothing and Mapping)**: don't throw the old solution away.
 
 ---
 
 ## 3. Why is this possible?
-
-This is where things get interesting.
 
 Suppose we have a [factor graph](factor_graph.md):
 
@@ -103,59 +91,30 @@ After linearization, the nonlinear optimization becomes approximately a linear l
 \min_{\Delta x} \lVert A\Delta x - b \rVert^2
 ```
 
-Instead of solving this from scratch every time, we can factorize $A$:
+Instead of solving this from scratch every time, we can factorize $A = QR$ (or work with a related factorization of the information/Hessian system).
 
-$$A = QR$$
+> **Note**: QR decomposition factors a matrix as $A=QR$, with $Q$ orthogonal and $R$ upper-triangular. Because $Q$ is orthogonal it doesn't change the least-squares solution, so minimizing $`\lVert A\Delta x - b \rVert^2`$ reduces to the cheap triangular solve $R\Delta x = Q^\top b$ - and, critically for iSAM, $R$ can be updated incrementally via Givens rotations when a new row (factor) arrives, instead of refactorizing $A$ from scratch. That incremental-update property is what the next point relies on.
 
-or equivalently work with a related factorization of the information/Hessian system.
-
-> **Note**: QR decomposition factors a matrix as $A=QR$, with $Q$ orthogonal and $R$ upper-triangular. Because $Q$ is orthogonal it doesn't change the least-squares solution, so minimizing $`\lVert A\Delta x - b \rVert^2`$ reduces to the cheap triangular solve $R\Delta x = Q^\top b$ - and, critically for iSAM, $R$ can be updated incrementally via Givens rotations when a new row (factor) arrives, instead of refactorizing $A$ from scratch. That incremental-update property is exactly what the next paragraph relies on.
-
-The important point is:
+The important point:
 
 > **When a new factor is added, much of the previous factorization is still useful.**
-
-We don't necessarily need to throw away the previous computation.
 
 ---
 
 ## 4. An analogy: editing a spreadsheet
 
-Imagine you have a huge spreadsheet:
+Imagine a spreadsheet with 100,000 calculations, and we change one cell.
 
-```text
-100,000 calculations
-```
+- Naive: "Recalculate absolutely everything from scratch."
+- Incremental: "Which calculations actually depend on this cell?" Update only those.
 
-You change one cell.
-
-A stupid approach would be:
-
-> "Let's recalculate absolutely everything from scratch."
-
-An incremental approach says:
-
-> "Which calculations actually depend on this cell?"
-
-Then update only those.
-
-iSAM applies a similar philosophy to the optimization problem.
+iSAM applies the same philosophy to the optimization problem.
 
 ---
 
 ## 5. The SLAM example
 
-Suppose your robot has estimated:
-
-```text
-x0 ── x1 ── x2 ── x3 ── x4
-```
-
-and each edge represents odometry.
-
-Then you get a new camera observation at $x_4$.
-
-Maybe it observes landmark $l_0$:
+Suppose the robot has estimated the chain below (each edge is odometry), then gets a new camera observation at $x_4$ of landmark $l_0$:
 
 ```text
                         l0
@@ -166,19 +125,12 @@ x0 ── x1 ── x2 ── x3 ── x4
                    new camera
 ```
 
-A batch optimizer says:
-
-> Rebuild and solve the entire nonlinear problem.
-
-An incremental optimizer says roughly:
-
-> "The new factor primarily affects $x_4$ and the variables connected to it. Update the existing solution accordingly."
+- Batch: rebuild and solve the entire nonlinear problem.
+- Incremental: the new factor primarily affects $x_4$ and the variables connected to it, so update the existing solution accordingly.
 
 ---
 
 ## 6. But what about loop closure?
-
-This is where incremental SLAM becomes especially interesting.
 
 Suppose we have:
 
@@ -189,13 +141,13 @@ x0 ── x1 ── x2 ── x3 ── x4
        loop closure
 ```
 
-The loop closure can affect **many previous poses**.
+The loop closure can affect **many previous poses**, so incremental optimization cannot simply update $x_4$.
 
-So incremental optimization cannot simply update $x_4$.
+- Original iSAM still absorbs the loop-closure factor like any other: one more row folded into the factorization with Givens rotations (§3).
+- But this row links $x_4$ back to $x_0$, so the rotations sweep through most of the factorization and leave it denser (fill-in).
+- Original iSAM cleans this up periodically, by relinearizing everything and choosing a new variable ordering in one batch step (Kaess et al. 2008). This repo's script goes straight to that batch step when the loop closes (§14.1).
 
-Original iSAM still absorbs the loop-closure factor like any other: as one more row folded into the factorization with Givens rotations (§3). But this row links $x_4$ all the way back to $x_0$, so the rotations sweep through most of the factorization and leave it denser than before (fill-in). Original iSAM cleans this up periodically, by relinearizing everything and choosing a new variable ordering in one batch step (Kaess et al. 2008). This repo's script goes straight to that batch step when the loop closes (§14.1).
-
-So loop closures are exactly where incremental updates lose most of their advantage. Working out *which* variables a new factor really affects, and recomputing only those, is what iSAM2's Bayes tree adds (§7).
+Loop closures are therefore where incremental updates lose most of their advantage. Working out *which* variables a new factor really affects, and recomputing only those, is what iSAM2's Bayes tree adds (§7).
 
 ---
 
@@ -207,8 +159,6 @@ Original iSAM stops at §3's mechanism: Givens-rotation updates to the factoriza
 
 ## 8. Batch vs incremental
 
-Here's the simplest comparison:
-
 | Batch optimization              | Incremental optimization        |
 | ------------------------------- | ------------------------------- |
 | Add measurements                | Add measurements                |
@@ -217,8 +167,6 @@ Here's the simplest comparison:
 | Good for offline SLAM           | Good for online SLAM            |
 | Simple conceptual model         | More complicated implementation |
 | Example: standard Gauss-Newton  | Example: iSAM/iSAM2             |
-
-Think:
 
 ```text
 BATCH
@@ -250,17 +198,11 @@ new measurement
 
 ## 9. iSAM doesn't mean "never touch old variables"
 
-This is an important misconception.
-
-You might think:
+A common misconception is:
 
 > "Incremental means only optimize the newest pose."
 
-**No.**
-
-Old poses can absolutely be updated.
-
-For example:
+**No.** Old poses can absolutely be updated. For example:
 
 ```text
 Before loop closure:
@@ -275,31 +217,11 @@ Loop closure arrives:
 x4 ───────── x0
 ```
 
-$x_0$ is the anchor, so it stays put; the small errors of every odometry step add up along the chain and show at $x_4$. Now the loop closure tells us the trajectory is inconsistent.
+$x_0$ is the anchor, so it stays put; the small errors of every odometry step add up along the chain and show at $x_4$. The loop closure tells us the trajectory is inconsistent, so the optimizer may change $x_1, \ldots, x_4$: all of them can move, because the loop closure ties $x_4$ back to $x_0$ through the whole chain.
 
-The optimizer may change:
+As §6 explains, this is the expensive case. This repo's script handles it with a full batch relinearization; original iSAM inserts the row with Givens rotations and cleans up the fill-in at its next periodic batch step.
 
-```text
-x0
-x1
-x2
-x3
-x4
-```
-
-All of them can move, because the loop closure ties $x_4$ back to $x_0$ through the whole chain. As §6 explains, this is the expensive case, not a cheap one: original iSAM, and this repo's script, handle it with a full batch relinearization.
-
-That's why the term **smoothing** is important.
-
-The system is not merely estimating:
-
-$$x_t$$
-
-It is continually refining:
-
-$$x_0,\ldots,x_t$$
-
-using all available information.
+This is why **smoothing** matters: the system is not merely estimating $x_t$, it keeps refining $x_0, \ldots, x_t$ using all available information.
 
 ---
 
@@ -317,17 +239,13 @@ x0 → x1 → x2 → x3 → x4
             current state
 ```
 
-Once you've processed $x_0$, you largely summarize its information and move forward.
-
-You primarily care about:
+Once $x_0$ is processed, we largely summarize its information and move forward. We primarily care about:
 
 $$P(x_t \mid z_{1:t})$$
 
 ---
 
 ### iSAM/smoothing
-
-Instead:
 
 ```text
 x0 ── x1 ── x2 ── x3 ── x4
@@ -336,13 +254,7 @@ x0 ── x1 ── x2 ── x3 ── x4
        all history
 ```
 
-You maintain a representation of the entire trajectory:
-
-$$x_{0:t}$$
-
-and continuously refine it.
-
-So:
+Here we maintain a representation of the entire trajectory $x_{0:t}$ and continuously refine it.
 
 > **Filtering:** "What is my best estimate of the robot NOW?"
 
@@ -352,7 +264,7 @@ So:
 
 ## 11. Where iSAM fits into the SLAM mental map
 
-You can now connect your previous topics like this:
+The earlier topics connect like this:
 
 ```text
                     SLAM
@@ -399,27 +311,14 @@ This is one corner of the repo-wide map in [slam_mental_map.md](../slam_mental_m
 
 ---
 
-## 12. The most intuitive way to remember iSAM
+## 12. An analogy: drawing a map while walking
 
-Imagine you're drawing a map while walking.
+Imagine we draw a map while walking. At every step:
 
-### Batch approach
+- **Batch:** "Let me redraw the entire map from scratch."
+- **Incremental:** "I already have a pretty good map. I'll incorporate this new information into it."
 
-Every time you take one more step:
-
-> "Let me redraw the entire map from scratch."
-
-### Incremental approach
-
-Every time you take one more step:
-
-> "I already have a pretty good map. I'll incorporate this new information into it."
-
-And when you recognize a place you've visited before:
-
-> "Oh! This new observation conflicts with my old map. I need to adjust the affected parts."
-
-That's **iSAM**.
+And when we recognize a place we've visited before: "This new observation conflicts with my old map, so I adjust the affected parts." That's **iSAM**.
 
 ---
 
@@ -435,7 +334,7 @@ And **iSAM2** takes this further by using a **Bayes tree** to efficiently identi
 
 [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`) implements exactly §3's mechanism:
 - New odometry edges are absorbed into a running square-root-information matrix via Givens-rotation row insertion (`qr_insert_row` in `utils.py`) instead of rebuilding the linear system from scratch.
-- It is contrasted directly against a batch baseline that re-solves everything at every new node - reproducing §1/§8's batch-vs-incremental comparison and §6/§9's "loop closure needs a wide update" point empirically (the script always triggers a full relinearization on the loop-closure edge, plus periodically otherwise).
+- It is contrasted directly against a batch baseline that re-solves everything at every new node - reproducing §1/§8's batch-vs-incremental comparison (the script always triggers a full relinearization on the loop-closure edge, plus periodically otherwise, so it does not measure §6/§9's "loop closure needs a wide update" point; panel (c) of the concept figure below illustrates it).
 
 **It does not implement iSAM2's Bayes tree (§7), nor any variable reordering at all** - but only the Bayes tree is genuinely iSAM2-specific:
 - Variable reordering (via COLAMD) to bound fill-in is already part of *original* iSAM (Kaess et al. 2008, periodic batch reordering during full relinearization). What iSAM2 actually adds on top is making that reordering *incremental/fluid* (reordering only as needed, tied to the Bayes tree) instead of a periodic full pass.
@@ -443,7 +342,7 @@ And **iSAM2** takes this further by using a **Bayes tree** to efficiently identi
 
 For the Bayes tree itself, see [`bayes_tree.md`](bayes_tree.md); for the full iSAM2 algorithm this repo doesn't implement, see [`isam2_optimization.md`](isam2_optimization.md).
 
-![Three matrix panels from pose_graph_incremental.py on an 8-pose square: the square-root factor R after 7 poses, the few entries a Givens insertion of the next odometry edge changes, and the near-complete fill-in the loop-closure edge would cause if inserted the same way](../../assets/pose_graph_incremental_concept.png)
+![Three matrix panels from pose_graph_incremental.py on an 8-pose square: the square-root factor R after 7 poses, the few entries a Givens insertion of the next odometry edge changes, and what inserting the loop-closure edge the same way would do: it changes almost every existing nonzero and fills x7's block column](../../assets/pose_graph_incremental_concept.png)
 
 *Figure: `full_relinearize`, `edge_whitened_block` and `utils.qr_insert_row` on an 8-pose square (seed 0), plotted by `uv run python assets/make_figures.py pose_graph_incremental_concept`. The script itself runs a full relinearization at the loop closure; panel (c) shows what inserting that edge's rows would touch.*
 
@@ -490,7 +389,7 @@ $$\rho = \sqrt{R_{cc}^2 + a_c^2}, \qquad \gamma = \frac{R_{cc}}{\rho}, \qquad \s
 \mathbf{a}_{c:} & \beta \end{bmatrix}
 ```
 
-Each rotation is orthogonal, so after the sweep ${R^\top R}$ has gained exactly ${\mathbf{a}\mathbf{a}^\top}$ and ${R^\top d}$ has gained $`\beta \, \mathbf{a}`$. $R$ stays upper triangular, and the leftover $\beta$ is discarded. Two details are easy to miss:
+Each rotation is orthogonal, so after the sweep ${R^\top R}$ has gained exactly ${\mathbf{a}\mathbf{a}^\top}$ (in exact arithmetic; the code skips entries below $10^{-14}$) and ${R^\top d}$ has gained $`\beta \, \mathbf{a}`$. $R$ stays upper triangular, and the leftover $\beta$ is discarded. Two details are easy to miss:
 
 - The rotation also works when $R_{cc} = 0$. Then $\gamma = 0$ and $\sigma = \pm 1$, so the rotation just swaps the new row into row $c$. This is what happens at a new node's still-empty diagonal block.
 - The docstring's "O(m)" is the cost of one rotation, not of one row. A row whose first nonzero is at column $c_0$ can trigger up to ${m - c_0}$ rotations, so the worst case is ${O(m^2)}$ per row. An odometry edge into node $k$ starts at ${c_0 = 6(k-1)}$, so each of its rows needs at most 12 rotations, each at most 12 columns wide, no matter how long the trajectory is. The loop still scans the leading zero columns, which is O(m) per row.
@@ -504,9 +403,19 @@ Each rotation is orthogonal, so after the sweep ${R^\top R}$ has gained exactly 
 
 Between rebuilds, the linearization points ${\bar{X}}$ of old nodes never move. Only $\boldsymbol{\delta}$ changes, so old rows keep the Jacobians they were built with.
 
-**Relinearization triggers**: a full `relinearize_to_convergence` runs once at the start (node 0 only), then whenever ${k \bmod r = 0}$ with $r$ = `--relinearize-every` (default 8), and at the last node when a loop-closure edge exists. It starts from the read-out estimate $X$, not from ${\bar{X}}$. The loop-closure edge is never inserted with Givens rotations. It enters $R$ only through that final full rebuild. The module docstring gives the reason: a loop closure affects many old poses, so it would touch nearly every column of $R$ anyway. Here the edge connects the last node to node 0, so a Givens sweep would start at column 0.
+**Relinearization triggers**: a full `relinearize_to_convergence` runs:
+- once at the start (node 0 only);
+- whenever ${k \bmod r = 0}$ with $r$ = `--relinearize-every` (default 8);
+- at the last node, when a loop-closure edge exists.
 
-**Defaults**: `--nodes-per-side 16` gives 64 nodes, which stream in as ${k = 1, \ldots, 63}$. That makes 9 full relinearizations: the initial one, 7 periodic ones (${k = 8, 16, \ldots, 56}$) and the loop-closure one at ${k = 63}$. The `run_batch_streaming` baseline instead runs `pose_graph.py`'s damped solver from scratch 63 times, starting at `--damping 0.01`. With `--seed 0`, both solvers finish at the same final pose error (0.0334 m). The `use_manif/` twin has the same flow, triggers and defaults. It retracts with `x_lin[k] + manif.SE3Tangent(delta_k)`.
+It starts from the read-out estimate $X$, not from ${\bar{X}}$. The script never inserts the loop-closure edge with Givens rotations: it enters $R$ only through that final full rebuild. The module docstring gives the reason: a loop closure affects many old poses, so it would touch nearly every column of $R$ anyway. Here the edge connects the last node to node 0, so a Givens sweep would start at column 0.
+
+**Defaults**:
+- `--nodes-per-side 16` gives 64 nodes, which stream in as ${k = 1, \ldots, 63}$.
+- That makes 9 full relinearizations: the initial one, 7 periodic ones (${k = 8, 16, \ldots, 56}$) and the loop-closure one at ${k = 63}$.
+- The `run_batch_streaming` baseline instead runs `pose_graph.py`'s damped solver from scratch 63 times, starting at `--damping 0.01`.
+- With `--seed 0`, both solvers finish at the same final pose error (0.0334 m).
+- The `use_manif/` twin has the same flow, triggers and defaults. It retracts with `x_lin[k] + manif.SE3Tangent(delta_k)`.
 
 ---
 

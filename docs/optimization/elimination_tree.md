@@ -6,37 +6,17 @@
 
 ## 1. Start with the simplest example
 
-Suppose our sparse matrix has this structure:
+Suppose our sparse matrix has this structure, with each number a variable:
 
 ```text
 1 ─ 2 ─ 3 ─ 4
 ```
 
-Think of each number as a variable.
+We eliminate in the order $1 \rightarrow 2 \rightarrow 3 \rightarrow 4$:
 
-We eliminate variables in the order:
-
-$$1 \rightarrow 2 \rightarrow 3 \rightarrow 4$$
-
-When we eliminate variable 1, it interacts with 2.
-
-So we get:
-
-```text
-1 → 2
-```
-
-Then eliminate 2:
-
-```text
-2 → 3
-```
-
-Then:
-
-```text
-3 → 4
-```
+- Eliminating 1 leaves its information with its only neighbour, 2: `1 → 2`.
+- Eliminating 2 passes it on to 3: `2 → 3`.
+- Eliminating 3 passes it on to 4: `3 → 4`.
 
 This produces the **elimination tree**:
 
@@ -53,13 +33,13 @@ This produces the **elimination tree**:
 1
 ```
 
-Here, 2 is the **parent** of 1, 3 is the parent of 2, etc.
+Here 2 is the **parent** of 1, 3 is the parent of 2, and so on.
 
 ---
 
 ## 2. Why call it a tree?
 
-Because every variable, except the root, has a parent.
+Each variable has at most one parent: the earliest-eliminated variable among its later neighbours. Following parents only moves forward in the elimination order, so there are no cycles. A connected problem gives a single root; a disconnected graph gives a forest with several roots.
 
 For example:
 
@@ -71,87 +51,30 @@ For example:
    1   2
 ```
 
-might represent dependencies created during elimination.
+might represent the dependencies created during elimination.
 
-The important point is that the tree is **not necessarily the original graph**.
+The important point is that the tree is **not necessarily the original graph**:
 
-The original graph describes:
-
-> "Who directly interacts with whom?"
-
-The elimination tree describes:
-
-> "Who depends on whom during factorization?"
-
-That's a very important distinction.
+- The original graph says who directly interacts with whom.
+- The elimination tree says who depends on whom during factorization (§5 compares them side by side).
 
 ---
 
-## 3. Let's connect it to sparse Cholesky
+## 3. Connecting it to sparse Cholesky
 
-We want:
-
-$$H=LL^\top$$
-
-During factorization, we eliminate variables one by one.
-
-Suppose:
+We want $H=LL^\top$, computed by eliminating variables one by one. Take this graph:
 
 ```text
-Original graph:
-
 1 ─ 2 ─ 3
     │
     4
 ```
 
-If we eliminate 1 first:
+- **Eliminate 1.** It has one neighbour, so 2 takes over its information and no fill-in appears: $\text{parent}(1)=2$.
+- **Eliminate 2.** It still has **two** neighbours, 3 and 4, which were never directly connected. Removing 2 forces them to pick up each other's dependency, so a new edge $3 \leftrightarrow 4$ appears (fill-in), and $\text{parent}(2)=3$.
+- **Eliminate 3.** Its only remaining neighbour is 4, via that fill-in edge: $\text{parent}(3)=4$.
 
-```text
-1 removed
-```
-
-then 2 becomes responsible for the information from 1. Since 1 only had one neighbor, this creates no fill-in.
-
-Conceptually:
-
-```text
-2
-▲
-│
-1
-```
-
-So:
-
-$$\text{parent}(1)=2$$
-
-Now eliminate 2. It still has **two** neighbors left, 3 and 4 - and they were never directly connected. Removing 2 forces them to pick up each other's dependency, so a new edge appears:
-
-$$3 \leftrightarrow 4 \quad \text{(fill-in)}$$
-
-$$\text{parent}(2)=3$$
-
-Eliminating 3 next, its only remaining neighbor is 4 (via that new fill-in edge), so:
-
-$$\text{parent}(3)=4$$
-
-giving the full tree:
-
-```text
-4
-▲
-│
-3
-▲
-│
-2
-▲
-│
-1
-```
-
-Notice this ends up the same *shape* as Section 1's tree, but for a different reason: Section 1's chain came from a graph that was already a chain, while here the 3–4 link only exists because eliminating 2 created it. That's exactly Section 2's point - the tree is not the original graph.
+The result is the same chain as §1's tree, but for a different reason. §1's chain came from a graph that was already a chain; here the 3–4 link exists only because eliminating 2 created it. That is §2's point: the tree is not the original graph.
 
 The tree tells the factorization algorithm where information flows.
 
@@ -159,9 +82,7 @@ The tree tells the factorization algorithm where information flows.
 
 ## 4. The really useful intuition: information flows upward
 
-Imagine each variable carries some information.
-
-During elimination:
+Imagine each variable carries some information. When a child is eliminated, its information is passed to its parent:
 
 ```text
 parent
@@ -169,8 +90,6 @@ parent
   │
 child
 ```
-
-The child is eliminated, and its information is passed to its parent.
 
 For example:
 
@@ -187,23 +106,19 @@ For example:
 Landmark 1
 ```
 
-You can think:
+We can think:
 
 > "Landmark 1 has been eliminated, but its information still affects Pose 1."
 
-Then Pose 1 is eliminated, and its resulting information affects Pose 2.
-
-So information propagates **up the tree**.
+Then Pose 1 is eliminated, and its resulting information affects Pose 2. So information propagates **up the tree**.
 
 ---
 
 ## 5. Elimination tree vs. factor graph
 
-This distinction is extremely useful for SLAM.
+The two structures answer different questions.
 
-### Factor graph
-
-Shows measurement relationships:
+**Factor graph**: which variables are connected by measurements?
 
 ```text
 x1 ─ factor ─ l1
@@ -212,15 +127,7 @@ x2 ─ factor ─ l2
 x2 ─ factor ─ l3
 ```
 
-It answers:
-
-> **Which variables are connected by measurements?**
-
----
-
-### Elimination tree
-
-Shows computational dependency, here for the elimination order $l_1$, $l_2$, $l_3$, $x_1$, $x_2$:
+**Elimination tree**: what must be computed before what? Here it is for the elimination order $l_1$, $l_2$, $l_3$, $x_1$, $x_2$:
 
 ```text
         x2
@@ -230,53 +137,21 @@ Shows computational dependency, here for the elimination order $l_1$, $l_2$, $l_
    l1    l2
 ```
 
-($l_2$ touches both $x_1$ and $x_2$, so eliminating it creates a new fill-in link between them - which is why $x_1$ ends up as $x_2$'s child.)
+$l_2$ touches both $x_1$ and $x_2$, so eliminating it creates a new fill-in link between them. That is why $x_1$ ends up as $x_2$'s child.
 
-It answers:
-
-> **What must be computed before what?**
-
-So:
-
-```text
-Factor graph
-     ↓
-Variable interactions
-     ↓
-Choose elimination ordering
-     ↓
-Elimination tree
-     ↓
-Sparse Cholesky computation
-```
+§11 shows where both sit in the full pipeline.
 
 ---
 
 ## 6. Why is this useful?
 
-There are three major reasons.
+There are two major reasons.
 
 ### A. Understand fill-in
 
-Recall the fill-in example from [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md):
+Recall the fill-in example from [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md): eliminating 2 from `1 ─ 2 ─ 3` creates the link `1 ─── 3`.
 
-```text
-1 ─ 2 ─ 3
-```
-
-Eliminate 2:
-
-```text
-1 ─── 3
-```
-
-We created fill-in.
-
-The elimination tree helps represent the resulting dependency structure.
-
-So the tree is closely related to how the sparse factor $L$ is structured.
-
----
+The elimination tree records the resulting dependency structure, and §10 makes this precise: the parent of $j$ is the first sub-diagonal nonzero in column $j$ of the sparse factor $L$.
 
 ### B. Efficient computation
 
@@ -292,11 +167,10 @@ Suppose the tree looks like:
   2   3
 ```
 
-Variables 2 and 3 can be processed before 4.
+- Variables 2 and 3 can be processed before 4.
+- Similarly, 4 and 5 can potentially be processed independently before 6.
 
-Similarly, 4 and 5 can potentially be processed independently before 6.
-
-You can see computational dependencies immediately:
+The computational dependencies are visible immediately:
 
 ```text
 2 ─┐
@@ -314,35 +188,12 @@ The two subtrees under 8, {6, 4, 5, 2, 3} and {7, 1}, share nothing until 8, so 
 
 ## 7. This becomes very important for iSAM2
 
-iSAM2 uses a [**Bayes tree**](bayes_tree.md), which is built directly from the elimination tree.
-
-Very roughly:
-
-```text
-Factor Graph
-     │
-     ▼
-Variable elimination
-     │
-     ▼
-Bayes Tree
-```
+iSAM2 uses a [**Bayes tree**](bayes_tree.md), which is built directly from the elimination tree (the pipeline is drawn once, in §11).
 
 Concretely, a Bayes tree is the elimination tree with some of its nodes merged into **cliques**, where each clique stores the conditional density produced when its variables were eliminated ([bayes_tree.md §13](bayes_tree.md#13-one-more-important-concept-cliques)).
 
-You can think of:
-
-### Elimination tree
-
-```text
-"What depends on what?"
-```
-
-### Bayes tree
-
-```text
-"What probabilistic information is summarized by each clique?"
-```
+- **Elimination tree:** "What depends on what?"
+- **Bayes tree:** "What probabilistic information is summarized by each clique?"
 
 This is why the Bayes tree is so useful for **incremental SLAM**.
 
@@ -382,9 +233,7 @@ The elimination tree is:
         x1  l1  l2
 ```
 
-The exact tree depends heavily on the elimination ordering.
-
-That's important:
+The exact tree depends heavily on the elimination ordering:
 
 > **There isn't one universally fixed elimination tree for a problem. Change the ordering, and you can change the tree.**
 
@@ -405,18 +254,14 @@ Pose 3
 Landmarks
 ```
 
-In bundle adjustment, where each pose observes many landmarks, this creates lots of fill-in. Eliminating a pose connects every landmark it sees to every other one (Section 3's fill-in rule), so the landmark block fills in densely.
-
-You might end up with:
+In bundle adjustment, where each pose observes many landmarks, this creates lots of fill-in. Eliminating a pose connects every landmark it sees to every other one (§3's fill-in rule), so the landmark block fills in densely. We might end up with a nearly dense lower-triangular $L$, which means a lot of computation:
 
 ```text
-████████████████
- ███████████████
-  ██████████████
-   █████████████
+█
+██
+███
+████
 ```
-
-Lots of computation.
 
 ---
 
@@ -436,11 +281,9 @@ The resulting $L$ has far fewer nonzeros (it's always $n \times n$), and the eli
 
 ---
 
-## 10. One subtle point
+## 10. The tree comes from the factor, not the graph
 
-Don't think of the elimination tree as a picture of the original matrix's graph. It isn't one: Section 3's tree contains a 3–4 link that the original graph doesn't have.
-
-> **The elimination tree represents the dependency structure of the Cholesky factorization.**
+The elimination tree is **the dependency structure of the Cholesky factorization**, not a picture of the original matrix's graph (§3's tree contains a 3–4 link the original graph lacks).
 
 Precisely (Liu 1990), it's read off the sparsity of the **factor** $L$, with the variables numbered in elimination order:
 
@@ -448,13 +291,13 @@ Precisely (Liu 1990), it's read off the sparsity of the **factor** $L$, with the
 \text{parent}(j) = \min\{\, i > j : L_{ij} \neq 0 \,\}
 ```
 
-That is, the parent of $j$ is the row of the first nonzero below the diagonal in column $j$ of $L$. $L$'s pattern depends on both the matrix's pattern and the elimination order, so the same matrix under two different orderings gives two different trees - Section 9's point.
+That is, the parent of $j$ is the row of the first nonzero below the diagonal in column $j$ of $L$. $L$'s pattern depends on both the matrix's pattern and the elimination order, so the same matrix under two different orderings gives two different trees (§9's point).
 
 ---
 
 ## 11. The big picture
 
-The concepts covered above connect into a bigger picture:
+The concepts above connect into one pipeline:
 
 ```text
                 SLAM
@@ -469,7 +312,7 @@ The concepts covered above connect into a bigger picture:
               Jacobian J
                   │
                   ▼
-             H = Jᵀ W J
+             H = Jᵀ Ω J
                   │
                   ▼
           Sparse Hessian
@@ -493,33 +336,17 @@ The concepts covered above connect into a bigger picture:
               Solve Δx
 ```
 
-And then:
-
-```text
-Elimination structure
-        ↓
-    Bayes Tree
-        ↓
-      iSAM2
-```
+The elimination structure then feeds the Bayes tree (§7) and iSAM2.
 
 ### The simplest mental model
 
-If you remember only three things:
+If we remember only three things:
 
-**Factor graph:**
+- **Factor graph:** "Who talks to whom?"
+- **Sparse Cholesky:** "How can we solve the resulting system without wasting work on zeros?"
+- **Elimination tree:** "What computations depend on what other computations?"
 
-> "Who talks to whom?"
-
-**Sparse Cholesky:**
-
-> "How can I solve the resulting system without wasting work on zeros?"
-
-**Elimination tree:**
-
-> "What computations depend on what other computations?"
-
-That mental model will make **Bayes trees and iSAM2** much easier to understand.
+This will make **Bayes trees and iSAM2** much easier to understand.
 
 This is one corner of the repo-wide map in [slam_mental_map.md](../slam_mental_map.md), which places every doc and script on one picture.
 

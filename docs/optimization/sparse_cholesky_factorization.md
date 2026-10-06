@@ -1,4 +1,4 @@
-# Sparse Cholesky Factorization - intuitive explanation
+# Sparse Cholesky Factorization
 
 Sparse Cholesky factorization is essentially **Cholesky factorization designed to avoid doing unnecessary work on zeros**.
 
@@ -34,16 +34,14 @@ The key problem is that **large optimization problems often contain mostly zeros
 
 ## 1. Why does sparsity matter?
 
-Consider a SLAM problem.
+Consider a SLAM problem with 1,000 robot poses and 5,000 landmarks.
 
-Suppose we have 1,000 robot poses and 5,000 landmarks.
+Each measurement connects only a few variables:
 
-Each measurement usually connects only:
+- a landmark observation connects one pose and one landmark
+- an odometry or loop-closure factor connects two poses
 
-- one pose
-- one landmark
-
-So the graph of which variables share a measurement looks like:
+So the graph of which variables share a measurement looks like this (landmark observations only, for clarity):
 
 ```text
 Pose 1 ─ Landmark 1
@@ -57,13 +55,7 @@ Pose 3 ─ Landmark 3
 ...
 ```
 
-Most variables don't directly interact.
-
-Therefore the Hessian
-
-$$H = J^\top \Omega J$$
-
-is **sparse**.
+Most variables don't directly interact, so the Hessian $H = J^\top \Omega J$ is **sparse**.
 
 Instead of storing something like:
 
@@ -75,7 +67,7 @@ Instead of storing something like:
 ████████████████████
 ```
 
-we have something more like:
+we have something more like this (an illustrative sketch; the real pattern depends on the variable order):
 
 ```text
 ██
@@ -86,39 +78,33 @@ we have something more like:
     ██
 ```
 
-A dense Cholesky algorithm would waste enormous amounts of computation on the zeros.
-
-Sparse Cholesky tries to preserve and exploit this structure.
+A dense Cholesky algorithm would waste enormous amounts of computation on the zeros. Sparse Cholesky tries to preserve and exploit this structure.
 
 ---
 
 ## 2. The basic idea
 
-Suppose we're at the linear-solve step of Gauss-Newton or LM - [gauss_newton.md](gauss_newton.md)'s $H\approx J^\top J$ (or, weighted, $J^\top\Omega J$) and $b := J^\top r$ (weighted: $J^\top\Omega r$, with $\Omega$ the information matrix from [factor_graph.md §4](factor_graph.md#4-optimization-means-minimizing-all-those-errors), same quantity as $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty)):
+Suppose we're at the linear-solve step of Gauss-Newton or LM:
 
 $$H\Delta x = -b$$
 
-and $H$ is symmetric positive definite.
+- $H\approx J^\top J$ and $b := J^\top r$, as in [gauss_newton.md](gauss_newton.md).
+- Weighted, these become $H = J^\top\Omega J$ and $b = J^\top\Omega r$.
+- $\Omega$ is the information matrix from [factor_graph.md §4](factor_graph.md#4-optimization-means-minimizing-all-those-errors), the same quantity as $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty).
 
-That last condition isn't automatic. If every factor is relative (odometry, loop closures, reprojections with no prior), moving the whole solution rigidly leaves the cost unchanged. $H$ is then only positive *semi*-definite, and Cholesky breaks down on a zero pivot. Anchoring one pose fixes this ([pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive)), and so does LM's damping $H + \lambda I$ ([levenberg_marquardt.md](levenberg_marquardt.md)).
+We need $H$ to be symmetric positive definite, and that isn't automatic. If every factor is relative (odometry, loop closures, reprojections with no prior), some motion of the whole solution leaves the cost unchanged (a **gauge freedom**). $H$ is then only positive *semi*-definite, and Cholesky breaks down on a zero pivot.
 
-We factor:
+- **Pose graphs:** the gauge is a rigid motion of the whole trajectory. Anchoring one pose fixes it ([pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive)).
+- **Monocular BA:** the gauge also includes uniform rescaling of the scene (7 DoF), which one anchored pose can't pin. The repo's BA scripts fix two cameras instead ([bundle_adjustment.md §14](bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment)).
+- **Either case:** LM's damping $H + \lambda I$ also keeps the system solvable ([levenberg_marquardt.md](levenberg_marquardt.md)).
 
-$$H = LL^\top$$
-
-Then solving becomes two triangular solves:
-
-$$Ly=-b$$
-
-followed by
-
-$$L^\top\Delta x=y$$
+We then factor $H = LL^\top$, so solving becomes two triangular solves: $Ly=-b$, followed by $L^\top\Delta x=y$.
 
 The important difference is:
 
-> **Sparse Cholesky only stores and computes the nonzero entries of $L$.**
+> **Sparse Cholesky only stores and computes the entries of $L$ that can be nonzero (the symbolic pattern).**
 
-However, there is an important complication.
+The catch is fill-in.
 
 ---
 
@@ -136,11 +122,7 @@ H=\begin{bmatrix} * & * & * \\
 
 There is no connection between variable 2 and variable 3.
 
-But eliminating variable 1 first - the standard order - creates a new nonzero:
-
-$$L_{32}\neq0$$
-
-so the factor becomes:
+But eliminating variable 1 first - the natural order - creates a new nonzero, $L_{32}\neq0$, so the factor becomes:
 
 ```math
 L = \begin{bmatrix} * & 0 & 0 \\
@@ -160,80 +142,37 @@ So:
 
 ## 4. Why does fill-in happen?
 
-A very intuitive way to see it is through **variable elimination**.
-
-Suppose we have this graph:
+The intuitive way to see it is through **variable elimination**. Take this graph:
 
 ```text
 1 ─ 2 ─ 3
 ```
 
-Initially:
+Initially 1 is connected to 2, 2 is connected to 3, and 1 is **not** connected to 3.
 
-```text
-1 connected to 2
-2 connected to 3
-1 NOT connected to 3
-```
-
-Now eliminate variable 2.
-
-Because 2 connects both 1 and 3, after removing 2 we need to connect its neighbors:
+Now eliminate variable 2. Because 2 connects both 1 and 3, after removing 2 we need to connect its neighbors:
 
 ```text
 1 ───── 3
 ```
 
-So elimination creates a new edge:
-
-$$1 \leftrightarrow 3$$
-
-That edge corresponds to a new nonzero in the Cholesky factor.
-
-That's **fill-in**.
+So elimination creates a new edge $1 \leftrightarrow 3$, which corresponds to a new nonzero in the Cholesky factor. That is **fill-in**.
 
 ---
 
 ## 5. Ordering becomes extremely important
 
-Suppose we have:
+Take §4's chain `1 ─ 2 ─ 3` again:
 
-```text
-1 ─ 2 ─ 3
-```
-
-If we eliminate:
-
-```text
-2 first
-```
-
-we create:
-
-```text
-1 ─ 3
-```
-
-and get fill-in.
-
-But if we eliminate:
-
-```text
-1 first
-```
-
-there is no fill-in:
-
-```text
-2 ─ 3
-```
+- Eliminate **2 first**: we create the edge `1 ─ 3`, so there is fill-in.
+- Eliminate **1 first**: only `2 ─ 3` remains, so there is no fill-in.
 
 So the **order in which variables are eliminated** dramatically affects the amount of computation and memory required.
 
 Both examples follow the same rule: eliminating a variable connects all of its remaining neighbors, so eliminate variables with few neighbors first and hubs last. Finding the truly optimal order is NP-hard, so solvers use heuristics built on that rule:
 
 - **AMD** (Approximate Minimum Degree): repeatedly eliminate the variable with the fewest remaining neighbors.
-- **COLAMD**: the same idea, computed from the columns of $J$ without forming $H$. This is what batch solvers and the original iSAM use.
+- **COLAMD**: the same idea, computed from the columns of $J$ without forming $H$. It is a common choice for batch solvers.
 - **CCOLAMD**: constrained COLAMD, which can force chosen variables (for example the newest poses) to the end. iSAM2 uses it ([isam2_optimization.md §12](isam2_optimization.md#12-variable-ordering-is-also-crucial)).
 - **Nested dissection**: split the graph with a small separator, order each half recursively, and put the separator last.
 
@@ -243,9 +182,7 @@ Both examples follow the same rule: eliminating a variable connects all of its r
 
 ## 6. Connection to SLAM
 
-This is especially important for SLAM/optimization work.
-
-Suppose your state is:
+Suppose our state is:
 
 ```math
 x =\begin{bmatrix} x_1\\
@@ -262,13 +199,13 @@ with robot poses $x_1, \dots, x_N$ followed by landmarks $l_1, l_2, \dots$. Line
 
 Because each measurement only involves a small number of variables, $J$ and $H$ are sparse.
 
-The pattern also stays fixed. Every Gauss-Newton or LM iteration relinearizes at a new estimate, which changes the *values* in $H$, but the same factors connect the same variables, so the *nonzero pattern* doesn't change. Solvers exploit this by splitting the factorization in two: a **symbolic** step (choose the ordering, predict where $L$'s nonzeros go, allocate memory) done once, and a **numeric** step (compute the values) repeated every iteration. CHOLMOD's `analyze`/`factorize` calls are this split. That's why an expensive ordering heuristic is affordable: its cost is paid once, not per iteration.
+The pattern also stays fixed for a fixed graph. Every Gauss-Newton or LM iteration relinearizes at a new estimate, which changes the *values* in $H$, but the same factors connect the same variables, so the *nonzero pattern* doesn't change. Solvers exploit this by splitting the factorization in two: a **symbolic** step (choose the ordering, predict where $L$'s nonzeros go, allocate memory) done once for a fixed graph, and a **numeric** step (compute the values) repeated every iteration. CHOLMOD's `analyze`/`factorize` calls are this split. That's why an expensive ordering heuristic is affordable: its cost is paid once, not per iteration. (Incremental solvers add factors, so their pattern changes and they redo part of this step.)
 
 ---
 
 ## 7. Factor graph → Hessian → sparse Cholesky
 
-You can think about the entire process as:
+The entire process looks like:
 
 ```text
 Factor Graph
@@ -308,21 +245,12 @@ This is one of the core computational pipelines behind graph-based SLAM.
 
 ---
 
-## 9. One subtle but important distinction
+## 9. Two kinds of sparsity
 
-There are actually two different kinds of sparsity you may encounter:
+There are two different kinds of sparsity:
 
-### Sparse Jacobian
-
-$$J$$
-
-is sparse because each measurement depends on only a few variables.
-
-### Sparse Hessian
-
-$$H=J^\top \Omega J$$
-
-is also sparse, but its sparsity pattern represents **variable interactions**.
+- **Sparse Jacobian:** $J$ is sparse because each measurement depends on only a few variables.
+- **Sparse Hessian:** $H=J^\top \Omega J$ is also sparse, but its pattern represents **variable interactions**.
 
 For example:
 
@@ -348,7 +276,7 @@ L1     X     X
 L2     X  X     X
 ```
 
-The rule is exact: $H_{ij} \neq 0$ exactly when variables $i$ and $j$ appear together in at least one factor. So $H$'s graph is the **factor graph** with each factor replaced by edges between all of its variables.
+The rule is exact: $H_{ij}$ is structurally nonzero exactly when variables $i$ and $j$ appear together in at least one factor. So $H$'s graph is the **factor graph** with each factor replaced by edges between all of its variables.
 
 ---
 
@@ -356,13 +284,13 @@ The rule is exact: $H_{ij} \neq 0$ exactly when variables $i$ and $j$ appear tog
 
 In one sentence:
 
-> **Sparse Cholesky is a way of solving a large linear system exactly, doing arithmetic only on the entries that can be nonzero, while carefully choosing the elimination order to minimize new interactions (fill-in).**
+> **Sparse Cholesky is a way of solving a large linear system exactly, doing arithmetic only on the entries that can be nonzero, while choosing the elimination order to keep fill-in small.**
 
 It is still exact: nothing small is dropped. Dropping small entries on purpose is a different method, *incomplete* Cholesky, used as a preconditioner for iterative solvers.
 
 And in SLAM:
 
-> **The factor graph tells you which variables interact; elimination turns those interactions into a sparse factor $L$.**
+> **The factor graph tells us which variables interact; elimination turns those interactions into a sparse factor $L$.**
 
 This is why **variable ordering, fill-in, elimination trees, and sparse matrix structures** become so important in systems such as iSAM, GTSAM, g2o, and Ceres.
 
