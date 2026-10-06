@@ -1,10 +1,15 @@
 # Umeyama Alignment
 
-**Umeyama alignment** answers a narrow but very practical question that shows up every time you evaluate a reconstruction:
+**Umeyama alignment** answers a narrow but very practical question that shows up every time we evaluate a reconstruction:
 
 > Given two point sets that are supposed to describe the same shape but live in different, unaligned coordinate frames, what's the best rigid-plus-scale transform that overlays one onto the other?
 
-It's not a SLAM algorithm by itself. This doc focuses on its most common use, as the evaluation tool you reach for *after* running one, whenever the algorithm's own output is only defined up to an ambiguity that has to be removed before comparing against ground truth. The same closed-form fit also runs *inside* SLAM pipelines: it's the per-iteration alignment step of point-to-point ICP (with the scale fixed to 1), and monocular systems use the similarity version to align two maps at a loop closure.
+It isn't a SLAM algorithm by itself. We focus on its most common use: the evaluation tool we reach for *after* running one, whenever the output is only defined up to an ambiguity that must be removed before comparing against ground truth.
+
+The same closed-form fit also runs *inside* SLAM pipelines:
+
+- point-to-point ICP uses it as the per-iteration alignment step (scale fixed to 1)
+- monocular systems use the similarity version to align two maps at a loop closure
 
 ---
 
@@ -13,15 +18,15 @@ It's not a SLAM algorithm by itself. This doc focuses on its most common use, as
 A monocular camera looking at a static scene can recover the *shape* of the scene and the *relative* motion of the cameras, but it cannot recover:
 
 - **absolute position/orientation**: the whole reconstruction could be picked up and rigidly moved anywhere, and every reprojection error would stay identical
-- **absolute scale**: shrinking the entire scene and every camera-to-point distance by the same factor, while changing nothing else, leaves every projected pixel exactly where it was
+- **absolute scale**: shrinking the entire scene and every camera-to-point distance by the same factor, while changing nothing else, leaves every projected pixel where it was
 
 Together, that's a **7-parameter similarity ambiguity**: 3 translation + 3 rotation + 1 scale. This is the same **gauge freedom** idea as in [pose_graph_optimization.md](../optimization/pose_graph_optimization.md)'s "one subtlety this formula hides" note - a direction the optimizer's cost function is completely blind to - except pose graphs only have the 6-DoF rigid version (their edges are *relative rigid* constraints, so scale is never in question), while monocular bundle adjustment's edges are *projective*, so scale is unobservable too.
 
-You can't compute a meaningful "position error in meters" against ground truth while this ambiguity is still there - the reconstruction and the ground truth are simply expressed in two different (and differently scaled) coordinate systems. Umeyama alignment is how you solve for the one similarity transform that brings them into the same frame before measuring error.
+We can't compute a meaningful "position error in meters" against ground truth while this ambiguity remains: the two are expressed in different (and differently scaled) coordinate systems. Umeyama alignment solves for the one similarity transform that brings them into the same frame before we measure error.
 
 ### 1.1 Align only what's actually unobservable
 
-The 7-DoF similarity transform is right for monocular output, but not for every system. The rule: align away exactly the degrees of freedom the sensors can't observe, and no more. Aligning extra degrees of freedom hides real estimation error in the fitted transform.
+The 7-DoF similarity transform is right for monocular output, but not for every system. The rule: align away the degrees of freedom the sensors can't observe, and no more. Aligning extra degrees of freedom hides real estimation error in the fitted transform.
 
 | Sensor setup | Unobservable | Alignment |
 | --- | --- | --- |
@@ -35,7 +40,7 @@ Zhang & Scaramuzza (2018) give the full treatment, including the 4-DoF variant.
 
 ## 2. What it actually computes
 
-Given $n$ corresponding point pairs $`\{(x_i, y_i)\}`$ - here, $x_i$ from the estimated reconstruction and $y_i$ the ground truth - Umeyama's method (1991) finds the scale $s \in \mathbb{R}$, rotation $R \in SO(3)$, and translation $t \in \mathbb{R}^3$ that solve:
+Given $n$ corresponding point pairs $`\{(x_i, y_i)\}`$ - here, $x_i$ from the estimated reconstruction and $y_i$ the ground truth - Umeyama's method (1991) finds the scale $s > 0$, rotation $R \in SO(3)$, and translation $t \in \mathbb{R}^3$ that solve:
 
 ```math
 \boxed{\min_{s,R,t} \sum_{i=1}^{n} \left\| s R x_i + t - y_i \right\|^2}
@@ -51,9 +56,10 @@ This repo's implementation, [`umeyama_alignment`](../../utils.py) in `utils.py`,
 
 **Step 1. Center both point sets** on their own centroids, and stack the centered points as the rows of two $n\times3$ matrices $X$ and $Y$:
 
-$$\mu_{\text{est}} = \frac{1}{n}\sum x_i \qquad \mu_{\text{true}} = \frac{1}{n}\sum y_i \qquad X_i = x_i - \mu_{\text{est}} \qquad Y_i = y_i - \mu_{\text{true}}$$
+- centroids: $`\mu_{\text{est}} = \frac{1}{n}\sum x_i`$ and $`\mu_{\text{true}} = \frac{1}{n}\sum y_i`$
+- centered rows: $`X_i = x_i - \mu_{\text{est}}`$ and $`Y_i = y_i - \mu_{\text{true}}`$
 
-Centering removes translation from the problem; it's handled separately in step 4.
+Centering removes translation from the problem; step 4 recovers it.
 
 **Step 2. Cross-covariance and its SVD:**
 
@@ -61,16 +67,16 @@ $$\Sigma = \frac{1}{n} Y^\top X = U D V^\top$$
 
 **Step 3. Rotation, with a reflection guard:**
 
-$${R = U S V^\top}$$
+$$R = U S V^\top$$
 
 ```math
 S = \begin{cases} 
-I & \text{if } \det(U)\det(V^\top) \ge 0 \\ 
+I & \text{if } \det(U)\det(V^\top) > 0 \\ 
 \text{diag}(1,1,-1) & \text{if } \det(U)\det(V^\top) < 0 
 \end{cases}
 ```
 
-Plain $UV^\top$ is the best-fit *orthogonal* matrix, but "orthogonal" includes reflections ($\det = -1$) as well as rotations ($\det = +1$). Since $R$ must be an actual rotation, $S$ flips the sign of the axis paired with $\Sigma$'s smallest singular value (the last one, since `np.linalg.svd` sorts them in descending order) whenever the unconstrained best fit would have been a reflection - see the worked example in §4 for why this matters and what it costs.
+Plain $UV^\top$ is the best-fit *orthogonal* matrix, but that includes reflections ($\det = -1$) as well as rotations ($\det = +1$). Here $\det(U)\det(V^\top)$ is $\pm1$, and the code flips when it is negative. $S$ then flips the axis paired with $\Sigma$'s smallest singular value (the last, since `np.linalg.svd` sorts in descending order) whenever the plain fit would be a reflection. §4 shows why this matters and what it costs.
 
 **Step 4. Scale and translation:**
 
@@ -78,18 +84,18 @@ Plain $UV^\top$ is the best-fit *orthogonal* matrix, but "orthogonal" includes r
 s = \frac{\text{tr}(DS)}{\text{var}(X)}, \qquad \text{var}(X) = \frac{1}{n}\sum \|X_i\|^2, \qquad t = \mu_{\text{true}} - s R \mu_{\text{est}}
 ```
 
-That's exactly the four steps `umeyama_alignment` runs, in order.
+These are the four steps `umeyama_alignment` runs, in order.
 
 ---
 
 ## 4. Why the reflection guard matters
 
-Without step 3's correction, the fit can silently return a **mirror image** instead of a rotation whenever the point geometry allows it. Concretely, take the unit tetrahedron with corners $(0,0,0)$, $(1,0,0)$, $(0,1,0)$, $(0,0,1)$ (the same points as §5) and its true mirror image across the $z=0$ plane, made by negating each point's $z$ coordinate (a genuine reflection, $\det = -1$ relative to the original - not something *any* rotation can reproduce exactly):
+Without step 3's correction, the fit can return a **mirror image** instead of a rotation. Take the unit tetrahedron with corners $(0,0,0)$, $(1,0,0)$, $(0,1,0)$, $(0,0,1)$ (the same points as §5) and its mirror image across the $z=0$ plane, made by negating each $z$ ($\det = -1$ relative to the original, so no rotation reproduces it exactly):
 
-- **Uncorrected** ($R = UV^\top$): fits **perfectly** (residual $\approx 0$), but $\det(R) \approx -1$ - not a valid rotation, and physically meaningless as a camera/robot pose.
-- **Corrected** ($R = USV^\top$): $\det(R) = +1$, a valid rotation, but can now only *approximate* the mirrored points - in this example the best achievable fit has a max per-point residual of about $0.77$ (at the origin point; the other three are off by about $0.31$), and scale drops from the uncorrected $1.0$ to $s = 7/9 \approx 0.78$ to partially compensate.
+- **Uncorrected** ($R = UV^\top$): fits **perfectly** (residual $\approx 0$), but $\det(R) \approx -1$, which is not a valid rotation and not a valid camera/robot pose.
+- **Corrected** ($R = USV^\top$): $\det(R) = +1$, but it can only *approximate* the mirrored points. Here the best fit has a max per-point residual of about $0.77$ (at the origin point; the other three are off by about $0.31$), and scale drops from $1.0$ to $s = 7/9 \approx 0.78$ to partially compensate.
 
-So the guard is a deliberate trade: it always returns a physically valid rotation, at the cost of no longer being able to claim a perfect fit on point sets that are actually mirror-related. For the well-conditioned, non-degenerate point sets this repo's scripts generate (cameras spread around a 3D landmark cluster), the reflection case is not expected to trigger (this hasn't been measured separately) - it matters most for near-coplanar, very noisy, or otherwise degenerate configurations.
+So the guard trades a perfect fit on mirror-related point sets for a valid rotation. For the point sets this repo's scripts generate (cameras spread around a 3D landmark cluster), we don't expect the reflection case to trigger (not measured separately). It is more likely for noisy or nearly degenerate configurations; for exactly coplanar points the flip costs nothing.
 
 ---
 
@@ -114,23 +120,24 @@ X = \begin{bmatrix} 0 & 0 & 0\\
 \qquad Y = s\,(R_{\text{true}} X^\top)^\top + t
 ```
 
-Running `umeyama_alignment(X, Y)` recovers $\hat{s} = 2.0$, $\hat{R} = R_{\text{true}}$, and $\hat{t} = (1, 2, 3)$ back out - to floating-point precision ($< 10^{-15}$ max error), since 4 well-spread non-coplanar points exactly determine a similarity transform with no noise to average out. With real (noisy) data from more than 4 points, the same four steps instead return the *least-squares best* $s, R, t$, exactly like fitting a line through noisy points.
+Running `umeyama_alignment(X, Y)` recovers $\hat{s} = 2.0$, $\hat{R} = R_{\text{true}}$, and $\hat{t} = (1, 2, 3)$ back out - to floating-point precision ($< 10^{-15}$ max error), since 4 noise-free points are consistent with one similarity transform and there is no noise to average out. With real (noisy) data, the same four steps return the *least-squares best* $s, R, t$, like fitting a line through noisy points.
 
 ---
 
 ## 6. Where this is (and isn't) used in this repo
 
-- **[`bundle_adjustment.py`](../../use_numpy/bundle_adjustment.py)** (both `use_numpy/` and `use_manif/`) calls `umeyama_alignment` on the *camera positions* after solving, then applies the recovered $(s, R, t)$ to **both** the camera poses and the landmark positions before computing `pose_errors`/`landmark_errors` against ground truth. This is standard practice for evaluating monocular BA/SfM (Structure from Motion) output - see [bundle_adjustment.md](../optimization/bundle_adjustment.md) for how the alignment step fits into the rest of that script. Note that reprojection error itself is computed *before* alignment and is unaffected by it - only the absolute pose/landmark error numbers depend on this step.
-- **[`bundle_adjustment_advanced.py`](../../use_numpy/bundle_adjustment_advanced.py)** deliberately does **not** call it. That script hard-fixes **two** keyframes (poses 0 and 1) as a gauge anchor instead of using a soft gauge-prior factor:
-  - Fixing a single keyframe removes only the 6 rigid DoF (translation + rotation). Scale stays completely unobservable from that alone, since the same reconstruction rescaled about the one fixed pose satisfies every constraint equally well.
-  - A *second* fixed keyframe pins scale too, because it also fixes the *distance* between the two anchors, so the optimizer has no gauge freedom left.
-  - That doesn't mean there's nothing to align: keyframe 0 is fixed at its true pose, but keyframe 1 keeps its noisy front-end pose, so the scale and orientation it pins are slightly wrong. The script reports raw, unaligned error, which therefore includes that small similarity-transform offset; Umeyama alignment would remove it ([bundle_adjustment.md §14](../optimization/bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment)).
+- **[`bundle_adjustment.py`](../../use_numpy/bundle_adjustment.py)** (both `use_numpy/` and `use_manif/`) calls `umeyama_alignment` on the *camera positions* after solving, then applies the recovered $(s, R, t)$ to **both** the camera poses and the landmark positions before computing `pose_errors`/`landmark_errors` against ground truth. This is standard practice for evaluating monocular BA/SfM (Structure from Motion) output; see [bundle_adjustment.md](../optimization/bundle_adjustment.md) for how it fits into that script.
+  - Reprojection error is unaffected by the alignment (a similarity transform leaves every projected pixel unchanged), so only the absolute pose/landmark errors depend on this step.
+- **[`bundle_adjustment_advanced.py`](../../use_numpy/bundle_adjustment_advanced.py)** does **not** call it. It hard-fixes **two** keyframes (poses 0 and 1) as a gauge anchor instead of using a soft gauge-prior factor:
+  - One fixed keyframe removes only the 6 rigid DoF. Scale stays unobservable, since the reconstruction rescaled about that pose satisfies every constraint equally well.
+  - A *second* fixed keyframe also fixes the *distance* between the anchors, so no gauge freedom is left.
+  - That doesn't mean there's nothing to align. Keyframe 0 is fixed at its true pose, but keyframe 1 keeps its noisy front-end pose, so the scale and orientation it pins are wrong (up to ~19% in scale over seeds 0-4, see [bundle_adjustment.md §13.6](../optimization/bundle_adjustment.md#136-in-this-repo)). The reported raw error therefore includes a large similarity offset that Umeyama alignment would remove ([§14](../optimization/bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment)).
 
 ---
 
 ## 7. One-sentence intuition
 
-> **Umeyama alignment is a closed-form least-squares fit between two point clouds: it finds the one scale+rotation+translation that best overlays an estimate onto ground truth, which is exactly the piece missing before "position error in meters" against monocular reconstruction output means anything.**
+> **Umeyama alignment is a closed-form least-squares fit that finds the one scale + rotation + translation that best overlays an estimate onto ground truth, so that "position error in meters" means something for monocular output.**
 
 ---
 

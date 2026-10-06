@@ -252,9 +252,10 @@ def run_iekf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_
 
     Note: with isotropic point-noise covariance (R_diag = sigma^2 * I), the
     world-frame (EKF) and body-frame (here) residual/Jacobian pairs differ only by
-    a per-point orthogonal rotation (R_pred), which cancels exactly out of the
-    Kalman gain and posterior covariance -- so this produces the *exact same*
-    corrections as run_ekf every step, not just similar ones. The real benefit here
+    a per-point orthogonal rotation (R_pred). It cancels exactly out of the
+    correction K r and the posterior covariance P (K itself differs by that
+    rotation: K_world = K_body @ blkdiag(R_pred)^T) -- so this produces the *exact
+    same* corrections as run_ekf every step, not just similar ones. The real benefit here
     is computational (H is fixed, no per-step Jacobian rebuild) and structural
     (state-independent linearization), not different accuracy on this benchmark.
     Arguments:

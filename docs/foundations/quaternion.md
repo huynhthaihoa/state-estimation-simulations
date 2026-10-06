@@ -6,15 +6,7 @@ For **SLAM, state estimation, and robotics**, the most useful way to understand 
 
 ## 1. First: what problem is a quaternion solving?
 
-Imagine a robot:
-
-- It can point **left/right** → yaw
-- It can tilt **up/down** → pitch
-- It can roll sideways → roll
-
-So we need to describe its orientation in 3D.
-
-The obvious approach is Euler angles:
+Take a robot. It can point **left/right** (yaw), tilt **up/down** (pitch), and roll sideways (roll). We need to describe that orientation in 3D. The obvious approach is Euler angles:
 
 > "Rotate 30° around X, then 20° around Y, then 10° around Z."
 
@@ -23,38 +15,17 @@ But three angles cause two separate problems:
 - **Gimbal lock.** At certain orientations (for the common yaw-pitch-roll order, pitch $= \pm 90°$) two of the three rotation axes line up, and one degree of freedom disappears: different angle combinations give the same orientation, and small orientation changes can need large angle jumps. It's a singularity of the three-angle description, not of rotation itself.
 - **Order conventions.** Rotating around X and then Y is not the same as around Y and then X, so every set of Euler angles only means something together with its convention (XYZ, ZYX, ...). Interpolating the three angles separately also gives awkward paths.
 
-Quaternions avoid gimbal lock, because a unit quaternion has no singular orientation. They don't make rotation order-independent (nothing can: composing rotations is inherently order-dependent, Section 13), but they make composition a single, convention-free multiplication.
-
-A quaternion gives us another representation.
+Quaternions avoid gimbal lock, because a unit quaternion has no singular orientation. They don't make rotation order-independent (nothing can: composing rotations is inherently order-dependent, Section 13), but they make composition a single multiplication (once a convention is fixed).
 
 ---
 
 ## 2. The intuitive idea: a quaternion is an "axis + angle" in disguise
 
-Suppose I tell you:
+Suppose we say:
 
 > "Rotate the robot by **90° around the Z-axis**."
 
-That's actually enough information to define an orientation change.
-
-We have:
-
-- **Axis:** $(0, 0, 1)$
-- **Angle:** $90°$
-
-A quaternion essentially packages these two things into four numbers:
-
-$$
-q = (w,x,y,z)
-$$
-
-For a rotation by angle $\theta$ around a unit axis
-
-$$
-\mathbf{u}=(u_x,u_y,u_z)
-$$
-
-the quaternion is
+That is enough to define an orientation change. We have an **axis** $(0, 0, 1)$ and an **angle** $90°$. A quaternion $q = (w,x,y,z)$ packs these two things into four numbers. For a rotation by angle $\theta$ around a unit axis $\mathbf{u}=(u_x,u_y,u_z)$:
 
 $$
 q =
@@ -66,153 +37,60 @@ u_z\sin\frac{\theta}{2}
 \right)
 $$
 
-Notice the **half angle**.
-
-For our 90° Z rotation:
+Notice the **half angle**. For our running example, 90° around Z:
 
 $$
-q =
-\left(
-\cos45^\circ,
-0,
-0,
-\sin45^\circ
-\right)
+q = (\cos45^\circ, 0, 0, \sin45^\circ) \approx (0.707,0,0,0.707)
 $$
 
-so approximately
+So a quaternion reads as **"rotate around this axis by this amount."** The four numbers are just a convenient encoding of that idea.
 
-$$
-q=(0.707,0,0,0.707)
-$$
-
-You can think of it as:
-
-> **"Rotate around this axis by this amount."**
-
-The four numbers are just a convenient mathematical encoding of that idea.
-
-> **Watch the component order.** This doc writes quaternions scalar-first, $(w, x, y, z)$. Many libraries store them scalar-last, $[x, y, z, w]$: scipy's `Rotation.as_quat()`, ROS messages, and this repo's own `utils.py`. Reading one ordering as the other silently gives a different rotation. There are also two multiplication conventions in the literature: **Hamilton** (used here, and by most robotics libraries) and **JPL** (common in older aerospace and MSCKF-era VIO papers), which compose in opposite orders; Solà (2017) compares them. Always check both before mixing code or equations from different sources.
+> **Watch the component order and the convention.**
+>
+> - **Component order.** This doc writes quaternions scalar-first, $(w, x, y, z)$. Many libraries store them scalar-last, $[x, y, z, w]$: scipy's `Rotation.as_quat()`, ROS messages, and this repo's own `utils.py`. Reading one ordering as the other silently gives a different rotation.
+> - **Multiplication convention.** **Hamilton** (used here, and by most robotics libraries) and **JPL** (common in older aerospace and MSCKF-era VIO papers) compose in opposite orders. Solà (2017) compares them.
+> - Always check both before mixing code or equations from different sources.
 
 ---
 
 ## 3. Why four numbers?
 
-This is initially confusing because a 3D orientation seems like it should need only **three numbers**.
-
-After all, $(\text{roll}, \text{pitch}, \text{yaw})$ are three numbers. But quaternions use four: $(w, x, y, z)$.
-
-The important point is that **not every four-number quaternion represents a rotation**.
-
-For a rotation quaternion, we require:
+A 3D orientation seems to need only **three numbers**, like $(\text{roll}, \text{pitch}, \text{yaw})$, yet a quaternion has four: $(w, x, y, z)$. The catch is that **not every four-number quaternion is a rotation**. A rotation quaternion must satisfy
 
 $$
 w^2+x^2+y^2+z^2=1
 $$
 
-So there is a constraint.
-
-Effectively:
-
 > 4 numbers + 1 constraint → 3 degrees of freedom.
-
-That's why a quaternion can represent a 3D orientation even though it has four components.
 
 ---
 
-## 4. The most important intuition: don't think of it as a mysterious 4D object
+## 4. Read it as a 3D rotation, not a 4D point
 
-When learning robotics, it helps **not to think of a quaternion as "a point in 4D space" at first**.
+At first, it helps **not to think of a quaternion as "a point in 4D space"**. Think of it as a **compact representation of a 3D rotation**:
 
-Instead think:
-
-> **Quaternion = compact representation of a 3D rotation.**
-
-For example:
-
-$$
-q=(1,0,0,0)
-$$
-
-means:
-
-> **No rotation.**
-
-And:
-
-$$
-q=(0.707,0,0,0.707)
-$$
-
-means approximately:
-
-> **90° rotation around Z.**
-
-And:
-
-$$
-q=(0.707,0.707,0,0)
-$$
-
-means:
-
-> **90° rotation around X.**
+| Quaternion $(w,x,y,z)$ | Meaning |
+| --- | --- |
+| $(1,0,0,0)$ | No rotation |
+| $(0.707,0,0,0.707)$ | About 90° around Z |
+| $(0.707,0.707,0,0)$ | About 90° around X |
 
 ---
 
 ## 5. Why is there a $w$?
 
-This is where the formula $q = \left(\cos\frac{\theta}{2}, \mathbf{u}\sin\frac{\theta}{2}\right)$ is useful.
+From $q = \left(\cos\frac{\theta}{2}, \mathbf{u}\sin\frac{\theta}{2}\right)$, the quaternion has two parts:
 
-The quaternion has two conceptual parts:
+- $w=\cos(\theta/2)$ gives the **amount of rotation**: $\theta = 2\arccos(w)$. Check with the 90° example: $w = 0.707$ gives $\theta = 2 \cdot 45° = 90°$.
+- $(x,y,z)=\mathbf{u}\sin(\theta/2)$ is the **rotation axis weighted by the amount of rotation**.
 
-$$
-\boxed{w=\cos(\theta/2)}
-$$
-
-and
-
-$$
-\boxed{(x,y,z)=\mathbf{u}\sin(\theta/2)}
-$$
-
-So:
-
-**$w$** tells us something about the **amount of rotation**, while **$x,y,z$** encode the **rotation axis weighted by the amount of rotation**.
-
-For example, at zero rotation ($\theta = 0$), $w = \cos 0 = 1$ and $x = y = z = 0$, giving $q = (1, 0, 0, 0)$.
-
-As the rotation increases, the vector part grows.
+At zero rotation ($\theta = 0$), $w = \cos 0 = 1$ and $x = y = z = 0$, giving $q = (1, 0, 0, 0)$. As the rotation grows, the vector part grows.
 
 ---
 
 ## 6. Why are quaternions so useful in robotics?
 
-This is where they become really interesting for SLAM/state-estimation work.
-
-Suppose your IMU tells you:
-
-> "The robot rotated slightly during this 10 ms interval."
-
-You want to update:
-
-$$
-R_{k+1}=R_k\Delta R
-$$
-
-where $R$ is the robot's orientation.
-
-You can represent $R$ as a rotation matrix (${R \in SO(3)}$), but that's **9 numbers**.
-
-A quaternion only needs $q = (w,x,y,z)$ with the unit constraint.
-
-So quaternions give you a compact representation of rotation.
-
-More importantly, composing rotations becomes quaternion multiplication:
-
-$${q_{\text{new}}=q_{\text{old}}\otimes\Delta q}$$
-
-Conceptually:
+Suppose the IMU says "the robot rotated slightly during this 10 ms interval." We update the orientation $R_{k+1}=R_k\Delta R$. A rotation matrix ($`R \in SO(3)`$) needs **9 numbers**, while a quaternion needs only $q = (w,x,y,z)$ with the unit constraint. More importantly, composing rotations becomes quaternion multiplication, $q_{\text{new}}=q_{\text{old}}\otimes\Delta q$:
 
 > **Quaternion multiplication = "apply one rotation after another."**
 
@@ -222,46 +100,36 @@ This is the operation at the heart of IMU orientation integration.
 
 ## 7. A geometric intuition
 
-Imagine holding a phone.
-
-Initially:
+Hold a phone with its "up" arrow pointing up:
 
 ```text
       ↑
-      |
    ┌─────┐
    │PHONE│
    └─────┘
 ```
 
-Now rotate it +90° around the Z-axis (Z pointing out of the page, so positive is counterclockwise by the right-hand rule):
+Now rotate it +90° around the Z-axis (Z pointing out of the page, so positive is counterclockwise by the right-hand rule). The "up" arrow now points left:
 
 ```text
-   ┌─────┐
-   │PHONE│
-   └─────┘
-  ←
+   ┌───┐
+   │ P │
+   │ H │
+ ← │ O │
+   │ N │
+   │ E │
+   └───┘
 ```
 
-Instead of storing:
-
-> "The phone has roll = ?, pitch = ?, yaw = 90°"
-
-you can simply describe the transformation as:
-
-> **Rotate 90° around this axis.**
-
-The quaternion stores exactly that information in a form that is mathematically convenient for chaining rotations.
+Instead of storing "roll = ?, pitch = ?, yaw = 90°", we describe the transformation as **rotate 90° around this axis**. The quaternion stores exactly that, in a form that is convenient for chaining rotations.
 
 ---
 
 ## 8. Why not just use rotation matrices?
 
-You might reasonably ask:
-
 > "If rotation matrices work, why bother with quaternions?"
 
-A rotation matrix:
+A rotation matrix
 
 ```math
 R= \begin{bmatrix} r_{11} & r_{12} & r_{13}\\
@@ -269,23 +137,19 @@ r_{21} & r_{22} & r_{23}\\
 r_{31} & r_{32} & r_{33} \end{bmatrix}
 ```
 
-has **9 elements**, even though a rotation has only 3 degrees of freedom.
-
-And those 9 numbers must satisfy several constraints: $R^\top R = I$ and $\det(R) = 1$.
-
-Quaternions have only four numbers and one simple normalization constraint: $`\|q\| = 1`$.
-
-So they're generally:
+has **9 elements**, even though a rotation has only 3 degrees of freedom, and they must satisfy several constraints: $R^\top R = I$ and $\det(R) = 1$. A quaternion has four numbers and one simple normalization constraint: $`\|q\| = 1`$. So quaternions are:
 
 - more compact
 - numerically convenient: rounding makes $\lVert q\rVert$ drift slowly from 1 over many multiplications, so implementations renormalize regularly, which is much cheaper than re-orthogonalizing a rotation matrix
 - efficient for composing rotations
-- excellent for interpolation
+- easy to interpolate smoothly: slerp (spherical linear interpolation) $\text{slerp}(q_0, q_1, t)$ moves at constant angular speed along the shortest arc (choose the sign of $q_1$ so that $q_0 \cdot q_1 \ge 0$, see Section 10)
 - free of gimbal lock
 
 ---
 
 ## 9. Quaternion vs Euler angles
+
+Think of them as **different languages describing the same orientation**:
 
 | Representation  | Intuition                         | Main problem                  |
 | --------------- | --------------------------------- | ----------------------------- |
@@ -293,19 +157,11 @@ So they're generally:
 | Rotation matrix | Transform coordinate axes         | 9 numbers + constraints       |
 | Quaternion      | Axis + angle encoded in 4 numbers | Less intuitive initially      |
 
-Think of them as **different languages describing the same orientation**.
+For our 90° around Z:
 
-For example:
-
-$${\text{90° around Z}}$$
-
-can be represented as:
-
-- **Euler**
-
-$${(roll,pitch,yaw)=(0,0,90^\circ)}$$
-
-- **Rotation matrix**
+- **Euler:** $(\text{roll},\text{pitch},\text{yaw})=(0,0,90^\circ)$
+- **Quaternion:** $q=(0.707,0,0,0.707)$
+- **Rotation matrix:**
 
 ```math
 R= \begin{bmatrix} 0 & -1 & 0\\
@@ -313,36 +169,29 @@ R= \begin{bmatrix} 0 & -1 & 0\\
 0 & 0 & 1 \end{bmatrix}
 ```
 
-- **Quaternion**
-
-$${q=(0.707,0,0,0.707)}$$
-
-Same physical rotation. Different mathematical representation.
-
 ---
 
 ## 10. q and -q are the same rotation
 
-There is a strange property: $q$ and $-q$ represent **the exact same physical orientation**.
+Strangely, $q$ and $-q$ represent **the exact same physical orientation**. For example, $q = (0.707, 0, 0, 0.707)$ and $-q = (-0.707, 0, 0, -0.707)$ are the same rotation.
 
-For example, $q = (0.707, 0, 0, 0.707)$ and $-q = (-0.707, 0, 0, -0.707)$ represent the same rotation.
+This matters for **optimization, SLAM, EKF, and Lie-group state estimation**, because treating quaternion components as ordinary Euclidean coordinates causes two problems:
 
-This becomes particularly important when working with **optimization, SLAM, EKF, and Lie-group state estimation**, because treating quaternion components as ordinary Euclidean coordinates can cause problems.
+- **Additive updates break the unit-norm constraint.** Adding a small correction to $q$ leaves the unit sphere.
+- **The double cover makes averaging and differencing ambiguous.** Averaging $q$ and $-q$ (the same rotation) gives $(0,0,0,0)$, which is not a rotation. Their component-wise difference is as large as possible.
 
 ---
 
 ## 11. The connection to Kalman filtering
 
-This is actually where quaternions become especially relevant.
-
-In an EKF, you might have a state like
+Quaternions matter most inside filters. In an EKF, we might have a state like
 
 ```math
-{\mathbf{x}= \begin{bmatrix} p\\ 
+\mathbf{x}= \begin{bmatrix} p\\ 
 v\\ 
 q\\ 
 b_g\\ 
-b_a \end{bmatrix}}
+b_a \end{bmatrix}
 ```
 
 where:
@@ -357,13 +206,7 @@ The tricky part is:
 
 > **A quaternion does not live in ordinary 4D Euclidean space.**
 
-It lives on the **unit quaternion manifold**, which represents rotations.
-
-That's why modern VIO/SLAM systems often use a **small 3D orientation error** rather than directly adding a 4D quaternion error:
-
-$${q_{\text{true}} = \delta q\otimes q_{\text{estimate}}}$$
-
-where $\delta q$ represents a **small 3D rotational error**.
+It lives on the **unit quaternion manifold**. That's why modern VIO/SLAM systems often estimate a **small 3D rotational error** $\delta q$ rather than directly adding a 4D quaternion error.
 
 The small error can be attached on either side, and both are common:
 
@@ -374,30 +217,29 @@ This is the error-state idea of [extra_kf_variants.md §2](../filtering/extra_kf
 
 ---
 
-## 12. The one-sentence intuition
-
-In one sentence:
+## 12. Summary
 
 > **A quaternion is a clever four-number representation of a 3D rotation, essentially encoding "rotate by this angle around this axis," in a form that makes chaining and estimating rotations much easier.**
 
-And in a robotics context, it's worth mentally organizing it as:
+In a robotics context, it's worth organizing it as:
 
-$${ \boxed{ \text{Euler angles} \rightarrow \text{Quaternion} \rightarrow SO(3) \rightarrow \mathfrak{so}(3) \rightarrow \text{Lie-group state estimation} } }
+$$
+\boxed{ \text{Euler angles} \rightarrow \text{Quaternion} \rightarrow SO(3) \rightarrow \mathfrak{so}(3) \rightarrow \text{Lie-group state estimation} }
 $$
 
 That chain is a learning order, not a hierarchy: unit quaternions are a Lie group in their own right, and each rotation in $SO(3)$ corresponds to exactly two of them, $q$ and $-q$ (Section 10). Both groups share the same small-motion space, so the tools in [lie_algebra.md](lie_algebra.md) apply to either.
 
-The really interesting next step is **why quaternion multiplication actually performs rotation**, because that is the part that makes quaternions initially feel like magic. That's the next section.
+The next question is **why quaternion multiplication actually performs rotation**.
 
 ---
 
 ## 13. Why quaternion multiplication actually performs rotation
 
-So far we've treated a quaternion as "axis + angle in disguise." But that raises a fair question:
+So far we've treated a quaternion as "axis + angle in disguise." That raises a fair question:
 
 > "Why does *multiplying* four numbers together rotate a 3D vector?"
 
-It isn't magic. It comes down to four observations.
+The answer comes down to four observations.
 
 ### Step 1: the multiplication rule hides a dot product and a cross product
 
@@ -438,7 +280,7 @@ For a unit quaternion, $q \otimes q^{\ast} = (1, 0, 0, 0)$, so $q^{\ast}$ is als
 
 Why two multiplications? Why not just $q \otimes (0, \mathbf{v})$?
 
-Because multiplying from **one side** usually knocks the vector out of 3D. Take our 90° Z rotation $q = (0.707, 0, 0, 0.707)$ and follow two vectors through, writing every result as $(w, x, y, z)$:
+Because multiplying from **one side** leaks out of 3D whenever the vector has a component along the axis. Take our 90° Z rotation $q = (0.707, 0, 0, 0.707)$ and follow two vectors through, writing every result as $(w, x, y, z)$:
 
 | Input vector | After $q \otimes (0, \mathbf{v})$ | After $q \otimes (0, \mathbf{v}) \otimes q^{\ast}$ |
 | --- | --- | --- |
@@ -447,10 +289,10 @@ Because multiplying from **one side** usually knocks the vector out of 3D. Take 
 
 Two things to notice:
 
-- The **Z-axis** (the rotation axis itself) picks up a nonzero $w = -0.707$ after one multiplication. It is no longer a pure quaternion - it has leaked out of 3D space. The second multiplication by $q^{\ast}$ cancels the leak and returns it exactly to where it started, as a rotation should leave its own axis alone.
-- The **X-axis** lands on $(0.707, 0.707, 0)$ after one multiplication - rotated by only **45°**. The second multiplication adds another 45°, giving $(0, 1, 0)$: the full **90°**.
+- The **Z-axis** (the rotation axis itself) picks up a nonzero $w = -0.707$ after one multiplication. It is no longer a pure quaternion, because the Z-axis is entirely along the rotation axis. The second multiplication by $q^{\ast}$ cancels the leak and returns it exactly to where it started, as a rotation should leave its own axis alone.
+- The **X-axis** (perpendicular to the axis) stays pure and lands on $(0.707, 0.707, 0)$ after one multiplication, rotated by only **45°**. The second multiplication adds another 45°, giving $(0, 1, 0)$: the full **90°**.
 
-So each side of the sandwich does **half** of the rotation. That is the real reason for the half angle in Section 2.
+So each side of the sandwich does **half** of the rotation. That is the reason for the half angle in Section 2.
 
 ### Step 3: why the sandwich rotates by exactly $\theta$
 
@@ -530,7 +372,7 @@ So every rotation has exactly two quaternions, $q$ and $-q$. In angle terms: $\t
 
 Compare with rotation in 2D using complex numbers. Multiplying by $e^{i\theta} = \cos\theta + i\sin\theta$ rotates a point by $\theta$ with **one** multiplication, because multiplying two complex numbers always gives another point in the same plane - nothing can leak out.
 
-In 3D, one quaternion multiplication *can* leak out of 3D space (Step 2), so a second multiplication is needed to cancel the leak, and the rotation angle gets split between the two sides.
+In 3D, one quaternion multiplication leaks out of 3D whenever the vector has a component along the axis (Step 2), so a second multiplication is needed to cancel the leak, and the rotation angle gets split between the two sides.
 
 |  | 2D: complex numbers | 3D: unit quaternions |
 | --- | --- | --- |

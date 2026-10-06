@@ -99,21 +99,25 @@ For example:
 
 where $r_i$ is the error associated with a measurement.
 
-Common back-end techniques include:
+Two levels to keep apart:
+
+**Problem formulations** (what we optimize):
 
 - **[Bundle Adjustment](optimization/bundle_adjustment.md)**
 - **[Pose-graph optimization](optimization/pose_graph_optimization.md)**
 - **[Factor-graph optimization](optimization/factor_graph.md)**
-- **[Nonlinear least squares](optimization/nonlinear_least_square.md)**
-- **[Gauss-Newton](optimization/gauss_newton.md)**
-- **[Levenberg-Marquardt](optimization/levenberg_marquardt.md)**
-- **[iSAM/incremental optimization](optimization/isam_optimization.md)**
+- **[Nonlinear least squares](optimization/nonlinear_least_square.md)** - the general form behind all of them
+
+**Solvers** (how we minimize it):
+
+- **[Gauss-Newton](optimization/gauss_newton.md)** and **[Levenberg-Marquardt](optimization/levenberg_marquardt.md)** - step rules inside an iterative solve
+- **[iSAM/incremental optimization](optimization/isam_optimization.md)** - a strategy for re-solving incrementally as new constraints arrive
 
 ---
 
 ## 3. Example: loop closure
 
-Imagine your robot walks around a building:
+Imagine a robot walking around a building:
 
 ```text
        A ───── B
@@ -148,13 +152,7 @@ It generates a constraint between the *non-consecutive* poses $x_0$ and $x_4$: a
 
 The **back-end then optimizes the entire trajectory** so that all constraints are satisfied as well as possible.
 
-In practice, "loop closure" really spans both stages: the front-end/place-recognition module detects the candidate match, while the back-end verifies it and folds it into the global optimization - which is why some of the diagrams above draw the "loop closure" box on the back-end side instead.
-
-That's why you can think of:
-
-> **Front-end = measurement generation**
-
-> **Back-end = constraint optimization**
+In practice, "loop closure" really spans both stages: the front-end/place-recognition module detects the candidate match, while the back-end verifies it and folds it into the global optimization - which is why the diagrams above disagree: the third and fourth diagrams put "loop closure" inside the back-end, the second sends a loop-closure constraint out of the front-end, and the first draws it as a feedback box between the two.
 
 ---
 
@@ -164,10 +162,9 @@ That's why you can think of:
 | ------------------ | ------------------------------------------------ | --------------------------------------- |
 | Main job           | Understand sensor observations                   | Find globally consistent solution       |
 | Input              | Raw sensor data                                  | Measurements/constraints                |
-| Output             | Features, matches, relative poses, loop closures | Optimized poses/map                     |
+| Output             | Features, matches, relative poses, loop-closure candidates| Optimized poses/map (verified loop closures included) |
 | Typical algorithms | Feature tracking, VO, matching                   | BA, pose graph, factor graph            |
 | Focus              | Local/sequential                               | Global/accumulated                    |
-| Question           | "What happened?"                                 | "What is the best overall explanation?" |
 
 ---
 
@@ -175,7 +172,7 @@ That's why you can think of:
 
 The front-end **doesn't necessarily mean "real-time"**, and the back-end **doesn't necessarily mean "offline."**
 
-(Image 4 above labels the two stages "online" and "offline" respectively - a common simplification, but, as just stated, not a strict rule.)
+(The fourth diagram above labels the front-end "online processing" and the back-end "offline processing" - a common simplification, but, as just stated, not a strict rule.)
 
 In modern SLAM systems, both can operate online:
 
@@ -193,12 +190,6 @@ Sensors ──→ Tracking ──→ Constraints
 
 Separately, note that **front-end errors become constraints for the back-end**. If data association or motion estimation is wrong, a plain least-squares optimizer will fit the bad constraint and converge to the wrong solution. Back-ends therefore often use robust costs (Huber, Cauchy, DCS) that down-weight constraints that disagree strongly with the rest; see [optimization/pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
 
-A useful mental model is:
-
-> **Front-end = perception**
-
-> **Back-end = estimation/optimization**
-
 ---
 
 ## 6. References
@@ -213,7 +204,7 @@ A useful mental model is:
 
 ### Image sources
 
-The diagrams above were originally embedded as hotlinks to an OpenAI-hosted CDN (`images.openai.com`) and have since been downloaded into [`images/`](images/) for durability.
+The diagrams above are stored in [`images/`](images/); the original CDN URLs (`images.openai.com`) are kept below for provenance.
 
 1. `images/frontend_backend_1.jpg`
    - Original CDN URL: https://images.openai.com/static-rsc-4/ohut01r4hXxy0FBo1CUweMJvMR0DsWr7j5TugX3IqHY3ySm7JWT-MdDMc2CRdBXXvXt09Nx7tRO552QRLOCFQVlHDCt1ECQBAvWQ3EM4vtQVfcF4qvfLvULQutQRozc5gRTmOfctTMUsz0aIsbjamEKvI7-cPBEbDYm31qYmsS9bfmdHnOGJdUH9Z1ke9Gg4?purpose=fullsize

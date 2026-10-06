@@ -1,109 +1,77 @@
 # What are the differences between the standard Kalman Filter, Extended Kalman Filter, and Invariant Extended Kalman Filter?
 
-The most intuitive way to understand them is to start with one idea:
+Start with one idea:
 
-> **A Kalman Filter is basically a smart way of combining "what I predicted" with "what I measured."**
+> **A Kalman Filter is a smart way of combining "what I predicted" with "what I measured."**
 
-The three filters differ mainly in **what kind of system they assume** and **how they deal with nonlinear motion**.
+The three filters differ in **what kind of system they assume** and **how they deal with nonlinear motion**.
 
 This builds directly on:
-- **Lie groups and $SO(3)$/$`SE(3)`$** from [lie_algebra.md](../foundations/lie_algebra.md) - the geometric structure §3-§5's IEKF discussion is built around.
+- **Lie groups and $`SO(3)`$/$`SE(3)`$** from [lie_algebra.md](../foundations/lie_algebra.md) - the geometric structure §3-§5's IEKF discussion is built around.
 - The **right Jacobian/exp map** from [jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space) - the $\exp(\delta\theta^\wedge)$ notation used in §5.
 
 ---
 
 ## 1. Standard Kalman Filter: "Everything is nicely linear"
 
-Imagine you're tracking a car.
-
-You have:
+Say we are tracking a car. We have:
 
 - a previous estimate: "car is at $x = 10$ m, moving at 5 m/s"
 - a motion model: "after 1 second, it should be around $x = 15$ m"
 - a sensor measurement: "GPS says $x = 14$ m"
 
-The Kalman Filter asks:
+The Kalman Filter asks **how much we should trust the prediction versus the measurement**. If GPS is noisy, we might weight the prediction 70% and GPS 30%, giving $0.7 \cdot 15 + 0.3 \cdot 14 = 14.7$ m.
 
-> **How much should I trust my prediction versus my measurement?**
+The key assumption is that the state's evolution and the measurement are **linear**:
 
-If GPS is noisy, you might say:
-
-> Prediction: 70%
-
-> GPS: 30%
-
-So the result might be around `14.7 m`.
-
-The important assumption is that the relationship between the state and its evolution is **linear**.
-
-For example:
-
-$$x_{k+1} = Fx_k + w$$
-
-and measurement:
-
-$$z_k = Hx_k + v$$
+$$x_k = Fx_{k-1} + w_{k-1} \qquad z_k = Hx_k + v_k$$
 
 where:
 
-- $x$: state
-- $z$: measurement
-- $F$: linear motion model
-- $H$: linear measurement model
-- $w$: process noise (everything the motion model $F$ doesn't capture, like unmodeled dynamics, wind gusts, wheel slip, IMU bias drift, etc.), with covariance $Q = \mathrm{Cov}(w)$
-- $v$: measurement noise (sensor imperfections like GPS jitter, camera pixel noise, IMU noise, etc.), with covariance $R = \mathrm{Cov}(v)$
+- $x$: state, $z$: measurement
+- $F$: linear motion model, $H$: linear measurement model
+- $w$: process noise (everything $F$ doesn't capture: unmodeled dynamics, wind gusts, wheel slip, IMU bias drift, etc.), with covariance $`Q = \mathrm{Cov}(w)`$
+- $v$: measurement noise (GPS jitter, camera pixel noise, IMU noise, etc.), with covariance $`R = \mathrm{Cov}(v)`$
 
-$Q$ and $R$ - not $w$ and $v$ themselves - are what the filter actually needs as inputs: since the individual noise values are unknown at each step, the filter works with their statistics (how large and correlated the noise typically is) instead. This is the same $Q$/$`R`$ notation [extra_kf_variants.md §8](extra_kf_variants.md#8-adaptive-kalman-filter) (Adaptive KF) and [§12](extra_kf_variants.md#12-which-ones-should-you-prioritize-learning)'s checklist refer to.
+The filter needs $`Q`$ and $`R`$, not $w$ and $v$ themselves: the individual noise values are unknown at each step, so it works with their statistics (how large and correlated the noise typically is). This is the same $`Q`$/$`R`$ notation [extra_kf_variants.md §8](extra_kf_variants.md#8-adaptive-kalman-filter) (Adaptive KF) and [§12](extra_kf_variants.md#12-which-ones-should-you-prioritize-learning)'s checklist refer to.
 
-Every KF cycle alternates two steps, each carrying its own uncertainty as a **covariance matrix** $P$ (how spread-out/correlated the filter's belief about $x$ currently is):
+Every KF cycle alternates two steps, each carrying its uncertainty as a **covariance matrix** $P$ (how spread-out/correlated the filter's belief about $x$ currently is).
 
-- **Prediction step:** push the last estimate through the motion model, and grow $P$ by however uncertain that model is ($Q$):
+**Prediction step:** push the last estimate through the motion model, and grow $P$ by however uncertain that model is ($`Q`$):
 
 $$\hat x_k^- = F\hat x_{k-1} \qquad P_k^- = FP_{k-1}F^\top + Q$$
 
-- **Measurement update step:** compare the predicted measurement $H\hat x_k^-$ against what actually arrived ($z_k$), and blend the two using the **Kalman gain** $K_k$:
+**Measurement update step:** compare the predicted measurement $H\hat x_k^-$ against what arrived ($z_k$), and blend the two using the **Kalman gain** $K_k$:
 
 $$K_k = P_k^- H^\top(HP_k^-H^\top + R)^{-1} \qquad \hat x_k = \hat x_k^- + K_k(z_k - H\hat x_k^-) \qquad P_k = (I-K_kH)P_k^-$$
 
-$K_k$ is exactly the "how much should I trust my prediction versus my measurement" weighting from the intuition above: 
-- It's large (trusts the measurement more) when $P_k^-$ is large relative to $R$
-- It's small (trusts the prediction more) when $R$ is large relative to $P_k^-$ - the 70%/30% split earlier is $K$ in disguise
+$K_k$ is the "prediction versus measurement" weighting above:
+- It is large (trust the measurement more) when $P_k^-$ is large relative to $`R`$.
+- It is small (trust the prediction more) when $`R`$ is large relative to $P_k^-$. The 70%/30% split earlier is $K$ in disguise.
 
-### Intuition
+The standard KF is a straight ruler for a world that behaves like a straight line. It doesn't work directly for rotations, camera poses, or nonlinear robot dynamics.
 
-Think of the standard KF as:
-
-> **"I have a straight ruler, and the world behaves approximately like a straight line."**
-
-It's elegant and mathematically clean, but it doesn't work directly for things like rotations, camera poses, or nonlinear robot dynamics.
-
-**A concrete data point**: this repo's own `run_vanilla_kf` (same point-cloud pose-tracking benchmark referenced in [§7](#7-the-subtle-but-important-point)) is exactly this - a standard linear KF applied directly to a pose, via a redundant ambient `[vec(R), t]` state (`vec` taken row-major, as `R.flatten()` does) rather than the minimal $SE(3)$ tangent every other method there uses. It works, but only by bolting on a first-order truncation of the motion model and a post-hoc SVD re-projection to keep the rotation valid - see [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) for the measured cost of skipping the manifold structure altogether.
+**A concrete data point**: this repo's own `run_vanilla_kf` (same point-cloud pose-tracking benchmark referenced in [§7](#7-geometry-aware-is-not-the-same-as-more-accurate)) is exactly this - a standard linear KF applied directly to a pose, via a redundant ambient `[vec(R), t]` state (`vec` taken row-major, as `R.flatten()` does) rather than the minimal $SE(3)$ tangent every other method there uses. It works, but only by bolting on a first-order truncation of the motion model and a post-hoc SVD re-projection to keep the rotation valid - see [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) for the measured cost of skipping the manifold structure altogether.
 
 ---
 
 ## 2. Extended Kalman Filter: "The world is nonlinear, so I'll approximate it locally"
 
-Now suppose your robot is moving.
+Now say our robot is moving, with state $s = [p_x, p_y, \theta]$ ($\theta$ is its orientation), speed $v$ and turn rate $\omega$. A unicycle moves like this:
 
-Its state might be: $x = [x,y,\theta]$
+```math
+p_{x,k+1} = p_{x,k} + v\cos\theta_k\,\Delta t \qquad p_{y,k+1} = p_{y,k} + v\sin\theta_k\,\Delta t \qquad \theta_{k+1} = \theta_k + \omega\,\Delta t
+```
 
-where $\theta$ is its orientation.
+This is **nonlinear** because of $\cos\theta$ and $\sin\theta$, so a standard KF can't handle it directly. (For how to tell linear from nonlinear in general, and whether the nonlinearity matters at your uncertainty level, see [linear_nonlinear.md](linear_nonlinear.md).)
 
-The motion might look like:
- - $`x_{k+1}=x_k+v\cos\theta\,\Delta t`$
- - $`y_{k+1}=y_k+v\sin\theta\,\Delta t`$
+The EKF's idea: pretend the system is linear **around the current estimate**, using a **Jacobian** to approximate the function locally. For the unicycle, the Jacobian (evaluated at $\hat\theta_k$) is:
 
-This is **nonlinear** because of the $\cos\theta$ and $\sin\theta$. (For how to tell linear from nonlinear in general, and whether the nonlinearity actually matters at your uncertainty level, see [linear_nonlinear.md](linear_nonlinear.md).)
+```math
+F_k = \frac{\partial f}{\partial s} = \begin{bmatrix} 1 & 0 & -v\sin\hat\theta_k\,\Delta t \\ 0 & 1 & v\cos\hat\theta_k\,\Delta t \\ 0 & 0 & 1 \end{bmatrix}
+```
 
-A standard KF can't handle this directly.
-
-So the EKF says:
-
-> "Okay, the system is nonlinear, but perhaps I can pretend it's linear **around my current estimate**."
-
-It uses a **Jacobian** to locally approximate the nonlinear function.
-
-Imagine a curved road:
+Think of a curved road: we don't need to understand the whole curve, only to approximate it around where we currently are.
 
 ```text
                  actual nonlinear function
@@ -121,121 +89,56 @@ Imagine a curved road:
      /
 ```
 
-The EKF essentially says:
+Concretely, the EKF plugs the Jacobian into §1's same two-step cycle, for $x_k = f(x_{k-1}, u_{k-1}) + w_{k-1}$ and $z_k = h(x_k) + v_k$.
 
-> "I don't need to understand the whole curve.
-
-> I just need to approximate the curve around where I currently am."
-
-Mathematically, if: $x_{k+1}=f(x_k,u_k)+w$
-
-the EKF computes: $F_k = \frac{\partial f}{\partial x}$
-
-That's the Jacobian.
-
-Then it uses this local linear approximation inside the normal Kalman equations. Concretely, plugging that Jacobian into §1's same two-step cycle:
-
-- **Prediction step:** propagate the mean through the *exact* nonlinear $f$ (not a linear approximation of it - only $P$'s growth is linearized), and grow $P$ using the Jacobian $F_k$:
+**Prediction step:** propagate the mean through the *exact* nonlinear $f$ (only $P$'s growth is linearized), and grow $P$ using the Jacobian $F_k$:
 
 $$\hat x_k^- = f(\hat x_{k-1}, u_{k-1}) \qquad F_k = \frac{\partial f}{\partial x}\Big|_{\hat x_{k-1}} \qquad P_k^- = F_kP_{k-1}F_k^\top + Q$$
 
-- **Measurement update step:** identical structure to §1's KF, but with a fresh measurement Jacobian $H_k$, and the innovation computed against the exact nonlinear measurement function $h$ (for $z_k = h(x_k)+v$):
+**Measurement update step:** same structure as §1's KF, with a fresh measurement Jacobian $H_k$ and the innovation computed against the exact nonlinear $h$:
 
 $$H_k = \frac{\partial h}{\partial x}\Big|_{\hat x_k^-} \qquad K_k = P_k^-H_k^\top(H_kP_k^-H_k^\top+R)^{-1}$$
 $$\hat x_k = \hat x_k^- + K_k\big(z_k-h(\hat x_k^-)\big) \qquad P_k = (I-K_kH_k)P_k^-$$
 
-So the only two changes from §1's linear KF are: (a) the mean propagates through the true nonlinear $f$/$`h`$ instead of a fixed linear $F$/$`H`$, and (b) $F_k$/$`H_k`$ are **re-linearized at the current estimate every single step**, rather than being fixed matrices computed once. That second point is exactly the "Jacobians evaluated at the drifting state estimate" issue the next subsection digs into.
-
-### Intuition
-
-So:
-
-#### KF
-
-> "My world is linear."
-
-#### EKF
-
-> "My world is nonlinear, but I'll locally pretend it's linear."
-
-This works surprisingly well and is probably one of the most widely used nonlinear filtering approaches.
+So the only two changes from §1 are: (a) the mean propagates through the true nonlinear $`f`$/$`h`$ instead of a fixed linear $`F`$/$`H`$, and (b) $`F_k`$/$`H_k`$ are **re-linearized at the current estimate every step** instead of being fixed matrices. That second point is the "Jacobians evaluated at the drifting state estimate" issue below. This local-linearization recipe works surprisingly well and is one of the most widely used nonlinear filtering approaches.
 
 ### But here's the problem with EKF
 
-This becomes particularly important in **robotics and SLAM**.
+This matters most in **robotics and SLAM**. Say our robot has a pose $X=(R,p)$, with $R$ the rotation and $p$ the position. Rotations are not ordinary vectors:
 
-Suppose your robot has a pose: $X=(R,p)$
-
-where:
-
-- $R$: rotation
-- $p$: position
-
-Rotations are not ordinary vectors.
-
-In 2D, composing rotations is easy: rotating by 90° and then another 90° just adds the angles, $90^\circ + 90^\circ = 180^\circ$, and the order doesn't matter.
-
-In 3D, it's not that simple. Rotate an object 90° about the x-axis, then 90° about the y-axis, and you get a different orientation than doing it in the reverse order:
+- In 2D, composing rotations just adds the angles ($90^\circ + 90^\circ = 180^\circ$), and the order doesn't matter.
+- In 3D, rotating 90° about x then 90° about y gives a different orientation than the reverse order:
 
 ```math
 R_x(90^\circ)\,R_y(90^\circ) \neq R_y(90^\circ)\,R_x(90^\circ)
 ```
 
-3D rotations don't commute, and there's no simple "add the numbers" operation the way there is for positions on a line. That's the sense in which rotations aren't ordinary vectors.
+3D rotations don't commute, and there is no simple "add the numbers" operation as for positions on a line. They live on a **Lie group**: $SO(3)$ for rotations, $SE(3)$ for 3D poses.
 
-They live on a mathematical structure called a **Lie group**, typically:
- - $SO(3)$ for rotations
- - $SE(3)$ for 3D poses
+Representing rotations awkwardly isn't the deep problem, though. Plain EKF already has workarounds: quaternions, Euler angles, or multiplicative (small-rotation) perturbations around them, known as the MEKF (see Lefferts, Markley, and Shuster, 1982).
 
-But representing rotations awkwardly isn't actually the deep problem - plain EKF already has workarounds for that (quaternions, Euler angles, small additive perturbations around them; this is often called MEKF, and it's been standard in spacecraft attitude estimation since the 1960s-70s; see Lefferts, Markley, and Shuster, 1982).
-
-The real problem is more subtle: **the EKF's Jacobians are evaluated at the current, drifting state estimate**, and that estimate is different every run and every step.
+The real problem is more subtle: **the EKF's Jacobians are evaluated at the current, drifting state estimate**, which differs every run and every step.
 - Each time the filter linearizes at a slightly different point, it linearizes the system's symmetries slightly differently too.
-- Concretely, this can make the EKF inject spurious information into directions of the state that should be unobservable - for example, a global orientation offset that no sensor can actually see - leaving the filter overconfident (inconsistent) in exactly those directions. Huang, Mourikis, and Roumeliotis (2010) analyzed this consistency problem for EKF-SLAM.
-- The Invariant EKF, which goes back to Bonnabel (2007) and whose stability Barrau and Bonnabel (2017) proved, avoids it: Barrau and Bonnabel (2015) showed that an invariant EKF-SLAM keeps the unobservable directions unobservable, and is consistent where the standard EKF is not.
+- This can make the EKF inject spurious information into directions of the state that should be unobservable - for example, a global orientation offset that no sensor can see - leaving the filter overconfident (inconsistent) in exactly those directions. Huang, Mourikis, and Roumeliotis (2010) analyzed this consistency problem for EKF-SLAM.
+- The Invariant EKF goes back to Bonnabel (2007), and Barrau and Bonnabel (2017) proved its stability. Barrau and Bonnabel (2015) showed that an invariant EKF-SLAM keeps the unobservable directions unobservable, which gives it better consistency properties than the standard EKF.
 
-And this is where the Invariant EKF becomes interesting.
+That is where the Invariant EKF becomes interesting.
 
 ---
 
 ## 3. Invariant EKF: "Let's respect the geometry of the problem"
 
-The key insight is:
+The key insight:
 
 > **Don't treat a robot pose like an ordinary vector if it isn't one.**
 
 (Naming: in this doc and repo, "IEKF" always means the *Invariant* EKF. The same acronym is also used for the *Iterated* EKF, an unrelated idea covered in §9.)
 
-Imagine two robots:
-
-```text
-Robot A                    Robot B
-
-     ↑                          ↑
-     |                          |
-     ●                          ●
-```
-
-Suppose both robots observe the **same relative motion**.
-
-If you change the global coordinate system:
-
-```text
-Before                         and after changing the frame
-
-     ↑                               ↗
-     ●                               ●
-```
-
-the physical situation hasn't changed.
-
-The robot doesn't suddenly behave differently just because **you changed your coordinate system**. A good estimator should therefore behave consistently under these transformations. This property is related to **invariance**.
+If we change the global coordinate system, the physical situation doesn't change: the robot doesn't behave differently just because we picked another frame. A good estimator should behave consistently under such transformations. This property is called **invariance**.
 
 ---
 
-## 4. The big difference
-
-A compact way to hold the three apart:
+## 4. KF vs. EKF vs. IEKF at a glance
 
 | Filter   | Mental model                                                                                   |
 | -------- | ---------------------------------------------------------------------------------------------- |
@@ -243,57 +146,43 @@ A compact way to hold the three apart:
 | **EKF**  | "The world is nonlinear, so I'll linearize it."                                                |
 | **IEKF** | "The world is nonlinear, so I'll linearize it in a way that respects its geometry/symmetries." |
 
-The IEKF is therefore **not simply "EKF but more accurate"**. Instead, it's a different way of constructing the error and performing the linearization.
+The IEKF is **not simply "EKF but more accurate"** (§7). It is a different way of constructing the error and performing the linearization.
 
 ---
 
 ## 5. The really important difference: how do you define error?
 
-Suppose:
-- Your **estimated orientation** is $\hat R$ 
-- The **true orientation** is $R$
+Say our **estimated orientation** is $\hat R$ and the **true orientation** is $R$.
 
-### Ordinary EKF thinking
-
-You might think **the error** is defined as ${R-\hat R}$, but subtraction doesn't naturally make sense for rotations. So EKF implementations often represent the rotation using something like Euler angles or a local perturbation and then linearize.
-
-### IEKF thinking
-
-Instead of asking:
-
-> "What is the difference between these two rotations?"
-
-in an ordinary vector sense, we ask:
-
-> **"What rotation would transform my estimate into the true rotation?"**
-
-For example:
+- **Ordinary EKF thinking:** the error might be ${R-\hat R}$, but subtraction doesn't naturally make sense for rotations. EKF implementations often represent the rotation with Euler angles or a local perturbation and then linearize.
+- **IEKF thinking:** ask "what rotation would transform my estimate into the true rotation?" - "my estimate is here; what small motion on the rotation manifold takes me to the truth?" For example:
 
 $$R = \hat R \exp(\delta\theta^\wedge)$$
 
-where $\delta\theta$ is a **small rotation error**.
+where $\delta\theta$ is a **small rotation error**. This is a much more natural geometric representation for robot motion.
 
-This is much more natural geometrically, as you are essentially saying:
-
-> "My estimate is here. What small motion on the rotation manifold would take me to the truth?"
-
-That's a much more natural representation for robot motion.
-
-**A caveat worth remembering**: using $R = \hat R \exp(\delta\theta^\wedge)$ instead of $R - \hat R$ is, by itself, just a *manifold* or *multiplicative* error representation - it is not automatically "invariant." Plenty of widely-used filters (ESKF, MEKF, the error-state formulations behind most VIO pipelines) already define their error this way without being IEKFs. What earns the name **invariant** is a further, more specific choice: picking the error so that it's built from the group action itself (left- or right-invariant), which makes the *linearized error dynamics* independent of the current state estimate. That's the property that actually fixes the consistency problem from §2 - not the exp/log notation on its own.
+**A caveat**: $R = \hat R \exp(\delta\theta^\wedge)$ instead of $R - \hat R$ is, by itself, just a *manifold* (*multiplicative*) error representation - it is not automatically "invariant."
+- Widely-used filters (ESKF, MEKF, the error-state formulations behind most VIO pipelines) already define their error this way without being IEKFs.
+- What earns the name **invariant** is a further choice: building the error from the group action itself (left- or right-invariant).
+- For *group-affine* dynamics with invariant-form measurements, that makes the *linearized error dynamics* independent of the current state estimate. That property, not the exp/log notation, is what addresses the consistency problem from §2.
 
 ### EKF vs. IEKF, equations side by side
 
-§2 wrote down the EKF's predict/update cycle for an ordinary vector state; the subsections above explained *why* IEKF defines its error differently, but never wrote its equations down. This subsection does both, on the same concrete example §1 and §7 already use: tracking a pose $T\in SE(3)$ against a known point cloud (`run_ekf`/`run_iekf` in [pointcloud_pose_tracking.py](../../use_numpy/pointcloud_pose_tracking.py)). The point isn't just to see more formulas - it's to see the *one* line where EKF and IEKF actually diverge, since every other line is identical.
+§2 wrote the EKF's predict/update cycle for a vector state. Here we write both filters' equations on the concrete example §1 and §7 use: tracking a pose $T\in SE(3)$ against a known point cloud (`run_ekf`/`run_iekf` in [pointcloud_pose_tracking.py](../../use_numpy/pointcloud_pose_tracking.py)). The point is to see the *one* line where EKF and IEKF diverge, since every other line is identical.
 
 **Shared setup.** State $T$ (a pose, not a vector) with 6x6 tangent covariance $P$; a per-step body-frame twist input $u$; a point cloud $`\{p_i\}`$ known in the object's own body frame, observed as noisy world-frame points $z_i$.
 
-**Predict - identical for both filters.** Composing poses with the group operation (not addition) is *exact* here, so this step isn't even an approximation:
+**Predict - identical for both filters.** The mean is composed with the group operation (not addition), which is *exact* here:
 
 ```math
 \hat T_k^- = \hat T_{k-1}\exp(u_{k-1}\Delta t) \qquad P_k^- = J_{\text{self}}\,P_{k-1}\,J_{\text{self}}^\top + J_\tau\,Q\,J_\tau^\top
 ```
 
-Here $`J_{\text{self}} = \mathrm{Ad}_{\exp(-u_{k-1}\Delta t)}`$ (`se3_adjoint`) and $J_\tau = J_r(u_{k-1}\Delta t)$ (`se3_right_jacobian`). Both are closed-form $SE(3)$ Jacobians of that composition, not linearizations of an approximate model. $`Q = \Delta t^2\,\mathrm{diag}(\sigma_v^2 I_3, \sigma_\omega^2 I_3)`$ is the covariance of the twist increment $u\Delta t$. The full per-function math, including the UKF, vanilla KF and batch GN, is in [pointcloud_pose_tracking_empirical_note.md §1.1](pointcloud_pose_tracking_empirical_note.md#11-the-filter-math-concretely).
+- $`J_{\text{self}} = \mathrm{Ad}_{\exp(-u_{k-1}\Delta t)}`$ (`se3_adjoint`) is exact for this composition.
+- $J_\tau = J_r(u_{k-1}\Delta t)$ (`se3_right_jacobian`) is a first-order (in the twist noise) linearization.
+- $`Q = \Delta t^2\,\mathrm{diag}(\sigma_v^2 I_3, \sigma_\omega^2 I_3)`$ is the covariance of the twist increment $u\Delta t$.
+
+The full per-function math, including the UKF, vanilla KF and batch GN, is in [pointcloud_pose_tracking_empirical_note.md §1.1](pointcloud_pose_tracking_empirical_note.md#11-the-filter-math-concretely).
 
 **Update - this is where they diverge.**
 
@@ -303,29 +192,30 @@ Here $`J_{\text{self}} = \mathrm{Ad}_{\exp(-u_{k-1}\Delta t)}`$ (`se3_adjoint`) 
 | Jacobian $H_i$ | $`\left[R_{\text{pred}} \;\; -R_{\text{pred}}\,p_i^\wedge\right]`$ | $`\left[I \;\; -p_i^\wedge\right]`$ |
 | Depends on current estimate? | Yes - $R_{\text{pred}}$ appears in $H$ itself | **No** - only the fixed, known $p_i$ appears |
 
-Both then finish identically, with $`R_{\text{meas}} = \sigma^2 I`$ the point-noise covariance (named this way here because $R$ already means rotation in this section):
-$$K_k = P_k^-H^\top(HP_k^-H^\top+R_{\text{meas}})^{-1} \qquad \hat T_k = \hat T_k^-\exp(K_k r_k) \qquad P_k = (I-K_kH)P_k^-$$
+Both then use the same gain, covariance and pose-update formulas (each with its own $H$ and $r_k$), with $`R_{\text{meas}} = \sigma^2 I`$ the point-noise covariance (named this way because $R$ already means rotation in this section):
 
-**What this example does and doesn't show.** The IEKF's $H$ never mentions $R_{\text{pred}}$: it's built purely from the group action, by rotating the *measurement* into the body frame rather than rotating the *known points* into the world frame. That's the general IEKF recipe for the update (express the residual through the group action, and the state-dependence cancels out of $H$), and nothing about it is unique to point clouds.
+```math
+K_k = P_k^-H^\top(HP_k^-H^\top+R_{\text{meas}})^{-1} \qquad \hat T_k = \hat T_k^-\exp(K_k r_k) \qquad P_k = (I-K_kH)P_k^-
+```
 
-But this benchmark's `run_ekf` is not the kind of EKF §2 warns about:
+**What this example does and doesn't show.**
+- The IEKF's $H$ never mentions $R_{\text{pred}}$: it rotates the *measurement* into the body frame rather than rotating the *known points* into the world frame. For measurements of this invariant form, that is the general IEKF recipe (express the residual through the group action and the state-dependence drops out of $H$).
+- Caveat: the benchmark's state-independent $H$ relies on isotropic measurement noise. With anisotropic $\Sigma$, the body-frame noise $`R_{\text{pred}}^\top \Sigma R_{\text{pred}}`$ depends on the estimate.
+- Under isotropic noise, the two pairs give the *same* correction $K_k r_k$ and the same $P_k$ every step (§7). $R_{\text{pred}}$ cancels out of $K_k r_k$ and of $P_k$ because it is an orthogonal matrix acting on both sides of the update. $K_k$ itself differs: $`K_{\text{world}} = K_{\text{body}}\,\mathrm{blkdiag}(R_{\text{pred}})^\top`$.
+- So here the IEKF's advantage is computational and structural ($H$ is never rebuilt from $R_{\text{pred}}$), not statistical.
+
+This benchmark's `run_ekf` is also not the kind of EKF §2 warns about:
 - It already uses the same error as the IEKF, $T = \hat T\exp(\xi)$, which is why the two share a predict step whose Jacobians depend only on the input $u$, not on the estimate.
-- Its world-frame $H$ is just the body-frame $H$ with each point's rows rotated by $R_{\text{pred}}$: the same information, written in another frame. So the estimate-dependence in the EKF's $H$ here is harmless, as the exact equivalence below confirms.
-- §2's failure mode needs something this EKF doesn't have: an error defined additively on a vector parametrization (classic EKF-SLAM, with $[x, y, \theta]$ and landmark positions in one flat vector), so that re-linearizing at a drifting estimate changes which directions look observable.
+- Its world-frame $H$ is the body-frame $H$ with each point's rows rotated by $R_{\text{pred}}$: the same information in another frame, so the estimate-dependence is harmless, as the exact equivalence confirms.
+- §2's failure mode needs an error defined additively on a vector parametrization (classic EKF-SLAM, with $[x, y, \theta]$ and landmark positions in one flat vector), so that re-linearizing at a drifting estimate changes which directions look observable.
 
-This benchmark therefore demonstrates the IEKF's structural and computational side, not its consistency side.
-
-One more thing worth internalizing from this side-by-side view: under isotropic measurement noise, these two residual/Jacobian pairs turn out to produce *exactly* the same $K_k r_k$ correction every step (see §7) - $R_{\text{pred}}$ cancels out of the Kalman gain algebraically, since it's an orthogonal matrix acting identically on both sides of the update. So on *this* benchmark, IEKF's advantage isn't accuracy; it's that $H$ never needs to be rebuilt from $R_{\text{pred}}$ - a computational and structural win, not (yet) a statistical one. §7 covers when that changes.
+So this benchmark shows the IEKF's structural and computational side, not its consistency side.
 
 ---
 
 ## 6. Why is this useful for SLAM?
 
-Consider a robot state:
-
-$${X = \begin{bmatrix} R & p & v & b_g & b_a \end{bmatrix} }$$
-
-where:
+Consider a robot state $X = (R, p, v, b_g, b_a)$, where:
 
 - $R$: orientation
 - $p$: position
@@ -333,70 +223,36 @@ where:
 - $b_g$: gyroscope bias
 - $b_a$: accelerometer bias
 
-An ordinary EKF has to repeatedly calculate Jacobians around the current estimate. But the system has important **geometric symmetries**. For example, changing the **global reference frame** shouldn't fundamentally change the **robot's physical behavior**. The IEKF constructs the **estimation error** so that these symmetries are handled naturally. For systems whose dynamics have the right structure (*group-affine*, which covers IMU-driven orientation, velocity and position), that buys three concrete things:
+An ordinary EKF has to repeatedly calculate Jacobians around the current estimate. But the system has **geometric symmetries**: changing the **global reference frame** shouldn't change the **robot's physical behavior**. The IEKF constructs the **estimation error** so that these symmetries are handled naturally. For dynamics with the right structure (*group-affine*, which covers IMU-driven orientation, velocity and position) and invariant-form measurements, that buys three concrete things:
 
 - the linearized error dynamics don't depend on the current estimate, so a bad estimate doesn't distort the propagated covariance;
 - directions no sensor can observe (such as global yaw and position) stay unobservable in the filter, which is what keeps it consistent;
 - provable convergence properties (Barrau & Bonnabel 2017).
 
-**The catch is the biases.** No Lie group includes $b_g$ and $b_a$ while keeping the dynamics group-affine, so with biases in the state those guarantees no longer hold exactly. Practical filters use an "imperfect" IEKF: orientation, velocity and position on the group, biases handled as ordinary vector states. Hartley et al. (2020) report that it still outperforms the standard EKF.
+**The catch is the biases.** With $b_g$ and $b_a$ in the state, the dynamics are not group-affine in the standard formulation, so those guarantees no longer hold exactly. Practical filters keep orientation, velocity and position on the group and treat the biases as ordinary vector states (an "imperfect" IEKF). Hartley et al. (2020) report that this still outperforms the standard EKF.
 
 ---
 
-## 7. The subtle but important point
+## 7. Geometry-aware is not the same as more accurate
 
-One misconception is:
+A common misconception is **KF → EKF → IEKF = three levels of accuracy**. That's not quite right:
 
-> **KF → EKF → IEKF = three levels of accuracy.**
+- **KF**: different mathematical assumptions (linear).
+- **EKF**: generic nonlinear approximation.
+- **IEKF**: geometry-aware nonlinear approximation.
 
-That's not quite right.
-
-It's better to think:
-
-> **KF → different mathematical assumptions**
-
-> **EKF → generic nonlinear approximation**
-
-> **IEKF → geometry-aware nonlinear approximation**
-
-In fact, an IEKF can sometimes have **better convergence and consistency properties** than a conventional EKF because the linearization is aligned with the system's inherent symmetries.
+An IEKF can sometimes have **better convergence and consistency properties** than a conventional EKF because the linearization is aligned with the system's inherent symmetries. That is not the same as being more accurate everywhere.
 
 **A concrete data point** from this repo's own point-cloud pose-tracking benchmark ([use_numpy/pointcloud_pose_tracking.py](../../use_numpy/pointcloud_pose_tracking.py), [use_manif/pointcloud_pose_tracking.py](../../use_manif/pointcloud_pose_tracking.py)):
-- **Accuracy: identical.** Under [isotropic](../glossary.md#1-geometry-and-lie-groups) point-noise covariance, EKF and IEKF produce **exactly identical** corrections - proven algebraically (the body-frame and world-frame residual/Jacobian pairs differ only by a per-point rotation that cancels exactly out of the Kalman gain) and confirmed numerically to ~1e-14 precision. Both filters converged to the same estimate.
-- **Speed: IEKF wins.** Its fixed Jacobian made it about 30% faster per step than EKF, at identical memory - [the empirical note's §2.4](pointcloud_pose_tracking_empirical_note.md#24-what-actually-differs-between-them-speed-not-accuracy) measured 260 vs. 369 µs/step. Timings depend on the machine, and later re-runs gave a 27-40% speed-up.
-- **Takeaway**: "geometry-aware" doesn't always mean "more accurate" - sometimes it means "cheaper to compute the same answer," and the accuracy gap only opens up once the noise model or system structure breaks the symmetry that made them equivalent here.
+- **Accuracy: identical.** Under [isotropic](../glossary.md#1-geometry-and-lie-groups) point-noise covariance, EKF and IEKF produce **exactly identical** corrections $K r$ and posterior $P$ - proven algebraically (the body-frame and world-frame residual/Jacobian pairs differ only by a per-point rotation, which cancels out of $K r$ and $P$; $K$ itself differs by that rotation) and confirmed numerically to ~1e-13. Both filters converged to the same estimate.
+- **Speed: IEKF wins.** Its fixed Jacobian made it about 27-30% faster per step than EKF at identical memory - [the empirical note's §2.4](pointcloud_pose_tracking_empirical_note.md#24-what-actually-differs-between-them-speed-not-accuracy) measured 260 vs. 369 µs/step. Timing is machine-dependent and noisy.
+- **Takeaway**: "geometry-aware" doesn't always mean "more accurate" - sometimes it means "cheaper to compute the same answer." The accuracy gap only opens up once the noise model or system structure breaks the symmetry that made them equivalent here (for example, anisotropic measurement noise).
 
 ---
 
-## 8. A nice analogy (and the one-liners to remember)
+## 8. Which one should we use?
 
-Imagine you're navigating an unfamiliar city with a map.
-
-### KF
-
-You say:
-
-> "The streets are straight."
-
-Very easy. In one sentence: **"I can model my system as linear."**
-
-### EKF
-
-You realize:
-
-> "Okay, streets curve. I'll approximate the street as a straight line around my current location."
-
-Then you repeatedly update your approximation. In one sentence: **"My system is nonlinear, but I'll approximate it as linear around my current estimate."**
-
-### IEKF
-
-You realize:
-
-> "Wait. I'm navigating on a **map**, and the important thing is how my position and orientation transform relative to the map."
-
-So instead of pretending the map is just a giant flat vector space, you explicitly use the geometry of the navigation problem. In one sentence: **"My system is nonlinear and has geometric structure, so I'll define my errors and linearization in a way that respects that structure."**
-
-The same idea, as a decision procedure:
+The one-liners are in §4's table. As a decision procedure:
 
 ```text
                  State estimation
@@ -421,21 +277,21 @@ The same idea, as a decision procedure:
                                               the geometry"
 ```
 
-The last distinction is the one worth internalizing: **robot pose is not just a vector; it has geometry.** That's one of the main reasons IEKF is so attractive for inertial navigation, visual-inertial estimation, and SLAM.
+The last distinction is the one to internalize: **a robot pose is not just a vector; it has geometry.** That is one of the main reasons the IEKF is attractive for inertial navigation, visual-inertial estimation, and SLAM.
 
 ---
 
 ## 9. Other prominent variants worth keeping in mind
 
-KF, EKF, and IEKF aren't the whole landscape. A few others come up constantly in robotics/SLAM/VIO work, so it's worth knowing what each one buys you.
+KF, EKF, and IEKF aren't the whole landscape. A few others come up constantly in robotics/SLAM/VIO work.
 
 ### UKF (Unscented Kalman Filter) - "Don't linearize the function, sample around it instead"
 
-Instead of a Jacobian, the UKF pushes a small, deterministic set of "sigma points" through the *exact* nonlinear function and reconstructs the mean/covariance from the results. No derivatives needed, and it captures curvature a first-order Jacobian misses - often more accurate than EKF at similar cost.
+Instead of a Jacobian, the UKF pushes a small, deterministic set of "sigma points" through the *exact* nonlinear function and reconstructs the mean/covariance from the results. No derivatives needed, and it captures curvature a first-order Jacobian misses. The price is compute: in this repo the UKF is several times slower per step than EKF/IEKF ([empirical note](pointcloud_pose_tracking_empirical_note.md)).
 
 ### ESKF - "Keep a big slow-changing state and a tiny error state that's always near zero"
 
-Already touched on in §5: the ESKF splits the state into a "nominal" state, integrated directly with the raw nonlinear equations, and a small "error state" that stays close to zero and is safe to linearize. The error is additive for vector states and a small rotation for attitude ($`R = \hat R\exp(\delta\theta^\wedge)`$, as in §5). The filter estimates only the error; after each update that estimate is folded into the nominal state and reset to zero ([extra_kf_variants.md §2](extra_kf_variants.md#2-error-state-kalman-filter-eskf)). It's the de facto backbone of most modern VIO pipelines.
+Already touched on in §5: the ESKF splits the state into a "nominal" state, integrated directly with the raw nonlinear equations, and a small "error state" that stays close to zero and is safe to linearize. The error is additive for vector states and a small rotation for attitude ($`R = \hat R\exp(\delta\theta^\wedge)`$, as in §5). The filter estimates only the error; after each update that estimate is folded into the nominal state and reset to zero ([extra_kf_variants.md §2](extra_kf_variants.md#2-error-state-kalman-filter-eskf)). It's a common backbone of filter-based VIO (e.g. MSCKF-style systems).
 
 ### MSCKF - "Don't put landmarks in the state at all"
 
@@ -445,17 +301,17 @@ Instead of estimating landmark positions jointly with the pose (as EKF-SLAM does
 
 At each update, relinearize the measurement model around the *updated* state estimate and repeat until convergence - essentially Gauss-Newton applied inside a single EKF update. Reduces linearization error for measurements that are very nonlinear or very informative.
 
-**A naming collision worth flagging**: "IEKF" is used in the literature for *both* Iterated EKF and Invariant EKF - two unrelated ideas that happen to share an acronym. This doc uses IEKF exclusively for Invariant EKF (§2-§5); when reading other material, check which one is meant.
+**A naming collision**: "IEKF" is used in the literature for *both* Iterated EKF and Invariant EKF - two unrelated ideas that share an acronym. This doc uses IEKF exclusively for Invariant EKF (§2-§5); when reading other material, check which one is meant.
 
 ### EqF - "Generalize the invariant idea to any symmetry, not just matrix Lie groups"
 
-The Invariant EKF (§3-§5) needs the state itself to live on a Lie group like $SO(3)$ or $SE(3)$. The Equivariant Filter takes the same core idea - pick errors and linearizations that respect the system's symmetry - and extends it to systems whose state space is not a Lie group but is acted on by one (a homogeneous space), which covers more of the systems robots actually estimate. A reasonable "what comes after IEKF" pointer if you want to go further.
+The Invariant EKF (§3-§5) needs the state itself to live on a Lie group like $SO(3)$ or $SE(3)$. The Equivariant Filter takes the same core idea - pick errors and linearizations that respect the system's symmetry - and extends it to systems whose state space is not a Lie group but is acted on by one (a homogeneous space), which covers more of the systems robots actually estimate. A reasonable "what comes after IEKF" pointer if we want to go further.
 
 ---
 
 ## 10. One-sentence summary
 
-> **KF, EKF, and IEKF are three answers to the same question - how do I combine a prediction with a measurement - that differ only in what they assume about the system: linear (KF), nonlinear but locally linearizable (EKF), or nonlinear with geometric structure worth respecting in how the error itself is defined (IEKF).**
+> **KF, EKF, and IEKF are three answers to the same question - how do we combine a prediction with a measurement - that differ in what they assume about the system (linear for KF, nonlinear but locally linearizable for EKF, nonlinear with geometric structure worth respecting for IEKF), and in how the error is defined and the update is built (§5).**
 
 ---
 
@@ -463,7 +319,7 @@ The Invariant EKF (§3-§5) needs the state itself to live on a Lie group like $
 
 1. Kalman, R. E. (1960). *A New Approach to Linear Filtering and Prediction Problems*. Journal of Basic Engineering, 82(1), 35–45. https://doi.org/10.1115/1.3662552 - the original formulation behind §1's standard KF.
 2. Huang, G. P., Mourikis, A. I., & Roumeliotis, S. I. (2010). *Observability-based Rules for Designing Consistent EKF SLAM Estimators*. International Journal of Robotics Research, 29(5), 502–528. https://journals.sagepub.com/doi/10.1177/0278364909353640 - the consistency analysis behind §2's "spurious information into unobservable directions" argument.
-3. Lefferts, E. J., Markley, F. L., & Shuster, M. D. (1982). *Kalman Filtering for Spacecraft Attitude Estimation*. Journal of Guidance, Control, and Dynamics, 5(5), 417–429. https://doi.org/10.2514/3.56190 - the classic MEKF reference behind §2's spacecraft-attitude aside.
+3. Lefferts, E. J., Markley, F. L., & Shuster, M. D. (1982). *Kalman Filtering for Spacecraft Attitude Estimation*. Journal of Guidance, Control, and Dynamics, 5(5), 417–429. https://doi.org/10.2514/3.56190 - the classic MEKF reference behind §2's MEKF aside.
 4. Barrau, A., & Bonnabel, S. (2017). *The Invariant Extended Kalman Filter as a Stable Observer*. IEEE Transactions on Automatic Control, 62(4), 1797–1812. https://arxiv.org/abs/1410.1465 - the main modern IEKF reference, proving its stability as an observer for group-affine systems; §2, §3, §5 and §6. The invariant-EKF idea itself is older (reference 11).
 5. Solà, J., Deray, J., & Atchuthan, D. (2018). *A micro Lie theory for state estimation in robotics*. arXiv:1812.01537. https://arxiv.org/abs/1812.01537 - background for the exp/log/hat (Lie group) notation used in §5, and the theoretical basis of the `manif` library used in this repo's own benchmark referenced in §7.
 6. Julier, S. J., & Uhlmann, J. K. (1997). *New extension of the Kalman filter to nonlinear systems*. Proc. SPIE 3068, Signal Processing, Sensor Fusion, and Target Recognition VI, 182–193. https://doi.org/10.1117/12.280797 - the original UKF paper, referenced in §9.
@@ -473,4 +329,4 @@ The Invariant EKF (§3-§5) needs the state itself to live on a Lie group like $
 10. van Goor, P., Hamel, T., & Mahony, R. (2020). *Equivariant Filter (EqF)*. arXiv:2010.14666. https://arxiv.org/abs/2010.14666 - the EqF paper, §9.
 11. Bonnabel, S. (2007). *Left-invariant extended Kalman filter and attitude estimation*. 46th IEEE Conference on Decision and Control, 1027-1032. https://doi.org/10.1109/CDC.2007.4434662 - an early formulation of the invariant EKF, §2.
 12. Barrau, A., & Bonnabel, S. (2015). *An EKF-SLAM algorithm with consistency properties*. arXiv:1510.06263. https://arxiv.org/abs/1510.06263 - the invariant EKF-SLAM whose consistency addresses §2's problem.
-13. Hartley, R., Ghaffari, M., Eustice, R. M., & Grizzle, J. W. (2020). *Contact-aided invariant extended Kalman filtering for robot state estimation*. International Journal of Robotics Research, 39(4), 402-430. https://doi.org/10.1177/0278364919894385 - the "imperfect" IEKF with IMU biases, §6.
+13. Hartley, R., Ghaffari, M., Eustice, R. M., & Grizzle, J. W. (2020). *Contact-aided invariant extended Kalman filtering for robot state estimation*. International Journal of Robotics Research, 39(4), 402-430. https://doi.org/10.1177/0278364919894385 - an IEKF with IMU biases handled as vector states (the "imperfect" IEKF), §6.

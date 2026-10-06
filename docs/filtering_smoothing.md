@@ -1,6 +1,6 @@
 # Filtering vs. Optimization/Smoothing in SLAM
 
-The easiest way to understand **Filtering vs. Optimization/Smoothing in SLAM** is to think about **when the robot is allowed to change its mind about the past**.
+The key to **Filtering vs. Optimization/Smoothing in SLAM** is **when the robot is allowed to change its mind about the past**.
 
 ---
 
@@ -30,7 +30,7 @@ The fundamental difference is:
 
 > **Estimate a whole trajectory by jointly considering many states and measurements, including information that may arrive later.**
 
-This leads to a very useful mental model:
+Two one-line mental models:
 
 > **Filtering = "What do I believe right now?"**
 
@@ -74,20 +74,9 @@ Then the robot moves to $t_4$.
 
 The filter takes the estimate at $t_3$, propagates it forward, incorporates $z_4$, and produces the estimate at $t_4$.
 
-### Important property
+### What the filter forgets
 
-Once the filter has moved on, it generally **doesn't go back and completely reconsider old states**.
-
-For example:
-
-```text
-t₀       t₁       t₂       t₃
-|--------|--------|--------|
-                           ↑
-                     current estimate
-```
-
-It essentially says:
+Once the filter has moved on, it generally **doesn't go back and reconsider old states**. It essentially says:
 
 > "I have compressed everything before $t_3$ into my current belief. Now let's continue."
 
@@ -113,7 +102,7 @@ But later, at `E`, it recognizes:
 
 That's a **loop closure**.
 
-Now the robot realizes that its previous trajectory was wrong: the new information tells us it should have ended up back near its starting position, not off at a separate point `E`.
+The previous trajectory must have been wrong: the new information says the robot ended up back near its starting position, not at a separate point `E`.
 
 Therefore, **all those previous poses may need to move**:
 
@@ -162,9 +151,9 @@ x₀ ── x₁ ── x₂ ── x₃ ── x₄
 
 The SLAM problem becomes:
 
-> **Find the set of poses and landmarks that best explains all the measurements.**
+> **Find the set of poses and landmarks that best explains all the measurements (a local optimum, in general).**
 
-Mathematically, you can think of:
+Mathematically, we write:
 
 ```math
 {\mathbf{x}^*=\arg\min_{\mathbf{x}}\sum_i \|r_i(\mathbf{x})\|^2}
@@ -173,12 +162,12 @@ Mathematically, you can think of:
 where:
 
 - $\mathbf{x}$ = all poses/landmarks
-- $r_i(\mathbf{x})$ = measurement residual
-- optimization finds the trajectory that minimizes the total error.
+- $r_i(\mathbf{x})$ = (whitened) measurement residual, i.e. weighted by the measurement covariance
+- the solver (Gauss-Newton or a damped variant such as Levenberg-Marquardt) finds a local minimum of the total error, so a good initial guess matters.
 
 This is the fundamental idea behind **bundle adjustment**, **pose-graph optimization**, and many modern SLAM systems.
 
-### Why optimization is powerful
+### Revising the past after a loop closure
 
 Suppose we have:
 
@@ -223,7 +212,7 @@ After optimization:
 
 The important point is:
 
-### Optimization can revise the past.
+**Optimization can revise the past.**
 
 ---
 
@@ -265,59 +254,16 @@ x₀ x₁ x₂ x₃
   joint estimate
 ```
 
-Optimization is often used as the computational mechanism for obtaining this joint estimate. Strictly, least-squares optimization returns the single most likely trajectory (the MAP estimate, i.e. the peak of $`p(x_{0:t} \mid z_{0:t})`$), not the whole distribution; the uncertainty around it is usually approximated as a Gaussian whose information matrix is the Gauss-Newton Hessian $`J^\top J`$ at the solution.
+Optimization is often used as the computational mechanism for obtaining this joint estimate. Strictly, least-squares optimization returns the single most likely trajectory (the MAP estimate, i.e. the peak of $`p(x_{0:t} \mid z_{0:t})`$), not the whole distribution; the uncertainty around it is usually approximated as a Gaussian whose information matrix is the Gauss-Newton Hessian $`J^\top \Sigma^{-1} J`$ at the solution (with whitened Jacobians, simply $`J^\top J`$).
 
 ---
 
 ## 5. An analogy
 
-Imagine you're reconstructing a person's route through a city.
+We reconstruct a person's route through a city.
 
-### Filtering
-
-You ask the person at every intersection:
-
-> "Where are you now?"
-
-At intersection 1:
-
-> "I'm probably here."
-
-At intersection 2:
-
-> "Now I'm probably here."
-
-At intersection 3:
-
-> "I'm probably here."
-
-You keep moving forward.
-
-You don't spend much time reconsidering previous answers.
-
----
-
-### Smoothing
-
-At the end of the day, you give them:
-
-- GPS measurements
-- photos
-- timestamps
-- landmarks
-- the final destination
-
-and ask:
-
-> **"Given everything we know now, where were you at every point during the day?"**
-
-Suddenly they realize:
-
-> "Oh! That landmark I saw at 2 PM was actually the same place I saw at 10 AM."
-
-So they revise their estimate of where they were at 11 AM, 12 PM, 1 PM, etc.
-
-That's smoothing.
+- **Filtering:** at each intersection we take the previous answer, add the new clue (a street sign, a step count), and update "I'm probably here". We carry that belief forward and never reopen old answers.
+- **Smoothing:** at the end of the day we collect all the GPS fixes, photos, timestamps and landmarks and ask, **"Given everything we know now, where were you at every point during the day?"** The person realizes the landmark seen at 2 PM is the one seen at 10 AM, so the 11 AM, 12 PM and 1 PM positions get revised too.
 
 ---
 
@@ -331,7 +277,7 @@ This gives us a useful trade-off:
 | State maintained   | Current belief                 | Many historical states                     |
 | Uses past          | Compressed into current belief | Explicitly retained                        |
 | Can revise past?   | Limited                        | Yes                                        |
-| Loop closure       | More difficult                 | Natural                                    |
+| Loop closure       | Harder (no past poses to move; EKF-SLAM corrects the map via correlations) | Natural |
 | Computation        | Usually cheaper                | Usually more expensive                     |
 | Memory             | Lower                          | Higher                                     |
 | Online operation   | Excellent                      | Possible, but needs management             |
@@ -341,109 +287,84 @@ This gives us a useful trade-off:
 **A caveat on cost**: "filtering is cheaper" holds for small, fixed-size problems, but it inverts at scale.
 - **EKF-SLAM** keeps a *dense* joint covariance, so every update costs roughly $O(n^2)$ in the number of landmarks (Dissanayake et al., 2001).
 - **Sparse factor-graph smoothing** exploits the sparsity of the graph instead. With an incremental solver such as iSAM2 (Kaess et al., 2012), an odometry measurement only re-eliminates a small part of the Bayes tree near the newest pose.
-- **There is no guaranteed bound, though**: a loop closure can force re-elimination of most or all of the tree, and the cost of that step depends on the fill-in of the sparse factorization. This repo's [`bayes_tree_construction.py`](../use_numpy/bayes_tree_construction.py) shows both cases on a 16-node square loop: an odometry edge affects 2 of 16 variables, while a loop-closure edge affects all 16 (see [`bayes_tree.md` §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo)).
+- **There is no guaranteed bound**: a loop closure can force re-elimination of most or all of the tree, and the cost depends on the fill-in of the sparse factorization. This repo's [`bayes_tree_construction.py`](../use_numpy/bayes_tree_construction.py) shows both cases on a 16-node square loop. Under its fixed oldest-first ordering, an odometry edge affects 2 of 16 variables and a loop-closure edge affects all 16; iSAM2 additionally reorders the affected part, so its real cost is lower (see [`bayes_tree.md` §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo)).
 
-The defensible claim is therefore that *most* updates in a typical SLAM graph (mostly odometry, occasionally a loop closure) are cheap under iSAM2, while dense filtering pays $O(n^2)$ on every update. That is why large-scale SLAM moved from EKF-SLAM toward factor-graph smoothing.
+The defensible claim is therefore that *most* updates in a typical SLAM graph (mostly odometry, occasionally a loop closure) are cheap under iSAM2, while EKF-SLAM pays $O(n^2)$ on every update. That is why large-scale SLAM moved from EKF-SLAM toward factor-graph smoothing.
 
 ---
 
 ## 7. This is where factor graphs fit
 
-A **factor graph** is an excellent mental bridge between the two worlds.
+A **factor graph** is the bridge between the two worlds. It is bipartite: variables (poses, landmarks) are one kind of node, and each **factor** is its own node connected to the variables it constrains. A SLAM factor graph typically contains **three kinds of factors** (■ = factor node, ● = variable node):
 
-A SLAM factor graph typically contains **three kinds of factors**:
-
-- A **landmark factor** ties a pose to a landmark it observed (the drawing shows two such factors, from $x_0$ and $x_2$ to the same landmark):
+- A **landmark factor** ties a pose to a landmark it observed (two such factors, from $x_0$ and $x_2$ to the same landmark):
 
 ```text
-      landmark
-         ●
-        / \
-       /   \
- x₀   ●     ● x₂
+x₀ ● ──■── ● landmark ──■── ● x₂
 ```
 
 - A **pose-to-pose factor** ties two consecutive (or, for a loop closure, non-consecutive) poses together via a relative measurement:
 
 ```text
-x₀ ● ── x₁ ● ── x₂ ● ── x₃ ●
+x₀ ● ──■── ● x₁ ──■── ● x₂ ──■── ● x₃
 ```
 
-- A **unary (prior) factor** constrains a single pose directly, with no other variable involved - typically used to remove gauge freedom (the whole solution could otherwise shift and rotate together, and in monocular BA also rescale) or to inject an absolute measurement like GPS. In this repo, [`pose_graph.py`](../use_numpy/pose_graph.py) anchors node 0 with a strong prior on its block of the information matrix, and [`bundle_adjustment.py`](../use_numpy/bundle_adjustment.py) puts soft prior factors on the first two cameras, which also pins the monocular scale. [`bundle_adjustment_advanced.py`](../use_numpy/bundle_adjustment_advanced.py) uses no prior factor; it fixes the gauge by holding two keyframes constant:
+- A **unary (prior) factor** constrains a single variable directly. It removes gauge freedom (the whole solution could otherwise shift and rotate together, and in monocular BA also rescale) or injects an absolute measurement like GPS:
 
 ```text
+■ ── ● x₀ ──■── ● x₁ ──■── ● x₂
 prior
-  │
-  x₀ ● ── x₁ ● ── x₂ ●
 ```
 
-Each measurement becomes a **factor** imposing a constraint.
+In this repo the gauge is fixed as follows:
 
-For example:
+| Script | How the gauge is fixed |
+| --- | --- |
+| [`pose_graph.py`](../use_numpy/pose_graph.py) | strong prior on node 0's block of the information matrix |
+| [`bundle_adjustment.py`](../use_numpy/bundle_adjustment.py) | soft prior factors on the first two cameras (also pins the monocular scale) |
+| [`bundle_adjustment_advanced.py`](../use_numpy/bundle_adjustment_advanced.py) | no prior factor; two keyframes held constant |
+
+Each measurement becomes a factor node imposing a constraint:
 
 ```text
-IMU factor:
-x₁ ───────── x₂
-
-Visual odometry:
-x₂ ───────── x₃
-
-Loop closure:
-x₃ ───────── x₀
+IMU:             x₁ ●──■──● x₂
+Visual odometry: x₂ ●──■──● x₃
+Loop closure:    x₃ ●──■──● x₀
 ```
 
 Optimization then asks:
 
 > **"What configuration of $x_0$, $x_1$, $x_2$, $x_3$ best satisfies all these constraints?"**
 
-This is why factor graphs are so common in modern SLAM.
-
 ---
 
 ## 8. Filtering vs smoothing in one picture
 
-Think of the information flow:
-
-### Filtering
-
 ```text
-                    ┌──────────┐
-measurements ──────►│  FILTER  │──────► current state
-                    └──────────┘
-                         │
-                         ▼
-                    summarize past
+FILTERING                                   SMOOTHING / OPTIMIZATION
+
+                ┌──────────┐                measurements
+measurements ──►│  FILTER  │──► state             │
+                └──────────┘                      ▼
+                     │                 x₀ ─── x₁ ─── x₂ ─── x₃
+                     ▼                  \                   /
+                summarize past           └──loop closure────┘
+                                                  │
+                                                  ▼
+                                         JOINT OPTIMIZATION
+                                                  │
+                                                  ▼
+                                         optimized trajectory
 ```
 
-The past gets **compressed**.
-
-### Smoothing/optimization
-
-```text
-measurements
-     │
-     ├─────────┐
-     ├─────────┤
-     ├─────────┤
-     ▼         ▼
-   x₀  ─── x₁ ─── x₂ ─── x₃
-    \                   /
-    └──loop closure────┘
-             │
-             ▼
-        JOINT OPTIMIZATION
-             │
-             ▼
-     optimized trajectory
-```
-
-The past is **kept around so it can be reconsidered**.
+- The filter's past gets **compressed**.
+- The smoother's past is **kept around so it can be reconsidered**.
 
 ---
 
 ## 9. The precise distinction
 
-It's tempting to say:
+We are tempted to say:
 
 > "Filtering is local, optimization is global."
 
@@ -454,8 +375,6 @@ A filter can incorporate loop closures and other global information. For example
 The more precise distinction is:
 
 > **Filtering recursively represents the current posterior and marginalizes old information, whereas smoothing maintains a posterior over multiple states and can jointly revise them.**
-
-This distinction becomes especially important when studying **VIO, SLAM, and state estimation**.
 
 ---
 
@@ -481,10 +400,10 @@ A rough map is:
 
 (KF and EKF stay in the dense, recursive filtering loop; fixed-lag and full smoothing are the methods usually solved via sparse factor-graph optimization.)
 
-Examples you'll encounter:
+Examples:
 
 - **EKF-SLAM** → filtering
-- **MSCKF** → an EKF-based filter for visual-inertial estimation (a sliding window of poses, landmarks marginalized out rather than kept in the state)
+- **MSCKF** → an EKF-based filter for visual-inertial estimation, run over a sliding window of poses. Landmarks never enter the state; each is used once as a constraint between window poses, then dropped. Because of the window it fits the fixed-lag box only loosely.
 - **VINS-Mono/VINS-Fusion** → nonlinear optimization + sliding window
 - **ORB-SLAM** → heavily optimization-based
 - **GTSAM-based systems** → factor-graph optimization
@@ -498,7 +417,7 @@ This is one corner of the repo-wide map in [slam_mental_map.md](slam_mental_map.
 
 ## 11. And this matters a lot for SLAM + state estimation for resource-constrained robots with discontinuous/hybrid motion
 
-A robot operating with discontinuous/hybrid motion (bio-inspired locomotion, legged contact events, and similar) might experience:
+A robot with discontinuous/hybrid motion (bio-inspired locomotion, legged contact events, and similar) might experience:
 
 ```text
 normal motion
@@ -520,7 +439,7 @@ A smoothing approach can instead ask:
 
 > **"Given the measurements before and after this unusual transition, what was the most consistent trajectory and transition state?"**
 
-That can become very interesting when the motion model is **hybrid/discontinuous**, because future observations may provide strong evidence about what actually happened during an ambiguous transition.
+That matters when the motion model is **hybrid/discontinuous**, because future observations may provide strong evidence about what actually happened during an ambiguous transition.
 
 In summary:
 
@@ -528,7 +447,7 @@ In summary:
 
 > **Smoothing/optimization is like periodically reopening the entire notebook and rewriting the past trajectory so that everything observed so far fits together as consistently as possible.**
 
-And that distinction is one of the most useful conceptual foundations for understanding **EKF-SLAM → factor graphs → sliding-window VIO → pose-graph SLAM → incremental smoothing**.
+That distinction links **EKF-SLAM → factor graphs → sliding-window VIO → pose-graph SLAM → incremental smoothing**.
 
 ---
 

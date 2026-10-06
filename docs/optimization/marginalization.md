@@ -243,7 +243,7 @@ The same scope silences §6's FEJ subtlety here: the inconsistency only shows up
 
 ## 10. One-sentence summary
 
-> **Marginalization is the variable-elimination step from `bayes_tree.md`, used to permanently discard an old state.** It turns that state into a dense prior over whatever it was still connected to. That lets sliding-window/fixed-lag smoothers (MSCKF, VINS-Mono) run in bounded memory and time forever. The price is fill-in (§5) and a consistency subtlety (FEJ, §6) that full-batch and iSAM2 never face.
+> **Marginalization is the variable-elimination step from `bayes_tree.md`, used to permanently discard an old state.** It turns that state into a dense prior over whatever it was still connected to. That lets sliding-window/fixed-lag smoothers (VINS-Mono) and window filters (MSCKF) run in bounded memory and time forever. The price is fill-in (§5) and a consistency subtlety (FEJ, §6) that full-batch and iSAM2 never face.
 
 ---
 
