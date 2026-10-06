@@ -70,6 +70,7 @@ P_0 = \left(A + 10^{-9} I\right)^{-1} b
 $$
 
 - **Conditioning.** The depth error along the rays grows as the parallax (baseline) shrinks.
+- **Tiny example** (toy case: two rectified cameras, baseline $`B`$, focal length $`f`$, depth $`Z`$, pixel noise $`\sigma`$). Depth error is about $`Z^2\sigma/(fB)`$. With $`f=800`$ px, $`Z=10`$ m, $`\sigma=1`$ px: $`B=1`$ m gives 0.125 m of error, and $`B=0.1`$ m gives 1.25 m. A 10 times smaller baseline means a 10 times larger depth error.
 - **The $10^{-9} I$ term.** It keeps the solve defined when all rays are parallel. The depth along the rays is then arbitrary (the term pins the point's coordinate along the ray direction to 0, measured from the world origin).
 
 `refine_landmark_gn` then runs Gauss-Newton on the point alone, with $J_{\text{point}}$ from [bundle_adjustment.md Section 6.1](../optimization/bundle_adjustment.md#61-the-ba-math-concretely):
@@ -96,7 +97,13 @@ In `bundle_adjustment_advanced.py`, a landmark is triangulated once it has `min_
 
 $$d_i \times (R_{cw}P_i + t_{cw}) = 0$$
 
+**Intuition:** count the unknowns.
+- The 12 entries of $`[R_{cw} \mid t_{cw}]`$ are only defined up to scale, so there are 11 unknowns.
+- Each point gives 2 equations. 5 points give 10, which is less than 11. 6 points give 12, which is enough.
+
 This is **linear and homogeneous** in the 12 flattened entries of $[R_{cw} \mid t_{cw}]$ - exactly the classical **Direct Linear Transform (DLT)** camera-resectioning setup, specialized to *known* intrinsics. Stacking two independent rows of this constraint per correspondence gives an overdetermined homogeneous system $Ax=0$, solved via `linear_pnp_dlt` as the smallest right-singular vector of $A$ (`np.linalg.svd`).
+
+**Intuition:** the smallest singular vector is the direction that $A$ squashes the most. Toy case: $`A = \mathrm{diag}(3, 0.1)`$ stretches $`(1,0)`$ to length 3 but shrinks $`(0,1)`$ to 0.1, so $`(0,1)`$ is the best answer to $`Ax \approx 0`$.
 
 > **Note**: SVD (Singular Value Decomposition) factors any matrix as $A=U\Sigma V^\top$, with $U, V$ orthogonal and $\Sigma$ diagonal (the singular values, ranking how much each orthogonal direction contributes to $A$).
 > - The smallest right-singular vector of $A$ (the column of $V$ paired with the smallest singular value) is the least-squares null-space solution `linear_pnp_dlt` uses above.

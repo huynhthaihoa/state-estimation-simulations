@@ -136,6 +136,8 @@ BA doesn't say "the cameras are correct, I'll fix the points" or "the points are
 
 > **"I'll adjust everything together until the entire reconstruction explains the image measurements as well as possible."**
 
+To see why both must move, look at the RMS-error panel of the figure in [Section 6.1](#61-the-ba-math-concretely): it compares landmarks-only, poses-only and joint bundle adjustment.
+
 ---
 
 ## 5. Why is it called "bundle" adjustment?
@@ -221,6 +223,12 @@ p_c = R_i^\top (P_j - t_i) = \begin{bmatrix} x \\ y \\ z \end{bmatrix}, \qquad
 ```
 
 The code clamps $|z|$ to at least $10^{-9}$, keeping its sign, so a point at the camera center can't divide by zero.
+
+**Intuition (projection Jacobian):** it says how many pixels the image point moves per metre the 3D point moves, and far points move less.
+
+- Tiny example: shift a point $`1`$ cm sideways, with $`f_x = 800`$. The pixel moves by $`f_x \cdot 0.01 / z`$.
+- At $`z = 5`$ m that is $`1.6`$ px. At $`z = 10`$ m it is $`0.8`$ px. This is the $`f_x/z`$ entry of $`J_{\text{proj}}`$ below.
+- Sign: if the camera moves right by $`d`$, the point moves left by $`d`$ in the camera frame. This is the $`-I_3`$ in the pose block below.
 
 **Jacobians** (`camera_project(..., with_jacobians=True)`): both go through $p_c$ by the chain rule.
 
@@ -413,6 +421,13 @@ Real scenes usually have far more points than cameras, so solvers use the **Schu
 2. Solve the much smaller reduced camera-only system.
 3. Back-substitute to recover the points.
 
+**Tiny example:** a toy with 2 cameras and 1 point, one number each, and no prior.
+- Let $`J = \begin{bmatrix}1 & 0 & 1\\ 0 & 1 & 1\end{bmatrix}`$ (columns: camera 1, camera 2, point). The point block is $`1 \cdot 1 + 1 \cdot 1 = 2`$.
+- Eliminating the point gives the reduced camera matrix $`\begin{bmatrix}1 & 0\\ 0 & 1\end{bmatrix} - \tfrac{1}{2}\begin{bmatrix}1 & 1\\ 1 & 1\end{bmatrix} = \begin{bmatrix}0.5 & -0.5\\ -0.5 & 0.5\end{bmatrix}`$.
+- The new $`-0.5`$ links the two cameras. They never touched each other, but they share a point (covisibility).
+- This matrix is singular because the toy has no gauge prior. That is expected here.
+- In real BA each point block is only $`3 \times 3`$, so inverting all of them is cheap.
+
 It is the same style of sparsity exploitation that makes [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) tractable at scale.
 
 `bundle_adjustment.py` doesn't need this trick. Its toy scenes are small (8 cameras and 48 landmarks by default), so `run_bundle_adjustment` solves the full dense joint system every iteration. Schur-complement marginalization is what a production solver (COLMAP, g2o, GTSAM, Ceres) does at real scene sizes, not something this demo implements.
@@ -575,6 +590,11 @@ It uses the residual and Jacobians from [Section 6.1](#61-the-ba-math-concretely
 
 Diagonal entries of $H$ below $10^{-12}$ are floored to $10^{-12}$ before scaling. $\lambda$ starts at $10^{-3}$ in every call. A trial step is accepted only if it lowers the cost, and then $\lambda \leftarrow \max(\lambda/2, 10^{-7})$. Otherwise $\lambda \leftarrow 2\lambda$ and the solve is retried, up to 10 times. The loop stops when no step is accepted after 10 retries, when the step norm drops below `gn_tol`, or after `gn_max_iters` iterations.
 
+**Why cheirality matters (tiny example):** the pinhole $`u = f_x\,x/z + c_x`$ flips sign with $`z`$. Take $`f_x = 800`$, $`c_x = 320`$.
+- A point in front, $`P_c = (-1, 0, 5)`$, gives $`u = 160`$.
+- The point $`(1, 0, -5)`$ behind the camera gives the same $`u = 160`$.
+- So a point behind the camera can look like a valid mirrored pixel. The solver must reject it explicitly.
+
 Two cheirality rules protect the solve, using `point_depth` (the $z$ of $`R^\top(P - t)`$). First, any observation whose point is already behind its camera when the call starts is dropped for this call (gating). Second, a trial that puts any remaining point behind its camera gets infinite cost, so it is rejected. New landmarks are triangulated once they have `min_observations` observers (`triangulate_landmark`, then `refine_landmark_gn`, see [triangulation_pnp.md](../frontend/triangulation_pnp.md)). They are committed only if `passes_cheirality` holds. After each local and global solve, `cull_invalid_points` deletes any landmark that is now behind one of its observers, so it can be triangulated again later.
 
 Script defaults: 50 keyframes on a 90° arc of radius 15 m, 8 landmarks per keyframe, 6 m view range, `min_observations` = 3, `min_shared_for_covisibility` = 2, `max_window_keyframes` = 6, a Global BA pass every 8 keyframes (plus one at the end), `gn_tol` = $10^{-6}$, `gn_max_iters` = 15, front-end se3 twist noise std 0.02 per step, $\sigma_{\text{px}} = 1$ px.
@@ -584,6 +604,11 @@ Script defaults: 50 keyframes on a 90° arc of radius 15 m, 8 landmarks per keyf
 ## 14. Evaluating the result: gauge freedom and Umeyama alignment
 
 Monocular BA recovers the scene only up to an unknown similarity transform (rigid + scale). Shifting, rotating or uniformly rescaling the whole scene and every camera pose together leaves reprojection error unchanged.
+
+**Tiny example (scale):** use $`f_x = 800`$ and $`c_x = 320`$.
+- A point at $`(1, 0, 5)`$ gives $`u = 800 \cdot 1/5 + 320 = 480`$ px.
+- Double everything to $`(2, 0, 10)`$ and $`u = 800 \cdot 2/10 + 320 = 480`$ px. Same pixel, so the image cannot tell the two scenes apart.
+- Fixing the distance between two cameras gives the scene a ruler. That is why both BA scripts pin two cameras.
 
 - **`bundle_adjustment.py`** pins that freedom with a soft gauge-prior factor on the first two camera poses, but the resulting frame still won't match ground truth's frame or scale exactly. So before computing pose/landmark error, the script fits one scale + rotation + translation by Umeyama on the camera positions only, then applies it to the cameras and the landmarks. See [umeyama_alignment.md](../foundations/umeyama_alignment.md) for how the alignment is computed and why it's needed. Reprojection error is unaffected by the alignment.
 - **`bundle_adjustment_advanced.py`** hard-fixes two anchor keyframes instead of using a soft prior, which removes all gauge freedom up front, and it reports raw, unaligned error. The catch is *where* the gauge gets pinned: keyframe 0 sits at its true pose, but keyframe 1 keeps its noisy front-end pose, so the scale and orientation it fixes are wrong, and that error is part of what the script reports. [§13.6](#136-in-this-repo) measures it: up to ~19% off in scale over seeds 0-4.

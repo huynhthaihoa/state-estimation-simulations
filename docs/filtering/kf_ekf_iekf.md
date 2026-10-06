@@ -49,6 +49,13 @@ $K_k$ is the "prediction versus measurement" weighting above:
 - It is large (trust the measurement more) when $P_k^-$ is large relative to $`R`$.
 - It is small (trust the prediction more) when $`R`$ is large relative to $P_k^-$. The 70%/30% split earlier is $K$ in disguise.
 
+**Tiny example (1D, toy numbers):** the 15 m prediction vs. 14 m GPS from the start of this doc.
+- Say the prediction variance is $`P=3`$ and the GPS variance is $`R=7`$.
+- Then $`K = P/(P+R) = 3/10 = 0.3`$. That is the 30% on GPS (and 70% on the prediction) from before.
+- Estimate: $`15 + 0.3\,(14-15) = 14.7`$ m, same as the 70%/30% blend.
+- New variance: $`(1-K)P = 0.7 \cdot 3 = 2.1`$, smaller than both $`3`$ and $`7`$. A measurement never leaves us less sure.
+- The prediction step does the opposite: $P$ grows by $`Q`$, so we get less sure while we coast.
+
 The standard KF is a straight ruler for a world that behaves like a straight line. It doesn't work directly for rotations, camera poses, or nonlinear robot dynamics.
 
 **A concrete data point**: this repo's own `run_vanilla_kf` (same point-cloud pose-tracking benchmark referenced in [§7](#7-geometry-aware-is-not-the-same-as-more-accurate)) is exactly this - a standard linear KF applied directly to a pose, via a redundant ambient `[vec(R), t]` state (`vec` taken row-major, as `R.flatten()` does) rather than the minimal $SE(3)$ tangent every other method there uses. It works, but only by bolting on a first-order truncation of the motion model and a post-hoc SVD re-projection to keep the rotation valid - see [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) for the measured cost of skipping the manifold structure altogether.
@@ -119,6 +126,8 @@ Representing rotations awkwardly isn't the deep problem, though. Plain EKF alrea
 
 The real problem is more subtle: **the EKF's Jacobians are evaluated at the current, drifting state estimate**, which differs every run and every step.
 - Each time the filter linearizes at a slightly different point, it linearizes the system's symmetries slightly differently too.
+- **Picture:** some things no sensor can see, such as global yaw (every measurement is relative). An honest filter keeps its uncertainty wide there.
+- Each new linearization point acts like a slightly different ruler. Those small differences make the filter feel it measured yaw a little, so its covariance shrinks along a direction nobody observes. (Picture only, no number.)
 - This can make the EKF inject spurious information into directions of the state that should be unobservable - for example, a global orientation offset that no sensor can see - leaving the filter overconfident (inconsistent) in exactly those directions. Huang, Mourikis, and Roumeliotis (2010) analyzed this consistency problem for EKF-SLAM.
 - The Invariant EKF goes back to Bonnabel (2007), and Barrau and Bonnabel (2017) proved its stability. Barrau and Bonnabel (2015) showed that an invariant EKF-SLAM keeps the unobservable directions unobservable, which gives it better consistency properties than the standard EKF.
 
@@ -135,6 +144,10 @@ The key insight:
 (Naming: in this doc and repo, "IEKF" always means the *Invariant* EKF. The same acronym is also used for the *Iterated* EKF, an unrelated idea covered in §9.)
 
 If we change the global coordinate system, the physical situation doesn't change: the robot doesn't behave differently just because we picked another frame. A good estimator should behave consistently under such transformations. This property is called **invariance**.
+
+**Intuition:**
+- Redraw the map (move the origin, rotate the axes): the robot and our estimate both get new coordinates.
+- What stays the same is the error $`\eta = \hat X^{-1}X`$ (left form), the truth as seen from our estimate. Left/right picture: [left_right_invariant.md §3](left_right_invariant.md#3-why-invariant---and-why-leftright).
 
 ---
 
@@ -160,6 +173,10 @@ Say our **estimated orientation** is $\hat R$ and the **true orientation** is $R
 $$R = \hat R \exp(\delta\theta^\wedge)$$
 
 where $\delta\theta$ is a **small rotation error**. This is a much more natural geometric representation for robot motion.
+
+**Tiny example** (toy case: planar, rotation about $z$ only):
+- Estimate 30°, truth 32°. The error is $`\delta\theta = (0,0,2^\circ)`$, one small 3-vector.
+- In this planar case, left and right errors coincide. They differ only for rotations about different axes.
 
 **A caveat**: $R = \hat R \exp(\delta\theta^\wedge)$ instead of $R - \hat R$ is, by itself, just a *manifold* (*multiplicative*) error representation - it is not automatically "invariant."
 - Widely-used filters (ESKF, MEKF, the error-state formulations behind most VIO pipelines) already define their error this way without being IEKFs.

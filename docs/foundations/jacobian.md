@@ -131,6 +131,11 @@ Suppose the real system is nonlinear: $z = h(x)$. The EKF still evaluates the ex
 
 > "Around my current estimate $\hat{x}$, can I approximate this nonlinear function with a linear one?"
 
+**Intuition:** a Gaussian pushed through a straight line stays a Gaussian. Pushed through a curve, it bends out of shape.
+- Toy case: $`y = 2x + 1`$ turns $`\mathcal{N}(0,1)`$ into $`\mathcal{N}(1,4)`$, still a bell.
+- Toy case: $`y = x^2`$ turns $`\mathcal{N}(0,1)`$ into a lopsided shape that is never negative.
+- So the EKF first flattens the curve into a line (the Jacobian), then uses the Kalman formulas.
+
 The Jacobian gives us exactly that approximation:
 
 $$h(x) \approx h(\hat{x}) + H(x - \hat{x}) \qquad H = \left.\frac{\partial h}{\partial x}\right|_{\hat{x}}$$

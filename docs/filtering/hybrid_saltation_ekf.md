@@ -161,6 +161,8 @@ The problem is timing, not the reset map: $DR$ is the Jacobian of "apply the res
 - $DR$ is evaluated at the fixed instant $`t^{*}`$, so it cannot see this.
 - Near grazing (small $Dg\cdot f^{-}$, a shallow crossing), $\delta t \propto 1/(Dg\cdot f^{-})$ grows, so the timing effect can dominate the reset map's own contribution.
 
+**Grazing, in numbers:** the same 5 cm offset costs $`0.05/10.1 \approx 4.9`$ ms at a 10.1 m/s impact, but $`0.05/1 = 50`$ ms at a 1 m/s (shallow) impact. Slower crossing, bigger timing shift.
+
 The correct sensitivity has to account for that time-shift, for comparison at a shared later time. That is the **saltation matrix**, $\Xi$: the reset Jacobian $DR$ plus a correction for the event-timing sensitivity. §4 builds it in **two stages**:
 
 - **Stage 1:** a rank-one projector that removes the "along-the-flow" component of a perturbation - the part that only changes *when* the guard is crossed, not *where*. $DR$ times this projector is $`\Xi_{\text{own-time}}`$, the "wrong turn" §4 starts with: correct when each trajectory is compared at its own crossing moment, but not enough here.
@@ -204,6 +206,13 @@ $DR$ has no notion of time: it only transforms a state already on the guard, and
 
 ## 4. Deriving $\Xi$ - including a wrong turn, caught by verification
 
+**Intuition (tiny example, §3's setup):** ball A is nominal; ball B starts 5 cm higher.
+- At impact speed 10.10 m/s, B needs $`0.05/10.10 \approx 4.95`$ ms more to reach the ground. So B bounces 4.95 ms late.
+- At the shared clock time, A has already bounced and B has not. The two states are in different "phases".
+- The correction term below fixes exactly this: $`\Delta t \times`$ (how the state moves after the bounce minus how the mapped pre-bounce state was moving).
+- In the height slot that gap is $`+5.05 - (-10.10) = 15.15`$ m/s, so the term is about $`15.15 \times 0.00495 \approx 0.075`$ m. It subtracts: the height offset becomes $`0.05 - 0.075 = -0.025`$ m (see §5).
+- The naive $DR$ has no such term. It acts as if both balls bounced at the same instant.
+
 **A formula that looks right and is right for a different question.** Before deriving the formula this script uses, we record what *doesn't* work here: a natural first guess that is the correct answer to a different, easily-conflated question. Following the same implicit-differentiation idea as below, but stopping short of the flow that continues *after* the reset, gives
 
 $$\Xi_{\text{own-time}}(x^{-}) = DR(x^{-})\left[I - \frac{f(x^{-}) \otimes Dg(x^{-})}{Dg(x^{-}) \cdot f(x^{-})}\right]$$
@@ -232,6 +241,8 @@ Here $`\Phi_{\text{after}} = D_1\Phi(x^{+}, T-t^{*})`$ is the ordinary flow Jaco
 
 1. Expand $`\frac{dx^{+}}{dp} = DR\big[f^{-}(x^{-})\frac{dt^{*}}{dp} + S(t^{*})\big]`$ (same reasoning as $\Xi_{\text{own-time}}$'s derivation).
 2. Use the flow identity $D_1\Phi(x,s)\cdot f(x) = f\big(\Phi(x,s)\big)$ (an autonomous flow's linearization carries its generating vector field forward), so $\Phi_{\text{after}}\cdot f^{+}(x^{+}) = f_T$.
+   - **Intuition:** nudging a state forward along its own path is the same as starting a tiny bit later or earlier.
+   - **Tiny example (toy case: free fall, state $`(h, v)`$):** after time $`s`$ the flow gives $`h' = h + vs - gs^2/2`$ and $`v' = v - gs`$. Nudge the start along its path, by $`\epsilon f = \epsilon(v, -g)`$. The end state moves by $`\epsilon(v - gs,\, -g)`$, which is $`\epsilon f`$ evaluated at the end state. So $`D_1\Phi\cdot f(x) = f(\Phi(x,s))`$.
 3. Pull the term $`-f_T\,dt^{*}/dp`$ inside $\Phi_{\text{after}}$ using step 2.
 4. The $DR$ terms reproduce $\Xi_{\text{own-time}}$ exactly, and the pulled-in term adds exactly one new term on top of it:
 
@@ -253,6 +264,11 @@ where $`\Phi_{\text{before}} = D_1\Phi(x_0, t^{*})`$ (so $`S(t^{*})=\Phi_{\text{
 ---
 
 ## 5. A structural property that matters in practice: $`Dg\,\Xi = -e\,Dg`$
+
+**Intuition (same tiny example, $e = 0.5$):** the 5 cm height offset turns into a 4.95 ms lag, and the lag turns into a smaller height offset.
+- During the lag, ball A climbs at $5.05$ m/s: $`5.05 \times 0.00495 \approx 0.025`$ m.
+- That is $`e \times 0.05`$ m. The 5 cm offset has shrunk to 2.5 cm, with the sign flipped (B is now the one below A).
+- So the height offset is scaled by $-e$ at every bounce. The same logic gives $e^2$ for the variance in §6.
 
 For this guard ($g(x) = p_z$), $\Xi$'s output row for $p_z$ scales by exactly $-e$, for any $x^{-}$, $e$, $g$ with $Dg\cdot f^{-} \neq 0$ (i.e. $v_z^{-} \neq 0$, so the crossing is transversal):
 

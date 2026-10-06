@@ -138,6 +138,11 @@ $${e_{ij} = \text{Log}(\text{error}_{ij}) = \text{Log}\big(z_{ij}^{-1}(T_i^{-1}T
 
 That vector $e_{ij}$ is the thing that gets squared below.
 
+**Why not just subtract poses?** Try adding to a rotation.
+- 2D toy case: take $`R = I + 0.1\,[\omega]_\times = \begin{bmatrix}1 & -0.1\\ 0.1 & 1\end{bmatrix}`$.
+- Each column has length $`\sqrt{1.01} \approx 1.005`$, and $`R^\top R = 1.01\,I`$. This is not a rotation: it stretches.
+- **Exp** wraps a flat step onto the curved surface of valid poses. **Log** reads the gap between two poses back as a plain vector.
+
 ```text
 measured relationship        estimated relationship
         ↓                            ↓
@@ -151,6 +156,10 @@ measured relationship        estimated relationship
                  vector eᵢⱼ
 ```
 
+**Tiny example (1D toy case):** an edge measures $`z = 1.0`$ m, but our estimates imply $`1.1`$ m.
+- The error is $`e = 0.1`$ m, and its plain square is $`0.01`$.
+- With a trust weight $`\Omega = 100`$ (the weighted form $`e^\top \Omega e`$ used later), the cost is $`100 \cdot 0.1^2 = 1.0`$. A trusted edge makes the same gap hurt more.
+
 PGO then minimizes the total error over every edge (odometry edges plus loop-closure edges):
 
 ```math
@@ -162,6 +171,10 @@ In plain English:
 > **Find the poses that make all the measured relative transformations agree as much as possible.**
 
 One subtlety this formula hides: since every constraint is *relative*, rigidly translating and rotating the entire graph together leaves every $e_{ij}$ unchanged. The optimization has a flat direction with zero curvature, called **gauge freedom**. In practice we fix it by anchoring one pose (usually $T_0$), e.g. by giving it an enormous information weight, so the linear system solved at each step has a unique solution instead of infinitely many equally good ones.
+
+**Intuition:** picture a square of poses drawn on the floor.
+- Slide or turn the whole square: every relative edge is unchanged, so the cost does not change.
+- Anchoring node 0 nails the square to the floor, leaving one best answer.
 
 ---
 
@@ -423,6 +436,11 @@ Here the Jacobians are $`J_i = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_
 {J_i = - J_r^{-1}(r_{ij}) \, \mathrm{Ad}\left( T_j^{-1} T_i \right)}
 ```
 
+**Intuition (Adjoint):** the Adjoint mostly relabels axes, plus one term for the offset between the frames.
+
+- Toy case: frames $i$ and $j$ are $90^\circ$ apart. A 1 m push "forward" in one frame is a 1 m push "sideways" in the other.
+- The $R$ blocks of $\mathrm{Ad}$ do this relabeling. The $p^\wedge R$ block adds the effect of the offset $p$ between the frames.
+
 Here, ${\mathrm{Ad}(T) \in \mathbb{R}^{6 \times 6}}$ is the **Adjoint transformation matrix** of ${\mathrm{SE}(3)}$, which transforms velocity/tangent vectors between frame coordinate systems:
 
 ```math
@@ -432,6 +450,12 @@ Here, ${\mathrm{Ad}(T) \in \mathbb{R}^{6 \times 6}}$ is the **Adjoint transforma
 ```
 
 and ${J_r^{-1}(\cdot)}$ is the inverse right Jacobian of ${\mathrm{SE}(3)}$.
+
+**Intuition ($J_r^{-1}$):** it corrects for the curvature of the pose space. It is the identity when the edge error is zero.
+
+- Series: $`J_r^{-1}(e) = I + \tfrac{1}{2}\mathrm{ad}_e + \dots`$, so $`J_r^{-1}(0) = I`$.
+- Tiny example: an edge error with a $0.1$ rad rotation changes $J_r^{-1}$ by about $0.05$ (half the angle), so $I$ is a fair stand-in.
+- It matters only for large edge errors, e.g. a bad loop closure. Near convergence the errors are small and $J_r^{-1} \approx I$.
 
 ### 15.5 Solving the Linear System (Gauss-Newton Step)
 
@@ -572,6 +596,13 @@ Instead of minimizing the squared cost $e^2$ (where $e = \sqrt{r^\top \Omega r}$
 To integrate this into standard Gauss-Newton or Levenberg-Marquardt solvers without modifying the core linear algebra solver, robust kernels use **Iteratively Reweighted Least Squares (IRLS)**. The robust cost is converted into a modified information matrix $\Omega_{ij}^\text{robust} = w(e) \cdot \Omega_{ij}$, where the weight function $w(e)$ is:
 
 $$w(e) = \frac{1}{e} \frac{\partial \rho(e)}{\partial e}$$
+
+**Tiny example:** take $\delta = k = 1$ and one false loop closure with $e = 10$. Costs use the $\frac{1}{2}$ convention above.
+
+- $L_2$: cost $\frac{1}{2}\cdot 10^2 = 50$, weight $1$. The edge dominates the whole graph.
+- Huber: cost $1\cdot(10 - 0.5) = 9.5$, weight $\frac{1}{10} = 0.1$.
+- Cauchy: cost $\frac{1}{2}\ln(1 + 100) \approx 2.31$, weight $\frac{1}{101} \approx 0.0099$. The edge is almost ignored.
+- Good edge, $e = 0.5$: $L_2$ and Huber keep weight $1$. Cauchy gives $\frac{1}{1.25} = 0.8$, a mild down-weight.
 
 ### 16.2 Classical M-Estimators
 

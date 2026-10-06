@@ -188,6 +188,11 @@ P(x_1,x_2,x_3) = P(x_1 \mid x_2)\,P(x_2 \mid x_3)\,P(x_3)
 
 Each variable ends up conditioned only on its separator, and the separator's next-eliminated member is its parent in the tree (§4.1). The tree represents exactly these conditional relationships.
 
+**What a node holds in numbers:** it is a row of $`R`$, the triangular square root of the information matrix ($`H = R^\top R`$).
+- Each row reads $`x_j = (d_j - R_{j,\text{sep}}\, x_{\text{sep}}) / R_{jj}`$.
+- Chain example: $`x_1 = (d_1 - r_{12}\, x_2) / r_{11}`$. This one line is "$`x_1`$ given $`x_2`$".
+- To solve, read the tree from the root down. The root has no parents, so it is solved first. Its value is then substituted into the children.
+
 For iSAM2, the useful translation is:
 
 > **Bayes tree = conditional dependency tree created by variable elimination.**
@@ -207,6 +212,11 @@ The robot gets a new measurement involving $x_5$. iSAM2 doesn't rebuild everythi
 > "Which part of my factorization is affected by this new factor?"
 
 The tree has the shape of §4's chain, with $x_5$ as the root (new information arrives there) and $x_1$ as the leaf. An update only has to redo the path from the touched variables up to the root. Here $x_5$ *is* the root, so only the top of the tree changes, and $x_1$-$`x_4`$ below it are left alone.
+
+**Why the path goes up, not down:**
+- Each node's numbers are computed only from the factors in its own subtree (itself and everything below it). It never reads anything above.
+- A new factor on one variable changes that node, and every ancestor, because they absorb its summary.
+- Descendants and siblings never used that variable's numbers, so their rows stay valid and are reused as is.
 
 ---
 

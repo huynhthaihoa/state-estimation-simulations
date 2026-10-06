@@ -139,7 +139,15 @@ so the matrix is just the **cross product** written as a matrix.
 
 ## 8. The exponential map
 
-We have a rotation vector $\delta\theta$ (an axis times an angle) and want a real rotation matrix. The **exponential map** turns a local motion into an actual transformation:
+We have a rotation vector $\delta\theta$ (an axis times an angle) and want a real rotation matrix. The **exponential map** turns a local motion into an actual transformation.
+
+**Intuition:**
+
+- Picture spinning at a constant angular velocity $`\delta\theta`$ for 1 second. Where you end up is $`R`$.
+- The axis of $`\delta\theta`$ is the spin axis. Its length is the angle turned.
+- The result is always a valid rotation, never a stretched or skewed matrix.
+
+In symbols:
 
 $$R = \exp(\delta\theta^\wedge)$$
 
@@ -263,6 +271,13 @@ Just like $\mathfrak{so}(3)$ has a hat operator (Section 7), $\mathfrak{se}(3)$ 
 - $V$ is a $3\times3$ matrix, built purely from $\phi$, that "bends" the raw translation $\rho$ to account for the coupling. Its exact formula isn't the point here.
 - We can't glue the $SO(3)$ exponential and the raw translation together; the $SE(3)$ exponential genuinely mixes the two.
 - The log map has the mirror-image subtlety: recovering $\rho$ from a pose needs $V^{-1}$, not just the translation column.
+
+**Tiny example:** drive forward at 1 m/s while turning left at 90°/s, for 1 s.
+
+- Here $`\rho = (1,0,0)`$ and $`\phi = (0,0,\pi/2)`$. The robot traces a quarter circle.
+- It ends at $`V\rho = (2/\pi,\ 2/\pi,\ 0) \approx (0.637,\ 0.637,\ 0)`$, and its heading has turned by 90°.
+- So $`V`$ bends the straight line $`\rho`$ into an arc. The endpoint is not $`(1,0,0)`$.
+- For small $`\phi`$ the arc is almost straight, so $`V \approx I`$.
 
 The pose update is then
 

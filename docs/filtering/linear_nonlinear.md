@@ -95,6 +95,13 @@ Some quick scalings, each giving the dropped second-order term relative to the f
 | Camera, $X/Z$ | $\sim (\sigma_Z / Z)^2$ | depth uncertainty comparable to depth → trouble |
 | Range (2D), $r$ | $\sim \tfrac12 (\sigma_p / r)^2$ | position uncertainty comparable to range → trouble |
 
+**Tiny example (why the bias is one-sided):**
+- Toy case: $\hat\theta = 0$, $\theta \sim \mathcal N(0, 0.5^2)$, so $\sigma_\theta = 0.5$ rad.
+- $\cos\theta$ has a flat top at $0$: an error of $+0.5$ and an error of $-0.5$ both push it below $1$.
+- The errors do not cancel. Exactly, $`E[\cos\theta] = e^{-\sigma_\theta^2/2} = 0.8825`$, about 11.8% below $1$.
+- This matches the $\sigma_\theta^2/2 = 12.5\%$ in the table, which is the first-order estimate of the same bias.
+- A linearization at $\hat\theta = 0$ predicts exactly $1$, so it misses this shift.
+
 ### 4.2 Numerical: sample and compare (works for any model)
 
 Draw samples from the current belief, push them through the real function, and look at the residual that the linear model $`h(\hat x) + J(x - \hat x)`$ misses. Measuring the residual directly, rather than comparing sample means and covariances, cancels the first-order sampling noise, so a few thousand samples resolve even a small bias. For the range example above:
@@ -133,6 +140,11 @@ Run the filter and check whether its reported uncertainty is believable:
   - [`friction_anisotropic_ekf.py`](../../use_numpy/friction_anisotropic_ekf.py) ($n = 3$): a genuinely nonlinear motion model (heading enters through $\cos\theta$, $\sin\theta$);
   - [`inchworm_zupt_ekf.py`](../../use_numpy/inchworm_zupt_ekf.py) ($n = 2$): exactly linear;
   - [`saltation_matrix_ekf.py`](../../use_numpy/saltation_matrix_ekf.py) ($n = 6$): linear between bounces, with the nonlinearity concentrated in the bounce itself.
+
+**Intuition for NEES:**
+- Divide each error by its predicted spread. A consistent filter gives values around $\pm 1$.
+- Square them and sum over the $n$ states: the total is about $n$.
+- Well above $n$ means the filter is overconfident.
 
 A consistent filter's NEES averages the state dimension $n$ (NIS: the measurement dimension). Which bound to compare against depends on what we look at:
 

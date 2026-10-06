@@ -29,6 +29,12 @@ All four filters run the same two-step loop at every time step: **predict** the 
 
 **Update - where the measured points correct the predicted pose.** Every filter compares the measured points $z_i$ with the predicted ones $T_{\text{pred}}\cdot p_i$ and turns the mismatch into a correction; they differ in the frame and the tool used for that comparison.
 
+**Intuition for $`H = [I \;\; -p^\wedge]`$ below (tiny example, $\sigma_p = 0.03$ m default):**
+- The $I$ block is a shift: moving the pose by $t$ moves every point by the same $t$.
+- The $`-p^\wedge`$ block is a rotation: it moves a point in proportion to its distance from the pose origin.
+- A point $0.5$ m away, rotated by $0.02$ rad, moves $`0.5 \times 0.02 = 0.01`$ m (1 cm). A point at the origin does not move.
+- Compare 1 cm with the 3 cm point noise: far points feel a small rotation more than near points do.
+
 - **EKF**: residual and Jacobian in the **world frame**: $r_{\text{world}} = z_i - T_{\text{pred}}\cdot p_i$, $`H_{\text{world}} = R_{\text{pred}}\left[I \;\; -p_i^\wedge\right]`$. $H$ depends on the current rotation estimate $R_{\text{pred}}$, so it is rebuilt every step.
 - **IEKF**: the same comparison pulled into the **object's own body frame**: $r_{\text{body}} = T_{\text{pred}}^{-1}\cdot z_i - p_i$, $`H_{\text{body}} = \left[I \;\; -p_i^\wedge\right]`$. $H$ now depends only on the object's known geometry, so it is fixed and precomputed once. This residual is **left-invariant**: redefining the world frame (left-multiplying both the true and the estimated pose by the same fixed transform) doesn't change it. The measurement shape $h(T) = T\cdot p_i$ is the $`X b`$ row of [left_right_invariant.md §4](left_right_invariant.md#4-why-it-actually-matters-not-just-bookkeeping)'s table, which pairs with the left-invariant choice.
 - **UKF**: no Jacobian. Fresh sigma points around the predicted pose are pushed through the exact `observation_model`, and their spread gives the gain directly (equations in §1.1).
@@ -109,6 +115,11 @@ J_r(\xi) = \sum_{n=0}^{17} \frac{(-\mathrm{ad}_\xi)^n}{(n+1)!}, \qquad
 
 $\mathrm{Ad}$ is `se3_adjoint`. $J_r$ is `se3_right_jacobian`, which sums the series to 18 terms instead of using a closed form. $J_r^{-1}$ (`compute_se3_inv_right_jacobian`) is the matrix inverse of that series, not a separate formula. $J_{\text{self}}$ is exact, because $`T\,\mathrm{Exp}(\delta)\,\mathrm{Exp}(w) = T\,\mathrm{Exp}(w)\,\mathrm{Exp}(\mathrm{Ad}_{\mathrm{Exp}(-w)}\delta)`$.
 
+**Intuition for $J_{\text{self}} = \mathrm{Ad}_{\mathrm{Exp}(-w)}$ in the covariance predict:** it only re-expresses the old uncertainty in the new body frame.
+- Toy case: "30 cm of uncertainty ahead" becomes "30 cm to my left" after I turn 90° right.
+- The uncertainty is the same size. Only its axes are relabelled.
+- So $`\mathrm{Ad}`$ rotates the covariance. It does not resize it. The noise term $Q$ is what adds new uncertainty.
+
 #### Dead reckoning (`run_dead_reckoning`)
 
 Applies $`T_{k+1} = T_k\,\mathrm{Exp}(u_k\Delta t)`$ only. Its trajectory is also batch GN's initial guess.
@@ -157,6 +168,12 @@ W^m_i = W^c_i = \frac{1}{2(n + \lambda)}, \quad i = 1..2n
 $$
 
 The defaults give $\lambda = -3$, $n + \lambda = 3$, $W^m_0 = -1$, $W^c_0 = 1$ and $W_i = 1/6$. The negative central mean weight is intentional. The sigma offsets are $\chi_0 = 0$ and $\chi_i, \chi_{n+i} = \pm$ the $i$-th column of $L$. Here $L L^\top = (n+\lambda)(P_{\text{sym}} + 10^{-9} I)$, and $P_{\text{sym}}$ is the symmetrized $P$.
+
+**Intuition:** the UKF replaces the Gaussian by a few stand-in points that have the same mean and covariance.
+- Here $`n = 6`$, so there are $`2n + 1 = 13`$ points: the centre and $`\pm`$ one point per axis.
+- The weights add up to 1: $`-1 + 12/6 = 1`$.
+- Check the spread: each $`\pm`$ pair contributes $`2\cdot(1/6)\,L_jL_j^\top`$. Summed over the 6 columns this is $`(1/3)\,LL^\top = (1/3)(3P) = P`$ exactly.
+- The centre point sits at $`\chi_0 = 0`$, so it adds nothing to that sum. Its negative weight is bookkeeping that makes the weights total 1.
 
 **Predict step.** It pushes each retracted sigma point through the exact `motion_model` $f$. The predicted mean is sigma point 0's own propagation, $\bar T^- = f(T, u)$:
 

@@ -36,6 +36,13 @@ Each error is unaffected by one specific kind of frame change, and the name says
 - $\eta_L$ is unchanged if we left-multiply both $X$ and $\hat X$ by the same fixed transform $g$ (we redefine the *world/global* frame: rotate the map, shift the origin). That cancels out: $(g\hat X)^{-1}(gX) = \hat X^{-1}X$. So it's invariant to **global frame redefinition** - which makes sense, since a body-frame quantity shouldn't care how we labeled the world frame.
 - $\eta_R$ is unchanged if we right-multiply both by $g$ (we redefine the *body* frame convention: recalibrate where the robot frame origin sits, e.g. sensor extrinsics). That cancels out too: $(Xg)(\hat Xg)^{-1} = X\hat X^{-1}$. So it's invariant to **body-frame redefinition**.
 
+**Picture (re-drawing the map):**
+- Redraw the world map: move the origin or rotate the axes. The true pose and our estimate both get new coordinates.
+- But "where the truth sits as seen from my estimate" does not change, because both moved together. That is $`\eta_L`$.
+- Now re-bolt the sensor to a different spot on the robot body (new body frame). Both poses shift in the same body way.
+- The world positions now move by different amounts (each pose carries the offset in its own heading), so the plain distance between them changes.
+- But the world-frame move that carries our estimate onto the truth, $`X\hat X^{-1}`$, does not change. That is $`\eta_R`$.
+
 ### 3.1 Same story, one level down: angular velocity on $SO(3)$
 
 The pattern above is easiest to see on the rotation part alone, without the estimate/truth pair. For $R(t) \in SO(3)$, define body-frame and spatial (world-frame) angular velocity by
@@ -51,6 +58,12 @@ $$\hat\omega^b = R^\top\dot R \qquad \hat\omega^s = \dot RR^\top$$
 | Geometric term | Left-invariant vector field | Right-invariant vector field |
 
 So $\hat\omega^b$ plays the same role as $\eta_L$ above (indifferent to how we label the world) and $\hat\omega^s$ plays the same role as $\eta_R$ (indifferent to how we label the body).
+
+**Picture (gyro vs. ground watcher):**
+- $`\hat\omega^b`$ is what a gyro bolted to the robot reads: how fast I spin, in my own axes.
+- Rename the map axes ($`R\mapsto R_0R`$) and the gyro reading does not change: $`(R_0R)^\top R_0\dot R = R^\top\dot R`$.
+- $`\hat\omega^s`$ is what an observer standing on the ground sees: how fast the robot spins, in map axes.
+- Re-bolt the body axes ($`R\mapsto RR_0`$) and that view does not change: $`\dot RR_0\,R_0^\top R^\top = \dot RR^\top`$.
 
 ---
 
@@ -70,6 +83,7 @@ Rule of thumb for picking one:
 - **$X b$ with the left error (row 2).** Substitute $`X = \hat X \eta_L`$ and form the residual in the body frame: $`\hat X^{-1} z - b = \eta_L b - b`$ plus rotated noise. With $`\eta_L = \exp(\xi)`$ the Jacobian is $`[\,I \;\; -b^\wedge\,]`$, which is constant. This is equivalent to `run_iekf`'s residual, `((z[k+1] - t_pred) @ R_pred - body_points)` in `pointcloud_pose_tracking.py`, which computes $`R_{\text{pred}}^\top(z - t_{\text{pred}}) - p_i`$ for all points at once.
 - **$X^{-1}d$ with the right error (row 3).** Substitute $`X = \eta_R \hat X`$ and form the residual in the world frame: $`\hat X z - d = \eta_R^{-1} d - d`$ plus rotated noise. The Jacobian $`-[\,I \;\; -d^\wedge\,]`$ is constant too. This is the dual of row 2.
 - **Why the pairing matters.** Rows 2 and 3 both involve a point and a world frame, but the measurement shapes differ ($X b$ vs. $X^{-1}d$) and pair with opposite errors (Barrau & Bonnabel call them left- and right-invariant observations). The wrong pairing does not give a constant Jacobian: $X b$ with $`X = \eta_R \hat X`$ gives $`h(X) = \eta_R \hat X b`$, whose Jacobian $`[\,I \;\; -(\hat X b)^\wedge\,]`$ contains the predicted point, hence the current estimate.
+- **Same contrast, side by side.** The EKF-vs-IEKF table in [kf_ekf_iekf.md, EKF vs. IEKF equations side by side](kf_ekf_iekf.md#ekf-vs-iekf-equations-side-by-side) shows it for $Xb$: the world-frame (EKF) $H$ contains $`R_{\text{pred}}`$, the body-frame (IEKF) $H$ does not.
 - **Repo check.** The point-cloud IEKF tests row 2. Its fixed $`H = [\,I \;\; -p_i^\wedge\,]`$ is in [pointcloud_pose_tracking_empirical_note.md §2](pointcloud_pose_tracking_empirical_note.md#2-ekf-vs-iekf-exact-by-construction), and [§1](pointcloud_pose_tracking_empirical_note.md#1-the-setup) of that note explains why the residual is left-invariant.
 - **Propagation rarely decides.** For "group-affine" dynamics, such as IMU [dead-reckoning](../optimization/factor_graph.md#2-why-do-we-need-it) of pose and velocity, Barrau & Bonnabel (2017) show that both errors evolve independently of the estimate. So the measurement shape usually picks the error: papers choose whichever makes *their* sensor model's Jacobian trajectory-independent. That is the real design criterion, not a fixed rule.
 

@@ -256,6 +256,10 @@ x₀ x₁ x₂ x₃
 
 Optimization is often used as the computational mechanism for obtaining this joint estimate. Strictly, least-squares optimization returns the single most likely trajectory (the MAP estimate, i.e. the peak of $`p(x_{0:t} \mid z_{0:t})`$), not the whole distribution; the uncertainty around it is usually approximated as a Gaussian whose information matrix is the Gauss-Newton Hessian $`J^\top \Sigma^{-1} J`$ at the solution (with whitened Jacobians, simply $`J^\top J`$).
 
+**Tiny example** (toy case: one scalar $x$, measurement $r = x - z$ with $\sigma = 0.5$):
+- Information $= 1/\sigma^2 = 4$, so the variance is $1/4 = 0.25$.
+- A second identical measurement adds its information: $4 + 4 = 8$, and the variance halves to $0.125$.
+
 ---
 
 ## 5. An analogy
@@ -375,6 +379,12 @@ A filter can incorporate loop closures and other global information. For example
 The more precise distinction is:
 
 > **Filtering recursively represents the current posterior and marginalizes old information, whereas smoothing maintains a posterior over multiple states and can jointly revise them.**
+
+**Tiny example (toy case, 1D):**
+- Prior: $`x_0\sim N(0,1)`$, and $`x_1 = x_0 + 1`$ with extra noise of variance 1. So $`x_1`$ has mean 1 and variance 2.
+- Later we learn $`x_0 = 0.4`$ with variance 0.01 (a sharp reading).
+- Smoother (still holds $`x_0`$): $`x_0 = 40/101 \approx 0.396`$, so $`x_1 \approx 1.396`$, and var($`x_1`$) drops from 2 to about 1.01.
+- Filter that already dropped $`x_0`$: it only has $`x_1\sim N(1,2)`$, so it cannot use a reading of $`x_0`$.
 
 ---
 

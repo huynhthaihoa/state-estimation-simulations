@@ -43,6 +43,11 @@ Hand off to IMU preintegration + factor-graph optimization
 
 With a single (monocular) camera, SfM translations and structure are correct only up to an unknown scale factor, while rotations are not affected. That is why §1 lists scale, not rotation, as an unknown.
 
+**Intuition for Step 1** (toy case: one keyframe pair, 1 s apart):
+- SfM says the camera turned 10.0°. The preintegrated gyro says 10.5°.
+- The 0.5° gap, spread over 1 s, is a gyro bias of about 0.5°/s.
+- The real step does this fit jointly over all keyframe pairs in the window.
+
 **Step 1 - gyroscope bias.**
 - Short vision-only SfM gives relative rotations between keyframes that don't depend on scale.
 - Each should match the corresponding preintegrated $\Delta R$ ([imu_preintegration.md §3](../optimization/imu_preintegration.md#3-what-gets-compressed)); any mismatch is explained by the still-unknown gyro bias.
@@ -50,6 +55,8 @@ With a single (monocular) camera, SfM translations and structure are correct onl
 - It is solved once, in closed form, with no iteration, for the linearized (first-order) model.
 
 **Step 2 - gravity, scale, and velocities.**
+- **Tiny example (toy case: ignores gravity and starting velocity):** vision says the camera moved 2 units, and the IMU says the same move was 1 m. So the scale is $`s = 1\,\text{m} / 2\,\text{units} = 0.5`$ m/unit.
+- The real solve repeats this match over many keyframe pairs. That also pins down gravity and the velocities.
 - With the gyro bias corrected, $\Delta v$ and $\Delta p$ from every keyframe pair (still functions of the *unknown* scale $s$ and gravity vector $g$ in the vision frame) are combined with the vision-only relative poses into a second linear system.
 - It is solved jointly for $s$, $g$, and every keyframe's velocity.
 - The true gravity magnitude is known (~9.81 m/s²), so the raw linear $g$ is then refined by re-parameterizing it as a magnitude-constrained direction (2 degrees of freedom on a sphere) instead of a free 3-vector.

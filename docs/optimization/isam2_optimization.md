@@ -198,6 +198,8 @@ A nonlinear problem $f(x)$ is approximated around the current estimate:
 f(x+\Delta x) \approx f(x)+J\Delta x
 ```
 
+**Intuition:** $J$ is a tangent line, accurate only near the point where it was built. Relinearizing builds a fresh tangent at the new point.
+
 If $x$ changes significantly, the Jacobian $J$ becomes outdated and we must relinearize (new Jacobians, then optimize again). The naive approach relinearizes **everything**. iSAM2 asks: "Which variables actually moved enough that their linearization is no longer accurate?"
 
 ```text
@@ -285,6 +287,12 @@ Putting everything together, one iSAM2 update (simplified from Algorithm 1 of Ka
 ```
 
 Everything below the removed top of the tree keeps its factorization untouched (its estimates can still be updated in step 6).
+
+**Intuition for step 6:**
+- Each clique's estimate is computed from its parent's: in symbols, child $`\delta = (d - R_{sep}\,\delta_{parent}) / R_{cc}`$, where $d$ is the clique's own right-hand side and $R_{sep}$ couples it to its parent.
+- If the parent's $\delta$ barely moved and the clique's own $d$ is unchanged, the child's $\delta$ does not change either.
+- So the update can stop at that branch, and everything below it is skipped safely.
+- (Conceptual only: this repo does not implement iSAM2.)
 
 ---
 

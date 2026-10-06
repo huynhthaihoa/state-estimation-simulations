@@ -56,6 +56,12 @@ p_x^{-} = p_x + r\left(\sin\theta^{-} - \sin\theta\right), \qquad
 p_y^{-} = p_y - r\left(\cos\theta^{-} - \cos\theta\right)
 ```
 
+**Intuition for $F$'s third column (heading as a lever arm):** a heading error pushes the robot sideways a little on every step.
+- At the defaults ($0.2$ m/s, $\Delta t = 0.05$ s) one step is $`0.2 \times 0.05 = 0.01`$ m long.
+- A $1^\circ$ heading error ($`0.0175`$ rad) turns that step into a $`0.01 \times 0.0175 \approx 1.7\times10^{-4}`$ m sideways error.
+- Tiny per step, but it repeats every step, so it adds up.
+- Heading enters the position this way and no other way. So the position updates can correct heading only through this column.
+
 ```math
 F = \frac{\partial x^{-}}{\partial x} =
 \begin{bmatrix}
@@ -105,6 +111,12 @@ a c^2 + b s^2 & (a - b)\,c s \\
 (a - b)\,c s & a s^2 + b c^2
 \end{bmatrix}
 ```
+
+**Intuition (off-diagonal term):** the off-diagonal is what tilts the ellipse. At 45° it says "slip in $x$ and slip in $y$ move together".
+- At 45°, $`cs = 1/2`$, so both diagonal entries are $`(a+b)/2`$ and the off-diagonal is $`(a-b)/2`$.
+- The correlation is $`(a-b)/(a+b)`$.
+- At the script defaults, $`a = 4\times10^{-4}\,\Delta t^2`$ and $`b = 10^{-2}\,\Delta t^2`$, so the correlation is $`-0.0096/0.0104 \approx -0.92`$.
+- Negative means slip runs along the diagonal $`x = -y`$, the 135° line, which is the pad's long (lateral) axis when the body is at 45°.
 
 This function doesn't decide which heading to use. The caller does, and that choice separates the variants.
 

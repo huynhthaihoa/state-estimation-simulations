@@ -20,6 +20,8 @@ A monocular camera looking at a static scene can recover the *shape* of the scen
 - **absolute position/orientation**: the whole reconstruction could be picked up and rigidly moved anywhere, and every reprojection error would stay identical
 - **absolute scale**: shrinking the entire scene and every camera-to-point distance by the same factor, while changing nothing else, leaves every projected pixel where it was
 
+**Tiny example (toy case: pinhole camera, ignoring the principal point):** a point at $`(X, Z) = (1, 5)`$ and another at $`(2, 10)`$ both land at $`u = f X / Z = f/5`$. Doubling the whole scene changes no pixel.
+
 Together, that's a **7-parameter similarity ambiguity**: 3 translation + 3 rotation + 1 scale. This is the same **gauge freedom** idea as in [pose_graph_optimization.md](../optimization/pose_graph_optimization.md)'s "one subtlety this formula hides" note - a direction the optimizer's cost function is completely blind to - except pose graphs only have the 6-DoF rigid version (their edges are *relative rigid* constraints, so scale is never in question), while monocular bundle adjustment's edges are *projective*, so scale is unobservable too.
 
 We can't compute a meaningful "position error in meters" against ground truth while this ambiguity remains: the two are expressed in different (and differently scaled) coordinate systems. Umeyama alignment solves for the one similarity transform that brings them into the same frame before we measure error.
@@ -59,9 +61,18 @@ This repo's implementation, [`umeyama_alignment`](../../utils.py) in `utils.py`,
 - centroids: $`\mu_{\text{est}} = \frac{1}{n}\sum x_i`$ and $`\mu_{\text{true}} = \frac{1}{n}\sum y_i`$
 - centered rows: $`X_i = x_i - \mu_{\text{est}}`$ and $`Y_i = y_i - \mu_{\text{true}}`$
 
+**Intuition:** the best-fit transform always maps the estimated centroid onto the true centroid, so subtracting both centroids leaves only rotation and scale to find.
+
 Centering removes translation from the problem; step 4 recovers it.
 
 **Step 2. Cross-covariance and its SVD:**
+
+**Intuition:**
+
+- $`\Sigma`$ records how the spread of the centered $Y$ points lines up with the spread of the centered $X$ points.
+- The SVD splits that relation into stretches ($`D`$) and turns ($`U`$, $`V^\top`$).
+- Keeping only the turn, $`UV^\top`$, gives the rotation. The stretches go to the scale in step 4.
+- **Tiny example:** for the §5 data, the singular values are $`(0.5,\ 0.5,\ 0.125)`$, and $`UV^\top`$ comes out equal to $`R_{\text{true}}`$.
 
 $$\Sigma = \frac{1}{n} Y^\top X = U D V^\top$$
 
@@ -83,6 +94,12 @@ Plain $UV^\top$ is the best-fit *orthogonal* matrix, but that includes reflectio
 ```math
 s = \frac{\text{tr}(DS)}{\text{var}(X)}, \qquad \text{var}(X) = \frac{1}{n}\sum \|X_i\|^2, \qquad t = \mu_{\text{true}} - s R \mu_{\text{est}}
 ```
+
+**Intuition:**
+
+- $`\text{tr}(DS)`$ is how much the $`Y`$ cloud stretches along the matched axes. $`\text{var}(X)`$ is how spread out the $`X`$ cloud is.
+- Their ratio is the zoom factor. Then $`t`$ moves the scaled, rotated $`X`$ centroid onto the $`Y`$ centroid.
+- **Tiny example:** for the §5 data, $`\text{tr}(DS) = 0.5+0.5+0.125 = 1.125`$ and $`\text{var}(X) = 0.5625`$, so $`s = 1.125/0.5625 = 2`$.
 
 These are the four steps `umeyama_alignment` runs, in order.
 

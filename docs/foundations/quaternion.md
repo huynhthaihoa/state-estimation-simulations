@@ -249,7 +249,11 @@ $$
 q = (w, \mathbf{v}), \qquad \mathbf{v} = (x, y, z)
 $$
 
-Quaternion multiplication (the Hamilton product, built on the rule $i^2 = j^2 = k^2 = ijk = -1$) then works out to:
+**Tiny example:** the rule $`i^2 = j^2 = k^2 = ijk = -1`$ gives $`ij = k`$ but $`ji = -k`$. Swapping the order flips the sign.
+- Expand $`(w_1 + \mathbf{v}_1)(w_2 + \mathbf{v}_2)`$ term by term and collect the pieces.
+- The $`-1`$ from $`i^2`$ becomes the dot product, and the $`ij = k`$ terms become the cross product.
+
+In symbols, quaternion multiplication (the Hamilton product, built on the rule $i^2 = j^2 = k^2 = ijk = -1$) works out to:
 
 ```math
 q_1 \otimes q_2 = \left( w_1 w_2 - \mathbf{v}_1 \cdot \mathbf{v}_2,\; w_1 \mathbf{v}_2 + w_2 \mathbf{v}_1 + \mathbf{v}_1 \times \mathbf{v}_2 \right)

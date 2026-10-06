@@ -54,6 +54,11 @@ At every raw IMU sample, [`use_numpy/imu_preintegration.py`](../../use_numpy/imu
 \Delta R \leftarrow \Delta R \cdot \text{Exp}\big((\tilde\omega - b_g)\,dt\big)
 ```
 
+**Why the start-of-window frame?** Think of a trip summary like "go 3 m forward, turn 20° left".
+- It holds wherever the trip starts. It does not depend on the start place.
+- In the same way, $\Delta p, \Delta v, \Delta R$ stay valid when the optimizer moves the start pose or velocity.
+- Only a bias change needs the Jacobian correction (§4).
+
 Here $\tilde\omega, \tilde v$ are the raw sensor readings and $b_g, b_a$ are the bias estimates *in effect when this bundle started*.
 
 - **Update order matters.** Every right-hand side uses the value from *before* this step. $\Delta p$ needs the old $\Delta v$ and old $\Delta R$, and $\Delta v$ needs the old $\Delta R$. So $\Delta p$ is updated first, then $\Delta v$, then $\Delta R$ last. The code does this by saving `R_prev` before touching `self.delta_R`.
@@ -70,6 +75,15 @@ $$J_{R,b_g} = \frac{\partial \Delta R}{\partial b_g} \qquad J_{v,b_g} = \frac{\p
 
 These are the "sensitivity map" from [jacobian.md §3](../foundations/jacobian.md#3-think-of-it-as-a-sensitivity-map) ("if I nudge the input a little, how much does the output move?"), tracked incrementally one micro-step at a time. Each step uses the current micro-step's rotation $dR = \text{Exp}((\tilde\omega-b_g)dt)$ and right Jacobian $J_r = J_r\big((\tilde\omega-b_g)dt\big)$, in the same old-value order as §3 (`imu_preintegration.py:68-74`): $p$-Jacobians first, then $v$-Jacobians, then $J_{R,b_g}$ last.
 
+**Intuition (why bias moves $\Delta v$ and $\Delta p$):**
+- An accelerometer bias is plain "bias × time" in velocity and "bias × time²/2" in position.
+- A gyro bias is sneakier. It tilts the integrated frame, so the accelerometer reading gets pushed the wrong way.
+- **Tiny example (toy case: small angle, ignore the turn):** accel reading 1 m/s², gyro bias error 0.01 rad/s, 1 s.
+  - The tilt grows as $`0.01\,t`$ rad, so about 0.01 rad at the end.
+  - Sideways velocity error: $`\int a\,\theta\,dt = 0.005`$ m/s.
+  - Sideways position error: about $`0.01/6 \approx 0.0017`$ m.
+- This is the effect that $`J_{v,b_g}`$ and $`J_{p,b_g}`$ (the $`[\tilde v-b_a]_\times J_{R,b_g}`$ terms below) capture.
+
 ```math
 J_{p,b_g} \leftarrow J_{p,b_g} + J_{v,b_g}\,dt - \tfrac{1}{2}\Delta R\,[\tilde v-b_a]_\times J_{R,b_g}\,dt^2 \qquad J_{p,b_a} \leftarrow J_{p,b_a} + J_{v,b_a}\,dt - \tfrac{1}{2}\Delta R\,dt^2
 ```
@@ -81,6 +95,12 @@ J_{v,b_g} \leftarrow J_{v,b_g} - \Delta R\,[\tilde v-b_a]_\times J_{R,b_g}\,dt \
 ```math
 J_{R,b_g} \leftarrow dR^\top J_{R,b_g} - J_r\,dt
 ```
+
+**Tiny example (toy case: one axis, constant rate):** $N=100$, $dt=0.01$ s, so $T=1$ s.
+- On one axis $dR^\top = I$ and $J_r \approx I$, so each step is just $J \leftarrow J - dt$.
+- After 100 steps $J_{R,b_g} \approx -T = -1$ rad per (rad/s).
+- A bias error of 0.01 rad/s then changes $\Delta R$ by 0.01 rad (0.57°) after 1 s.
+- The minus sign: a larger bias estimate subtracts more rotation, so the correction in §5 points opposite the bias change.
 
 **Why $J_{R,b_g}$ is the one to study.** It is a direct instance of [jacobian.md §11.4](../foundations/jacobian.md#114-closed-form-for-so3)'s identities, and every other $J_{\cdot,b_g}$ inherits from it:
 

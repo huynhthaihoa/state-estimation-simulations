@@ -94,6 +94,11 @@ $$H\Delta x = -b$$
 
 We need $H$ to be symmetric positive definite, and that isn't automatic. If every factor is relative (odometry, loop closures, reprojections with no prior), some motion of the whole solution leaves the cost unchanged (a **gauge freedom**). $H$ is then only positive *semi*-definite, and Cholesky breaks down on a zero pivot.
 
+**Tiny example (toy case):** two poses joined by one odometry factor give $`H=\begin{bmatrix}1&-1\\-1&1\end{bmatrix}`$.
+- Moving both poses together changes nothing, so $`H`$ has rank 1.
+- Cholesky's second pivot is $`H_{22}-L_{21}^2=1-1=0`$, so it fails.
+- Anchoring pose 1 adds 1 to $`H_{11}`$: the first pivot becomes 2, the second becomes $`1-(1/\sqrt2)^2=0.5`$, and the factorization works.
+
 - **Pose graphs:** the gauge is a rigid motion of the whole trajectory. Anchoring one pose fixes it ([pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive)).
 - **Monocular BA:** the gauge also includes uniform rescaling of the scene (7 DoF), which one anchored pose can't pin. The repo's BA scripts fix two cameras instead ([bundle_adjustment.md §14](bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment)).
 - **Either case:** LM's damping $H + \lambda I$ also keeps the system solvable ([levenberg_marquardt.md](levenberg_marquardt.md)).
@@ -133,6 +138,11 @@ L = \begin{bmatrix} * & 0 & 0 \\
 where $[*]$ marks the entry that was zero in $H$. That newly created nonzero is called **fill-in**. It comes straight from the formula at the top: $`L_{32} = (H_{32} - L_{31}L_{21}) / L_{22}`$, and $H_{32} = 0$ doesn't help when $L_{31}$ and $L_{21}$ are both nonzero.
 
 Eliminate the hub last instead (order 2, 3, 1, so variable 1 becomes the last row and column), and $L$ has no fill at all. §5 turns this into a general rule.
+
+**Tiny example:** take $`H=\begin{bmatrix}4&2&2\\2&5&0\\2&0&5\end{bmatrix}`$ (variable 1 is the hub, $`H_{32}=0`$).
+- Order 1, 2, 3 gives $`L_{21}=1`$, $`L_{31}=1`$, so $`L_{32}=(0-1\cdot1)/2=-0.5`$. That is fill-in: a nonzero where $`H`$ had a zero.
+- Order 2, 3, 1 (hub last) gives $`L_{21}=0`$ (diagonal of $`L`$: 2.236, 2.236, 1.549), so the zero stays a zero.
+- Same matrix, same answer, different amount of nonzeros in $`L`$.
 
 So:
 

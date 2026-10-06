@@ -99,6 +99,8 @@ For example:
 
 where $r_i$ is the error associated with a measurement.
 
+**Intuition:** a residual is the gap between what the model predicts and what was measured. Toy case: the model predicts a landmark at pixel 100, the camera sees it at 103, so the residual has size 3. The sign convention varies, but the squared cost does not care.
+
 Two levels to keep apart:
 
 **Problem formulations** (what we optimize):
@@ -151,6 +153,11 @@ Call the poses $x_0$ (A), $x_1$ (B), $x_2$ (C), $x_3$ (D) and $x_4$ (A′, the e
 It generates a constraint between the *non-consecutive* poses $x_0$ and $x_4$: a measured relative pose $T_{04}$, which is close to the identity if the robot returned to exactly the same spot.
 
 The **back-end then optimizes the entire trajectory** so that all constraints are satisfied as well as possible.
+
+**Tiny example** (toy case: translation only, equal weights, loop closure fully trusted):
+- The loop closure says $x_4$ should sit back at $x_0$, but the drifted estimate is 0.4 m away.
+- That 0.4 m is spread over the 4 odometry steps, 0.1 m per step.
+- So $x_1, x_2, x_3, x_4$ move back by 0.1, 0.2, 0.3, 0.4 m. Later poses carry more of the drift, so they move more.
 
 In practice, "loop closure" really spans both stages: the front-end/place-recognition module detects the candidate match, while the back-end verifies it and folds it into the global optimization - which is why the diagrams above disagree: the third and fourth diagrams put "loop closure" inside the back-end, the second sends a loop-closure constraint out of the front-end, and the first draws it as a feedback box between the two.
 

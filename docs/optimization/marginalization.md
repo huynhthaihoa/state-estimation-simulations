@@ -36,6 +36,12 @@ Eliminate x1:
 
 That is marginalization. `bayes_tree.md` uses it to build a *solve order*, where nothing is thrown away for good. We use the same step to drop $x_1$ **permanently**, on purpose: it is the oldest pose in the window and the estimator will never touch it again.
 
+**Why not just delete $x_1$?**
+Two naive shortcuts both go wrong, in opposite directions:
+- **Delete $x_1$ and its factors:** everything those factors told us about $x_2$ is lost, so we become less sure than we should be.
+- **Cut $x_1$'s row and column out of $\Lambda$ (ignore the Schur term):** in the §4 example $x_2$ keeps information $2$, as if $x_1$ were known exactly. The true value is $`\Lambda' = 1.5`$, so the variance is $0.5$ instead of $0.667$: overconfident.
+- **Marginalize:** keeps exactly what $x_1$ taught us about $x_2$, as a prior on $x_2$.
+
 ---
 
 ## 3. Three flavors of elimination, compared
@@ -104,6 +110,13 @@ This is the **fill-in** that [elimination_tree.md §9](elimination_tree.md#9-why
 ## 6. The consistency gotcha: why FEJ exists
 
 $(\Lambda_b', \eta_b')$ is computed by linearizing at the *current* estimates of $x_a$ and $x_b$ at the moment of marginalization. That linearization point is then frozen into the prior's $\Lambda_b'$ and $\eta_b'$. The surviving variables in $x_b$ keep being relinearized at new estimates on every later iteration, at a *different* point from the one the prior was built at. (This repo's prior differs: it re-linearizes its Jacobian at every solve, and only $\Omega$ and $X_{\text{ref}}$ are frozen; see §8.)
+
+**Intuition (toy 2D range example):** a range factor between pose $`p`$ and landmark $`l`$ only measures their distance.
+- Move both by the same shift and the range does not change. So that shift is unobservable.
+- Consistent linearization: the Jacobian is the unit vector $`u`$ from $`p`$ to $`l`$ on the $`l`$ side and $`-u`$ on the $`p`$ side. For a common shift they cancel, so the information along it is 0.
+- Mixed points: $`p = (0,0)`$, $`l = (3,4)`$ give $`u = (0.6, 0.8)`$. Now linearize the pose side at $`p' = (0,1)`$, which gives $`u' = (0.707, 0.707)`$.
+- A common shift of $`(1,0)`$ then predicts a range change of $`0.6 - 0.707 = -0.107`$ m. The true change is 0.
+- So the system "sees" information where there is none, and becomes overconfident.
 
 This mismatch injects spurious information into directions of the state that should be unobservable (the same class of problem [kf_ekf_iekf.md §2](../filtering/kf_ekf_iekf.md#2-extended-kalman-filter-the-world-is-nonlinear-so-ill-approximate-it-locally) describes for plain EKF-SLAM), making the estimator overconfident.
 

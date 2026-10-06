@@ -95,6 +95,12 @@ Instead of solving this from scratch every time, we can factorize $A = QR$ (or w
 
 > **Note**: QR decomposition factors a matrix as $A=QR$, with $Q$ orthogonal and $R$ upper-triangular. Because $Q$ is orthogonal it doesn't change the least-squares solution, so minimizing $`\lVert A\Delta x - b \rVert^2`$ reduces to the cheap triangular solve $R\Delta x = Q^\top b$ - and, critically for iSAM, $R$ can be updated incrementally via Givens rotations when a new row (factor) arrives, instead of refactorizing $A$ from scratch. That incremental-update property is what the next point relies on.
 
+**Intuition: $R$ is a square root of the information.**
+- Like $25 = 5 \cdot 5$: $R^\top R = H$ (the information matrix, $H = A^\top A$), so $R$ holds the same information in a "half-size" form.
+- $R$ is triangular, so its last row involves only the newest variable. That variable is solved first.
+- Its value is then substituted upward into the rows above, one variable at a time.
+- This is why a new variable adds only a row at the bottom, and old rows stay valid.
+
 The important point:
 
 > **When a new factor is added, much of the previous factorization is still useful.**
@@ -146,6 +152,8 @@ The loop closure can affect **many previous poses**, so incremental optimization
 - Original iSAM still absorbs the loop-closure factor like any other: one more row folded into the factorization with Givens rotations (§3).
 - But this row links $x_4$ back to $x_0$, so the rotations sweep through most of the factorization and leave it denser (fill-in).
 - Original iSAM cleans this up periodically, by relinearizing everything and choosing a new variable ordering in one batch step (Kaess et al. 2008). This repo's script goes straight to that batch step when the loop closes (§14.1).
+
+**Why it sweeps:** Givens rotations start at the first nonzero column of the new row. An odometry row starts near the end; a loop-closure row touches $`x_0`$ (column 0), so it sweeps every column (worked in §14.1).
 
 Loop closures are therefore where incremental updates lose most of their advantage. Working out *which* variables a new factor really affects, and recomputing only those, is what iSAM2's Bayes tree adds (§7).
 
@@ -377,6 +385,11 @@ This gives ${R^\top R = A^\top A = H}$ and ${R^\top d = A^\top b = g}$, the same
 ```
 
 It stops when ${\lVert \boldsymbol{\delta} \rVert <}$ `--gn-tol` (default $10^{-6}$), or after `--gn-max-iters` steps (default 10). $R$ and $d$ are rebuilt before each convergence check, so the returned $R$ and $d$ always belong to the returned ${\bar{X}}$.
+
+**Intuition for a Givens rotation:** it turns two rows to push one entry to zero, like turning a ruler.
+- **Tiny example (one column):** $`R_{cc} = 3`$ and the new row has $`a_c = 4`$. Then $`\rho = 5`$, $`\gamma = 0.6`$, $`\sigma = 0.8`$.
+- The rotated entries are $`(\gamma \cdot 3 + \sigma \cdot 4,\; -\sigma \cdot 3 + \gamma \cdot 4) = (5, 0)`$. The new row's entry is zeroed and $`R_{cc}`$ grows to 5.
+- Nothing is lost: $`3^2 + 4^2 = 5^2`$. A rotation only mixes rows, so the information is kept.
 
 **Givens row insertion** (`qr_insert_row` in `utils.py`): this absorbs one new whitened row ${(\mathbf{a}, \beta)}$ into ${(R, d)}$ without refactorizing. For each column $c$ where ${\lvert a_c \rvert \ge 10^{-14}}$, a plane rotation mixes row $c$ of the system with the new row so that $a_c$ becomes 0:
 

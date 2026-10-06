@@ -139,6 +139,12 @@ A ramp only helps if it is gentle enough. The rule: compare the true ramp accele
 | Bad ratio (illustration) | 0.1 s | 0.2 m/s | 0.05 m/s² | $40\times$ |
 | Current defaults ($t_{\text{extend}} = 1.0$ s) | 0.2 s | 0.1 m/s | 0.15 m/s² | $\sim 3.3\times$ |
 
+**Intuition:** the ratio counts how many times larger than its assumed disturbance the real acceleration is.
+- $\sigma_{\text{process}}$ is an acceleration standard deviation (m/s²): the size of surprise the filter expects.
+- At the defaults the ramp accelerates at $`0.1/0.2 = 0.5`$ m/s², against $`0.15`$ m/s² assumed.
+- $`0.5/0.15 \approx 3.3`$: each ramp is about 3.3 "standard surprises", not 1.
+- The bad-ratio row is the same idea, at $`40`$ standard surprises.
+
 The defaults' $t_{\text{extend}}$ gives 12 cruise and 20 anchor ticks, enough to settle before being measured. The $40\times$ case is far worse, but $3.3\times$ is still a real mismatch, not a negligible one: §3 shows it sets every variant's NEES level and drives the `never`-vs-`phase_conditional` comparison.
 
 The lesson matches the Zeno-regime pitfall in [`hybrid_saltation_ekf.md` §7](hybrid_saltation_ekf.md#7-two-things-worth-knowing-before-reusing-this-pattern): pick simulation parameters with real margin under a hard failure mode, not by trial against the first numbers that come out.
@@ -150,6 +156,12 @@ The headline NEES comparison below excludes the ramp ticks themselves (`is_cruis
 ## 3. The finding: not just "always is wrong while moving"
 
 One might expect `always` to match `phase_conditional` during genuine anchor ticks (both apply the identical, correct update there) and diverge only during motion. It doesn't (seeds 0-3, `n_trials=500`, mean NEES over the cruise-only/anchor-only windows):
+
+**Intuition (per-tick scale, at the defaults $`\Delta t = 0.05`$ s):** the truth changes speed faster than the filter expects.
+- During a ramp the speed really changes by $`0.5 \times 0.05 = 0.025`$ m/s per tick.
+- The filter's process noise allows only $`0.15 \times 0.05 = 0.0075`$ m/s per tick (the $`\sigma_{\text{process}}\Delta t`$ in $Q$). That is $3.3\times$ too small.
+- A confident ZUPT adds to the gap: after each update the filter claims $`\sigma_v \le 0.01`$ m/s, so the real change is about $2.5\times$ that claim.
+- Confident and under-sized: that is why the NEES below is too high. This is a per-tick scale, not the exact NEES.
 
 ![Two panels from inchworm_zupt_ekf.py: velocity over the anchor/extend gait with the estimates of the three ZUPT policies, and Monte Carlo NEES for never, every-tick and anchor-only ZUPT against the consistent value of 2](../../assets/inchworm_zupt_ekf.png)
 

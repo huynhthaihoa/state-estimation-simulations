@@ -224,7 +224,7 @@ Then update, and repeat:
 
 $$\boxed{x_{k+1}=x_k+\Delta x}$$
 
-(For poses, $+$ becomes $\oplus$, a retraction onto the pose manifold.)
+(For poses, $+$ becomes $\oplus$, a retraction onto the pose manifold: a step along the curved pose space instead of adding vectors. See [why not just subtract poses](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive).)
 
 ---
 

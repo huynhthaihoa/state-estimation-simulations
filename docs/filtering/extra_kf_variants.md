@@ -99,6 +99,11 @@ Each cycle has three steps:
 2. **Update**: a measurement produces an estimate of $\delta x$ through a normal EKF update.
 3. **Inject and reset**: fold $\delta x$ into the nominal state (for rotation, $`\hat R \leftarrow \hat R\exp(\delta\theta^\wedge)`$), then set $\delta x = 0$.
 
+**Intuition:**
+- Think of a big map (the nominal state) plus a small sticky note (the error state) with the current correction.
+- Predict: redraw the map using the full model. Update: only the sticky note is corrected.
+- Inject and reset: copy the note onto the map, then use a blank note.
+
 Why it helps: some states, especially **rotation**, live on manifolds rather than ordinary Euclidean vector spaces. The error state stays small and near zero, so its linearization is accurate, and $\delta\theta$ is a minimal 3-vector with no unit-norm constraint and no singularities near zero error, unlike a quaternion or Euler angles stored directly in the state.
 
 The same filter goes by several names in visual-inertial odometry and inertial navigation: ESKF, error-state EKF, or indirect EKF. The **Multiplicative EKF (MEKF)** is the attitude-only version, and **right/left-invariant error-state filters** are §4's IEKF.
@@ -158,6 +163,10 @@ Carrying $S$ avoids this in two ways:
 
 - $SS^\top$ is positive semi-definite **by construction**, whatever rounding happens to $S$.
 - $S$'s condition number is the square root of $P$'s, so the same arithmetic keeps roughly twice as many significant digits.
+
+**Tiny example** (toy case: two independent states):
+- $P$ has variances 1 and $10^{-8}$, so the spread of its entries is $10^8$. That is too much for float32 (about 7 digits).
+- $S$ has 1 and $10^{-4}$, so the spread is only $10^4$.
 
 A cheaper, common partial fix is the **Joseph form** of the update, $`P \leftarrow (I-KH)P(I-KH)^\top + KRK^\top`$, which keeps $P$ symmetric positive semi-definite for any gain.
 
@@ -239,6 +248,12 @@ Normally we assume the process noise covariance $Q$ and measurement noise covari
 
 An adaptive KF estimates or adjusts $Q$ and/or $R$ online. One family does this from the filter's own innovation sequence, the approach of Mehra (1970, reference 7). It is useful when the environment or sensor quality changes over time.
 
+**Intuition:**
+- Before each measurement, the filter predicts how big its surprise (the innovation) should be: the innovation covariance $`S`$.
+- Then it compares with the surprise it actually gets.
+- Surprises much bigger than $`S`$ say that $Q$ or $R$ is too small. Much smaller says too big.
+- So the filter nudges $Q$/$R$ until predicted and actual surprise agree.
+
 ---
 
 ## 9. Robust Kalman Filter
@@ -262,6 +277,10 @@ A conventional KF may be pulled toward that outlier. Robust filtering reduces th
 
 - **Innovation gating**, widely used. Before an update, compute the normalized innovation squared $`\nu^\top S^{-1}\nu`$ (the NIS from [linear_nonlinear.md §4.4](linear_nonlinear.md#44-after-the-fact-consistency-tests)). If it exceeds a chi-square threshold (for example the 99% bound for the measurement's dimension), reject the measurement outright.
 - **Down-weighting**: keep the measurement but inflate its $R$ in proportion to how surprising it is. This is the filter's version of the Huber-style robust losses in [pose_graph_optimization.md §16](../optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
+
+**Tiny example of gating** (1-D measurement, $S = 1$):
+- A 3σ surprise gives $`\nu^\top S^{-1}\nu = 9`$.
+- The 99% chi-square bound for 1 degree of freedom is 6.63, and $9 > 6.63$, so the measurement is rejected.
 
 Particularly relevant to visual SLAM, feature tracking, GNSS, LiDAR and multi-sensor fusion.
 
