@@ -13,43 +13,48 @@ ANCHOR                    EXTEND                     ANCHOR
    to ground, v = 0      forward, then contracts       v = 0 again
 ```
 
+*Illustrative: the toy itself is a point mass with a trapezoidal velocity.*
+
 - **Anchor**: one end is planted on the ground, so that segment is, ideally, stationary ($v = 0$). In this toy the whole point mass stands still, so it's known ground truth.
-- **Extend**: the anchor releases, the body extends/pushes forward at some commanded speed, then the new end plants and grips.
+- **Extend**: the anchor releases, the body pushes forward at some commanded speed, then the new end plants and grips.
 
-The idea this doc explores: during anchor, "velocity = 0" is a *free, trustworthy measurement* (a ZUPT - Zero-Velocity Update) you can feed into the filter - but only during anchor. Feed it in during extend (when the robot is actually moving) and you're telling the filter a lie with high confidence, which is exactly the failure mode the `always` variant below demonstrates.
+The idea: during anchor, "velocity = 0" is a known, free measurement (a ZUPT, Zero-Velocity Update) that we can feed into the filter. It is valid only while we're still. Fed in during extend, it tells the filter something false with high confidence, which is the failure mode the `always` variant demonstrates.
 
-The same idea is well established for foot-mounted pedestrian navigation (Foxlin 2005), where the shoe is still during each stance phase. For an inchworm robot, a sensor mounted on the anchored segment gets up to three nearly free pieces of information while that segment is planted:
+The same idea is well established for foot-mounted pedestrian navigation (Foxlin 2005), where the shoe is still during each stance phase. For an inchworm robot, a sensor on the anchored segment gets up to three nearly free pieces of information while that segment is planted:
 
 - **velocity ≈ 0**, a zero-velocity update (ZUPT);
 - **angular rate ≈ 0**, a zero-angular-rate update (ZARU);
 - **an accelerometer reading of gravity plus bias**, since the sensor isn't accelerating, which gives a tilt reference.
 
-During release and extend, none of these holds. Three caveats keep this honest:
+None of these holds during release and extend. Three caveats:
 
 - **It applies to the anchored segment, not the whole robot.** In a real inchworm gait the rest of the body moves while one end is planted. This toy's point mass stands in for a sensor on the anchored segment.
-- **"Stationary" is approximate.** Micro-slip and vibration mean the zero is never exact, which is why the ZUPT update below carries a noise $\sigma_{\text{zupt}}$ rather than being treated as exact.
-- **Stillness isn't the only time the accelerometer sees just gravity.** Any unaccelerated motion does too. Stillness is the time you can know it without a motion model.
+- **"Stationary" is approximate.** Micro-slip and vibration mean the zero is never exact, so the ZUPT update below carries a noise $\sigma_{\text{zupt}}$ rather than being treated as exact.
+- **Stillness isn't the only time the accelerometer sees just gravity.** Any unaccelerated motion does too. But only at rest do we know the velocity is zero without a motion model.
 
-This doc works through the simplest concrete version of that idea, using [`inchworm_zupt_ekf.py`](../../use_numpy/inchworm_zupt_ekf.py)'s 1D crawling point mass as the toy problem.
+We work through the simplest concrete version using [`inchworm_zupt_ekf.py`](../../use_numpy/inchworm_zupt_ekf.py)'s 1D crawling point mass.
 
 ![Three rows from inchworm_zupt_ekf.py's defaults over three gait cycles: position as a staircase that holds its value while anchored, velocity as a continuous trapezoid labelled with t_anchor, t_extend, t_ramp and v_extend, and the ticks where the never, always and phase_conditional variants apply a zero-velocity update](../../assets/inchworm_zupt_ekf_concept.png)
 
 *Figure: the gait schedule at `use_numpy/inchworm_zupt_ekf.py`'s defaults, plotted by `uv run python assets/make_figures.py inchworm_zupt_ekf_concept`.*
 
-**Scope, stated up front**: this is deliberately a small slice of the real idea. It models translation only - zero-velocity updates (ZUPT), not the zero-angular-rate update (ZARU), which needs gyro-bias and orientation states this toy doesn't carry. It also assumes the gait schedule (when anchor/extend happen) is *known*, not detected. That second question - what happens once the schedule itself is uncertain - is exactly the subject of [`hybrid_saltation_ekf.md` §8](hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter), which this doc leans on rather than repeating.
+**Scope**: this is deliberately a small slice of the real idea.
+
+- It models translation only: ZUPT, not ZARU, which needs gyro-bias and orientation states this toy doesn't carry.
+- It assumes the gait schedule (when anchor/extend happen) is *known*, not detected. What happens once the schedule itself is uncertain is the subject of [`hybrid_saltation_ekf.md` §8](hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter), which we lean on rather than repeat.
 
 ---
 
 ## 1. Why this isn't a hybrid-reset problem
 
-Unlike the bouncing point mass in `hybrid_saltation_ekf.md`, nothing here needs a guard, a reset map, or a saltation matrix. Velocity is externally commanded per phase - an ordinary **switched-linear system**, not a discontinuous *state* jump the filter's covariance has to be linearized through. The entire interesting question sits on the **measurement** side: does the filter correctly exploit (or wrongly misuse) the free zero-velocity information the anchor phase provides?
+Unlike the bouncing point mass in `hybrid_saltation_ekf.md`, nothing here needs a guard, a reset map, or a saltation matrix. Velocity is externally commanded per phase - an ordinary **switched-linear system**, not a discontinuous *state* jump the filter's covariance has to be linearized through. The interesting question sits on the **measurement** side: does the filter exploit (or misuse) the zero-velocity information the anchor phase provides?
 
 State is $x = [p, v]$ (1D). The gait cycle alternates:
 
 - **anchor** (duration $t_{\text{anchor}}$): the point mass is exactly stationary, $v = 0$.
-- **extend** (duration $t_{\text{extend}}$): the point mass ramps up to a commanded cruise speed $v_{\text{extend}}$, holds it, then ramps back down to exactly $0$ before the next anchor phase begins - continuous everywhere, no instantaneous jump (see §2 for why that matters).
+- **extend** (duration $t_{\text{extend}}$): the point mass ramps up to a commanded cruise speed $v_{\text{extend}}$, holds it, then ramps back down to exactly $0$ before the next anchor phase begins - continuous everywhere, no instantaneous jump (§2 explains why).
 
-Three ways of using a zero-velocity pseudo-measurement (ZUPT) are compared, sharing an identical predict step and the same noisy position measurement every tick - they differ *only* in when an additional ZUPT update runs:
+We compare three ways of using the ZUPT pseudo-measurement, sharing an identical predict step and the same noisy position measurement every tick - they differ *only* in when an additional ZUPT update runs:
 
 | Variant | ZUPT applied when |
 | --- | --- |
@@ -72,7 +77,7 @@ Q = \begin{bmatrix} \left(\tfrac{1}{2}\sigma_{\text{process}}\Delta t^2\right)^2
 x^{-} = \Phi\,x, \qquad P^{-} = \Phi\,P\,\Phi^\top + Q
 ```
 
-$Q$ is a simple diagonal heuristic, the same one `saltation_matrix_ekf.py` uses. It is not the textbook continuous white-noise-acceleration $Q$, which would also have off-diagonal terms.
+$Q$ is a simple diagonal heuristic (the same formula as in `saltation_matrix_ekf.py`), not the textbook continuous white-noise-acceleration $Q$, which also has off-diagonal terms.
 
 **Measurement updates** (`_kf_update`): both updates go through the same standard linear-Gaussian update and differ only in $z$, $H$ and $R$:
 
@@ -117,32 +122,34 @@ Three things follow directly from these formulas:
 
 - **It shrinks velocity toward zero.** The velocity estimate is multiplied by a factor between 0 and 1. The more the filter already trusts its velocity estimate (small $P_{vv}$) relative to the pseudo-measurement, the less it moves; the more uncertain it is, the harder it is pulled to $0$.
 
-- **It corrects position too, through the cross-covariance.** $P_{pv}$ is how the filter has learned that position and velocity errors move together. If the velocity estimate turns out too high, the position estimate has probably drifted ahead too, so $p$ gets pulled back as well. This is how a velocity-only pseudo-measurement also affects position.
+- **It corrects position too, through the cross-covariance.** $P_{pv}$ is how the filter has learned that position and velocity errors move together. If the velocity estimate turns out too high, the position estimate has probably drifted ahead too, so $p$ gets pulled back as well (for positive $P_{pv}$). This is how a velocity-only pseudo-measurement also affects position.
 
-- **It always makes the filter more confident, whether or not the claim is true.** $P_{vv}^{+}$ is always smaller than both $P_{vv}$ and $R_{\text{zupt}}$. Nothing in the update looks at whether the robot is actually stationary. So when `always` applies it during extend, the filter reports a velocity standard deviation of at most 0.01 m/s while the true velocity is up to $v_{\text{extend}} = 0.1$ m/s away from the zero it was just told. That built-in overconfidence is what drives the large NEES values for `always` in §3.
+- **It always makes the filter more confident, whether or not the claim is true.** $P_{vv}^{+}$ is always smaller than both $P_{vv}$ and $R_{\text{zupt}}$. Nothing in the update checks whether the robot is stationary. So when `always` applies it during extend, the filter reports a velocity standard deviation of at most 0.01 m/s while the true velocity is up to $v_{\text{extend}} = 0.1$ m/s away from the zero it was just told. That built-in overconfidence drives the large `always` NEES values in §3.
 
 ---
 
-## 2. A calibration trap: an instantaneous velocity jump swamps the comparison
+## 2. Choosing the ramp: a step jump is an unmodeled acceleration
 
-The first version of this toy used a hard step for `true_velocity` - $0$ during anchor, $v_{\text{extend}}$ the instant extend began. That produced nonsense: $\text{NEES}$ in the hundreds to thousands for *all three* filter variants, dominated by a shared spike at every phase transition that had nothing to do with ZUPT policy. The reason: an instantaneous jump is an effectively-infinite acceleration, and the predict step's constant-velocity assumption (with a finite process-noise budget) has no way to represent that, regardless of which measurements get fused afterward.
+A true step in velocity ($0$ during anchor, $v_{\text{extend}}$ the instant extend begins) is an unmodeled acceleration spike at every phase transition, the same mechanism as in §3. The predict step's constant-velocity model with a finite process-noise budget can't represent it. So `true_velocity` ramps linearly over a $t_{\text{ramp}}$ window at each end of the extend phase, and velocity is continuous everywhere.
 
-The fix was physical, not numerical: `true_velocity` now ramps linearly over a $t_{\text{ramp}}$ window at each end of the extend phase, so velocity is continuous everywhere.
+A ramp only helps if it is gentle enough. The rule: compare the true ramp acceleration $v_{\text{extend}} / t_{\text{ramp}}$ with $\sigma_{\text{process}}$, the filter's assumed acceleration disturbance. That ratio measures the mismatch.
 
-But *even a short ramp* isn't automatically enough: the true ramp acceleration ($v_{\text{extend}} / t_{\text{ramp}}$) still has to be checked against $\sigma_{\text{process}}$ (the filter's assumed acceleration disturbance), or the same swamping happens on a smaller scale.
-- **First ramped attempt** ($`t_{\text{ramp}} = 0.1\,\text{s}`$, $`v_{\text{extend}} = 0.2\,\text{m/s}`$, $`\sigma_{\text{process}} = 0.05\,\text{m/s}^2`$): a true/assumed acceleration ratio of $40\times$, still enough to produce $\text{NEES}$ in the hundreds throughout an entire 6-tick cruise window, never converging.
-- **Recalibrated defaults** ($`t_{\text{ramp}} = 0.2\,\text{s}`$, $`v_{\text{extend}} = 0.1\,\text{m/s}`$, $`\sigma_{\text{process}} = 0.15\,\text{m/s}^2`$, $`t_{\text{extend}} = 1.0\,\text{s}`$): the ratio drops to $\sim 3.3\times$, and the cruise/anchor windows get enough ticks (12 and 20 respectively) to actually settle before being measured.
-- That removed the swamping, but $3.3\times$ is still a real mismatch, not a negligible one: §3 shows it sets every variant's NEES level and drives the `never`-vs-`phase_conditional` comparison.
+| Case | $t_{\text{ramp}}$ | $v_{\text{extend}}$ | $\sigma_{\text{process}}$ | Ratio |
+| --- | --- | --- | --- | --- |
+| Bad ratio (illustration) | 0.1 s | 0.2 m/s | 0.05 m/s² | $40\times$ |
+| Current defaults ($t_{\text{extend}} = 1.0$ s) | 0.2 s | 0.1 m/s | 0.15 m/s² | $\sim 3.3\times$ |
 
-Same lesson as `saltation_matrix_ekf.py`'s Zeno-regime pitfall: pick simulation parameters with real margin under a hard failure mode, not by trial and error against the first numbers that come out.
+The defaults' $t_{\text{extend}}$ gives 12 cruise and 20 anchor ticks, enough to settle before being measured. The $40\times$ case is far worse, but $3.3\times$ is still a real mismatch, not a negligible one: §3 shows it sets every variant's NEES level and drives the `never`-vs-`phase_conditional` comparison.
 
-The headline NEES comparison below also excludes the ramp ticks themselves (`is_cruise` explicitly excludes them, matching `is_anchor`'s own definition) - they're a shared transition cost all three variants pay alike, not the phenomenon being measured, the same convention `hybrid_saltation_ekf.md` uses for its own shared bounce-tick spike.
+The lesson matches the Zeno-regime pitfall in [`hybrid_saltation_ekf.md` §7](hybrid_saltation_ekf.md#7-two-things-worth-knowing-before-reusing-this-pattern): pick simulation parameters with real margin under a hard failure mode, not by trial against the first numbers that come out.
+
+The headline NEES comparison below excludes the ramp ticks themselves (`is_cruise` excludes them, matching `is_anchor`'s own definition). They are a shared transition cost all three variants pay alike, not the phenomenon being measured, the same convention `hybrid_saltation_ekf.md` uses for its shared bounce-tick spike.
 
 ---
 
 ## 3. The finding: not just "always is wrong while moving"
 
-The going-in expectation was that `always` would at least match `phase_conditional` during genuine anchor ticks (both apply the identical, correct update there) and only diverge during motion. Running it says otherwise (seeds 0-3, `n_trials=500`, mean NEES over the cruise-only/anchor-only windows):
+One might expect `always` to match `phase_conditional` during genuine anchor ticks (both apply the identical, correct update there) and diverge only during motion. It doesn't (seeds 0-3, `n_trials=500`, mean NEES over the cruise-only/anchor-only windows):
 
 ![Two panels from inchworm_zupt_ekf.py: velocity over the anchor/extend gait with the estimates of the three ZUPT policies, and Monte Carlo NEES for never, every-tick and anchor-only ZUPT against the consistent value of 2](../../assets/inchworm_zupt_ekf.png)
 
@@ -154,9 +161,9 @@ The going-in expectation was that `always` would at least match `phase_condition
 | `always` | ~299 | ~521 | ~0.060 m/s |
 | `phase_conditional` | ~6.1 | ~16.4 | ~0.043-0.045 m/s |
 
-A consistent 2-DoF filter averages $\text{NEES} = 2$; for an average over 500 trials the 95% interval is about $[1.83, 2.18]$. None of the three is consistent: even the best windows sit at 3-8× that value.
+A consistent 2-DoF filter averages $\text{NEES} = 2$; for an average over 500 trials the 95% interval is about $[1.83, 2.18]$. None of the three is consistent: the three non-`always` windows (6.0-16.4) sit at ~3-8× that value.
 
-**Why every variant is overconfident: the ramps.** The truth has no random disturbance at all. Its only departure from the filters' constant-velocity model is the ramp acceleration, $`v_{\text{extend}}/t_{\text{ramp}} = 0.5\,\text{m/s}^2`$, which is $3.3\times$ the assumed $`\sigma_{\text{process}} = 0.15\,\text{m/s}^2`$ (§2). Two checks at seed 0 confirm this is the whole story:
+**Why every variant is overconfident: the ramps.** The truth has no random disturbance at all. Its only departure from the filters' constant-velocity model is the ramp acceleration, $`v_{\text{extend}}/t_{\text{ramp}} = 0.5\,\text{m/s}^2`$, against the assumed $`\sigma_{\text{process}} = 0.15\,\text{m/s}^2`$ (the $3.3\times$ of §2). Two checks at seed 0 confirm this is the whole story:
 
 | Setting | `never` anchor/cruise | `phase_conditional` anchor/cruise |
 | --- | --- | --- |
@@ -164,12 +171,14 @@ A consistent 2-DoF filter averages $\text{NEES} = 2$; for an average over 500 tr
 | No motion ($`v_{\text{extend}} = 0`$) | 1.1/1.0 | 0.8/0.7 |
 | $`\sigma_{\text{process}} = 0.5\,\text{m/s}^2`$ (covers the ramps) | 1.4/1.6 | 0.9/1.7 |
 
-With no motion, every variant is at or below 2 (conservative, since the filters assume noise the truth doesn't have). With $\sigma_{\text{process}}$ large enough to cover the ramps, `never` and `phase_conditional` are both consistent.
+- With no motion, every variant is at or below 2 (conservative, since the filters assume noise the truth doesn't have).
+- With $\sigma_{\text{process}}$ large enough to cover the ramps, `never` and `phase_conditional` are close to consistent, slightly conservative: all four windows (0.9-1.7) fall below the interval's lower edge of 1.83.
 
-**`always` is dramatically worse everywhere, not just during motion.** Misapplying ZUPT throughout every cruise phase leaves the filter so overconfident (velocity variance driven artificially tight around a wrong belief) that ~20 ticks of genuinely correct ZUPT evidence at the start of the next anchor phase can't recover it before that phase ends. The corruption from one cycle bleeds into the next, and it compounds:
+**`always` is dramatically worse everywhere, not just during motion.** Misapplying ZUPT throughout every cruise phase drives the velocity variance artificially tight around a wrong belief. About 20 ticks of correct ZUPT evidence at the start of the next anchor phase can't undo that before the phase ends, so the corruption bleeds into the next cycle and compounds:
+
 - `always`'s NEES at the first tick of anchor phases 2-5 (seed 0; phase 1 precedes any cruise, so it's still ~2 there) is 230, 564, 732, then 798, and within phase 4 it decays only from 732 to 266.
 - `phase_conditional`'s starts near 20 and settles near 3.6 in each of those phases.
-- `always` also gets no accuracy benefit for the trouble: its velocity RMS (~0.060 m/s) matches `never`'s, while being *dangerously overconfident* the whole time.
+- `always` gets no accuracy benefit for the trouble. Its velocity RMS (~0.060 m/s) matches `never`'s, and its position RMS is far worse (0.060-0.062 m vs. `never`'s 0.011-0.015 m, single runs, seeds 0-3), while it is overconfident throughout.
 
 **A second finding, and what actually causes it.** At the defaults, `phase_conditional` has the best *velocity* accuracy of the three, but not the best position accuracy or calibration:
 
@@ -184,17 +193,13 @@ So this is a property of the under-sized process model, not of ZUPT. With $`\sig
 
 ## 4. Takeaway for a real phase-gated measurement update
 
-This toy's `never`/`always`/`phase_conditional` split is a minimal stand-in for a general design question in any estimator that fuses a phase-dependent pseudo-measurement: **which measurement terms are active should be gated by phase within the single update**, not applied unconditionally and not left out for simplicity. §3's two findings both argue for taking that gating seriously:
-- **The blunter one**: misapplying the constraint doesn't just cost accuracy on the ticks it's wrong. The overconfidence it creates bleeds into the next anchor phase and isn't fully undone before that phase ends, so a gating bug doesn't stay contained to the phase it occurs in.
-- **The subtler one**: correct gating makes the filter confident, and a confident filter has less slack for whatever else its model gets wrong. Here that was an under-sized process model at the phase transitions, which made `never` look better than `phase_conditional` on position and calibration until $\sigma_{\text{process}}$ was sized to cover the ramps.
-
-So the payoff for correct gating is real (clearly better velocity tracking, and by far the best-behaved failure mode), but only once the rest of the model is honest, especially around the transitions where the constraint switches on and off. Check calibration there, rather than assuming a correctly gated filter wins everywhere.
+This toy's `never`/`always`/`phase_conditional` split is a minimal stand-in for a general design question in any estimator that fuses a phase-dependent pseudo-measurement: **gate which measurement terms are active by phase within the single update**, rather than applying them unconditionally or leaving them out for simplicity. The payoff is real: clearly better velocity tracking, and a mild failure mode (its worst window, 16.4, is ~30× below `always`'s 521). But it holds only once the rest of the model is sized honestly, especially at the transitions where the constraint switches on and off. Check calibration there rather than assuming a correctly gated filter wins everywhere (§3: gating bugs spill into the next phase, and a gated, confident filter has less slack for model error).
 
 ---
 
 ## 5. References
 
-1. Foxlin, E. (2005). *Pedestrian Tracking with Shoe-Mounted Inertial Sensors*. IEEE Computer Graphics and Applications, 25(6), 38-46. https://doi.org/10.1109/MCG.2005.140 - the paper that popularized zero-velocity updates (ZUPT) for foot-mounted inertial navigation (the technique itself was already used in vehicle inertial navigation) - the basis of this doc's `never`/`always`/`phase_conditional` split, there gated by a stance-phase detector rather than this toy's known anchor/extend schedule.
-2. Lubbe, E., Withey, D., & Uren, K. R. (2015). *State Estimation for a Hexapod Robot*. 2015 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 6286-6291. https://doi.org/10.1109/IROS.2015.7354274 - a full-scale version of the estimator §4 generalizes to: an EKF that fuses on-board IMU measurements with a leg-kinematic model to estimate a physical hexapod's full pose, using only proprioceptive sensors.
-3. Liu, Y., Gao, H., Ding, L., Liu, G., Deng, Z., & Li, N. (2018). *State Estimation of a Heavy-Duty Hexapod Robot with Passive Compliant Ankles Based on the Leg Kinematics and IMU Data Fusion*. Journal of Mechanical Science and Technology, 32(8), 3885-3897. https://doi.org/10.1007/s12206-018-0741-4 - the same IMU + leg-kinematics fusion on a heavy-duty hexapod, estimating the trunk's velocity and posture without geometric knowledge of the terrain. Its passive compliant ankles make the foot contact less ideal than this toy's perfectly stationary anchor phase.
-4. Khalili, H. H., Cheah, W., Garcia-Nathan, T. B., Carrasco, J., Watson, S., & Lennox, B. (2020). *Tuning and Sensitivity Analysis of a Hexapod State Estimator*. Robotics and Autonomous Systems, 129, 103509. https://doi.org/10.1016/j.robot.2020.103509 - an IMU + leg-kinematics EKF on the Corin hexapod, with an analysis of how its accuracy depends on the filter's noise parameters and a particle-swarm tuning of them. The real-robot counterpart of §3's lesson that the process noise has to be sized honestly before the gating comparison means anything.
+1. Foxlin, E. (2005). *Pedestrian Tracking with Shoe-Mounted Inertial Sensors*. IEEE Computer Graphics and Applications, 25(6), 38-46. https://doi.org/10.1109/MCG.2005.140 - foot-mounted inertial navigation with zero-velocity updates; the basis of this doc's `never`/`always`/`phase_conditional` split, there gated by a stance-phase detector rather than this toy's known anchor/extend schedule.
+2. Lubbe, E., Withey, D., & Uren, K. R. (2015). *State Estimation for a Hexapod Robot*. 2015 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 6286-6291. https://doi.org/10.1109/IROS.2015.7354274 - state estimation for a physical hexapod robot, a larger-scale setting related to the one §4 discusses; its method is not reproduced here.
+3. Liu, Y., Gao, H., Ding, L., Liu, G., Deng, Z., & Li, N. (2018). *State Estimation of a Heavy-Duty Hexapod Robot with Passive Compliant Ankles Based on the Leg Kinematics and IMU Data Fusion*. Journal of Mechanical Science and Technology, 32(8), 3885-3897. https://doi.org/10.1007/s12206-018-0741-4 - leg-kinematics and IMU fusion on a heavy-duty hexapod with passive compliant ankles, a much less idealized contact setting than this toy's stationary anchor phase.
+4. Khalili, H. H., Cheah, W., Garcia-Nathan, T. B., Carrasco, J., Watson, S., & Lennox, B. (2020). *Tuning and Sensitivity Analysis of a Hexapod State Estimator*. Robotics and Autonomous Systems, 129, 103509. https://doi.org/10.1016/j.robot.2020.103509 - tuning and sensitivity analysis of a hexapod state estimator; related in spirit to §3's lesson that the process noise has to be sized honestly before the gating comparison means anything.

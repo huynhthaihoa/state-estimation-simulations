@@ -1,6 +1,6 @@
 # An overview of other prominent Kalman Filter variants
 
-For **robotics, SLAM, visual-inertial estimation, and embedded systems**, there are several Kalman filter variants worth knowing. You don't need to master all of them, but it's useful to know **why each one exists**.
+For **robotics, SLAM, visual-inertial estimation, and embedded systems**, several Kalman filter variants are worth knowing. We focus on **why each one exists**.
 
 This builds directly on:
 - The **standard KF, EKF, and IEKF** foundations from [kf_ekf_iekf.md](kf_ekf_iekf.md) - this doc surveys the wider family those three sit inside.
@@ -30,9 +30,7 @@ Standard KF  ┌───┴───────┐
            IEKF
 ```
 
-And then there are variants dealing with **noise, time, robustness, and computational constraints**.
-
-This is one corner of the repo-wide map in [slam_mental_map.md](../slam_mental_map.md), which places every doc and script on one picture.
+The remaining variants deal with **noise, time, robustness, and computational constraints**. This is one corner of the repo-wide map in [slam_mental_map.md](../slam_mental_map.md), which places every doc and script on one picture.
 
 ---
 
@@ -46,9 +44,9 @@ The UKF says:
 
 > "I don't want to calculate Jacobians. I'll pick a few carefully chosen points around my estimate and see how the nonlinear function transforms them."
 
-These points are called **sigma points**. They aren't random samples: for an $n$-dimensional state there are $2n+1$ of them, placed deterministically at the mean and at $\pm$ one scaled standard deviation along each principal axis of $P$.
+These points are called **sigma points**. They aren't random samples: for an $n$-dimensional state there are $2n+1$ of them, placed deterministically at the mean and at $\pm$ the columns of a matrix square root of $`(n+\lambda)P`$ (this repo uses the Cholesky factor).
 
-Imagine your uncertainty is an ellipse:
+Picture the uncertainty as an ellipse:
 
 ```text
               •
@@ -60,7 +58,7 @@ Imagine your uncertainty is an ellipse:
               •
 ```
 
-Instead of approximating the nonlinear function with a tangent line like EKF, UKF sends these representative points through the actual nonlinear function:
+Instead of approximating the nonlinear function with a tangent line like the EKF, the UKF sends these representative points through the actual nonlinear function, then reconstructs the new mean and covariance:
 
 ```text
      uncertainty          nonlinear transformation
@@ -72,25 +70,11 @@ Instead of approximating the nonlinear function with a tangent line like EKF, UK
        •                         •
 ```
 
-Then it reconstructs the new mean and covariance.
-
-### EKF
-
-$$\text{nonlinear function} \rightarrow \text{Jacobian} \rightarrow \text{linear approximation}$$
-
-### UKF
-
-$$\text{nonlinear function} \rightarrow \text{sigma points} \rightarrow \text{transformed sigma points} \rightarrow \text{new mean/covariance}$$
-
 **Why care?**
 
-The main reason is accuracy. Passing sigma points through the real function reproduces the transformed mean and covariance correctly to second order, while the EKF's tangent line is only first-order accurate. So the UKF captures the bias that curvature adds to the mean, which the EKF misses entirely ([linear_nonlinear.md §4](linear_nonlinear.md#4-how-do-you-know-whether-its-nonlinear-over-your-uncertainty-region) shows how big that bias can get, and §4.2 uses exactly this UKF-vs-EKF comparison as a nonlinearity check).
-
-UKF can be attractive when:
-
-- the nonlinearities are strong over the region your uncertainty covers,
-- calculating Jacobians is difficult,
-- you want a derivative-free method.
+- **Accuracy.** For a Gaussian input, the transformed mean is accurate to second order, while the EKF's tangent line is only first-order accurate. So the UKF captures the bias that curvature adds to the mean, which the EKF misses entirely ([linear_nonlinear.md §4](linear_nonlinear.md#4-how-do-you-know-whether-its-nonlinear-over-your-uncertainty-region) shows how big that bias can get, and §4.2 mentions a sigma-point comparison as a cheaper variant of its nonlinearity check).
+- **Strong nonlinearity.** It helps when the nonlinearities are strong over the region the uncertainty covers.
+- **No Jacobians.** It is derivative-free, which is attractive when Jacobians are hard to compute.
 
 The cost: it evaluates the model $2n+1$ times per step instead of once, which adds up for high-dimensional states.
 
@@ -100,25 +84,14 @@ See `run_ukf` in [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/point
 
 ## 2. Error-State Kalman Filter (ESKF)
 
-This is one of the most important variants to know for SLAM/VIO work.
+One of the most useful variants for SLAM/VIO work.
 
-An ESKF doesn't estimate the entire state directly.
-
-Instead, it separates:
-
-$$\text{nominal state} + \text{small error state}$$
-
-For example, the true rotation is written as the nominal one times a small correction:
+An ESKF doesn't estimate the entire state directly. It separates a **nominal state** from a **small error state**. For example, the true rotation is the nominal one times a small correction:
 
 $$R = \hat R \exp(\delta\theta^\wedge)$$
 
-The nominal state might contain:
-
-$$\hat X = (\hat R,\hat p,\hat v,\hat b_g,\hat b_a)$$
-
-and the EKF operates primarily on:
-
-$$\delta x = (\delta\theta,\delta p,\delta v,\delta b_g,\delta b_a)$$
+- Nominal state: $`\hat X = (\hat R,\hat p,\hat v,\hat b_g,\hat b_a)`$
+- Error state, on which the EKF mainly operates: $`\delta x = (\delta\theta,\delta p,\delta v,\delta b_g,\delta b_a)`$
 
 Each cycle has three steps:
 
@@ -126,97 +99,60 @@ Each cycle has three steps:
 2. **Update**: a measurement produces an estimate of $\delta x$ through a normal EKF update.
 3. **Inject and reset**: fold $\delta x$ into the nominal state (for rotation, $`\hat R \leftarrow \hat R\exp(\delta\theta^\wedge)`$), then set $\delta x = 0$.
 
-This is extremely useful because some states, especially **rotation**, live on manifolds rather than ordinary Euclidean vector spaces. The error state stays small and near zero, so its linearization is accurate, and $\delta\theta$ is a minimal 3-vector with no unit-norm constraint and no singularities, unlike a quaternion or Euler angles stored directly in the state.
+Why it helps: some states, especially **rotation**, live on manifolds rather than ordinary Euclidean vector spaces. The error state stays small and near zero, so its linearization is accurate, and $\delta\theta$ is a minimal 3-vector with no unit-norm constraint and no singularities near zero error, unlike a quaternion or Euler angles stored directly in the state.
 
 The same filter goes by several names in visual-inertial odometry and inertial navigation: ESKF, error-state EKF, or indirect EKF. The **Multiplicative EKF (MEKF)** is the attitude-only version, and **right/left-invariant error-state filters** are §4's IEKF.
 
 The **MSCKF** (Mourikis & Roumeliotis 2007), a classic VIO filter, is an ESKF whose state also holds a sliding window of past camera poses, with landmarks kept out of the state entirely. [kf_ekf_iekf.md §9](kf_ekf_iekf.md#9-other-prominent-variants-worth-keeping-in-mind) explains how it works.
 
-### Important relationship
+### ESKF vs IEKF
 
-ESKF and IEKF aren't competing alternatives. The IEKF *is* an error-state filter; what it changes is how the error is defined. Instead of an error chosen for convenience, it uses the group-invariant error ($`\eta = \hat X^{-1}X`$ or $`X\hat X^{-1}`$). For systems with the right symmetry, the dynamics of that error don't depend on the current estimate at all.
+They aren't competing alternatives: the IEKF *is* an error-state filter. In fact the ESKF rotation error above, $`\delta\theta = \log(\hat R^{-1}R)`$, already *is* the left-invariant error ($`\eta = \hat X^{-1}X`$; the right-invariant one is $`X\hat X^{-1}`$). What the IEKF adds is:
+
+- **Estimate-independent error dynamics.** For group-affine dynamics (and suitable invariant measurements), the error dynamics and their Jacobians don't depend on the current estimate. This can fail, for example with IMU biases in the state.
+- **Left vs right choice.** We pick the invariant error that matches the measurement.
 
 ---
 
-## 3. Unscented vs Extended: a useful comparison
+## 3. Unscented vs Extended
 
-|                             | EKF                 | UKF                         |
-| --------------------------- | ------------------- | --------------------------- |
-| Nonlinear system            | ✓                   | ✓                           |
-| Jacobians                   | Required            | No                          |
-| Linearizes function         | ✓                   | No                          |
-| Sigma points                | No                  | ✓                           |
-| Computational cost          | Lower               | Higher                      |
-| Easy for complicated models | Sometimes difficult | Often easier                |
-| Common in robotics          | Very common         | Less dominant than EKF/ESKF |
+|                             | EKF                 | UKF                                                                 |
+| --------------------------- | ------------------- | ------------------------------------------------------------------- |
+| Nonlinear system            | ✓                   | ✓                                                                   |
+| Jacobians                   | Required            | No explicit Jacobian                                                |
+| Linearizes function         | ✓                   | No explicit Jacobian (statistical linearization through sigma points) |
+| Sigma points                | No                  | ✓                                                                   |
+| Computational cost          | Lower               | Higher                                                              |
+| Easy for complicated models | Sometimes difficult | Often easier                                                        |
+| Common in robotics          | Very common         | Less dominant than EKF/ESKF                                         |
 
-For robotics, the typical learning order is:
-
-**KF → EKF → ESKF → IEKF**
-
-before spending too much time on UKF.
+For robotics we usually learn KF, EKF, ESKF and IEKF before spending much time on the UKF (see §12).
 
 ---
 
 ## 4. Invariant EKF (IEKF)
 
-[kf_ekf_iekf.md](kf_ekf_iekf.md) covers this one in depth, but it's worth putting it into the broader family.
+[kf_ekf_iekf.md](kf_ekf_iekf.md) covers this one in depth; here we place it in the broader family.
 
 **Naming**: in this repo "IEKF" always means the *Invariant* EKF. The literature also uses IEKF for the *Iterated* EKF, which relinearizes the update at the new estimate and repeats. That is an unrelated idea, covered in [kf_ekf_iekf.md §9](kf_ekf_iekf.md#9-other-prominent-variants-worth-keeping-in-mind).
 
-The important idea is:
+The key idea:
 
 > **Exploit the symmetry and Lie-group structure of the system.**
 
-For example:
+We treat $`R \in SO(3)`$ and $`T \in SE(3)`$ as group elements rather than as ordinary vectors. There are two formulations, using a left-invariant or a right-invariant error. For group-affine systems, both give error dynamics that are independent of the current state, which ordinary EKF linearizations don't. See [left_right_invariant.md](left_right_invariant.md) for what distinguishes the two and when to reach for each.
 
-$$R \in SO(3)$$
-
-and
-
-$$T \in SE(3)$$
-
-rather than treating everything as an ordinary vector.
-
-There are particularly interesting formulations involving:
-
-- left-invariant error
-- right-invariant error
-
-which can give the estimation error dynamics properties that are independent of the current state in ways that ordinary EKF linearizations aren't. See [left_right_invariant.md](left_right_invariant.md) for exactly what distinguishes the two and when to reach for each.
-
-This is particularly relevant to:
-
-- IMU navigation
-- VIO
-- SLAM
-- robotics
-- pose estimation
+Particularly relevant to IMU navigation, VIO, SLAM, robotics and pose estimation.
 
 ---
 
 ## 5. Square-Root Kalman Filter (SR-KF)
 
-This one is less about changing the **estimation philosophy** and more about improving **numerical stability**.
+This one is less about the **estimation philosophy** and more about **numerical stability**.
 
-Standard KF stores covariance:
+The standard KF stores the covariance $P$. The square-root version stores a factor $S$ with $P = SS^\top$, often obtained through Cholesky decomposition.
 
-$$P$$
-
-The square-root version instead stores something like:
-
-$$P = SS^\top$$
-
-where $S$ is a square-root factor, often obtained through Cholesky decomposition.
-
-Why?
-
-Because covariance matrices should be:
-
-- symmetric
-- positive semi-definite
-
-In floating point, the standard update $P \leftarrow (I - KH)P$ subtracts nearly equal numbers, and rounding error can leave $P$ slightly asymmetric or with a negative eigenvalue. After that, the filter can diverge.
+Why? A covariance matrix must be symmetric and positive semi-definite. In floating point, the standard update $P \leftarrow (I - KH)P$ subtracts nearly equal numbers, and rounding error can leave $P$ slightly asymmetric or with a negative eigenvalue. After that, the filter can diverge.
 
 Carrying $S$ avoids this in two ways:
 
@@ -243,11 +179,7 @@ This matters most in long-running filters, single-precision or embedded arithmet
 
 ## 6. Ensemble Kalman Filter (EnKF)
 
-Instead of storing the mean and covariance explicitly:
-
-$$\mu, P$$
-
-you maintain an **ensemble of possible states**:
+Instead of storing the mean and covariance $\mu, P$ explicitly, we keep an **ensemble of possible states**, each one a possible realization of the system:
 
 ```text
      •
@@ -258,30 +190,21 @@ you maintain an **ensemble of possible states**:
           •
 ```
 
-Each point represents a possible realization of the system.
-
-You propagate them through the nonlinear model, with no Jacobians, and read the mean and covariance off the ensemble whenever you need them.
+We propagate the members through the nonlinear model, with no Jacobians, and read the mean and covariance off the ensemble whenever we need them.
 
 The update is still a **Kalman update**. The gain comes from the ensemble's sample covariance, and each member is shifted linearly toward the measurement. So the EnKF keeps the Kalman family's Gaussian, linear-update assumption. That is the key difference from the particle filter (§7), which reweights and resamples instead.
 
-What it gets rid of is the $n \times n$ matrix $P$. When the state has $n \sim 10^6$ to $10^8$ entries (a gridded atmosphere or ocean), $P$ can't even be stored, but an ensemble of about 50–100 members gives a usable low-rank approximation of it.
+What it gets rid of is the $n \times n$ matrix $P$. When the state has $n \sim 10^6$ to $10^8$ entries (a gridded atmosphere or ocean), $P$ can't even be stored, but an ensemble of tens to ~100 members gives a usable low-rank approximation of it.
 
-This is especially popular in:
-
-- weather prediction
-- geophysical systems
-- ocean modeling
-- very high-dimensional systems
-
-It's generally **less central to robotics/SLAM** than EKF/ESKF/IEKF.
+Especially popular in weather prediction, geophysical systems, ocean modeling and other very high-dimensional systems. It's generally **less central to robotics/SLAM** than EKF/ESKF/IEKF.
 
 ---
 
 ## 7. Particle Filter (PF)
 
-This one drops the Gaussian assumption that every other variant in this list relies on.
+This one drops the Gaussian assumption that most other variants in this list rely on.
 
-Instead of a mean and covariance, your belief is a swarm of weighted samples ("particles"), each one a full hypothesis for the state:
+Instead of a mean and covariance, our belief is a swarm of weighted samples ("particles"), each one a full hypothesis for the state:
 
 $$\text{belief} \approx \lbrace (x^{(1)}, w^{(1)}), (x^{(2)}, w^{(2)}), \dots, (x^{(N)}, w^{(N)}) \rbrace$$
 
@@ -312,38 +235,19 @@ The notable exception is the **Rao-Blackwellized particle filter**. Given the ro
 
 ## 8. Adaptive Kalman Filter
 
-Normally you assume:
+Normally we assume the process noise covariance $Q$ and measurement noise covariance $R$ are known and fixed. In real life they change: an IMU, for example, behaves differently when the robot vibrates heavily.
 
-$$Q = \text{known}$$
-
-$$R = \text{known}$$
-
-where:
-
-- $Q$ = process noise covariance
-- $R$ = measurement noise covariance
-
-But in real life, those values may change.
-
-For example:
-
-> Your IMU might behave differently when the robot is vibrating heavily.
-
-So an adaptive KF tries to estimate or adjust $Q$ and/or $R$ online.
-
-This is useful when the environment or sensor quality changes over time.
+An adaptive KF estimates or adjusts $Q$ and/or $R$ online. One family does this from the filter's own innovation sequence, the approach of Mehra (1970, reference 7). It is useful when the environment or sensor quality changes over time.
 
 ---
 
 ## 9. Robust Kalman Filter
 
-Standard KF essentially assumes:
+The standard KF essentially assumes:
 
 > "My noise is reasonably well-behaved, approximately Gaussian."
 
-But what if your camera occasionally produces a **terrible outlier**?
-
-For example:
+But what if the camera occasionally produces a **terrible outlier**?
 
 ```text
 measurements:
@@ -354,42 +258,26 @@ measurements:
                      X  ← outlier
 ```
 
-A conventional KF may be pulled toward that outlier.
+A conventional KF may be pulled toward that outlier. Robust filtering reduces the influence of bad measurements. The two common approaches are:
 
-Robust filtering tries to reduce the influence of bad measurements. The two common approaches are:
-
-- **Innovation gating**, the workhorse in practice. Before an update, compute the normalized innovation squared $`\nu^\top S^{-1}\nu`$ (the NIS from [linear_nonlinear.md §4.4](linear_nonlinear.md#44-after-the-fact-consistency-tests)). If it exceeds a chi-square threshold (for example the 99% bound for the measurement's dimension), reject the measurement outright.
+- **Innovation gating**, widely used. Before an update, compute the normalized innovation squared $`\nu^\top S^{-1}\nu`$ (the NIS from [linear_nonlinear.md §4.4](linear_nonlinear.md#44-after-the-fact-consistency-tests)). If it exceeds a chi-square threshold (for example the 99% bound for the measurement's dimension), reject the measurement outright.
 - **Down-weighting**: keep the measurement but inflate its $R$ in proportion to how surprising it is. This is the filter's version of the Huber-style robust losses in [pose_graph_optimization.md §16](../optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
 
-This is particularly relevant to:
+Particularly relevant to visual SLAM, feature tracking, GNSS, LiDAR and multi-sensor fusion.
 
-- visual SLAM
-- feature tracking
-- GNSS
-- LiDAR
-- multi-sensor fusion
-
-Although in robotics, robust losses such as **Huber loss** are also commonly used within optimization-based estimators rather than relying exclusively on a "robust KF."
+In robotics, robust losses such as the **Huber loss** are also commonly used inside optimization-based estimators rather than relying exclusively on a robust KF.
 
 ---
 
 ## 10. Kalman Smoother
 
-This isn't exactly another KF variant, but it's important enough to know.
+Not exactly another KF variant, but worth knowing.
 
-A normal Kalman filter estimates:
-
-$$x_k | z_1,\ldots,z_k$$
-
-In other words:
+A normal Kalman filter estimates $x_k | z_1,\ldots,z_k$:
 
 > "What is the state **now**, given everything I've seen so far?"
 
-A smoother can use **future measurements** too:
-
-$$x_k | z_1,\ldots,z_N$$
-
-So:
+A smoother can use **future measurements** too, estimating $x_k | z_1,\ldots,z_N$:
 
 ```text
 Filtering:
@@ -409,15 +297,13 @@ t0 → t1 → t2 → t3 → t4
      both past AND future
 ```
 
-The classic example is the **Rauch–Tung–Striebel (RTS) smoother**.
-
-This is very important for **offline SLAM and trajectory estimation**. [filtering_smoothing.md](../filtering_smoothing.md) covers the filtering-vs-smoothing distinction in depth.
+The classic example is the **Rauch–Tung–Striebel (RTS) smoother**, very useful for **offline SLAM and trajectory estimation**. [filtering_smoothing.md](../filtering_smoothing.md) covers the filtering-vs-smoothing distinction in depth.
 
 ---
 
 ## 11. Multi-rate/asynchronous Kalman filtering
 
-Suppose you have:
+Suppose we have:
 
 ```text
 IMU       200 Hz
@@ -426,9 +312,7 @@ LiDAR      10 Hz
 GPS         1 Hz
 ```
 
-You don't want to force everything to run at the same frequency.
-
-A filter can propagate using IMU:
+We don't want to force everything to run at the same frequency. Instead, the filter propagates with the IMU:
 
 ```text
 IMU → predict
@@ -437,7 +321,7 @@ IMU → predict
 ...
 ```
 
-and then update whenever another sensor arrives:
+and updates whenever another sensor arrives:
 
 ```text
 Camera → update
@@ -445,15 +329,13 @@ LiDAR  → update
 GPS    → update
 ```
 
-This is one of the fundamental patterns behind real-time sensor fusion.
+This is a fundamental pattern behind real-time sensor fusion.
 
 ---
 
 ## 12. Which ones should you prioritize learning?
 
-For robotics work spanning **computer vision, SLAM, embedded systems, and resource-constrained platforms**, it's not necessary to learn every Kalman variant equally.
-
-A reasonable prioritization:
+For robotics work spanning **computer vision, SLAM, embedded systems, and resource-constrained platforms**, we don't need to learn every Kalman variant equally. A reasonable prioritization:
 
 ### Tier 1 - Must understand
 
@@ -544,19 +426,21 @@ Mostly useful for low-dimensional, multimodal problems like global/Monte Carlo l
 
 ---
 
-## 13. And there's one more important distinction for SLAM
+## 13. Filtering vs optimization for SLAM
 
 Modern robotics estimators fall into two big families ([filtering_smoothing.md](../filtering_smoothing.md) compares them in depth):
 
 ### Filtering
 
+We maintain a state estimate recursively (§10's filtering diagram):
+
 ```text
 IMU → KF/EKF/ESKF/IEKF → current state
 ```
 
-You maintain a state estimate recursively.
-
 ### Optimization/smoothing
+
+We optimize over the whole trajectory at once (§10's smoothing picture):
 
 ```text
            ┌────── camera ───────┐
@@ -578,11 +462,11 @@ Examples include:
 - GTSAM-style smoothing
 - pose-graph optimization
 
-A particularly useful learning progression is:
+A useful learning progression:
 
 $$\boxed{\text{KF} \rightarrow \text{EKF} \rightarrow \text{ESKF} \rightarrow \text{Lie groups} \rightarrow \text{IEKF} \rightarrow \text{Factor graphs/smoothing}}$$
 
-Once you understand that sequence, you'll have a pretty solid conceptual foundation for modern **VIO/SLAM and state estimation**.
+That sequence gives a solid conceptual foundation for modern **VIO/SLAM and state estimation**.
 
 ---
 
