@@ -209,7 +209,7 @@ with robot poses $x_1, \dots, x_N$ followed by landmarks $l_1, l_2, \dots$. Line
 
 Because each measurement only involves a small number of variables, $J$ and $H$ are sparse.
 
-The pattern also stays fixed for a fixed graph. Every Gauss-Newton or LM iteration relinearizes at a new estimate, which changes the *values* in $H$, but the same factors connect the same variables, so the *nonzero pattern* doesn't change. Solvers exploit this by splitting the factorization in two: a **symbolic** step (choose the ordering, predict where $L$'s nonzeros go, allocate memory) done once for a fixed graph, and a **numeric** step (compute the values) repeated every iteration. CHOLMOD's `analyze`/`factorize` calls are this split. That's why an expensive ordering heuristic is affordable: its cost is paid once, not per iteration. (Incremental solvers add factors, so their pattern changes and they redo part of this step.)
+The pattern also stays fixed for a fixed graph. Every Gauss-Newton or LM iteration relinearizes at a new estimate, which changes the *values* in $H$, but the same factors connect the same variables, so the **nonzero pattern** doesn't change. Solvers exploit this by splitting the factorization in two: a **symbolic** step (choose the ordering, predict where $L$'s nonzeros go, allocate memory) done once for a fixed graph, and a **numeric** step (compute the values) repeated every iteration. CHOLMOD's `analyze`/`factorize` calls are this split. That's why an expensive ordering heuristic is affordable: its cost is paid once, not per iteration. (Incremental solvers add factors, so their pattern changes and they redo part of this step.)
 
 ---
 
@@ -296,7 +296,7 @@ In one sentence:
 
 > **Sparse Cholesky is a way of solving a large linear system exactly, doing arithmetic only on the entries that can be nonzero, while choosing the elimination order to keep fill-in small.**
 
-It is still exact: nothing small is dropped. Dropping small entries on purpose is a different method, *incomplete* Cholesky, used as a preconditioner for iterative solvers.
+It is still exact: nothing small is dropped. Dropping small entries on purpose is a different method, **incomplete Cholesky**, used as a preconditioner for iterative solvers.
 
 And in SLAM:
 

@@ -218,7 +218,7 @@ So instead of blindly asking "What is the derivative with respect to my state ve
 
 That's one reason Lie groups and Jacobians become so tightly connected in modern SLAM.
 
-A manifold perturbation on its own isn't yet what makes a filter *invariant*: error-state filters such as the ESKF and MEKF already perturb on the manifold. The IEKF goes one step further and picks the specific error that ignores a change of world or body frame (left- or right-invariant), which is what makes its linearization independent of the current estimate for group-affine dynamics. See [kf_ekf_iekf.md §5](../filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error) and [left_right_invariant.md](../filtering/left_right_invariant.md).
+A manifold perturbation on its own isn't yet what makes a filter **invariant**: error-state filters such as the ESKF and MEKF already perturb on the manifold. The IEKF goes one step further and picks the specific error that ignores a change of world or body frame (left- or right-invariant), which is what makes its linearization independent of the current estimate for group-affine dynamics. See [kf_ekf_iekf.md §5](../filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error) and [left_right_invariant.md](../filtering/left_right_invariant.md).
 
 ---
 

@@ -30,7 +30,7 @@ The first two tests are exact. The third is a heuristic for spotting what will f
   - the state is a minimal parameterization (angles, tangent-space error) or must satisfy the $SO(3)$ constraint;
   - the angular velocity or a bias is itself a state, so it multiplies $R$.
 
-  With a known body twist, $R_{k+1} = R_k\,\mathrm{Exp}(\omega\,\Delta t)$ is linear in $\mathrm{vec}(R_k)$. The vanilla KF in [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) is inexact only because it truncates the exponential and needs an SVD re-projection onto $SO(3)$. For *group-affine* dynamics, a well-chosen invariant error evolves independently of the state estimate (Barrau & Bonnabel 2017, [kf_ekf_iekf.md §11](kf_ekf_iekf.md#11-references)).
+  With a known body twist, $R_{k+1} = R_k\,\mathrm{Exp}(\omega\,\Delta t)$ is linear in $\mathrm{vec}(R_k)$. The vanilla KF in [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) is inexact only because it truncates the exponential and needs an SVD re-projection onto $SO(3)$. For **group-affine** dynamics, a well-chosen invariant error evolves independently of the state estimate (Barrau & Bonnabel 2017, [kf_ekf_iekf.md §11](kf_ekf_iekf.md#11-references)).
 
 ## 3. "How nonlinear" matters in practice
 

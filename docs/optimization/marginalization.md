@@ -34,7 +34,7 @@ Eliminate x1:
     from x1
 ```
 
-That is marginalization. `bayes_tree.md` uses it to build a *solve order*, where nothing is thrown away for good. We use the same step to drop $x_1$ **permanently**, on purpose: it is the oldest pose in the window and the estimator will never touch it again.
+That is marginalization. `bayes_tree.md` uses it to build a **solve order**, where nothing is thrown away for good. We use the same step to drop $x_1$ **permanently**, on purpose: it is the oldest pose in the window and the estimator will never touch it again.
 
 **Why not just delete $x_1$?**
 Two naive shortcuts both go wrong, in opposite directions:
@@ -83,7 +83,7 @@ $(\Lambda_b', \eta_b')$ is a brand-new **prior factor** over exactly the variabl
 
 The difference from BA's version of this trick:
 - BA computes $\Lambda_b'$ *only to solve the reduced system faster*, then back-substitutes to recover $x_a$ from $x_b$.
-- Here there is no back-substitution: $x_a$ is never coming back. That is what makes this *temporal* marginalization rather than a solver optimization.
+- Here there is no back-substitution: $x_a$ is never coming back. That is what makes this **temporal marginalization** rather than a solver optimization.
 
 ---
 

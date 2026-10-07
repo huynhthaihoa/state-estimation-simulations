@@ -180,10 +180,10 @@ where $\delta\theta$ is a **small rotation error**. This is a much more natural 
 - Estimate 30°, truth 32°. The error is $`\delta\theta = (0,0,2^\circ)`$, one small 3-vector.
 - In this planar case, left and right errors coincide. They differ only for rotations about different axes.
 
-**A caveat**: $R = \hat R \exp(\delta\theta^\wedge)$ instead of $R - \hat R$ is, by itself, just a *manifold* (*multiplicative*) error representation - it is not automatically "invariant."
+**A caveat**: $R = \hat R \exp(\delta\theta^\wedge)$ instead of $R - \hat R$ is, by itself, just a **manifold** (**multiplicative**) error representation - it is not automatically "invariant."
 - Widely-used filters (ESKF, MEKF, the error-state formulations behind most VIO pipelines) already define their error this way without being IEKFs.
 - What earns the name **invariant** is a further choice: building the error from the group action itself (left- or right-invariant).
-- For *group-affine* dynamics with invariant-form measurements, that makes the *linearized error dynamics* independent of the current state estimate. That property, not the exp/log notation, is what addresses the consistency problem from §2.
+- For **group-affine** dynamics with invariant-form measurements, that makes the **linearized error dynamics** independent of the current state estimate. That property, not the exp/log notation, is what addresses the consistency problem from §2.
 
 ### EKF vs. IEKF, equations side by side
 
@@ -218,10 +218,16 @@ K_k = P_k^-H^\top(HP_k^-H^\top+R_{\text{meas}})^{-1} \qquad \hat T_k = \hat T_k^
 ```
 
 **What this example does and doesn't show.**
-- The IEKF's $H$ never mentions $R_{\text{pred}}$: it rotates the *measurement* into the body frame rather than rotating the *known points* into the world frame. For measurements of this invariant form, that is the general IEKF recipe (express the residual through the group action and the state-dependence drops out of $H$).
+- The IEKF's $H$ never mentions $R_{\text{pred}}$: it rotates the **measurement** into the body frame rather than rotating the **known points** into the world frame. For measurements of this invariant form, that is the general IEKF recipe (express the residual through the group action and the state-dependence drops out of $H$).
 - Caveat: the benchmark's state-independent $H$ relies on isotropic measurement noise. With anisotropic $\Sigma$, the body-frame noise $`R_{\text{pred}}^\top \Sigma R_{\text{pred}}`$ depends on the estimate.
 - Under isotropic noise, the two pairs give the *same* correction $K_k r_k$ and the same $P_k$ every step (§7). $R_{\text{pred}}$ cancels out of $K_k r_k$ and of $P_k$ because it is an orthogonal matrix acting on both sides of the update. $K_k$ itself differs: $`K_{\text{world}} = K_{\text{body}}\,\mathrm{blkdiag}(R_{\text{pred}})^\top`$.
 - So here the IEKF's advantage is computational and structural ($H$ is never rebuilt from $R_{\text{pred}}$), not statistical.
+
+> **Note**: $`\mathrm{blkdiag}`$ in general means **block-diagonal matrix**, a matrix with the given blocks along its diagonal and zeros everywhere else. Here it stands for $R_{\text{pred}}$ repeated once for each measured point, because the measurement stacks the 3D points one after another:
+>
+> ```math
+> \mathrm{blkdiag}(R_{\text{pred}}) = \begin{bmatrix} R_{\text{pred}} & & 0 \\ & \ddots & \\ 0 & & R_{\text{pred}} \end{bmatrix}
+> ```
 
 This benchmark's `run_ekf` is also not the kind of EKF §2 warns about:
 - It already uses the same error as the IEKF, $T = \hat T\exp(\xi)$, which is why the two share a predict step whose Jacobians depend only on the input $u$, not on the estimate.
@@ -242,7 +248,7 @@ Consider a robot state $X = (R, p, v, b_g, b_a)$, where:
 - $b_g$: gyroscope bias
 - $b_a$: accelerometer bias
 
-An ordinary EKF has to repeatedly calculate Jacobians around the current estimate. But the system has **geometric symmetries**: changing the **global reference frame** shouldn't change the **robot's physical behavior**. The IEKF constructs the **estimation error** so that these symmetries are handled naturally. For dynamics with the right structure (*group-affine*, which covers IMU-driven orientation, velocity and position) and invariant-form measurements, that buys three concrete things:
+An ordinary EKF has to repeatedly calculate Jacobians around the current estimate. But the system has **geometric symmetries**: changing the **global reference frame** shouldn't change the **robot's physical behavior**. The IEKF constructs the **estimation error** so that these symmetries are handled naturally. For dynamics with the right structure (**group-affine**, which covers IMU-driven orientation, velocity and position) and invariant-form measurements, that buys three concrete things:
 
 - the linearized error dynamics don't depend on the current estimate, so a bad estimate doesn't distort the propagated covariance;
 - directions no sensor can observe (such as global yaw and position) stay unobservable in the filter, which is what keeps it consistent;

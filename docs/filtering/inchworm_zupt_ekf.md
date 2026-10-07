@@ -96,7 +96,7 @@ x^{+} = x^{-} + K r, \qquad P^{+} = (I - K H)\,P^{-}
 | Position | `measurement_update_position` | noisy position reading | $`\begin{bmatrix} 1 & 0 \end{bmatrix}`$ | $`\sigma_{\text{pos}}^2`$ | every tick |
 | ZUPT | `measurement_update_zupt` | $0$ (pseudo-measurement) | $`\begin{bmatrix} 0 & 1 \end{bmatrix}`$ | $`\sigma_{\text{zupt}}^2`$ | depends on the variant |
 
-ZUPT is a *pseudo*-measurement: no sensor produces that $z = 0$. The filter is simply told "velocity is zero, give or take $\sigma_{\text{zupt}}$", which is only true if the robot really is stationary. The script's defaults are $\sigma_{\text{pos}} = 0.02$ m and $\sigma_{\text{zupt}} = 0.01$ m/s. Because the two measurement noises are independent, running the ZUPT update right after the position update in the same tick gives the same result as one joint update with both rows of $H$ stacked.
+ZUPT is a **pseudo-measurement**: no sensor produces that $z = 0$. The filter is simply told "velocity is zero, give or take $\sigma_{\text{zupt}}$", which is only true if the robot really is stationary. The script's defaults are $\sigma_{\text{pos}} = 0.02$ m and $\sigma_{\text{zupt}} = 0.01$ m/s. Because the two measurement noises are independent, running the ZUPT update right after the position update in the same tick gives the same result as one joint update with both rows of $H$ stacked.
 
 **The ZUPT update, written out.** With $`H = \begin{bmatrix} 0 & 1 \end{bmatrix}`$ everything reduces to scalars. Write the predicted covariance as
 

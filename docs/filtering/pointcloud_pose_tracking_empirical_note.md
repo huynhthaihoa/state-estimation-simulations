@@ -14,7 +14,7 @@ We keep the three claims separate and explain the mechanism behind each.
 
 - **State**: a single rigid pose $T \in SE(3)$.
 - **Motion model**: $`T_{\text{pred}} = T_{\text{prev}}\exp(u\,\Delta t)`$ - constant body-frame twist $u$ over a step of length $\Delta t$. Composing with this known relative motion makes the state-error propagation exact (the noise still enters to first order, §1.1).
-  - This is the simplest *group-affine* system (right-multiplication by a known group element, listed by Barrau & Bonnabel 2017, Remark 1 [2]); IMU position/velocity/attitude propagation is a richer example of the same class.
+  - This is the simplest **group-affine** system (right-multiplication by a known group element, listed by Barrau & Bonnabel 2017, Remark 1 [2]); IMU position/velocity/attitude propagation is a richer example of the same class.
   - EKF, IEKF and UKF all use it exactly; **vanilla KF does not**, it only approximates the composition (§4.2).
   - This is context, not part of the EKF/IEKF equivalence argument (§2.2).
 - **Observation model**: a fixed body-frame point cloud $p_i$, observed as $z_i = T\cdot p_i + \text{noise}$ ($T\cdot p_i$ is the pose applied to a point, `T.act(p_i)` in code), with **isotropic** Gaussian noise ($R = \sigma^2 I$, same variance in every direction, uncorrelated across x/y/z).

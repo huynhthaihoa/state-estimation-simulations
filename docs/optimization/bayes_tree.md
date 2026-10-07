@@ -387,7 +387,7 @@ So:
 
 ## 15. Where this is implemented in this repo
 
-Partially. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds the *elimination tree* of this repo's pose-graph topology: one node per variable, no clique merging (§13). It is the structure a Bayes tree is built from, not a full Bayes tree.
+Partially. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds the **elimination tree** of this repo's pose-graph topology: one node per variable, no clique merging (§13). It is the structure a Bayes tree is built from, not a full Bayes tree.
 
 **What it does:**
 - `symbolic_eliminate`/`bayes_tree_affected_path` in `utils.py` run the elimination-game construction from §3-§4 (spelled out in §4.1) and the root-ward affected-path query from §7-§9. Every "N/16 affected" count is a count of variables, not cliques.

@@ -156,7 +156,7 @@ With noise, neither linear step is accurate enough alone; the Gauss-Newton refin
 `linear_pnp_dlt` is the simplest *correct* version of linear PnP, not a production algorithm. It needs $n \geq 6$ correspondences for $A$ to reach rank 11 (§3). Its limits are about accuracy, not cost:
 
 - **Cost is not the issue.** A version linear in $n$ would take the SVD of the fixed $12\times12$ matrix $A^\top A$ (or use `full_matrices=False`). Our code takes the SVD of the full $2n\times12$ matrix $A$ directly, which is fine at these sizes.
-- **Accuracy is.** It solves for 12 unconstrained numbers and minimizes an *algebraic* error, ignoring that 9 of them must form a rotation until the orthogonalization step afterwards. More points help, but with few points, noticeable noise, or points close to a plane it is less accurate than purpose-built solvers.
+- **Accuracy is.** It solves for 12 unconstrained numbers and minimizes an **algebraic error**, ignoring that 9 of them must form a rotation until the orthogonalization step afterwards. More points help, but with few points, noticeable noise, or points close to a plane it is less accurate than purpose-built solvers.
 - **Exactly coplanar points break it.** $A$ then loses rank and the null space is no longer one-dimensional; planar scenes need a homography-based method instead.
 
 **EPnP** (Lepetit, Moreno-Noguer & Fua, 2009 - see References) expresses every 3D point as a weighted combination of four virtual control points, so the problem becomes recovering just those four points' camera-frame coordinates. The $`O(n)`$ in its title is relative to earlier non-iterative PnP methods (the paper cites $`O(n^5)`$ and $`O(n^8)`$), not to the DLT. Its advantage over the DLT is accuracy.
