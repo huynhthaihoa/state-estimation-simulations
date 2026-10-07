@@ -441,17 +441,25 @@ new contact
 normal motion
 ```
 
-A filtering approach naturally asks:
+### The filtering question
 
 > **"Given the state right now, what happens next?"**
 
-A smoothing approach can instead ask:
+A filter asks this for both **smooth motion** and **hybrid motion**. The difference is what happens when the answer is a little wrong:
 
-> **"Given the measurements before and after this unusual transition, what was the most consistent trajectory and transition state?"**
+| | Smooth motion | Hybrid motion |
+|---|---|---|
+| Next step | Integrate the motion model | Also decide **when** the jump happens (e.g. touchdown), then apply it |
+| Uncertainty | Ordinary Jacobian | **Saltation matrix** ([hybrid_saltation_ekf.md §2](filtering/hybrid_saltation_ekf.md#2-why-the-reset-maps-own-jacobian-is-not-enough)) |
+| A wrong call | A small error; the next measurements pull it back | A wrong decision, e.g. contact detected late ([§8](filtering/hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter)) or "velocity = 0" while still moving ([inchworm_zupt_ekf.md §3](filtering/inchworm_zupt_ekf.md#3-the-finding-not-just-always-is-wrong-while-moving)); the filter can't go back and redo it |
 
-That matters when the motion model is **hybrid/discontinuous**, because future observations may provide strong evidence about what actually happened during an ambiguous transition.
+### The smoothing question
 
-In summary:
+> **"Given the measurements before and after, what trajectory fits them all best?"**
+
+A smoother asks this for any motion. For **hybrid motion**, that includes the transition itself: **when** contact really happened, and what the state was at that moment. Measurements from after the transition often settle exactly the call a filter had to make blind.
+
+### Summary
 
 > **Filtering is like continuously updating a belief about where the robot is.**
 
