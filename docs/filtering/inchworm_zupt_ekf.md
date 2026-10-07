@@ -77,6 +77,8 @@ Q = \begin{bmatrix} \left(\tfrac{1}{2}\sigma_{\text{process}}\Delta t^2\right)^2
 x^{-} = \Phi\,x, \qquad P^{-} = \Phi\,P\,\Phi^\top + Q
 ```
 
+Superscripts mark the step: $x^-$, $P^-$ are predicted (before the update) and $x^+$, $P^+$ are updated ([kf_ekf_iekf.md §1](kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear)).
+
 $Q$ is a simple diagonal heuristic (the same formula as in `saltation_matrix_ekf.py`), not the textbook continuous white-noise-acceleration $Q$, which also has off-diagonal terms.
 
 **Measurement updates** (`_kf_update`): both updates go through the same standard linear-Gaussian update and differ only in $z$, $H$ and $R$:

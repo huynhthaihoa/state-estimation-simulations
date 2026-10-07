@@ -35,11 +35,13 @@ where:
 
 The filter needs $`Q`$ and $`R`$, not $w$ and $v$ themselves: the individual noise values are unknown at each step, so it works with their statistics (how large and correlated the noise typically is). This is the same $`Q`$/$`R`$ notation [extra_kf_variants.md §8](extra_kf_variants.md#8-adaptive-kalman-filter) (Adaptive KF) and [§12](extra_kf_variants.md#12-which-ones-should-you-prioritize-learning)'s checklist refer to.
 
-Every KF cycle alternates two steps, each carrying its uncertainty as a **covariance matrix** $P$ (how spread-out/correlated the filter's belief about $x$ currently is).
+Every KF cycle alternates two steps, each carrying its uncertainty as a third **covariance matrix**, $P$. It is neither a process noise covariance $`Q`$ nor a measurement noise covariance $`R`$, but the covariance of the filter's own **estimation error** $x - \hat x$: how spread-out/correlated its belief about $x$ currently is.
 
 **Prediction step:** push the last estimate through the motion model, and grow $P$ by however uncertain that model is ($`Q`$):
 
 $$\hat x_k^- = F\hat x_{k-1} \qquad P_k^- = FP_{k-1}F^\top + Q$$
+
+The superscript $`{}^-`$ marks the **predicted (prior)** value: after predicting, before the measurement $z_k$ arrives. No superscript (written $`{}^+`$ in some other docs) means the **updated (posterior)** value.
 
 **Measurement update step:** compare the predicted measurement $H\hat x_k^-$ against what arrived ($z_k$), and blend the two using the **Kalman gain** $K_k$:
 
