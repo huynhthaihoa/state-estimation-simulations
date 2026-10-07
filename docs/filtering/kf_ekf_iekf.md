@@ -218,7 +218,7 @@ K_k = P_k^-H^\top(HP_k^-H^\top+R_{\text{meas}})^{-1} \qquad \hat T_k = \hat T_k^
 ```
 
 **What this example does and doesn't show.**
-- The IEKF's $H$ never mentions $R_{\text{pred}}$: it rotates the **measurement** into the body frame rather than rotating the **known points** into the world frame. For measurements of this invariant form, that is the general IEKF recipe (express the residual through the group action and the state-dependence drops out of $H$).
+- The IEKF's $H$ never mentions $R_{\text{pred}}$: it rotates the **measurement** into the **body frame** rather than rotating the **known points** into the **world frame**. For measurements of this invariant form, that is the general IEKF recipe (express the residual through the group action and the state-dependence drops out of $H$).
 - Caveat: the benchmark's state-independent $H$ relies on isotropic measurement noise. With anisotropic $\Sigma$, the body-frame noise $`R_{\text{pred}}^\top \Sigma R_{\text{pred}}`$ depends on the estimate.
 - Under isotropic noise, the two pairs give the *same* correction $K_k r_k$ and the same $P_k$ every step (§7). $R_{\text{pred}}$ cancels out of $K_k r_k$ and of $P_k$ because it is an orthogonal matrix acting on both sides of the update. $K_k$ itself differs: $`K_{\text{world}} = K_{\text{body}}\,\mathrm{blkdiag}(R_{\text{pred}})^\top`$.
 - So here the IEKF's advantage is computational and structural ($H$ is never rebuilt from $R_{\text{pred}}$), not statistical.
