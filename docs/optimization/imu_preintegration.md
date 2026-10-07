@@ -14,7 +14,7 @@ It builds on two earlier ideas:
 An IMU reports angular rate and acceleration at 100-1000 Hz. The keyframes or loop closures that a pose-graph or bundle-adjustment back-end optimizes over arrive at about 1-10 Hz. That gap means 10-1000 raw samples per keyframe, and it causes two problems:
 
 - **Problem A - too many samples.** One node per raw sample would add 100+ nodes per second, and the back-end only needs the *net* relative motion between keyframes.
-- **Problem B - bias re-linearization.** The gyro/accel biases ($b_g$, $b_a$) are part of the optimized state, and the optimizer changes them on essentially every iteration. Every raw sample was integrated with the *old* bias, so in principle each segment must be re-integrated (100+ samples, for every IMU segment, every iteration).
+- **Problem B - bias re-linearization.** The **gyro/accel biases ($b_g$, $b_a$)** are part of the optimized state, and the optimizer changes them on essentially every iteration. Every raw sample was integrated with the *old* bias, so in principle each segment must be re-integrated (100+ samples, for every IMU segment, every iteration).
 
 Preintegration solves both:
 
