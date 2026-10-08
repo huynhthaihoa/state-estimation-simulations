@@ -656,6 +656,134 @@ def run_vanilla_kf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_
     return T_list
 
 
+class BatchGNSmoother:
+    """Batch Gauss-Newton smoother over the whole trajectory T_0..T_N -- see
+    run_batch_gn's docstring. Unlike the recursive filters above, it carries
+    no per-tick state: each Gauss-Newton iteration linearizes every factor at
+    the current trajectory estimate, solves the resulting normal equations
+    H delta = g for all poses jointly, and retracts every pose by its slice of
+    delta. Factor weights are fixed by the problem, so they're computed once
+    here; each factor type adds its own blocks to (H, g) in its own method.
+    """
+
+    def __init__(self, T_prior0, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_std):
+        """
+        Arguments:
+            T_prior0: prior pose on T_0 (4,4)
+            P_init: 6x6 tangent covariance of the prior on T_0 (numpy array)
+            u_meas: (N,6) array of noisy body-frame twists
+            z: list of noisy point-cloud measurements (M,3)
+            body_points: (M,3) array of points in the object's body frame
+            dt: time step (s)
+            Q_tangent: 6x6 tangent covariance of the motion-model twist increment,
+                inverted into the motion-factor weight (numpy array)
+            point_noise_std: std-dev of the point-cloud measurement noise (m),
+                giving the per-coordinate measurement-factor weight 1/sigma^2
+        """
+        self.T_prior0 = T_prior0
+        self.u_meas = u_meas
+        self.z = z
+        self.body_points = body_points
+        self.dt = dt
+        self.Omega_prior = np.linalg.inv(P_init)
+        self.Omega_motion = np.linalg.inv(Q_tangent)
+        self.omega_point = 1.0 / point_noise_std ** 2
+
+    def linearize(self, T_est):
+        """Builds the Gauss-Newton normal equations at the trajectory estimate
+        T_est: H is the (6(N+1), 6(N+1)) approximate Hessian J^T Omega J and g
+        the gradient term -J^T Omega e, summed over every factor.
+        Arguments:
+            T_est: list of current pose estimates (4,4)
+        Returns:
+            H: (6(N+1), 6(N+1)) information matrix
+            g: (6(N+1),) right-hand side
+        """
+        dof = 6 * len(T_est)
+        H = np.zeros((dof, dof))
+        g = np.zeros(dof)
+        self._add_prior_factor(H, g, T_est)
+        self._add_motion_factors(H, g, T_est)
+        self._add_measurement_factors(H, g, T_est)
+        return H, g
+
+    def _add_prior_factor(self, H, g, T_est):
+        """Prior factor on T_0: e0 = Log(T_prior0^-1 @ T_0)."""
+        e0 = se3_log(se3_inv(self.T_prior0) @ T_est[0])
+        Jp = compute_se3_inv_right_jacobian(e0)
+        H[0:6, 0:6] += Jp.T @ self.Omega_prior @ Jp
+        g[0:6] += -Jp.T @ self.Omega_prior @ e0
+
+    def _add_motion_factors(self, H, g, T_est):
+        """Motion factors between consecutive poses: e_k = Log(T_pred^-1 @ T_k),
+        T_pred = motion_model(T_{k-1}, u_{k-1}), so e_k depends on both poses."""
+        for k in range(1, len(T_est)):
+            Jc_self, Jc_tau = np.zeros((6, 6)), np.zeros((6, 6))
+            T_pred = motion_model(T_est[k - 1], self.u_meas[k - 1], self.dt, Jc_self, Jc_tau)
+
+            e_k = se3_log(se3_inv(T_pred) @ T_est[k])
+            Ja = compute_se3_inv_right_jacobian(e_k)
+            Jb = -compute_se3_inv_right_jacobian(-e_k)
+
+            J_prev = Jb @ Jc_self  # d e_k / d T_est[k-1], chained through T_pred
+            J_curr = Ja            # d e_k / d T_est[k]
+
+            c0, c1 = 6 * (k - 1), 6 * k
+            H[c0:c0 + 6, c0:c0 + 6] += J_prev.T @ self.Omega_motion @ J_prev
+            H[c0:c0 + 6, c1:c1 + 6] += J_prev.T @ self.Omega_motion @ J_curr
+            H[c1:c1 + 6, c0:c0 + 6] += J_curr.T @ self.Omega_motion @ J_prev
+            H[c1:c1 + 6, c1:c1 + 6] += J_curr.T @ self.Omega_motion @ J_curr
+            g[c0:c0 + 6] += -J_prev.T @ self.Omega_motion @ e_k
+            g[c1:c1 + 6] += -J_curr.T @ self.Omega_motion @ e_k
+
+    def _add_measurement_factors(self, H, g, T_est):
+        """Point-cloud measurement factors at every pose: e = z_k - h(T_k)."""
+        for k in range(len(T_est)):
+            pred, Jm = observation_model(T_est[k], self.body_points, with_jacobian=True)
+            e_meas = (self.z[k] - pred).reshape(-1)
+            Jm = -Jm  # d(z - h(T))/dT = -dh/dT
+
+            c = 6 * k
+            H[c:c + 6, c:c + 6] += self.omega_point * (Jm.T @ Jm)
+            g[c:c + 6] += -self.omega_point * (Jm.T @ e_meas)
+
+    def retract(self, T_est, delta):
+        """Applies each pose's slice of delta as a right perturbation T_k @ Exp(delta_k).
+        Arguments:
+            T_est: list of pose estimates (4,4)
+            delta: (6(N+1),) stacked tangent update
+        Returns:
+            list of updated poses (4,4)
+        """
+        return [T @ se3_exp(delta[6 * k:6 * k + 6]) for k, T in enumerate(T_est)]
+
+    def solve(self, T_init_list, gn_tol, gn_max_iters):
+        """Gauss-Newton iterations from T_init_list until the step norm drops
+        below gn_tol or gn_max_iters is reached.
+        Arguments:
+            T_init_list: list of initial pose guesses (4,4)
+            gn_tol: convergence threshold on |delta|
+            gn_max_iters: maximum number of Gauss-Newton iterations
+        Returns:
+            T_est: list of estimated poses (4,4)
+        """
+        T_est = list(T_init_list)
+        for it in range(gn_max_iters):
+            H, g = self.linearize(T_est)
+            H += np.eye(len(g)) * 1e-6
+            delta = np.linalg.solve(H, g)
+            T_est = self.retract(T_est, delta)
+
+            step_norm = np.linalg.norm(delta)
+            if step_norm < gn_tol:
+                print(f"    Batch GN converged after {it + 1} iteration(s) (|delta| < {gn_tol})")
+                break
+        else:
+            print(f"    Batch GN reached max iterations ({gn_max_iters}) without full convergence")
+
+        return T_est
+
+
 def run_batch_gn(T_init_list, T_prior0, P_init, u_meas, z, body_points, dt, Q_tangent,
                   point_noise_std, gn_tol, gn_max_iters):
     """Batch Gauss-Newton smoother: jointly optimizes the whole trajectory
@@ -673,69 +801,9 @@ def run_batch_gn(T_init_list, T_prior0, P_init, u_meas, z, body_points, dt, Q_ta
     Returns:
         T_est: list of estimated poses (4,4)
     """
-    n_poses = len(T_init_list)
-    dof = 6 * n_poses
-
-    Omega_prior = np.linalg.inv(P_init)
-    Omega_motion = np.linalg.inv(Q_tangent)
-    omega_point = 1.0 / point_noise_std ** 2
-
-    T_est = list(T_init_list)
-
-    for it in range(gn_max_iters):
-        H = np.zeros((dof, dof))
-        g = np.zeros(dof)
-
-        # --- Prior factor on T_0 ---
-        e0 = se3_log(se3_inv(T_prior0) @ T_est[0])
-        Jp = compute_se3_inv_right_jacobian(e0)
-        H[0:6, 0:6] += Jp.T @ Omega_prior @ Jp
-        g[0:6] += -Jp.T @ Omega_prior @ e0
-
-        # --- Motion factors between consecutive poses ---
-        for k in range(1, n_poses):
-            Jc_self, Jc_tau = np.zeros((6, 6)), np.zeros((6, 6))
-            T_pred = motion_model(T_est[k - 1], u_meas[k - 1], dt, Jc_self, Jc_tau)
-
-            e_k = se3_log(se3_inv(T_pred) @ T_est[k])
-            Ja = compute_se3_inv_right_jacobian(e_k)
-            Jb = -compute_se3_inv_right_jacobian(-e_k)
-
-            J_prev = Jb @ Jc_self  # d e_k / d T_est[k-1], chained through T_pred
-            J_curr = Ja            # d e_k / d T_est[k]
-
-            c0, c1 = 6 * (k - 1), 6 * k
-            H[c0:c0 + 6, c0:c0 + 6] += J_prev.T @ Omega_motion @ J_prev
-            H[c0:c0 + 6, c1:c1 + 6] += J_prev.T @ Omega_motion @ J_curr
-            H[c1:c1 + 6, c0:c0 + 6] += J_curr.T @ Omega_motion @ J_prev
-            H[c1:c1 + 6, c1:c1 + 6] += J_curr.T @ Omega_motion @ J_curr
-            g[c0:c0 + 6] += -J_prev.T @ Omega_motion @ e_k
-            g[c1:c1 + 6] += -J_curr.T @ Omega_motion @ e_k
-
-        # --- Measurement factors at every pose ---
-        for k in range(n_poses):
-            pred, Jm = observation_model(T_est[k], body_points, with_jacobian=True)
-            e_meas = (z[k] - pred).reshape(-1)
-            Jm = -Jm  # d(z - h(T))/dT = -dh/dT
-
-            c = 6 * k
-            H[c:c + 6, c:c + 6] += omega_point * (Jm.T @ Jm)
-            g[c:c + 6] += -omega_point * (Jm.T @ e_meas)
-
-        H += np.eye(dof) * 1e-6
-        delta = np.linalg.solve(H, g)
-
-        for k in range(n_poses):
-            T_est[k] = T_est[k] @ se3_exp(delta[6 * k:6 * k + 6])
-
-        step_norm = np.linalg.norm(delta)
-        if step_norm < gn_tol:
-            print(f"    Batch GN converged after {it + 1} iteration(s) (|delta| < {gn_tol})")
-            break
-    else:
-        print(f"    Batch GN reached max iterations ({gn_max_iters}) without full convergence")
-
-    return T_est
+    smoother = BatchGNSmoother(T_prior0, P_init, u_meas, z, body_points, dt, Q_tangent,
+                               point_noise_std)
+    return smoother.solve(T_init_list, gn_tol, gn_max_iters)
 
 
 def pose_errors(T_true_list, T_est_list):

@@ -274,6 +274,22 @@ Each iteration solves the damped normal equations. It then updates every pose wi
 
 There is no line search or Levenberg-Marquardt schedule. It starts from the dead-reckoning trajectory, and with the defaults it converged in 5 iterations. The motion factor uses $Q$ directly as the covariance of $e_k$. It does not use the EKF predict's $J_\tau Q J_\tau^\top$.
 
+**Intuition:** batch GN and the EKF use the same models and the same measurements. They differ in **which measurements each pose gets to use**.
+- The EKF settles pose $`T_k`$ from the measurements up to time $`k`$ and never revisits it. Batch GN is a **smoother**: it solves for every pose at once, so each pose also uses the measurements that came **after** it ([filtering vs. smoothing](../filtering_smoothing.md#8-filtering-vs-smoothing-in-one-picture)).
+- Each iteration is plain Gauss-Newton: treat every factor as linear around the current trajectory, solve for all the pose corrections $`\delta`$ together, apply them, repeat ([gauss_newton.md §2](../optimization/gauss_newton.md#2-intuition-fit-a-bowl-jump-to-its-bottom)).
+- Worked numbers (defaults, 51 poses):
+
+| | Error at $`T_0`$ | Final error | RMS, all poses | RMS, poses 1-50 |
+|---|---|---|---|---|
+| EKF, rotation | 6.08° | 0.289° | 1.043° | 0.609° |
+| Batch GN, rotation | 0.80° | 0.287° | 0.422° | 0.411° |
+| EKF, position | 0.282 m | 0.0031 m | 0.0404 m | 0.0086 m |
+| Batch GN, position | 0.010 m | 0.0031 m | 0.0078 m | 0.0077 m |
+
+- **$`T_0`$ shows smoothing most clearly.** The EKF never revisits it, so it keeps the initial guess's 6° error. Batch GN pulls it to 0.8° using measurements from later times.
+- **At the last pose** both have seen the same measurements, so their errors nearly match.
+- **In between**, the later measurements still help: rotation RMS over poses 1-50 is about 1.5x lower. Position gains only about 10%, so most of the 5x gap in the all-poses RMS comes from $`T_0`$ alone (see the note on $`k = 0`$ under Error metrics below).
+
 #### Error metrics (`pose_errors`, `rotation_geodesic_error`)
 
 - The **rotation error** is the angle $\theta$ of the relative rotation $`W = R^\top \hat R`$, in degrees. It is computed as $`\mathrm{atan2}(s, c)`$, where $`c = (\mathrm{tr}\,W - 1)/2 = \cos\theta`$ is read off the symmetric part of $W$ and $`s = \tfrac12 \lVert (W - W^\top)^\vee \rVert = \sin\theta`$ off its skew part. Unlike $\arccos(c)$, this stays accurate for tiny angles, down to round-off. The `use_manif` version computes the same angle as $`\lVert \hat R\ \text{rminus}\ R \rVert`$, and manif's $SO(3)$ $\mathrm{Log}$ also uses `atan2`, so the same accuracy holds there.
