@@ -77,15 +77,17 @@ Q = \begin{bmatrix} \left(\tfrac{1}{2}\sigma_{\text{process}}\Delta t^2\right)^2
 x^{-} = \Phi\,x, \qquad P^{-} = \Phi\,P\,\Phi^\top + Q
 ```
 
-Superscripts mark the step: $x^-$, $P^-$ are predicted (before the update) and $x^+$, $P^+$ are updated ([kf_ekf_iekf.md §1](kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear)).
+Superscripts mark the step: $x^-$, $P^-$ are predicted (before the update) and $x^+$, $P^+$ are updated, where $`P`$ is the state **covariance** ([glossary](../glossary.md#2-uncertainty-and-probability)) ([kf_ekf_iekf.md §1](kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear)).
 
-$Q$ is a simple diagonal heuristic (the same formula as in `saltation_matrix_ekf.py`), not the textbook continuous white-noise-acceleration $Q$, which also has off-diagonal terms.
+$`\sigma_{\text{process}}`$ is the assumed acceleration-disturbance standard deviation (§2), and $Q$ (the **process-noise covariance**, [glossary](../glossary.md#6-kalman-filter-family)) is a simple diagonal heuristic (the same formula as in `saltation_matrix_ekf.py`), not the textbook continuous white-noise-acceleration $Q$, which also has off-diagonal terms.
 
-**Measurement updates** (`_kf_update`): both updates go through the same standard linear-Gaussian update and differ only in $z$, $H$ and $R$:
+**Measurement updates** (`_kf_update`): both updates go through the same standard linear-Gaussian update and differ only in $z$, $H$ and $R$ (the measurement, the **measurement Jacobian** and the **measurement-noise covariance**, [glossary](../glossary.md#6-kalman-filter-family)):
 
 $$
 r = z - H x^{-}, \qquad S = H P^{-} H^\top + R, \qquad K = P^{-} H^\top S^{-1}
 $$
+
+Here $`r`$ is the **innovation**, $`S`$ its covariance and $`K`$ the **Kalman gain** ([glossary](../glossary.md#6-kalman-filter-family)).
 
 ```math
 x^{+} = x^{-} + K r, \qquad P^{+} = (I - K H)\,P^{-}
@@ -126,7 +128,7 @@ Three things follow directly from these formulas:
 
 - **It corrects position too, through the cross-covariance.** $P_{pv}$ is how the filter has learned that position and velocity errors move together. If the velocity estimate turns out too high, the position estimate has probably drifted ahead too, so $p$ gets pulled back as well (for positive $P_{pv}$). This is how a velocity-only pseudo-measurement also affects position.
 
-- **It always makes the filter more confident, whether or not the claim is true.** $P_{vv}^{+}$ is always smaller than both $P_{vv}$ and $R_{\text{zupt}}$. Nothing in the update checks whether the robot is stationary. So when `always` applies it during extend, the filter reports a velocity standard deviation of at most 0.01 m/s while the true velocity is up to $v_{\text{extend}} = 0.1$ m/s away from the zero it was just told. That built-in overconfidence drives the large `always` NEES values in §3.
+- **It always makes the filter more confident, whether or not the claim is true.** $P_{vv}^{+}$ is always smaller than both $P_{vv}$ and $R_{\text{zupt}}$. Nothing in the update checks whether the robot is stationary. So when `always` applies it during extend, the filter reports a velocity standard deviation of at most 0.01 m/s while the true velocity is up to $v_{\text{extend}} = 0.1$ m/s away from the zero it was just told. That built-in overconfidence drives the large `always` NEES values in §3 (**NEES** is the normalized estimation error squared, 2 on average for a consistent 2-state filter, [glossary](../glossary.md#2-uncertainty-and-probability)).
 
 ---
 

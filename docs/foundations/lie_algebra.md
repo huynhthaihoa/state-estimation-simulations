@@ -99,7 +99,7 @@ A rotation matrix is a point in this space. Optimizing directly on it is inconve
 
 ## 6. Lie algebra: zoom in locally
 
-Now suppose we are at some rotation $R$. Instead of thinking about all possible rotations, we zoom in around $R$, where small rotations behave approximately like ordinary vectors. Every nearby rotation can be written as $R\exp(\delta\theta^\wedge)$ for a small 3-vector:
+Now suppose we are at some rotation $R$. Instead of thinking about all possible rotations, we zoom in around $R$, where small rotations behave approximately like ordinary vectors. Every nearby rotation can be written as $R\exp(\delta\theta^\wedge)$ for a small 3-vector (where $`\delta\theta^\wedge`$ is the **hat operator**'s skew-symmetric matrix, Section 7, and $`\exp`$ the **matrix exponential**, Section 8; see the [glossary](../glossary.md#1-geometry-and-lie-groups)):
 
 ```math
 \delta\theta =\begin{bmatrix}\delta\theta_x\\ 
@@ -211,7 +211,7 @@ so Exp builds the matrix and Log recovers the original 3-vector (checked numeric
 
 This is how we turn "the difference between two poses" into a plain vector we can measure, weight, and feed into a least-squares solver, which is what pose-graph optimization does with every edge residual.
 
-The same idea applies to $SE(3)$: $\xi^\wedge = \log(T_1^{-1}T_2)$ gives the 6D motion that separates two poses $T_1$ and $T_2$.
+The same idea applies to $SE(3)$: $\xi^\wedge = \log(T_1^{-1}T_2)$ (where $`\xi = [\rho, \phi]`$ is the 6-vector defined in Section 11; the [glossary](../glossary.md#1-geometry-and-lie-groups) writes it $[v, \omega]$) gives the 6D motion that separates two poses $T_1$ and $T_2$.
 
 ---
 
@@ -241,7 +241,7 @@ $SE(3)$ is the **Lie group of 3D rigid-body transformations**. Its Lie algebra i
 \phi \end{bmatrix} \in \mathbb{R}^6
 ```
 
-- $\rho$: translational part (the actual translation it produces is $V\rho$, see below)
+- $\rho$: translational part (the actual translation it produces is $V\rho$, where $`V`$ is the matrix explained below)
 - $\phi$: tiny rotation
 
 So one 6D vector represents a tiny change in the entire robot pose:

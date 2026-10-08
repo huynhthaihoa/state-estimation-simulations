@@ -35,7 +35,7 @@ We want to adjust $x_1$ and $l_1$ so that the error becomes smaller.
 
 ## 2. Why not just use [Gauss-Newton](gauss_newton.md)?
 
-Gauss-Newton linearizes the error, $e(x+\Delta x)\approx e(x)+J\Delta x$, then solves
+Gauss-Newton linearizes the error, $e(x+\Delta x)\approx e(x)+J\Delta x$ (where $`J`$ is the **Jacobian** of $`e`$, [glossary](../glossary.md#3-least-squares-optimization)), then solves
 
 $$\boxed{J^\top J\Delta x=-J^\top e}$$
 
@@ -179,8 +179,9 @@ $$u =\pi(TX)$$
 
 where:
 
+- $u$ = the pixel coordinates of the landmark in the image
 - $X$ = 3D landmark
-- $T$ = camera pose, written here as world-to-camera, so $TX$ is the landmark in the camera frame. [bundle_adjustment.md](bundle_adjustment.md) uses the inverse convention: a camera-to-world $T$, and $\pi(T^{-1}P)$.
+- $T$ = camera pose, written here as world-to-camera, so $TX$ is the landmark in the camera frame. [bundle_adjustment.md](bundle_adjustment.md) uses the inverse convention: a camera-to-world $T$, and $\pi(T^{-1}P)$ ($P$ there is the 3D point, written $`X`$ in this doc, not a covariance).
 - $\pi$ = camera projection
 
 The reprojection error is $e = \pi(TX)-z$ (prediction minus measurement, the same convention as [gauss_newton.md](gauss_newton.md)'s residual $r$), and we optimize:

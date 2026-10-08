@@ -6,7 +6,7 @@ We can tell by looking at the model equations, not the data. Write the two model
 x_{k+1} = f(x_k, u_k) + w_k \qquad z_k = h(x_k) + v_k
 ```
 
-The system is linear only if both $f$ and $h$ are linear in the state $x$, meaning they can be written as $f = F x + G u$ and $h = H x$, where $F$, $G$, $H$ don't depend on $x$. If either one isn't, the system is nonlinear, and the plain KF is no longer the exact answer.
+The system is linear only if both $f$ and $h$ are linear in the state $x$, meaning they can be written as $f = F x + G u$ and $h = H x$, where $F$, $G$, $H$ don't depend on $x$. Here $`u_k`$ is the control input, $`w_k`$ the process noise and $`v_k`$ the measurement noise ([glossary](../glossary.md#6-kalman-filter-family)), and $`G`$ maps the input into the state. If either one isn't, the system is nonlinear, and the plain KF is no longer the exact answer.
 
 ## 1. Three ways to tell
 
@@ -14,10 +14,10 @@ The system is linear only if both $f$ and $h$ are linear in the state $x$, meani
 2. **The Jacobian doesn't depend on $x$.** Differentiate: if $\partial f / \partial x$ or $\partial h / \partial x$ still contains $x$, the system is nonlinear. This is the most practical test, and it is why the EKF has to recompute $F_k$ and $H_k$ at every step ([kf_ekf_iekf.md §2](kf_ekf_iekf.md#2-extended-kalman-filter-the-world-is-nonlinear-so-ill-approximate-it-locally)): they change as the estimate changes.
 3. **Look for these patterns.** Any of them makes a model nonlinear:
    - **Trig of a state**: $\cos\theta$, $\sin\theta$ where $\theta$ is estimated. This is the unicycle in [kf_ekf_iekf.md §2](kf_ekf_iekf.md#2-extended-kalman-filter-the-world-is-nonlinear-so-ill-approximate-it-locally).
-   - **States multiplied together**: $v \cdot \cos\theta$, or $`R\,p`$ when both $R$ and $p$ are estimated.
-   - **Rotations or poses in minimal coordinates**: composing $T \cdot \mathrm{Exp}(\xi)$, or a pose parameterized by angles. The point-cloud observation $R\,p_i + t$ is the counter-example: it is exactly linear in the state $[\mathrm{vec}(R), t]$ ([pointcloud_pose_tracking_empirical_note.md §4.1](pointcloud_pose_tracking_empirical_note.md#41-what-vanilla-buys-and-costs)). The nonlinearity enters through the rotation constraint and the minimal error coordinates.
-   - **Division by a state**: camera projection $u = f_x X/Z$.
-   - **Norms and square roots**: range $\sqrt{(x-x_L)^2 + (y-y_L)^2}$.
+   - **States multiplied together**: $v \cdot \cos\theta$ (here $`v`$ is a speed, not the measurement noise), or $`R\,p`$ when both $R$ and $p$ are estimated ($`R`$ the rotation, not the noise covariance; $`p`$ the position).
+   - **Rotations or poses in minimal coordinates**: composing $T \cdot \mathrm{Exp}(\xi)$ (pose $`T`$, tangent-space error $`\xi`$, **exponential map** $`\mathrm{Exp}`$; [glossary](../glossary.md#1-geometry-and-lie-groups)), or a pose parameterized by angles. The point-cloud observation $R\,p_i + t$ is the counter-example: it is exactly linear in the state $[\mathrm{vec}(R), t]$ ([pointcloud_pose_tracking_empirical_note.md §4.1](pointcloud_pose_tracking_empirical_note.md#41-what-vanilla-buys-and-costs)). The nonlinearity enters through the rotation constraint and the minimal error coordinates.
+   - **Division by a state**: camera projection $u = f_x X/Z$ (here $`u`$ is the pixel coordinate, not the control input; $`f_x`$ is the focal length in pixels, not the motion model $`f`$; $`X`$ and $`Z`$ are the lateral and depth coordinates of the point in the camera frame).
+   - **Norms and square roots**: range $\sqrt{(x-x_L)^2 + (y-y_L)^2}$ (robot position $`(x, y)`$, landmark position $`(x_L, y_L)`$).
    - **Switching or contact**: impacts, or stick/slip friction. These are non-smooth, which is what the saltation-matrix EKF in [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) handles.
 
 The first two tests are exact. The third is a heuristic for spotting what will fail them.
@@ -34,7 +34,7 @@ The first two tests are exact. The third is a heuristic for spotting what will f
 
 ## 3. "How nonlinear" matters in practice
 
-Almost every real robot model is nonlinear. The useful question is whether it's nonlinear *over the region our uncertainty covers*. A quick numerical check: take a step $\delta$ about the size of our standard deviation and measure the linearization error
+Almost every real robot model is nonlinear. The useful question is whether it's nonlinear *over the region our uncertainty covers*. A quick numerical check: take a step $\delta$ about the size of our standard deviation and measure the linearization error, where $`J`$ is the Jacobian of $`f`$ at $`\hat x`$ ([glossary](../glossary.md#3-least-squares-optimization))
 
 ```math
 \lVert f(\hat x + \delta) - f(\hat x) - J\delta \rVert
@@ -45,7 +45,7 @@ Compare that to the process or measurement noise.
 - **Much smaller than the noise**: the EKF is fine.
 - **Comparable to the noise or larger**: the Jacobian changes a lot within our uncertainty (for example, a large heading uncertainty, or a landmark close to the camera). Consider the UKF, an iterated update, or an invariant or manifold formulation.
 
-$P$ changes over time, so the answer does too. Check at the worst moments:
+$P$ (the state covariance) changes over time, so the answer does too. Check at the worst moments:
 
 - right after initialization, when $P$ is large;
 - after long dead-reckoning;
@@ -68,7 +68,7 @@ Expand the model around the estimate:
 f(\hat x + \delta) = f(\hat x) + J\delta + \tfrac12\,\delta^\top \nabla^2 f\,\delta + \dots
 ```
 
-The EKF keeps only the first two terms. With $\delta \sim \mathcal N(0, P)$, what it drops is, per output component $i$:
+The EKF keeps only the first two terms. With $\delta \sim \mathcal N(0, P)$ (and $`\nabla^2 f`$ the Hessian, the second derivatives of $`f`$), what it drops is, per output component $i$:
 
 - a mean bias of $`\tfrac12\,\mathrm{tr}(\nabla^2 f_i\, P)`$;
 - an extra covariance of $`\tfrac12\,\mathrm{tr}(\nabla^2 f_i\, P\, \nabla^2 f_j\, P)`$ in entry $(i, j)$.
@@ -78,7 +78,7 @@ Compare both with the noise the model already carries: $R$ for $h$, $Q$ for $f$.
 - **Small**: the bias and the extra spread $`\sqrt{\tfrac12\mathrm{tr}(\nabla^2 f_i\,P\,\nabla^2 f_i\,P)}`$ are both much smaller than $`\sqrt{R_{ii}}`$ (the sensor's own standard deviation), so the linearization is adequate.
 - **Comparable or larger**, in either: the model is effectively nonlinear at this uncertainty.
 
-**Range sensor example (2D)**: the Hessian of $`h = \lVert p - L\rVert`$ is $`(I - uu^\top)/r`$, where $u$ is the unit line-of-sight vector. It has curvature $1/r$ across the line of sight, so the bias is about $\sigma_p^2 / (2r)$ (in 3D there are two perpendicular directions, which gives $\sigma_p^2 / r$). With $\sigma_p = 1$ m and $\sigma_{\text{range}} = 0.1$ m:
+**Range sensor example (2D)**: the Hessian of $`h = \lVert p - L\rVert`$ is $`(I - uu^\top)/r`$, where $u$ is the unit line-of-sight vector (not the control input), $`p`$ the position, $`L`$ the landmark, $`r`$ the range $`\lVert p-L\rVert`$ and $`\sigma_p`$ the position standard deviation. It has curvature $1/r$ across the line of sight, so the bias is about $\sigma_p^2 / (2r)$ (in 3D there are two perpendicular directions, which gives $\sigma_p^2 / r$). With $\sigma_p = 1$ m and $\sigma_{\text{range}} = 0.1$ m:
 
 | Range $r$ | Bias | Extra spread $\sqrt{\tfrac12 / r^2}$ | vs. 0.1 m noise |
 | --- | --- | --- | --- |
@@ -91,8 +91,8 @@ Some quick scalings, each giving the dropped second-order term relative to the f
 
 | Model | Second-order term ÷ value | Example |
 | --- | --- | --- |
-| Heading, $\cos\theta$ | $\sim \sigma_\theta^2/2$ | 0.1 rad → 0.5%; 0.5 rad → 12.5% |
-| Camera, $X/Z$ | $\sim (\sigma_Z / Z)^2$ | depth uncertainty comparable to depth → trouble |
+| Heading, $\cos\theta$ | $\sim \sigma_\theta^2/2$ ($`\sigma_\theta`$ = heading standard deviation) | 0.1 rad → 0.5%; 0.5 rad → 12.5% |
+| Camera, $X/Z$ | $\sim (\sigma_Z / Z)^2$ ($`\sigma_Z`$ = depth standard deviation) | depth uncertainty comparable to depth → trouble |
 | Range (2D), $r$ | $\sim \tfrac12 (\sigma_p / r)^2$ | position uncertainty comparable to range → trouble |
 
 **Tiny example (why the bias is one-sided):**
@@ -129,13 +129,13 @@ For a cheaper version, use 2n+1 sigma points instead of 5000 samples. If the UKF
 
 ### 4.3 Jacobian drift
 
-Evaluate $J$ at $\hat x \pm \sigma$ along the main axes of $P$ (the eigenvectors, scaled by $\sqrt{\lambda}$). If $`\lVert J(\hat x + \sigma e) - J(\hat x)\rVert / \lVert J(\hat x)\rVert`$ is more than a few percent, the linear model varies a lot within our uncertainty.
+Evaluate $J$ at $\hat x \pm \sigma$ along the main axes of $P$ (the eigenvectors, scaled by $\sqrt{\lambda}$; here $`\lambda`$ is an eigenvalue of $`P`$, not the LM damping, $`e`$ the unit eigenvector and $`\sigma`$ the standard deviation along it). If $`\lVert J(\hat x + \sigma e) - J(\hat x)\rVert / \lVert J(\hat x)\rVert`$ is more than a few percent, the linear model varies a lot within our uncertainty.
 
 ### 4.4 After the fact: consistency tests
 
 Run the filter and check whether its reported uncertainty is believable:
 
-- **NIS**, the normalized innovation squared, $\nu^\top S^{-1}\nu$, needs no ground truth.
+- **NIS**, the normalized innovation squared, $\nu^\top S^{-1}\nu$ (innovation $`\nu`$ and **innovation covariance** $`S`$, [glossary](../glossary.md#6-kalman-filter-family)), needs no ground truth.
 - **NEES**, the normalized estimation error squared, needs simulated ground truth. This repo reports a Monte Carlo NEES in three scripts, which test different things:
   - [`friction_anisotropic_ekf.py`](../../use_numpy/friction_anisotropic_ekf.py) ($n = 3$): a genuinely nonlinear motion model (heading enters through $\cos\theta$, $\sin\theta$);
   - [`inchworm_zupt_ekf.py`](../../use_numpy/inchworm_zupt_ekf.py) ($n = 2$): exactly linear;

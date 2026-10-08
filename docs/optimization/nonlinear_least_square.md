@@ -46,7 +46,7 @@ Take errors $`[1,-2,3]`$:
 Absolute values, $`\sum_i|e_i|`$, would also stop the cancelling, so why squares? Two reasons:
 
 - **Easy to solve.** Once we linearize $e$ (§7), each step is a linear least-squares problem with a closed-form solution (normal equations, §8). $`|e|`$ has a kink at zero and no such structure.
-- **Statistically right.** For Gaussian measurement noise, minimizing squared error gives the maximum-likelihood estimate, which is also why §12's weights are $`W_i=\Sigma_i^{-1}`$.
+- **Statistically right.** For Gaussian measurement noise, minimizing squared error gives the maximum-likelihood estimate, which is also why §12's weights are $`W_i=\Sigma_i^{-1}`$ (the weight $`W_i`$ and the measurement covariance $`\Sigma_i`$, both defined in §12).
 
 So $`\text{total error}=\sum_i e_i^2`$.
 
@@ -68,7 +68,8 @@ $$e_i = z_i-\pi(TX_i)$$
 
 where:
 
-- $T$ = camera pose, written here as world-to-camera, so $TX_i$ is the landmark in the camera frame. [bundle_adjustment.md](bundle_adjustment.md) uses the inverse convention: a camera-to-world $T$, and $\pi(T^{-1}P)$.
+- $z_i$ = the measured pixel coordinates of landmark $`i`$ (the measurement)
+- $T$ = camera pose, written here as world-to-camera, so $TX_i$ is the landmark in the camera frame. [bundle_adjustment.md](bundle_adjustment.md) uses the inverse convention: a camera-to-world $T$, and $\pi(T^{-1}P)$ ($P$ there is the 3D point, written $`X_i`$ here, not a covariance).
 - $X_i$ = 3D landmark
 - $\pi$ = camera projection
 
@@ -157,7 +158,7 @@ This is exactly the kind of problem encountered in **[bundle adjustment](bundle_
 
 ## 6. Why not solve it directly?
 
-A linear equation $`Ax=b`$ can be solved directly with linear algebra. Our SLAM problem looks more like $`e(x)=z-f(x)`$ with $f$ nonlinear, for example (here $x$ is a scalar input):
+A linear equation $`Ax=b`$ (here $`A`$ is a generic matrix and $`b`$ a right-hand-side vector, not the line's intercept $`b`$ of §1) can be solved directly with linear algebra. Our SLAM problem looks more like $`e(x)=z-f(x)`$ with $f$ nonlinear, for example (here $x$ is a scalar input):
 
 ```math
 f(x)=\begin{bmatrix} \sin x\\ e^x\\ x^2 \end{bmatrix}
@@ -354,6 +355,8 @@ Almost every SLAM sensor gives a statement like:
 | Camera | $`e_{cam}(X_i,L_j)`$ |
 | GPS | $`e_{gps}(X_i)`$ |
 | Loop closure | $`e_{loop}(X_i,X_j)`$ |
+
+Here $`X_i`$ is now the $i$-th **pose** (not the landmark $`X_i`$ of §3), $`L_j`$ is the $j$-th landmark, $`v_i`$ the velocity at pose $i$, and $`b_i`$ the IMU bias at pose $i$ (not the intercept $`b`$ of §1; [glossary](../glossary.md#5-slam-system)).
 
 Putting everything together (each term weighted by its $W_i$ as in §12, left out here for readability):
 

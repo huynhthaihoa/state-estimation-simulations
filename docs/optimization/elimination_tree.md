@@ -62,7 +62,7 @@ The important point is that the tree is **not necessarily the original graph**:
 
 ## 3. Connecting it to sparse Cholesky
 
-We want $H=LL^\top$, computed by eliminating variables one by one. Take this graph:
+We want $`H=LL^\top`$, where $`H`$ is the **Hessian** (information matrix) of the linearized problem ([glossary](../glossary.md#3-least-squares-optimization)) and $`L`$ is its lower-triangular Cholesky factor, computed by eliminating variables one by one. Take this graph:
 
 ```text
 1 ─ 2 ─ 3
@@ -336,7 +336,7 @@ The concepts above connect into one pipeline:
               Solve Δx
 ```
 
-The elimination structure then feeds the Bayes tree (§7) and iSAM2.
+The elimination structure then feeds the Bayes tree (§7) and iSAM2. Here $`J`$ is the Jacobian of the residuals, and $`\Omega`$ in $`H = J^\top \Omega J`$ is the measurement **information matrix** ([glossary](../glossary.md#2-uncertainty-and-probability)).
 
 ### The simplest mental model
 

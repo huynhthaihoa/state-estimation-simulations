@@ -55,7 +55,7 @@ Pose 3 ─ Landmark 3
 ...
 ```
 
-Most variables don't directly interact, so the Hessian $H = J^\top \Omega J$ is **sparse**.
+Most variables don't directly interact, so the Hessian $H = J^\top \Omega J$ is **sparse** (with Jacobian $`J`$ and measurement **information matrix** $`\Omega`$, [glossary](../glossary.md#3-least-squares-optimization); §2 derives this).
 
 Instead of storing something like:
 

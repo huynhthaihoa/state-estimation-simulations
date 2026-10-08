@@ -296,7 +296,7 @@ For example, if one measurement is highly reliable (weight $w_1 = 100$) and anot
 
 $${\min_X \sum_{(i,j) \in \mathcal{E}} e_{ij}^\top \Omega_{ij} e_{ij}}$$
 
-where $\Omega_{ij}$ is related to the **information/covariance** of the measurement. This is why sensor uncertainty matters.
+where $`X`$ is the set of all node poses (defined in §15.1) and $\Omega_{ij}$ is related to the **information/covariance** of the measurement. This is why sensor uncertainty matters.
 
 Caveat about the accompanying scripts:
 
@@ -387,7 +387,7 @@ The residual vector stacks a translational and a rotational part:
 r_{ij} = \left[ \mathbf{v}_{ij}^\top \;\; \boldsymbol{\omega}_{ij}^\top \right]^\top
 ```
 
-- $`\mathbf{v}_{ij}`$ is the translational part of the twist, $`\mathbf{v} = V(\boldsymbol{\omega})^{-1} t_E`$ (as in `use_numpy/lie_utils.py`). It equals $`E_{ij}`$'s translation only when $`\boldsymbol{\omega} = \mathbf{0}`$, or to first order.
+- $`\mathbf{v}_{ij}`$ is the translational part of the twist, $`\mathbf{v} = V(\boldsymbol{\omega})^{-1} t_E`$ (here $`V(\boldsymbol{\omega})`$ is the **left Jacobian** of $`\mathrm{SO}(3)`$, [glossary](../glossary.md#1-geometry-and-lie-groups), and $`t_E`$ is the translation of $`E_{ij}`$; as in `use_numpy/lie_utils.py`). It equals $`E_{ij}`$'s translation only when $`\boldsymbol{\omega} = \mathbf{0}`$, or to first order.
 - $`\boldsymbol{\omega}_{ij}`$ is the rotational error.
 
 ### 15.3 Objective Function
@@ -427,7 +427,7 @@ Linearizing the residual $r_{ij}$ with respect to local perturbations ${\boldsym
 r_{ij}(X \oplus \boldsymbol{\delta}) \approx r_{ij}(X) + J_i \, \boldsymbol{\xi}_i + J_j \, \boldsymbol{\xi}_j
 ```
 
-Here the Jacobians are $`J_i = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_i}`$ and $`J_j = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_j}`$. They are exact (no small-residual approximation), with $`J_j = J_r^{-1}(r_{ij})`$ and $`J_i`$ carrying an extra adjoint factor:
+Here the Jacobians are $`J_i = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_i}`$ and $`J_j = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_j}`$. They are exact (no small-residual approximation), with $`J_j = J_r^{-1}(r_{ij})`$ (the inverse **right Jacobian**, [glossary](../glossary.md#1-geometry-and-lie-groups)) and $`J_i`$ carrying an extra adjoint factor:
 
 - `use_numpy/` evaluates $J_r^{-1}$ from an 18-term series (see [§15.7](#157-the-solver-concretely)); its truncation error is $\lesssim 10^{-12}$ at about 1.6 rad.
 - `use_manif/` uses manif's closed-form Jacobians. For small residuals the two agree to machine precision.
@@ -441,7 +441,7 @@ Here the Jacobians are $`J_i = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_
 - Toy case: frames $i$ and $j$ are $90^\circ$ apart. A 1 m push "forward" in one frame is a 1 m push "sideways" in the other.
 - The $R$ blocks of $\mathrm{Ad}$ do this relabeling. The $p^\wedge R$ block adds the effect of the offset $p$ between the frames.
 
-Here, ${\mathrm{Ad}(T) \in \mathbb{R}^{6 \times 6}}$ is the **Adjoint transformation matrix** of ${\mathrm{SE}(3)}$, which transforms velocity/tangent vectors between frame coordinate systems:
+Here, ${\mathrm{Ad}(T) \in \mathbb{R}^{6 \times 6}}$ is the **Adjoint transformation matrix** of ${\mathrm{SE}(3)}$ ([glossary](../glossary.md#1-geometry-and-lie-groups)), which transforms velocity/tangent vectors between frame coordinate systems:
 
 ```math
 {\mathrm{Ad}\left(\begin{bmatrix} R & p \\ 
@@ -453,20 +453,20 @@ and ${J_r^{-1}(\cdot)}$ is the inverse right Jacobian of ${\mathrm{SE}(3)}$.
 
 **Intuition ($J_r^{-1}$):** it corrects for the curvature of the pose space. It is the identity when the edge error is zero.
 
-- Series: $`J_r^{-1}(e) = I + \tfrac{1}{2}\mathrm{ad}_e + \dots`$, so $`J_r^{-1}(0) = I`$.
+- Series: $`J_r^{-1}(e) = I + \tfrac{1}{2}\mathrm{ad}_e + \dots`$ (where $`\mathrm{ad}_e`$ is the little adjoint, the Lie-algebra bracket with $`e`$, 6x6 for $`\mathrm{se}(3)`$), so $`J_r^{-1}(0) = I`$.
 - Tiny example: an edge error with a $0.1$ rad rotation changes $J_r^{-1}$ by about $0.05$ (half the angle), so $I$ is a fair stand-in.
 - It matters only for large edge errors, e.g. a bad loop closure. Near convergence the errors are small and $J_r^{-1} \approx I$.
 
 ### 15.5 Solving the Linear System (Gauss-Newton Step)
 
-Stacking all residuals into a global residual vector $R(X)$ and Jacobians into a sparse Jacobian matrix $J$, the linearization takes the standard form:
+Stacking all residuals into a global residual vector $`\mathbf{r}(X)`$ and Jacobians into a sparse Jacobian matrix $J$, the linearization takes the standard form:
 
 ```math
 {H \, \boldsymbol{\delta}^* = -b}
 ```
 
 - **Gauss-Newton approximation of the Hessian:** ${H = J^\top \Omega J = \sum_{(i,j) \in \mathcal{E}} J_{ij}^\top \Omega_{ij} J_{ij} \in \mathbb{R}^{6N \times 6N}}$
-- **Gradient Vector:** ${b = J^\top \Omega R(X) \in \mathbb{R}^{6N}}$
+- **Gradient Vector:** ${b = J^\top \Omega \mathbf{r}(X) \in \mathbb{R}^{6N}}$
 - **Update Vector:** $`{\boldsymbol{\delta}^* = \left[ \boldsymbol{\xi}_1^\top \;\; \boldsymbol{\xi}_2^\top \;\; \dots \;\; \boldsymbol{\xi}_N^\top \right]^\top}`$
 
 Here $F$ has no $\frac{1}{2}$ (as in the code's `cost`), while $b$ is the gradient of $\frac{1}{2}F$. The factor 2 cancels on both sides of the step, so $H\boldsymbol{\delta}^* = -b$ is unchanged.
@@ -545,7 +545,7 @@ These are `Jc_self` ($`\partial \hat{X}_j / \partial X_i`$), `Ja` ($`\partial e_
 -J_r^{-1}(-e_{ij}) \, \mathrm{Ad}\big(Z_{ij}^{-1}\big) = -J_r^{-1}(e_{ij}) \, \mathrm{Ad}\big(X_j^{-1} X_i\big)
 ```
 
-This holds because $`J_r(-e) = J_l(e) = \mathrm{Ad}(\mathrm{Exp}(e)) \, J_r(e)`$ and ${\mathrm{Exp}(e_{ij})^{-1} = X_j^{-1} X_i Z_{ij}}$.
+This holds because $`J_r(-e) = J_l(e) = \mathrm{Ad}(\mathrm{Exp}(e)) \, J_r(e)`$ ($`J_l`$ is the **left Jacobian**, [glossary](../glossary.md#1-geometry-and-lie-groups)) and ${\mathrm{Exp}(e_{ij})^{-1} = X_j^{-1} X_i Z_{ij}}$.
 
 **Right Jacobian** (`se3_right_jacobian`, `compute_se3_inv_right_jacobian` in `use_numpy/lie_utils.py`): an 18-term series in the little adjoint (`se3_ad`), then a plain matrix inverse:
 
@@ -556,7 +556,7 @@ J_r(\boldsymbol{\xi}) = \sum_{n=0}^{17} \frac{\left(-\mathrm{ad}_{\boldsymbol{\x
 
 The series needs no small-angle branch. `se3_adjoint` builds $\mathrm{Ad}$ exactly as in §15.4.
 
-**Assembly** (the edge loop): each edge adds four blocks to $H$ and two to $g$, with $\Omega$ = `info_matrix`:
+**Assembly** (the edge loop): each edge adds four blocks to $H$ and two to the right-hand-side vector $`g`$ (the negative gradient), with $\Omega$ = `info_matrix`:
 
 $$H_{ii} \mathrel{+}= J_i^\top \Omega J_i, \quad H_{jj} \mathrel{+}= J_j^\top \Omega J_j, \quad H_{ij} \mathrel{+}= J_i^\top \Omega J_j, \quad H_{ji} \mathrel{+}= J_j^\top \Omega J_i$$
 
@@ -597,7 +597,7 @@ To integrate this into standard Gauss-Newton or Levenberg-Marquardt solvers with
 
 $$w(e) = \frac{1}{e} \frac{\partial \rho(e)}{\partial e}$$
 
-**Tiny example:** take $\delta = k = 1$ and one false loop closure with $e = 10$. Costs use the $\frac{1}{2}$ convention above.
+**Tiny example:** (here $`\delta`$ is the scalar Huber threshold, not the bold update vector $`\boldsymbol{\delta}`$ of §15.5; $`k`$ is the analogous Cauchy scale, see below) take $\delta = k = 1$ and one false loop closure with $e = 10$. Costs use the $\frac{1}{2}$ convention above.
 
 - $L_2$: cost $\frac{1}{2}\cdot 10^2 = 50$, weight $1$. The edge dominates the whole graph.
 - Huber: cost $1\cdot(10 - 0.5) = 9.5$, weight $\frac{1}{10} = 0.1$.
@@ -621,7 +621,7 @@ Huber acts as quadratic ($L_2$) for small residuals (inliers) and linear ($L_1$)
 
 #### Cauchy Loss
 
-Cauchy uses a logarithmic tail that flattens out faster than Huber:
+Cauchy uses a logarithmic tail (with scale $`k`$, playing the role of Huber's threshold) that flattens out faster than Huber:
 
 $$\rho(e) = \frac{k^2}{2} \ln\left(1 + \frac{e^2}{k^2}\right), \quad w(e) = \frac{1}{1 + \left(\frac{e}{k}\right)^2}$$
 

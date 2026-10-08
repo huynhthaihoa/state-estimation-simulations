@@ -63,6 +63,8 @@ Then we polish and validate:
 d_k = \frac{R_k \tilde d_k}{\left\| R_k \tilde d_k \right\|}
 ```
 
+Here $`u_k, v_k`$ are the pixel coordinates of the observation in camera $`k`$, $`(c_x, c_y)`$ the principal point and $`(f_x, f_y)`$ the focal lengths in pixels (the **intrinsics**). In the next block, $`A`$ and $`b`$ are the normal-equation matrix and vector of the closest-point problem and $`P_0`$ is the initial point estimate (here $`A`$ is not the DLT matrix of §3).
+
 $$
 A = \sum_k \left(I - d_k d_k^\top\right), \qquad
 b = \sum_k \left(I - d_k d_k^\top\right) o_k, \qquad
@@ -73,7 +75,7 @@ $$
 - **Tiny example** (toy case: two rectified cameras, baseline $`B`$, focal length $`f`$, depth $`Z`$, pixel noise $`\sigma`$). Depth error is about $`Z^2\sigma/(fB)`$. With $`f=800`$ px, $`Z=10`$ m, $`\sigma=1`$ px: $`B=1`$ m gives 0.125 m of error, and $`B=0.1`$ m gives 1.25 m. A 10 times smaller baseline means a 10 times larger depth error.
 - **The $10^{-9} I$ term.** It keeps the solve defined when all rays are parallel. The depth along the rays is then arbitrary (the term pins the point's coordinate along the ray direction to 0, measured from the world origin).
 
-`refine_landmark_gn` then runs Gauss-Newton on the point alone, with $J_{\text{point}}$ from [bundle_adjustment.md Section 6.1](../optimization/bundle_adjustment.md#61-the-ba-math-concretely):
+`refine_landmark_gn` then runs Gauss-Newton on the point alone (here $`P`$ is the 3D point being refined, $`\delta`$ is its step, $`z_k`$ is the observed pixel and $`\pi`$ is the camera projection to pixels; $`\delta`$ is a different step in the PnP refinement of §3), with $J_{\text{point}}$ from [bundle_adjustment.md Section 6.1](../optimization/bundle_adjustment.md#61-the-ba-math-concretely):
 
 $$
 \left(\sum_k J_{\text{point},k}^\top J_{\text{point},k} + 10^{-9} I\right)\delta = \sum_k J_{\text{point},k}^\top r_k, \qquad
@@ -101,7 +103,7 @@ $$d_i \times (R_{cw}P_i + t_{cw}) = 0$$
 - The 12 entries of $`[R_{cw} \mid t_{cw}]`$ are only defined up to scale, so there are 11 unknowns.
 - Each point gives 2 equations. 5 points give 10, which is less than 11. 6 points give 12, which is enough.
 
-This is **linear and homogeneous** in the 12 flattened entries of $[R_{cw} \mid t_{cw}]$ - exactly the classical **Direct Linear Transform (DLT)** camera-resectioning setup, specialized to *known* intrinsics. Stacking two independent rows of this constraint per correspondence gives an overdetermined homogeneous system $Ax=0$, solved via `linear_pnp_dlt` as the smallest right-singular vector of $A$ (`np.linalg.svd`).
+This is **linear and homogeneous** in the 12 flattened entries of $[R_{cw} \mid t_{cw}]$ - exactly the classical **Direct Linear Transform (DLT)** camera-resectioning setup, specialized to *known* intrinsics. Stacking two independent rows of this constraint per correspondence gives an overdetermined homogeneous system $Ax=0$ (here $`A`$ is the DLT matrix, not the matrix $`A`$ of §2), solved via `linear_pnp_dlt` as the smallest right-singular vector of $A$ (`np.linalg.svd`).
 
 **Intuition:** the smallest singular vector is the direction that $A$ squashes the most. Toy case: $`A = \mathrm{diag}(3, 0.1)`$ stretches $`(1,0)`$ to length 3 but shrinks $`(0,1)`$ to 0.1, so $`(0,1)`$ is the best answer to $`Ax \approx 0`$.
 
@@ -129,7 +131,7 @@ The recovered $3\times3$ block is only a *scaled, possibly reflected* rotation -
 
 With noise-free pixels, this recovers the true pose to floating-point precision.
 
-`refine_pose_gn` then runs Gauss-Newton on the true reprojection error, updating the pose via a right-multiplicative correction $T \leftarrow T\cdot\mathrm{Exp}(\delta)$ - following `refine_landmark_gn`'s loop (minus its early exit on non-positive depth), solving a $6\times6$ system for the pose instead of a $3\times3$ system for the point. It uses the same $J_{\text{pose}}$ as bundle adjustment ([bundle_adjustment.md Section 6.1](../optimization/bundle_adjustment.md#61-the-ba-math-concretely)), for $\delta = [\delta v, \delta\omega]$:
+`refine_pose_gn` then runs Gauss-Newton on the true reprojection error, updating the pose ($`T`$ is the camera pose, $`z_i`$ the observed pixel of point $`P_i`$ and $`\pi`$ the same projection as above) via a right-multiplicative correction $T \leftarrow T\cdot\mathrm{Exp}(\delta)$ - following `refine_landmark_gn`'s loop (minus its early exit on non-positive depth), solving a $6\times6$ system for the pose instead of a $3\times3$ system for the point. It uses the same $J_{\text{pose}}$ as bundle adjustment ([bundle_adjustment.md Section 6.1](../optimization/bundle_adjustment.md#61-the-ba-math-concretely)), for the pose step $\delta = [\delta v, \delta\omega]$ (not the point step $\delta$ of §2):
 
 $$
 \left(\sum_i J_{\text{pose},i}^\top J_{\text{pose},i} + 10^{-9} I_6\right)\delta = \sum_i J_{\text{pose},i}^\top r_i, \qquad

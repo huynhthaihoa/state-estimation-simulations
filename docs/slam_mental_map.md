@@ -50,6 +50,8 @@ Several docs already draw a partial map of their own corner. We treat those as z
   Jacobian · Lie groups SO(3)/SE(3) · quaternion · linear vs. nonlinear
 ```
 
+In the diagram, $`Q`$ is the **process-noise covariance** of the filter's predict step ([glossary](glossary.md#6-kalman-filter-family)).
+
 Three questions organize the whole map:
 
 1. **What does the front-end hand over?** Constraints, not a final answer. See [frontend_backend.md §1](frontend_backend.md#1-slam-front-end---extracting-constraints).
@@ -101,9 +103,11 @@ Three questions organize the whole map:
                               (seeds the first linearization point)
 ```
 
+Here $`\Delta R, \Delta v, \Delta p`$ are the preintegrated rotation, velocity and position changes, $`v`$ is the velocity, and $`b_g`$ is the gyro bias ([glossary](glossary.md#5-slam-system)).
+
 | Step | What it produces | Doc | Script |
 |---|---|---|---|
-| Features, data association, keyframes | Tracked observations $z_{ij}$ | [frontend_backend.md §1](frontend_backend.md#1-slam-front-end---extracting-constraints) | - |
+| Features, data association, keyframes | Tracked observations $`z_{ij}`$ (pixel measurement of landmark $`j`$ from pose $`i`$) | [frontend_backend.md §1](frontend_backend.md#1-slam-front-end---extracting-constraints) | - |
 | Triangulation | A 3D landmark from known poses | [triangulation_pnp.md §2](frontend/triangulation_pnp.md#2-triangulation-worked-from-the-real-code) | `bundle_adjustment_advanced.py` |
 | PnP | A camera pose from known landmarks | [triangulation_pnp.md §3](frontend/triangulation_pnp.md#3-pnp-as-the-inverse-problem) | `pnp_estimation.py` |
 | Loop-closure detection | A constraint between non-consecutive poses | [frontend_backend.md §3](frontend_backend.md#3-example-loop-closure) | `pose_graph.py` (the constraint is given, not detected) |
@@ -148,7 +152,7 @@ A filter carries only the current state and its covariance. Each new measurement
 | KF → EKF → IEKF | Linear, then linearized, then geometry-aware error | [kf_ekf_iekf.md §1-§3](filtering/kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear), [§5](filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error) | `pointcloud_pose_tracking.py` |
 | Left- vs. right-invariant error | Which frame the error is defined in, and why it matters | [left_right_invariant.md §3](filtering/left_right_invariant.md#3-why-invariant---and-why-leftright) | `pointcloud_pose_tracking.py` (`run_iekf`) |
 | UKF, ESKF, MSCKF, PF, ... | Each relaxes one KF assumption | [extra_kf_variants.md §1](filtering/extra_kf_variants.md#1-unscented-kalman-filter-ukf), [§2](filtering/extra_kf_variants.md#2-error-state-kalman-filter-eskf), [§7](filtering/extra_kf_variants.md#7-particle-filter-pf), [kf_ekf_iekf.md §9](filtering/kf_ekf_iekf.md#9-other-prominent-variants-worth-keeping-in-mind) (MSCKF) | `pointcloud_pose_tracking.py` (`run_ukf`; UKF only) |
-| What differs in practice | EKF = IEKF (same $K r$ and $P$ to round-off); UKF ~1.4 mm at the first update, micrometers after; vanilla KF ~1-4 mm off from truncating the motion step to first order | [pointcloud_pose_tracking_empirical_note.md §2-§4](filtering/pointcloud_pose_tracking_empirical_note.md#2-ekf-vs-iekf-exact-by-construction) | `pointcloud_pose_tracking.py` |
+| What differs in practice | EKF = IEKF (same update $K r$, the **Kalman gain** times the innovation, and covariance $`P`$ to round-off; [glossary](glossary.md#6-kalman-filter-family)); UKF ~1.4 mm at the first update, micrometers after; vanilla KF ~1-4 mm off from truncating the motion step to first order | [pointcloud_pose_tracking_empirical_note.md §2-§4](filtering/pointcloud_pose_tracking_empirical_note.md#2-ekf-vs-iekf-exact-by-construction) | `pointcloud_pose_tracking.py` |
 | Hybrid events | Propagating covariance through a reset | [hybrid_saltation_ekf.md §2](filtering/hybrid_saltation_ekf.md#2-why-the-reset-maps-own-jacobian-is-not-enough), [§6](filtering/hybrid_saltation_ekf.md#6-the-empirical-finding-a-modest-real-gap-not-a-dramatic-one) | `saltation_matrix_ekf.py` |
 | Phase-gated measurements | Free zero-velocity information, but wrong gating is catastrophic and a confident gated filter is hit harder by unmodeled acceleration | [inchworm_zupt_ekf.md §3](filtering/inchworm_zupt_ekf.md#3-the-finding-not-just-always-is-wrong-while-moving) | `inchworm_zupt_ekf.py` |
 | Shaped process noise | A wrongly oriented $Q$ is worse than an isotropic one | [friction_anisotropic_ekf.md §2](filtering/friction_anisotropic_ekf.md#2-the-dominant-finding-fixed_anisotropic-is-dramatically-worse-everywhere), [§3](filtering/friction_anisotropic_ekf.md#3-a-secondary-finding-the-worst-mismatch-is-90-not-180) | `friction_anisotropic_ekf.py` |
@@ -184,6 +188,8 @@ Smoothing keeps past states as variables and re-solves them jointly. The chain f
     everything  factorization             marginalize the rest
      (GN/LM)    (iSAM → iSAM2)            (sliding window/fixed lag)
 ```
+
+In the chain, $`r_i`$ is the residual of factor $`i`$ and $`\Omega`$ its **information matrix** ([glossary](glossary.md#2-uncertainty-and-probability)); $`H`$ is the **Gauss-Newton Hessian** (approximate), $`b`$ the gradient, and $`\Delta x`$ the step ([glossary](glossary.md#3-least-squares-optimization)); $`\boxplus`$ is the **retraction**, the manifold-aware "add" ([glossary](glossary.md#1-geometry-and-lie-groups)).
 
 The bottom row is the solve strategy. GN/LM is the step rule, a separate axis: iSAM is another way to run the linear solves, not an alternative to GN/LM ([levenberg_marquardt.md §11](optimization/levenberg_marquardt.md#11-where-lm-fits)).
 
@@ -236,7 +242,7 @@ Every estimator here that faces a nonlinear model, except the sigma-point UKF an
   marginalization ────┘     ...and the linearization point matters (FEJ, relinearization)
 ```
 
-The EKF linearizes once per predict/update step, at the current estimate. GN/LM re-linearize every iteration. iSAM2 re-linearizes only variables that moved enough ([isam2_optimization.md §10](optimization/isam2_optimization.md#10-selective-relinearization)). Marginalization freezes a linearization point for good in general; this repo's prior re-linearizes the Jacobian and freezes only $\Omega$ and $X_\mathrm{ref}$ ([marginalization.md §6](optimization/marginalization.md#6-the-consistency-gotcha-why-fej-exists)).
+The EKF linearizes once per predict/update step, at the current estimate. GN/LM re-linearize every iteration. iSAM2 re-linearizes only variables that moved enough ([isam2_optimization.md §10](optimization/isam2_optimization.md#10-selective-relinearization)). Marginalization freezes a linearization point for good in general; this repo's prior re-linearizes the Jacobian and freezes only $\Omega$ and $X_\mathrm{ref}$ (the prior's frozen reference pose) ([marginalization.md §6](optimization/marginalization.md#6-the-consistency-gotcha-why-fej-exists)).
 
 ### 6.2 Where the error is defined
 

@@ -66,7 +66,7 @@ The standard KF is a straight ruler for a world that behaves like a straight lin
 
 ## 2. Extended Kalman Filter: "The world is nonlinear, so I'll approximate it locally"
 
-Now say our robot is moving, with state $s = [p_x, p_y, \theta]$ ($\theta$ is its orientation), speed $v$ and turn rate $\omega$. A unicycle moves like this:
+Now say our robot is moving, with state $s = [p_x, p_y, \theta]$ ($\theta$ is its orientation), speed $v$ (here $`v`$ is a scalar speed, not the measurement noise $`v`$ of §1) and turn rate $\omega$. A unicycle moves like this:
 
 ```math
 p_{x,k+1} = p_{x,k} + v\cos\theta_k\,\Delta t \qquad p_{y,k+1} = p_{y,k} + v\sin\theta_k\,\Delta t \qquad \theta_{k+1} = \theta_k + \omega\,\Delta t
@@ -98,7 +98,7 @@ Think of a curved road: we don't need to understand the whole curve, only to app
      /
 ```
 
-Concretely, the EKF plugs the Jacobian into §1's same two-step cycle, for $x_k = f(x_{k-1}, u_{k-1}) + w_{k-1}$ and $z_k = h(x_k) + v_k$.
+Concretely, the EKF plugs the Jacobian into §1's same two-step cycle, for $x_k = f(x_{k-1}, u_{k-1}) + w_{k-1}$ and $z_k = h(x_k) + v_k$, where $`f`$ is the nonlinear motion model driven by the control input $`u`$, and $`h`$ is the nonlinear measurement model ([glossary](../glossary.md#6-kalman-filter-family)).
 
 **Prediction step:** propagate the mean through the *exact* nonlinear $f$ (only $P$'s growth is linearized), and grow $P$ using the Jacobian $F_k$:
 
@@ -113,7 +113,7 @@ So the only two changes from §1 are: (a) the mean propagates through the true n
 
 ### But here's the problem with EKF
 
-This matters most in **robotics and SLAM**. Say our robot has a pose $X=(R,p)$, with $R$ the rotation and $p$ the position. Rotations are not ordinary vectors:
+This matters most in **robotics and SLAM**. Say our robot has a pose $X=(R,p)$, with $R$ the rotation and $p$ the position (here $`R`$ is the rotation, not the noise covariance $`R`$ of §1). Rotations are not ordinary vectors:
 
 - In 2D, composing rotations just adds the angles ($90^\circ + 90^\circ = 180^\circ$), and the order doesn't matter.
 - In 3D, rotating 90° about x then 90° about y gives a different orientation than the reverse order:
@@ -197,13 +197,13 @@ where $\delta\theta$ is a **small rotation error**. This is a much more natural 
 \hat T_k^- = \hat T_{k-1}\exp(u_{k-1}\Delta t) \qquad P_k^- = J_{\text{self}}\,P_{k-1}\,J_{\text{self}}^\top + J_\tau\,Q\,J_\tau^\top
 ```
 
-- $`J_{\text{self}} = \mathrm{Ad}_{\exp(-u_{k-1}\Delta t)}`$ (`se3_adjoint`) is exact for this composition.
+- $`J_{\text{self}} = \mathrm{Ad}_{\exp(-u_{k-1}\Delta t)}`$ (`se3_adjoint`; $`\mathrm{Ad}`$ is the **adjoint**, [glossary](../glossary.md#1-geometry-and-lie-groups)) is exact for this composition.
 - $J_\tau = J_r(u_{k-1}\Delta t)$ (`se3_right_jacobian`) is a first-order (in the twist noise) linearization.
-- $`Q = \Delta t^2\,\mathrm{diag}(\sigma_v^2 I_3, \sigma_\omega^2 I_3)`$ is the covariance of the twist increment $u\Delta t$.
+- $`Q = \Delta t^2\,\mathrm{diag}(\sigma_v^2 I_3, \sigma_\omega^2 I_3)`$ is the covariance of the twist increment $u\Delta t$, where $`\sigma_v`$ and $`\sigma_\omega`$ are the standard deviations of the linear and angular velocity noise.
 
 The full per-function math, including the UKF, vanilla KF and batch GN, is in [pointcloud_pose_tracking_empirical_note.md §1.1](pointcloud_pose_tracking_empirical_note.md#11-the-filter-math-concretely).
 
-**Update - this is where they diverge.**
+**Update - this is where they diverge.** Here $`R_{\text{pred}}`$ and $`t_{\text{pred}}`$ are the rotation and translation of the predicted pose $`\hat T_k^-`$.
 
 | | EKF (world-frame residual) | IEKF (body-frame residual) |
 | --- | --- | --- |
@@ -219,8 +219,8 @@ K_k = P_k^-H^\top(HP_k^-H^\top+R_{\text{meas}})^{-1} \qquad \hat T_k = \hat T_k^
 
 **What this example does and doesn't show.**
 - The IEKF's $H$ never mentions $R_{\text{pred}}$: it rotates the **measurement** into the **body frame** rather than rotating the **known points** into the **world frame**. For measurements of this invariant form, that is the general IEKF recipe (express the residual through the group action and the state-dependence drops out of $H$).
-- Caveat: the benchmark's state-independent $H$ relies on isotropic measurement noise. With anisotropic $\Sigma$, the body-frame noise $`R_{\text{pred}}^\top \Sigma R_{\text{pred}}`$ depends on the estimate.
-- Under isotropic noise, the two pairs give the *same* correction $K_k r_k$ and the same $P_k$ every step (§7). $R_{\text{pred}}$ cancels out of $K_k r_k$ and of $P_k$ because it is an orthogonal matrix acting on both sides of the update. $K_k$ itself differs: $`K_{\text{world}} = K_{\text{body}}\,\mathrm{blkdiag}(R_{\text{pred}})^\top`$.
+- Caveat: the benchmark's state-independent $H$ relies on isotropic measurement noise. With anisotropic noise covariance $`\Sigma`$ (different variance per axis), the body-frame noise $`R_{\text{pred}}^\top \Sigma R_{\text{pred}}`$ depends on the estimate.
+- Under isotropic noise, the two pairs give the *same* correction $K_k r_k$ and the same $P_k$ every step (§7). $R_{\text{pred}}$ cancels out of $K_k r_k$ and of $P_k$ because it is an orthogonal matrix acting on both sides of the update. $K_k$ itself differs: $`K_{\text{world}} = K_{\text{body}}\,\mathrm{blkdiag}(R_{\text{pred}})^\top`$ (`blkdiag` is explained in the note below).
 - So here the IEKF's advantage is computational and structural ($H$ is never rebuilt from $R_{\text{pred}}$), not statistical.
 
 > **Note**: $`\mathrm{blkdiag}`$ in general means **block-diagonal matrix**, a matrix with the given blocks along its diagonal and zeros everywhere else. Here it stands for $R_{\text{pred}}$ repeated once for each measured point, because the measurement stacks the 3D points one after another:
@@ -230,7 +230,7 @@ K_k = P_k^-H^\top(HP_k^-H^\top+R_{\text{meas}})^{-1} \qquad \hat T_k = \hat T_k^
 > ```
 
 This benchmark's `run_ekf` is also not the kind of EKF §2 warns about:
-- It already uses the same error as the IEKF, $T = \hat T\exp(\xi)$, which is why the two share a predict step whose Jacobians depend only on the input $u$, not on the estimate.
+- It already uses the same error as the IEKF, $T = \hat T\exp(\xi)$ (where $`\xi`$ is the 6-vector tangent-space error, [glossary](../glossary.md#1-geometry-and-lie-groups)), which is why the two share a predict step whose Jacobians depend only on the input $u$, not on the estimate.
 - Its world-frame $H$ is the body-frame $H$ with each point's rows rotated by $R_{\text{pred}}$: the same information in another frame, so the estimate-dependence is harmless, as the exact equivalence confirms.
 - §2's failure mode needs an error defined additively on a vector parametrization (classic EKF-SLAM, with $[x, y, \theta]$ and landmark positions in one flat vector), so that re-linearizing at a drifting estimate changes which directions look observable.
 
@@ -244,7 +244,7 @@ Consider a robot state $X = (R, p, v, b_g, b_a)$, where:
 
 - $R$: orientation
 - $p$: position
-- $v$: velocity
+- $v$: velocity (a vector here, not the scalar speed of §2)
 - $b_g$: gyroscope bias
 - $b_a$: accelerometer bias
 

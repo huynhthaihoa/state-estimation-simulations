@@ -19,7 +19,7 @@ So a filter that fixes the ellipse orientation once (say at $t = 0$) is right on
 - `heading_aware`: ellipse re-oriented every step to the current heading.
 - `isotropic`: no directional claim at all, the safe fallback.
 
-**Where the question comes from.** Hybrid-systems filtering usually models friction as discrete contact modes (stuck or sliding), each switch with its own saltation matrix. Kong et al. (2024, §V-F) derive that matrix for stick-slip under Coulomb friction, whose single coefficient $\mu$ has no preferred direction. For an anisotropic pad that is not enough: slip variance depends on heading relative to the pad's own friction axes, not only on the active mode. A filter that switches modes correctly but keeps an isotropic $Q$ treats slip along the low-friction axis like slip along the high-friction one.
+**Where the question comes from.** Hybrid-systems filtering usually models friction as discrete contact modes (stuck or sliding), each switch with its own saltation matrix. Kong et al. (2024, §V-F) derive that matrix for stick-slip under Coulomb friction, whose single coefficient $\mu$ has no preferred direction. For an anisotropic pad that is not enough: slip variance depends on heading relative to the pad's own friction axes, not only on the active mode. A filter that switches modes correctly but keeps an isotropic process-noise covariance $`Q`$ (defined in §1) treats slip along the low-friction axis like slip along the high-friction one.
 
 We work through the simplest concrete version, using [`friction_anisotropic_ekf.py`](../../use_numpy/friction_anisotropic_ekf.py)'s crawling unicycle.
 
@@ -80,7 +80,7 @@ P^{-} = F\,P\,F^\top + Q, \qquad
 Q = \begin{bmatrix} Q_{\text{pos}} & 0 \\ 0 & (\sigma_\theta\,\Delta t)^2 \end{bmatrix}
 ```
 
-$Q_{\text{pos}}$ is the 2×2 position block, and it is the only thing that changes between variants. Two functions build it: `isotropic_Q_pos` (a circle) and `anisotropic_Q_pos` (a rotated ellipse). The three variants are then defined by which function they call and, for the ellipse, which heading they pass in.
+$`\sigma_\theta`$ is the heading process-noise standard deviation, and $Q_{\text{pos}}$ is the 2×2 position block, and it is the only thing that changes between variants. Two functions build it: `isotropic_Q_pos` (a circle) and `anisotropic_Q_pos` (a rotated ellipse). The three variants are then defined by which function they call and, for the ellipse, which heading they pass in.
 
 **Isotropic block** (`isotropic_Q_pos`). The same variance in every direction:
 
@@ -90,7 +90,7 @@ Q_{\text{pos}}^{\text{iso}} = \sigma_{\text{iso}}^2\,\Delta t^2\,I_2,
 \sigma_{\text{iso}}^2 = \frac{\sigma_{\text{grip}}^2 + \sigma_{\text{slip}}^2}{2}
 ```
 
-$\sigma_{\text{iso}}^2$ is the average of the two body-frame slip variances. Rotation doesn't change a matrix's trace, so the circle has the same total variance as the ellipse below, namely $2\sigma_{\text{iso}}^2 \Delta t^2 = (\sigma_{\text{grip}}^2 + \sigma_{\text{slip}}^2)\Delta t^2$. The isotropic variant is not handicapped by assuming more or less noise overall; it only lacks direction. A circle looks the same at every rotation, so this block needs no heading.
+Here $`\sigma_{\text{grip}}`$ and $`\sigma_{\text{slip}}`$ are the body-frame slip standard deviations along the grip (forward) and slip (lateral) axes, and $\sigma_{\text{iso}}^2$ is the average of the two body-frame slip variances. Rotation doesn't change a matrix's trace, so the circle has the same total variance as the ellipse below, namely $2\sigma_{\text{iso}}^2 \Delta t^2 = (\sigma_{\text{grip}}^2 + \sigma_{\text{slip}}^2)\Delta t^2$. The isotropic variant is not handicapped by assuming more or less noise overall; it only lacks direction. A circle looks the same at every rotation, so this block needs no heading.
 
 **Anisotropic block** (`anisotropic_Q_pos`). It starts from an ellipse in the pad's own body frame (small variance along the grip/forward axis, large variance along the slip/lateral axis) and rotates it into the world frame by some heading $\theta_Q$:
 
@@ -144,6 +144,8 @@ r = z - H x^{-}, \qquad S = H P^{-} H^\top + R, \qquad K = P^{-} H^\top S^{-1}, 
 x^{+} = x^{-} + K r, \qquad P^{+} = (I - K H)\,P^{-}
 ```
 
+Here $`z`$ is the measured position, $`R`$ is the measurement-noise covariance with $`\sigma_{\text{pos}}`$ its standard deviation (this $`R`$ is not the rotation $`R(\theta_Q)`$ above), $`r`$ is the **innovation** (not the arc radius $r$ of the predict step), $`S`$ is its covariance and $`K`$ the **Kalman gain** ([glossary](../glossary.md#6-kalman-filter-family)).
+
 Heading is never measured directly. It gets corrected only through the position-heading cross-covariance that $F$'s third column builds up in $P^{-}$. That is where `heading_aware`'s $\hat\theta_{k-1}$ comes from.
 
 Script defaults: $\sigma_{\text{grip}} = 0.02$ m/s, $\sigma_{\text{slip}} = 0.1$ m/s, $\sigma_\theta = 0.01$ rad/s, $\sigma_{\text{pos}} = 0.02$ m, $v = 0.2$ m/s, $\Delta t = 0.05$ s. The true heading is noise-free, so the small $\sigma_\theta$ term only keeps the filter's heading covariance from collapsing to zero.
@@ -157,7 +159,7 @@ Two consequences follow directly from these formulas:
 
 ## 2. The dominant finding: `fixed_anisotropic` is dramatically worse, everywhere
 
-Monte Carlo NEES over 500 trials (seed 0, $`dt = 0.05\,\text{s}`$, one full loop over $`20\,\text{s}`$, all script defaults), binned by how far the true heading has rotated away from `fixed_anisotropic`'s fixed reference heading. Each trial draws a fresh slip realization, initial error and measurement noise. Redrawing the slip matters, because slip is the process noise whose model $Q$ is being tested.
+Monte Carlo NEES (**NEES**: normalized estimation error squared, [glossary](../glossary.md#2-uncertainty-and-probability)) over 500 trials (seed 0, $`dt = 0.05\,\text{s}`$, one full loop over $`20\,\text{s}`$, all script defaults), binned by how far the true heading has rotated away from `fixed_anisotropic`'s fixed reference heading. Each trial draws a fresh slip realization, initial error and measurement noise. Redrawing the slip matters, because slip is the process noise whose model $Q$ is being tested.
 
 ![Two panels from friction_anisotropic_ekf.py: the circular path with the per-step slip covariance ellipse turning with the heading, and Monte Carlo NEES over one full turn for isotropic, frozen anisotropic and heading-aware process noise](../../assets/friction_anisotropic_ekf.png)
 

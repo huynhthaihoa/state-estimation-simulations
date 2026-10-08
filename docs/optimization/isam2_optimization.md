@@ -34,6 +34,8 @@ We want the poses that best explain all measurements:
 X^*=\arg\min_X \sum_i \|r_i(X)\|^2
 ```
 
+where $`X`$ stacks all the poses, $`r_i(X)`$ is the residual (predicted minus measured) of the $i$-th measurement, and $`X^*`$ is the best-fit $`X`$.
+
 Each odometry measurement says roughly how far the robot moved. The true step was 1 m each time, but every measurement carries a little noise:
 
 ```text
@@ -289,7 +291,7 @@ Putting everything together, one iSAM2 update (simplified from Algorithm 1 of Ka
 Everything below the removed top of the tree keeps its factorization untouched (its estimates can still be updated in step 6).
 
 **Intuition for step 6:**
-- Each clique's estimate is computed from its parent's: in symbols, child $`\delta = (d - R_{sep}\,\delta_{parent}) / R_{cc}`$, where $d$ is the clique's own right-hand side and $R_{sep}$ couples it to its parent.
+- Each clique's estimate is computed from its parent's: in symbols, child $`\delta = (d - R_{sep}\,\delta_{parent}) / R_{cc}`$, where $`\delta`$ is the clique's update step, $`R_{cc}`$ is the clique's own diagonal block of the triangular factor $R$, $d$ is the clique's own right-hand side and $R_{sep}$ couples it to its parent.
 - If the parent's $\delta$ barely moved and the clique's own $d$ is unchanged, the child's $\delta$ does not change either.
 - So the update can stop at that branch, and everything below it is skipped safely.
 - (Conceptual only: this repo does not implement iSAM2.)

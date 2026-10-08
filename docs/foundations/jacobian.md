@@ -104,7 +104,7 @@ Suppose a 3D point $P = (X, Y, Z)$ is projected onto the image:
 
 $$u = f\frac{X}{Z} \qquad v = f\frac{Y}{Z}$$
 
-This is nonlinear because of the division by $Z$. We ask:
+Here $`f`$ is the camera's focal length and $`u, v`$ are pixel coordinates (not the generic function $f$ of §2). This is nonlinear because of the division by $Z$. We ask:
 
 > "What happens to the image point if the 3D point moves slightly?"
 
@@ -198,7 +198,7 @@ The system $x_{k+1} = Fx_k$ is already linear, so no Jacobian is necessary.
 
 ### EKF
 
-The system $x_{k+1} = f(x_k)$ is nonlinear, so we linearize:
+The system $x_{k+1} = f(x_k)$ is nonlinear (here $`f`$ is the generic state-transition function again, not the focal length), so we linearize:
 
 $$F_k = \left.\frac{\partial f}{\partial x}\right|_{\hat{x}_k}$$
 

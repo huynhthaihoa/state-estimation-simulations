@@ -313,7 +313,7 @@ We have:
 
 But the errors are nonlinear because poses involve rotations and transformations.
 
-So we linearize:
+So we linearize, where $`\oplus`$ is the **retraction** that applies a small update $`\Delta X`$ to a state ([glossary](../glossary.md#1-geometry-and-lie-groups)) and $`J`$ is the **Jacobian** of $`e`$ with respect to $`\Delta X`$ ([glossary](../glossary.md#3-least-squares-optimization)):
 
 $$e(X\oplus\Delta X)\approx e(X)+J\Delta X$$
 

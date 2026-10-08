@@ -91,6 +91,8 @@ After linearization, the nonlinear optimization becomes approximately a linear l
 \min_{\Delta x} \lVert A\Delta x - b \rVert^2
 ```
 
+Here $`A`$ is the stacked, noise-whitened Jacobian of all factors, $`b`$ is the stacked (negated) residual vector, and $`\Delta x`$ is the update step to the variables. (§14.1 writes the same step as $`\boldsymbol\delta`$.)
+
 Instead of solving this from scratch every time, we can factorize $A = QR$ (or work with a related factorization of the information/Hessian system).
 
 > **Note**: QR decomposition factors a matrix as $A=QR$, with $Q$ orthogonal and $R$ upper-triangular. Because $Q$ is orthogonal it doesn't change the least-squares solution, so minimizing $`\lVert A\Delta x - b \rVert^2`$ reduces to the cheap triangular solve $R\Delta x = Q^\top b$ - and, critically for iSAM, $R$ can be updated incrementally via Givens rotations when a new row (factor) arrives, instead of refactorizing $A$ from scratch. That incremental-update property is what the next point relies on.
@@ -251,6 +253,8 @@ Once $x_0$ is processed, we largely summarize its information and move forward. 
 
 $$P(x_t \mid z_{1:t})$$
 
+where $`z_{1:t}`$ denotes all measurements received from time 1 to $`t`$.
+
 ---
 
 ### iSAM/smoothing
@@ -360,7 +364,7 @@ For the Bayes tree itself, see [`bayes_tree.md`](bayes_tree.md); for the full iS
 
 ### 14.1 The incremental math, concretely
 
-The script solves the same pose graph as `pose_graph.py`. `linearize_edge` returns that script's residual ${e_{ij} = \mathrm{Log}(Z_{ij}^{-1} X_i^{-1} X_j)}$ and Jacobians $J_i$, $J_j$ (see [pose_graph_optimization.md §15.7](pose_graph_optimization.md#157-the-solver-concretely)). The difference is how the linear system is stored and updated. Instead of $H$ and $g$, the script keeps an upper-triangular square-root-information matrix $R$ and a right-hand side $d$. The step is always ${\boldsymbol{\delta} = R^{-1} d}$, computed by back substitution (`solve_triangular`).
+The script solves the same pose graph as `pose_graph.py`. `linearize_edge` returns that script's residual ${e_{ij} = \mathrm{Log}(Z_{ij}^{-1} X_i^{-1} X_j)}$ (where $`Z_{ij}`$ is the measured relative pose from node $`i`$ to node $`j`$) and Jacobians $J_i$, $J_j$ (see [pose_graph_optimization.md §15.7](pose_graph_optimization.md#157-the-solver-concretely)). The difference is how the linear system is stored and updated. Instead of $H$ and the gradient $`g = A^\top b`$ (the right-hand side of the normal equations $`H\boldsymbol{\delta} = g`$), the script keeps an upper-triangular square-root-information matrix $R$ and a right-hand side $d$. The step is always ${\boldsymbol{\delta} = R^{-1} d}$ (the same step as $`\Delta x`$ in §3), computed by back substitution (`solve_triangular`).
 
 **Whitened rows** (`edge_whitened_block`): each edge becomes 6 rows of a least-squares system ${A \boldsymbol{\delta} \approx b}$. With $S$ the upper-triangular square root of the edge information matrix $\Omega$ (`sqrt_info`):
 
@@ -387,7 +391,7 @@ This gives ${R^\top R = A^\top A = H}$ and ${R^\top d = A^\top b = g}$, the same
 It stops when ${\lVert \boldsymbol{\delta} \rVert <}$ `--gn-tol` (default $10^{-6}$), or after `--gn-max-iters` steps (default 10). $R$ and $d$ are rebuilt before each convergence check, so the returned $R$ and $d$ always belong to the returned ${\bar{X}}$.
 
 **Intuition for a Givens rotation:** it turns two rows to push one entry to zero, like turning a ruler.
-- **Tiny example (one column):** $`R_{cc} = 3`$ and the new row has $`a_c = 4`$. Then $`\rho = 5`$, $`\gamma = 0.6`$, $`\sigma = 0.8`$.
+- **Tiny example (one column):** $`R_{cc} = 3`$ and the new row has $`a_c = 4`$. Then $`\rho = 5`$, $`\gamma = 0.6`$, $`\sigma = 0.8`$ (the combined length, cosine and sine of the rotation, formulas below).
 - The rotated entries are $`(\gamma \cdot 3 + \sigma \cdot 4,\; -\sigma \cdot 3 + \gamma \cdot 4) = (5, 0)`$. The new row's entry is zeroed and $`R_{cc}`$ grows to 5.
 - Nothing is lost: $`3^2 + 4^2 = 5^2`$. A rotation only mixes rows, so the information is kept.
 
@@ -405,7 +409,7 @@ $$\rho = \sqrt{R_{cc}^2 + a_c^2}, \qquad \gamma = \frac{R_{cc}}{\rho}, \qquad \s
 Each rotation is orthogonal, so after the sweep ${R^\top R}$ has gained exactly ${\mathbf{a}\mathbf{a}^\top}$ (in exact arithmetic; the code skips entries below $10^{-14}$) and ${R^\top d}$ has gained $`\beta \, \mathbf{a}`$. $R$ stays upper triangular, and the leftover $\beta$ is discarded. Two details are easy to miss:
 
 - The rotation also works when $R_{cc} = 0$. Then $\gamma = 0$ and $\sigma = \pm 1$, so the rotation just swaps the new row into row $c$. This is what happens at a new node's still-empty diagonal block.
-- The docstring's "O(m)" is the cost of one rotation, not of one row. A row whose first nonzero is at column $c_0$ can trigger up to ${m - c_0}$ rotations, so the worst case is ${O(m^2)}$ per row. An odometry edge into node $k$ starts at ${c_0 = 6(k-1)}$, so each of its rows needs at most 12 rotations, each at most 12 columns wide, no matter how long the trajectory is. The loop still scans the leading zero columns, which is O(m) per row.
+- The docstring's "O(m)" (where $`m`$ is the number of columns of $`R`$) is the cost of one rotation, not of one row. A row whose first nonzero is at column $c_0$ can trigger up to ${m - c_0}$ rotations, so the worst case is ${O(m^2)}$ per row. An odometry edge into node $k$ starts at ${c_0 = 6(k-1)}$, so each of its rows needs at most 12 rotations, each at most 12 columns wide, no matter how long the trajectory is. The loop still scans the leading zero columns, which is O(m) per row.
 
 **Streaming a new node** (`run_incremental_pose_graph`): for node $k$ with odometry edge ${Z_{k-1,k}}$:
 

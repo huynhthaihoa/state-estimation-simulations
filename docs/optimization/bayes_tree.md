@@ -36,6 +36,8 @@ The goal is still:
 X^* = \arg\min_X \sum_i \|r_i(X)\|^2
 ```
 
+where $`X`$ stacks all poses and landmarks, $`r_i(X)`$ is the residual of the $i$-th measurement, and $`X^*`$ is the best-fit $`X`$.
+
 ---
 
 ## 2. Linearization gives us a big equation
@@ -44,11 +46,15 @@ After Gauss-Newton linearization, we get something like:
 
 $$H\Delta x=g$$
 
+where $`H`$ is the Hessian, $`g`$ the gradient and $`\Delta x`$ the update step ($`H`$ and $`g`$ are written out below).
+
 These are the normal equations of the linear least-squares problem
 
 ```math
 \min_{\Delta x} \lVert A\Delta x - b \rVert^2, \qquad H = A^\top A, \quad g = A^\top b
 ```
+
+Here $`A`$ is the stacked, noise-whitened Jacobian of all factors and $`b`$ is the stacked (negated) residual vector.
 
 We now need to solve this large sparse system efficiently. That is where **sparse Cholesky factorization** comes in: $H = LL^\top$, solved with two triangular substitutions instead of a full inversion, exploiting that $H$ is mostly zero. See [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) for the full explainer.
 
@@ -189,8 +195,8 @@ P(x_1,x_2,x_3) = P(x_1 \mid x_2)\,P(x_2 \mid x_3)\,P(x_3)
 Each variable ends up conditioned only on its separator, and the separator's next-eliminated member is its parent in the tree (§4.1). The tree represents exactly these conditional relationships.
 
 **What a node holds in numbers:** it is a row of $`R`$, the triangular square root of the information matrix ($`H = R^\top R`$).
-- Each row reads $`x_j = (d_j - R_{j,\text{sep}}\, x_{\text{sep}}) / R_{jj}`$.
-- Chain example: $`x_1 = (d_1 - r_{12}\, x_2) / r_{11}`$. This one line is "$`x_1`$ given $`x_2`$".
+- Each row reads $`x_j = (d_j - R_{j,\text{sep}}\, x_{\text{sep}}) / R_{jj}`$, where $`d_j`$ is the row's right-hand-side entry, $`R_{jj}`$ its diagonal entry, $`R_{j,\text{sep}}`$ its entries in the separator columns and $`x_{\text{sep}}`$ the separator variables (§4.1).
+- Chain example: $`x_1 = (d_1 - r_{12}\, x_2) / r_{11}`$ (here $`r_{11}`$, $`r_{12}`$, $`d_1`$ are row 1's diagonal, off-diagonal and right-hand-side entries). This one line is "$`x_1`$ given $`x_2`$".
 - To solve, read the tree from the root down. The root has no parents, so it is solved first. Its value is then substituted into the children.
 
 For iSAM2, the useful translation is:

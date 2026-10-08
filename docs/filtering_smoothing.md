@@ -254,7 +254,7 @@ x₀ x₁ x₂ x₃
   joint estimate
 ```
 
-Optimization is often used as the computational mechanism for obtaining this joint estimate. Strictly, least-squares optimization returns the single most likely trajectory (the MAP estimate, i.e. the peak of $`p(x_{0:t} \mid z_{0:t})`$), not the whole distribution; the uncertainty around it is usually approximated as a Gaussian whose information matrix is the Gauss-Newton Hessian $`J^\top \Sigma^{-1} J`$ at the solution (with whitened Jacobians, simply $`J^\top J`$).
+Optimization is often used as the computational mechanism for obtaining this joint estimate. Strictly, least-squares optimization returns the single most likely trajectory (the MAP estimate, i.e. the peak of $`p(x_{0:t} \mid z_{0:t})`$), not the whole distribution; the uncertainty around it is usually approximated as a Gaussian whose information matrix is the Gauss-Newton Hessian $`J^\top \Sigma^{-1} J`$ at the solution, where $`J`$ is the stacked **Jacobian** of the residuals and $`\Sigma`$ is the measurement covariance ([glossary](glossary.md#3-least-squares-optimization)); with whitened Jacobians, simply $`J^\top J`$.
 
 **Tiny example** (toy case: one scalar $x$, measurement $r = x - z$ with $\sigma = 0.5$):
 - Information $= 1/\sigma^2 = 4$, so the variance is $1/4 = 0.25$.

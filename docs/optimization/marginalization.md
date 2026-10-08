@@ -39,7 +39,7 @@ That is marginalization. `bayes_tree.md` uses it to build a **solve order**, whe
 **Why not just delete $x_1$?**
 Two naive shortcuts both go wrong, in opposite directions:
 - **Delete $x_1$ and its factors:** everything those factors told us about $x_2$ is lost, so we become less sure than we should be.
-- **Cut $x_1$'s row and column out of $\Lambda$ (ignore the Schur term):** in the §4 example $x_2$ keeps information $2$, as if $x_1$ were known exactly. The true value is $`\Lambda' = 1.5`$, so the variance is $0.5$ instead of $0.667$: overconfident.
+- **Cut $x_1$'s row and column out of $\Lambda$ (ignore the Schur term):** in the §4 example (information matrix $`\Lambda`$, [glossary](../glossary.md#2-uncertainty-and-probability), defined in §4) $x_2$ keeps information $2$, as if $x_1$ were known exactly. The true value is $`\Lambda' = 1.5`$ ($`\Lambda'`$ = information after marginalizing, §4), so the variance is $0.5$ instead of $0.667$: overconfident.
 - **Marginalize:** keeps exactly what $x_1$ taught us about $x_2$, as a prior on $x_2$.
 
 ---
@@ -103,13 +103,13 @@ Before:                  After eliminating x_a:
  through x_a)                  directly connected)
 ```
 
-This is the **fill-in** that [elimination_tree.md §9](elimination_tree.md#9-why-ordering-matters-so-much) shows the elimination order can control, and that iSAM2's reordering ([isam2_optimization.md §12](isam2_optimization.md#12-variable-ordering-is-also-crucial)) keeps small. Sliding-window marginalization has no such choice: we always eliminate the oldest pose, whatever it is connected to. That cost is accepted, and it is why systems keep the window small: a bigger window costs $O(W^3)$ per step, and the dense prior can span more states.
+This is the **fill-in** that [elimination_tree.md §9](elimination_tree.md#9-why-ordering-matters-so-much) shows the elimination order can control, and that iSAM2's reordering ([isam2_optimization.md §12](isam2_optimization.md#12-variable-ordering-is-also-crucial)) keeps small. Sliding-window marginalization has no such choice: we always eliminate the oldest pose, whatever it is connected to. That cost is accepted, and it is why systems keep the window small: a bigger window (of $`W`$ poses) costs $O(W^3)$ per step, and the dense prior can span more states.
 
 ---
 
 ## 6. The consistency gotcha: why FEJ exists
 
-$(\Lambda_b', \eta_b')$ is computed by linearizing at the *current* estimates of $x_a$ and $x_b$ at the moment of marginalization. That linearization point is then frozen into the prior's $\Lambda_b'$ and $\eta_b'$. The surviving variables in $x_b$ keep being relinearized at new estimates on every later iteration, at a *different* point from the one the prior was built at. (This repo's prior differs: it re-linearizes its Jacobian at every solve, and only $\Omega$ and $X_{\text{ref}}$ are frozen; see §8.)
+$(\Lambda_b', \eta_b')$ is computed by linearizing at the *current* estimates of $x_a$ and $x_b$ at the moment of marginalization. That linearization point is then frozen into the prior's $\Lambda_b'$ and $\eta_b'$. The surviving variables in $x_b$ keep being relinearized at new estimates on every later iteration, at a *different* point from the one the prior was built at. (This repo's prior differs: it re-linearizes its Jacobian at every solve, and only the prior's information matrix $`\Omega`$ and its reference pose $`X_{\text{ref}}`$ are frozen; see §8.)
 
 **Intuition (toy 2D range example):** a range factor between pose $`p`$ and landmark $`l`$ only measures their distance.
 - Move both by the same shift and the range does not change. So that shift is unobservable.
@@ -176,7 +176,7 @@ Two deliberate scope choices, both flagged in the script:
 
 Poses $X_k$ are $4 \times 4$ SE(3) matrices, and tangent vectors follow the repo's `[vx, vy, vz, wx, wy, wz]` order. We solve every window by plain Gauss-Newton over two factor types, both linearized at the current estimate on every iteration (no First-Estimate Jacobians).
 
-**Odometry edge** (`linearize_edge`, reused from `pose_graph_incremental.py`). Here $\mathcal{J}_r^{-1}$ is the inverse right Jacobian of SE(3) (`compute_se3_inv_right_jacobian`) and $\mathrm{Ad}$ is the adjoint:
+**Odometry edge** (`linearize_edge`, reused from `pose_graph_incremental.py`). Here $\mathcal{J}_r^{-1}$ is the inverse right Jacobian of SE(3) (`compute_se3_inv_right_jacobian`), $\mathrm{Ad}$ is the adjoint, $`Z_{ij}`$ is the measured relative pose from $`X_i`$ to $`X_j`$, and $\mathrm{Log}$ maps an SE(3) element to its 6-vector tangent ([glossary](../glossary.md#1-geometry-and-lie-groups)):
 
 ```math
 e_{ij} = \mathrm{Log}\big((X_i Z_{ij})^{-1} X_j\big), \qquad
@@ -208,7 +208,7 @@ $$
 
 Taking $\Lambda_{bb}$ from the full $H$ instead would also include the b–c edge. That edge stays in the window, so it would be counted twice. $\Omega_p'$ equals §4's Schur complement of the system built from $a$'s prior plus the a–b edge.
 
-**Why storing no $\eta_b'$ is exact here.** Because $X_{\text{ref}}' = X_b$, the new prior's residual is zero when it is created, so its linear term is zero too. §4's $\eta_b'$ really is zero in this setting. The chain has a single anchor and no loop closures, so every factor can be satisfied exactly. Each new pose also starts at $X_{\text{last}} Z_{ij}$, which already zeroes its edge residual. So at the optimum, every residual, and therefore every gradient term, is zero. This depends on the pure-chain scope. With a loop closure or a shared landmark, residuals would not vanish, and dropping $\eta_b'$ would lose information.
+**Why storing no $\eta_b'$ is exact here.** Because $X_{\text{ref}}' = X_b$, the new prior's residual is zero when it is created, so its linear term is zero too. §4's $\eta_b'$ really is zero in this setting. The chain has a single anchor and no loop closures, so every factor can be satisfied exactly. Each new pose also starts at $X_{\text{last}} Z_{ij}$ ($`X_{\text{last}}`$ = the newest pose in the window before it is added), which already zeroes its edge residual. So at the optimum, every residual, and therefore every gradient term, is zero. This depends on the pure-chain scope. With a loop closure or a shared landmark, residuals would not vanish, and dropping $\eta_b'$ would lose information.
 
 **Ordering** (`run_sliding_window_pose_graph`). For each new node, the script:
 

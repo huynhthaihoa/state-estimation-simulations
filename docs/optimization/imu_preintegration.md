@@ -59,7 +59,7 @@ At every raw IMU sample, [`use_numpy/imu_preintegration.py`](../../use_numpy/imu
 - In the same way, $\Delta p, \Delta v, \Delta R$ stay valid when the optimizer moves the start pose or velocity.
 - Only a bias change needs the Jacobian correction (§4).
 
-Here $\tilde\omega, \tilde v$ are the raw sensor readings and $b_g, b_a$ are the bias estimates *in effect when this bundle started*.
+Here $\tilde\omega, \tilde v$ are the raw sensor readings (gyro rate and accelerometer reading), $dt$ is the IMU sample period, and $b_g, b_a$ are the bias estimates *in effect when this bundle started*.
 
 - **Update order matters.** Every right-hand side uses the value from *before* this step. $\Delta p$ needs the old $\Delta v$ and old $\Delta R$, and $\Delta v$ needs the old $\Delta R$. So $\Delta p$ is updated first, then $\Delta v$, then $\Delta R$ last. The code does this by saving `R_prev` before touching `self.delta_R`.
 - **Rotations compose, they don't add.** $\Delta R$'s update is the $\text{Exp}$-map composition from [jacobian.md §11.1](../foundations/jacobian.md#111-why-plain-addition-breaks): each micro-step's tiny rotation is *composed onto* the running $\Delta R$.
@@ -82,7 +82,7 @@ These are the "sensitivity map" from [jacobian.md §3](../foundations/jacobian.m
   - The tilt grows as $`0.01\,t`$ rad, so about 0.01 rad at the end.
   - Sideways velocity error: $`\int a\,\theta\,dt = 0.005`$ m/s.
   - Sideways position error: about $`0.01/6 \approx 0.0017`$ m.
-- This is the effect that $`J_{v,b_g}`$ and $`J_{p,b_g}`$ (the $`[\tilde v-b_a]_\times J_{R,b_g}`$ terms below) capture.
+- This is the effect that $`J_{v,b_g}`$ and $`J_{p,b_g}`$ (the $`[\tilde v-b_a]_\times J_{R,b_g}`$ terms below, where $`[\cdot]_\times`$ is the skew-symmetric **hat** matrix, [glossary](../glossary.md#1-geometry-and-lie-groups)) capture.
 
 ```math
 J_{p,b_g} \leftarrow J_{p,b_g} + J_{v,b_g}\,dt - \tfrac{1}{2}\Delta R\,[\tilde v-b_a]_\times J_{R,b_g}\,dt^2 \qquad J_{p,b_a} \leftarrow J_{p,b_a} + J_{v,b_a}\,dt - \tfrac{1}{2}\Delta R\,dt^2
@@ -171,7 +171,7 @@ The scripts share `lie_utils.py`. The $SO(3)$ exponential `so3_exp` is Rodrigues
 
 $$\text{Exp}(\phi) = I + \frac{\sin\theta}{\theta}[\phi]_\times + \frac{1-\cos\theta}{\theta^2}[\phi]_\times^2, \qquad \theta = \lVert\phi\rVert$$
 
-**`imu_integration_comparison.py`, measurements** (`run_simulation`). True body rates $\omega$, $v$ come from `utils.true_body_rates(t)`. Both estimators consume the *same* noisy readings each step:
+**`imu_integration_comparison.py`, measurements** (`run_simulation`). True body rates $\omega$, $v$ come from `utils.true_body_rates(t)`. Both estimators consume the *same* noisy readings each step (here $\tilde v$ is a noisy **linear velocity** reading, not the accelerometer reading $\tilde v$ of §3-§5):
 
 $$\tilde\omega = \omega + n_\omega,\quad n_\omega \sim \mathcal N(0, \sigma_g^2 I), \qquad \tilde v = v + n_v,\quad n_v \sim \mathcal N(0, \sigma_v^2 I)$$
 

@@ -20,7 +20,7 @@ A monocular camera looking at a static scene can recover the *shape* of the scen
 - **absolute position/orientation**: the whole reconstruction could be picked up and rigidly moved anywhere, and every reprojection error would stay identical
 - **absolute scale**: shrinking the entire scene and every camera-to-point distance by the same factor, while changing nothing else, leaves every projected pixel where it was
 
-**Tiny example (toy case: pinhole camera, ignoring the principal point):** a point at $`(X, Z) = (1, 5)`$ and another at $`(2, 10)`$ both land at $`u = f X / Z = f/5`$. Doubling the whole scene changes no pixel.
+**Tiny example (toy case: pinhole camera, ignoring the principal point):** a point at $`(X, Z) = (1, 5)`$ and another at $`(2, 10)`$ both land at $`u = f X / Z = f/5`$ (where $`f`$ is the focal length, $`u`$ the horizontal pixel coordinate, and $`X, Z`$ the point's lateral and depth coordinates). Doubling the whole scene changes no pixel.
 
 Together, that's a **7-parameter similarity ambiguity**: 3 translation + 3 rotation + 1 scale. This is the same **gauge freedom** idea as in [pose_graph_optimization.md](../optimization/pose_graph_optimization.md)'s "one subtlety this formula hides" note - a direction the optimizer's cost function is completely blind to - except pose graphs only have the 6-DoF rigid version (their edges are *relative rigid* constraints, so scale is never in question), while monocular bundle adjustment's edges are *projective*, so scale is unobservable too.
 
@@ -56,7 +56,7 @@ i.e., the least-squares best-fit similarity transform mapping the estimated poin
 
 This repo's implementation, [`umeyama_alignment`](../../utils.py) in `utils.py`, is the textbook closed-form solution end-to-end:
 
-**Step 1. Center both point sets** on their own centroids, and stack the centered points as the rows of two $n\times3$ matrices $X$ and $Y$:
+**Step 1. Center both point sets** on their own centroids, and stack the centered points as the rows of two $n\times3$ matrices $X$ and $Y$ (here $`X`$ is the matrix of centered points, not the coordinate $X$ of the §1 example):
 
 - centroids: $`\mu_{\text{est}} = \frac{1}{n}\sum x_i`$ and $`\mu_{\text{true}} = \frac{1}{n}\sum y_i`$
 - centered rows: $`X_i = x_i - \mu_{\text{est}}`$ and $`Y_i = y_i - \mu_{\text{true}}`$
@@ -69,10 +69,10 @@ Centering removes translation from the problem; step 4 recovers it.
 
 **Intuition:**
 
-- $`\Sigma`$ records how the spread of the centered $Y$ points lines up with the spread of the centered $X$ points.
+- $`\Sigma = UDV^\top`$ (defined just below) records how the spread of the centered $Y$ points lines up with the spread of the centered $X$ points.
 - The SVD splits that relation into stretches ($`D`$) and turns ($`U`$, $`V^\top`$).
 - Keeping only the turn, $`UV^\top`$, gives the rotation. The stretches go to the scale in step 4.
-- **Tiny example:** for the §5 data, the singular values are $`(0.5,\ 0.5,\ 0.125)`$, and $`UV^\top`$ comes out equal to $`R_{\text{true}}`$.
+- **Tiny example:** for the §5 data, the singular values are $`(0.5,\ 0.5,\ 0.125)`$, and $`UV^\top`$ comes out equal to $`R_{\text{true}}`$, the known rotation of that example.
 
 $$\Sigma = \frac{1}{n} Y^\top X = U D V^\top$$
 

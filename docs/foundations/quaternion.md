@@ -90,7 +90,7 @@ At zero rotation ($\theta = 0$), $w = \cos 0 = 1$ and $x = y = z = 0$, giving $q
 
 ## 6. Why are quaternions so useful in robotics?
 
-Suppose the IMU says "the robot rotated slightly during this 10 ms interval." We update the orientation $R_{k+1}=R_k\Delta R$. A rotation matrix ($`R \in SO(3)`$) needs **9 numbers**, while a quaternion needs only $q = (w,x,y,z)$ with the unit constraint. More importantly, composing rotations becomes quaternion multiplication, $q_{\text{new}}=q_{\text{old}}\otimes\Delta q$:
+Suppose the IMU says "the robot rotated slightly during this 10 ms interval." We update the orientation $R_{k+1}=R_k\Delta R$. A rotation matrix ($`R \in SO(3)`$) needs **9 numbers**, while a quaternion needs only $q = (w,x,y,z)$ with the unit constraint. More importantly, composing rotations becomes quaternion multiplication, $q_{\text{new}}=q_{\text{old}}\otimes\Delta q$ (where $`\otimes`$ is the **quaternion product**, defined in Section 13, and $`\Delta q`$ is the quaternion of the small rotation $`\Delta R`$ measured over the interval, [glossary](../glossary.md#5-slam-system)):
 
 > **Quaternion multiplication = "apply one rotation after another."**
 
@@ -142,7 +142,7 @@ has **9 elements**, even though a rotation has only 3 degrees of freedom, and th
 - more compact
 - numerically convenient: rounding makes $\lVert q\rVert$ drift slowly from 1 over many multiplications, so implementations renormalize regularly, which is much cheaper than re-orthogonalizing a rotation matrix
 - efficient for composing rotations
-- easy to interpolate smoothly: slerp (spherical linear interpolation) $\text{slerp}(q_0, q_1, t)$ moves at constant angular speed along the shortest arc (choose the sign of $q_1$ so that $q_0 \cdot q_1 \ge 0$, see Section 10)
+- easy to interpolate smoothly: slerp (spherical linear interpolation) $\text{slerp}(q_0, q_1, t)$ (from start orientation $`q_0`$ to end orientation $`q_1`$, with fraction $`t \in [0,1]`$) moves at constant angular speed along the shortest arc (choose the sign of $q_1$ so that $q_0 \cdot q_1 \ge 0$, see Section 10)
 - free of gimbal lock
 
 ---
@@ -211,7 +211,7 @@ It lives on the **unit quaternion manifold**. That's why modern VIO/SLAM systems
 The small error can be attached on either side, and both are common:
 
 - $`q_{\text{true}} = \delta q\otimes \hat q`$: the error is expressed in the world frame. In the terminology of [left_right_invariant.md](../filtering/left_right_invariant.md) this is a *right*-invariant error.
-- $`q_{\text{true}} = \hat q\otimes \delta q`$: the error is expressed in the body frame. This is the *left*-invariant error, the convention of Solà's ESKF and of this repo's `run_iekf` (the $\hat X\,\mathrm{Exp}(\xi)$ form).
+- $`q_{\text{true}} = \hat q\otimes \delta q`$: the error is expressed in the body frame. This is the *left*-invariant error, the convention of Solà's ESKF and of this repo's `run_iekf` (the $\hat X\,\mathrm{Exp}(\xi)$ form, where $`\hat X`$ is the estimated pose, $`\xi`$ the tangent-space error and $`\mathrm{Exp}`$ the exponential map, see the [glossary](../glossary.md#1-geometry-and-lie-groups)).
 
 This is the error-state idea of [extra_kf_variants.md §2](../filtering/extra_kf_variants.md#2-error-state-kalman-filter-eskf), and it leads directly into **SO(3), Lie groups, Lie algebra, and the Invariant EKF**.
 
@@ -243,7 +243,7 @@ The answer comes down to four observations.
 
 ### Step 1: the multiplication rule hides a dot product and a cross product
 
-Write a quaternion as a scalar part plus a vector part:
+Write a quaternion as a scalar part plus a vector part (here $`\mathbf{v}`$ is the vector part, not the velocity $v$ of Section 11):
 
 $$
 q = (w, \mathbf{v}), \qquad \mathbf{v} = (x, y, z)
@@ -268,7 +268,7 @@ Those are exactly the ingredients of 3D rotation formulas. The cross product als
 
 ### Step 2: put the vector inside a quaternion, then "sandwich" it
 
-To rotate a vector $\mathbf{v}$, first turn it into a quaternion with zero scalar part (a **pure quaternion**):
+To rotate a vector $\mathbf{v}$ (the symbol is reused: now a general 3D vector, not the vector part of $q$), first turn it into a quaternion with zero scalar part (a **pure quaternion**):
 
 ```math
 \mathbf{v} \;\rightarrow\; (0, \mathbf{v})
@@ -356,7 +356,7 @@ This is exactly **Rodrigues' rotation formula** - the same rotation a rotation m
 
 ### Step 4: two facts from earlier sections, now explained
 
-**Chaining rotations (Section 6).** The conjugate of a product reverses the order: $(p \otimes q)^{\ast} = q^{\ast} \otimes p^{\ast}$. So rotating by $q$ and then by $p$ gives:
+**Chaining rotations (Section 6).** The conjugate of a product reverses the order: $(p \otimes q)^{\ast} = q^{\ast} \otimes p^{\ast}$. So rotating by $q$ and then by $p$ (here $`p`$ is a second unit quaternion, not the position $p$ of Section 11) gives:
 
 $$
 p \otimes \left(q \otimes \mathbf{v} \otimes q^{\ast}\right) \otimes p^{\ast} = (p \otimes q) \otimes \mathbf{v} \otimes (p \otimes q)^{\ast}

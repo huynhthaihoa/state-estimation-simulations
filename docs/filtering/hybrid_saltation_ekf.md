@@ -136,7 +136,7 @@ Here $`x_{k|k-1}, P_{k|k-1}`$ are the output of this tick's hybrid predict and $
 
 - **True trajectory** (`generate_ground_truth_and_data`): `step_hybrid` itself with zero process noise and zero covariance, so it follows the same bounce and resting rules as the filters.
 - **Dead reckoning** (`run_dead_reckoning`): the same noise-free propagation from the perturbed initial guess, with no updates.
-- **Monte Carlo** (`run_monte_carlo_consistency`): each trial draws a fresh initial guess $`x_0 = x_{\text{true},0} + \text{diag}(\sigma_0)\,n`$ with $n \sim \mathcal{N}(0, I_6)$ and fresh measurement noise, starts both filters from
+- **Monte Carlo** (`run_monte_carlo_consistency`): each trial draws a fresh initial guess $`x_0 = x_{\text{true},0} + \text{diag}(\sigma_0)\,n`$ (where $`\sigma_0`$ stacks the position and velocity initial standard deviations $`\sigma_{p0}, \sigma_{v0}`$ given below) with $n \sim \mathcal{N}(0, I_6)$ and fresh measurement noise, starts both filters from
 
 $$
 P_0 = \text{diag}\big(\sigma_{p0}^2 I_3,\ \sigma_{v0}^2 I_3\big), \qquad \sigma_{p0} = 0.1\ \text{m}, \quad \sigma_{v0} = 0.2\ \text{m/s}
@@ -345,8 +345,7 @@ So with exact detection there is no case for the naive update:
 ```math
 \tau_{\text{detect}} = \text{clip}\big(\tau + b_{\text{detect}} + \mathcal{N}(0,\,\sigma_{\text{detect}}^2)\,,\ 0,\ \tau_{\text{remain}}\big)
 ```
-
-instead of the true geometric $\tau$, so early detection resets the mean while still above ground and late detection resets it after the free-fall model has carried it slightly below $p_z = 0$ - both real artifacts of a delayed or jittery contact detector (e.g. an accelerometer spike, as in the IMU-based foot-strike detector of [Čížek et al., 2018](#11-references), or a force threshold), not numerical noise.
+instead of the true geometric $\tau$ (here $`\tau_{\text{remain}}`$ is the time left in the tick, `remaining` in `step_hybrid`, and $`b_{\text{detect}}, \sigma_{\text{detect}}`$ are the bias and noise std above), so early detection resets the mean while still above ground and late detection resets it after the free-fall model has carried it slightly below $p_z = 0$ - both real artifacts of a delayed or jittery contact detector (e.g. an accelerometer spike, as in the IMU-based foot-strike detector of [Čížek et al., 2018](#11-references), or a force threshold), not numerical noise.
 
 Under detection jitter, `saltation_matrix` is evaluated at an $x^{-}$ that is off the guard ($p_z \neq 0$), outside its own stated assumption (its docstring says $x^{-}$ already satisfies $p_z = 0$). The code does not correct for this; it uses the current $v_z$, since nothing in the formula depends on $p_z$.
 
@@ -388,13 +387,13 @@ Two notes on how §4's formula enters this section:
 
 ## 9. Connection to Poincaré maps
 
-Saltation matrices show up in a second, related context: analyzing the stability of a *periodic* hybrid trajectory - e.g., a robot repeatedly bouncing (or, for legged locomotion, repeatedly striking the ground once per stride). Sampling the state once per cycle, at a chosen event, defines a discrete return map $x_{k+1} = P(x_k)$, and its derivative $DP$ governs whether nearby trajectories converge back to the periodic orbit or diverge from it - the hybrid-systems analogue of eigenvalue stability analysis for a fixed point.
+Saltation matrices show up in a second, related context: analyzing the stability of a *periodic* hybrid trajectory - e.g., a robot repeatedly bouncing (or, for legged locomotion, repeatedly striking the ground once per stride). Sampling the state once per cycle, at a chosen event, defines a discrete return map $`x_{k+1} = \Pi(x_k)`$, and its derivative $`D\Pi`$ governs whether nearby trajectories converge back to the periodic orbit or diverge from it - the hybrid-systems analogue of eigenvalue stability analysis for a fixed point.
 
 The standard tool for this is the **monodromy matrix**: flow Jacobians and saltation matrices multiplied in cycle order, e.g. $`\Phi_{\text{mono}} = \Phi_3\,\Xi_2\,\Phi_2\,\Xi_1\,\Phi_1`$ for three flow phases and two events ($\Phi_i$ is the flow's Jacobian over phase $i$, $\Xi_i$ the saltation matrix at event $i$).
 
 - It maps a perturbation at one time to the perturbation one full period later (Kong et al. 2024, Eq. 34).
 - Its $\Xi_i$ is the *full* saltation matrix, §4's boxed formula with the $f^{+}$ term, not $\Xi_{\text{own-time}}$.
-- It carries the same stability information as the Poincaré-map Jacobian $DP$: for an autonomous system and a cycle starting and ending at the orbit's fixed point $x^{*}$, it has $DP$'s eigenvalues plus one extra eigenvalue $1$, the direction along the flow (Kong et al. 2024, §III-C).
+- It carries the same stability information as the Poincaré-map Jacobian $`D\Pi`$: for an autonomous system and a cycle starting and ending at the orbit's fixed point $x^{*}$, it has $`D\Pi`$'s eigenvalues plus one extra eigenvalue $1$, the direction along the flow (Kong et al. 2024, §III-C).
 
 This script doesn't build or verify that composition: it propagates one covariance through one fixed-$`\Delta t`$ tick at a time, the different setting §3-§4 work out. So this section is a pointer to where saltation matrices show up next, not a second derivation. If we extend this toy into a periodic-orbit-stability tool, we should start from the full $\Xi$ and verify the composed monodromy matrix numerically (the same finite-difference discipline §4 uses) before trusting it.
 
