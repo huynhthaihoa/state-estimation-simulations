@@ -245,6 +245,12 @@ Two measurements, only one of them deterministic:
 
 *Figure: `use_numpy/sliding_window_marginalization.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py sliding_window_marginalization`.*
 
+The same streaming, animated for a 64-pose run with a 10-pose window. The window's system size stops at 60 unknowns while a full batch re-solve keeps growing as 6 unknowns per pose, reaching 384 at the last pose. The path drifts and does not close the square because there are only odometry edges, so both solvers return the dead-reckoned path.
+
+![Animation of a 64-pose odometry-only square path streaming in: top, the live 10-pose window in blue, marginalized poses frozen in gray and the pose being marginalized circled in red; bottom left, the system size of a full batch re-solve growing with the number of poses against the sliding window capped at 60 unknowns; bottom right, the window's block-tridiagonal information matrix with the prior block on its oldest pose](../../assets/sliding_window_marginalization.gif)
+
+*Animation: `use_numpy/animate_sliding_window_marginalization.py` at its defaults (seed 0), rendered by `uv run python use_numpy/animate_sliding_window_marginalization.py --out assets/sliding_window_marginalization.gif`. The batch curve is computed (6 unknowns per pose), not re-solved.*
+
 **Accuracy is identical here, but that's guaranteed by the setup, not evidence that marginalization loses nothing.**
 - Final RMS position error is the same for full-batch and sliding-window at every trajectory length.
 - The reason is the one in §8.1 (all residuals are zero): the least-squares optimum *is* the dead-reckoned trajectory. Both solvers return exactly that. Checked at seed 0, both match dead reckoning with a maximum difference of 0.0 at 8, 16 and 32 poses.

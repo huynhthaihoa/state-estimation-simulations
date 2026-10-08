@@ -171,6 +171,12 @@ One might expect `always` to match `phase_conditional` during genuine anchor tic
 
 *Figure: `use_numpy/inchworm_zupt_ekf.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py inchworm_zupt_ekf`.*
 
+The same run, animated over five anchor/extend cycles. The top strip shows the point mass crawling along its track, gold while anchored and green while extending, with a gray footprint at each anchor point and each policy's position estimate below it; `always` falls several centimetres behind (position RMS 0.060 m vs 0.015-0.016 m). The middle panel shows each policy's velocity estimate with its ±2σ band: `always` collapses its band during motion, and `phase_conditional` tightens only on anchor ticks. The bottom panel shows the Monte Carlo NEES building up cycle by cycle; `always` climbs to about 900, and none of the three is consistent at these defaults (§3).
+
+![Animation of the inchworm gait over five cycles: top, the point mass crawling along its track with its anchor footprints and the three position estimates; middle, true velocity and the never, always and phase_conditional estimates with their ±2-sigma bands, anchor phases shaded; bottom, each policy's Monte Carlo averaged NEES on a log scale against the expected value 2](../../assets/inchworm_zupt_ekf.gif)
+
+*Animation: `use_numpy/animate_inchworm_zupt_ekf.py` at its defaults (seed 0, 500 trials), rendered by `uv run python use_numpy/animate_inchworm_zupt_ekf.py --out assets/inchworm_zupt_ekf.gif`.*
+
 | Variant | anchor-only NEES | cruise-only NEES | velocity RMS (single run) |
 | --- | --- | --- | --- |
 | `never` | ~6.0 | ~10.8 | ~0.055-0.060 m/s |

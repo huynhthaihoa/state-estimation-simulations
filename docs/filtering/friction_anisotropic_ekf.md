@@ -165,6 +165,12 @@ Monte Carlo NEES (**NEES**: normalized estimation error squared, [glossary](../g
 
 *Figure: `use_numpy/friction_anisotropic_ekf.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py friction_anisotropic_ekf`.*
 
+The same run, animated over one loop. The position tracks overlap, so the left panel shows instead the process-noise ellipse each policy assumes at the robot, magnified 30 times: `isotropic` is a fixed circle, `fixed_anisotropic` keeps the shape of its starting heading, and `heading_aware` turns with the heading on top of the true slip ellipse. The right panel shows the Monte Carlo NEES: `fixed_anisotropic` climbs to about 28 as its ellipse turns towards a 90° mismatch, and only partly recovers when the ellipses line up again at 180°.
+
+![Animation of one loop: left, the robot on its circular path with the true slip ellipse and the isotropic, fixed_anisotropic and heading_aware process-noise ellipses, magnified 30 times; right, each policy's Monte Carlo averaged NEES over time on a log scale, with the fixed ellipse's misalignment from the heading](../../assets/friction_anisotropic_ekf.gif)
+
+*Animation: `use_numpy/animate_friction_anisotropic_ekf.py` at its defaults (seed 0, 500 trials, every third tick), rendered by `uv run python use_numpy/animate_friction_anisotropic_ekf.py --out assets/friction_anisotropic_ekf.gif`. The ellipses come from one run; the NEES curves are the Monte Carlo average.*
+
 | Rotation away from reference | `isotropic` | `fixed_anisotropic` | `heading_aware` |
 | --- | --- | --- | --- |
 | 0-45° | 3.5 | 11.1 | 3.1 |

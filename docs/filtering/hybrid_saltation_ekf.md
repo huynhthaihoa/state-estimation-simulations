@@ -322,6 +322,12 @@ So with exact detection there is no case for the naive update:
 
 *Figure: `use_numpy/saltation_matrix_ekf.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py saltation_matrix_ekf`.*
 
+The same run, animated. The two estimates stay close; what differs is the uncertainty each filter reports after a bounce. In the bottom-right panel, the vertical-velocity standard deviation drops at every bounce from about 0.030 m/s to about 0.025 m/s (naive) and 0.018 m/s (saltation). Both then recover to about 0.028 m/s before the next bounce.
+
+![Animation of the default run: top, the bouncing point mass with measurements and both EKF estimates; bottom left, each filter's height and vertical-velocity error with its 2-sigma ellipse; bottom right, each filter's reported vertical-velocity standard deviation over time, which drops further at every bounce for the saltation update than for the naive one](../../assets/saltation_matrix_ekf.gif)
+
+*Animation: `use_numpy/animate_saltation_ekf.py` at its defaults (seed 0), rendered by `uv run python use_numpy/animate_saltation_ekf.py --out assets/saltation_matrix_ekf.gif`.*
+
 ---
 
 ## 7. Two things worth knowing before reusing this pattern

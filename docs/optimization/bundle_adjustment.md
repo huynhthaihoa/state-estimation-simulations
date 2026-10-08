@@ -215,6 +215,12 @@ Real implementations usually wrap the squared reprojection error in a **robust l
 
 *Figure: `use_numpy/bundle_adjustment.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py bundle_adjustment`.*
 
+The same run, animated over its Gauss-Newton iterations. Optimizing poses and landmarks jointly brings the reprojection error from 127.7 px to 1.2 px within three iterations, while the one-sided solvers, which hold either the landmarks or the poses at their noisy guess, stop at 100.1 px and 53.9 px.
+
+![Animation of bundle_adjustment.py: left, a top-down view of cameras and landmarks moving from the noisy initial guess onto ground truth over the Gauss-Newton iterations; right, the reprojection RMS falling to about 1.2 px on a log scale, below the landmarks-only (100 px) and poses-only (54 px) levels](../../assets/bundle_adjustment.gif)
+
+*Animation: `use_numpy/animate_bundle_adjustment.py` at its defaults (seed 0), rendered by `uv run python use_numpy/animate_bundle_adjustment.py --out assets/bundle_adjustment.gif`. Each iterate is aligned to ground truth for display (gauge freedom), and the motion between the 7 iterates is interpolated.*
+
 **Projection** (`camera_project`): move the point into the camera frame, then apply the pinhole model with intrinsics $(f_x, f_y, c_x, c_y)$:
 
 ```math
