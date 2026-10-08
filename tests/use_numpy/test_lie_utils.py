@@ -232,3 +232,31 @@ def test_rotation_geodesic_error_resolves_tiny_angles(lie_utils):
         assert np.isclose(lie_utils.rotation_geodesic_error(R, R2), angle, rtol=1e-3, atol=0.0)
     R_pi = R @ lie_utils.so3_exp(np.array([0.0, 0.0, np.pi - 1e-9]))
     assert np.isclose(lie_utils.rotation_geodesic_error(R, R_pi), np.pi - 1e-9, atol=1e-7)
+
+
+@pytest.mark.parametrize("group, method, function", [
+    ("SO3", "hat", "skew"),
+    ("SO3", "exp", "so3_exp"),
+    ("SO3", "right_jacobian", "so3_right_jacobian"),
+    ("SO3", "inv_right_jacobian", "compute_so3_inv_right_jacobian"),
+    ("SO3", "geodesic_error", "rotation_geodesic_error"),
+    ("SE3", "exp", "se3_exp"),
+    ("SE3", "log", "se3_log"),
+    ("SE3", "inv", "se3_inv"),
+    ("SE3", "adjoint", "se3_adjoint"),
+    ("SE3", "ad", "se3_ad"),
+    ("SE3", "right_jacobian", "se3_right_jacobian"),
+    ("SE3", "inv_right_jacobian", "compute_se3_inv_right_jacobian"),
+])
+def test_namespace_methods_are_the_module_functions(lie_utils, group, method, function):
+    # Pure aliases: the class attribute is the very same function object, so
+    # results can't diverge from the module-level function.
+    assert getattr(getattr(lie_utils, group), method) is getattr(lie_utils, function)
+
+
+def test_namespace_methods_callable_without_instance(lie_utils):
+    xi = XIS[3]
+    T = lie_utils.SE3.exp(xi)
+    np.testing.assert_allclose(lie_utils.SE3.log(T), xi, atol=1e-12)
+    np.testing.assert_allclose(lie_utils.SE3.inv(T) @ T, np.eye(4), atol=1e-12)
+    np.testing.assert_allclose(lie_utils.SO3.exp(xi[3:6]), T[0:3, 0:3], atol=1e-15)

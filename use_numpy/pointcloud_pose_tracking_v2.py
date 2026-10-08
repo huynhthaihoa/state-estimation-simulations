@@ -1,0 +1,908 @@
+'''
+Tracks the pose of a rigid object over time from a combination of:
+
+  1. A *prior*, coming from a motion model driven by noisy control/odometry
+     inputs (a body-frame twist [v, omega], exactly like the IMU scripts in
+     this codebase): T_pred = T_prev (+) Exp([v,omega]*dt).
+
+  2. A *point-cloud measurement*: at every step, the object's known body-frame
+     point cloud is observed transformed into the world frame (noisy 3D
+     point-to-point correspondences), i.e. z_i = T.act(p_i) + noise.
+
+Five ways to fuse the two into a pose estimate are implemented, all built on
+the exact same `motion_model`/`observation_model` functions and hand-rolled
+analytical SE(3) Jacobians (closed-form skew/exp/log/adjoint math, no
+external Lie-theory library) -- except the vanilla KF, which deliberately
+avoids SE(3) altogether:
+
+  - EKF (recursive): predict with the motion model + propagate a 6x6 tangent
+    covariance, update with the point-cloud observation model + a Kalman
+    gain. Constant-size state (T, P); only ever looks at the current step.
+
+  - Invariant EKF / IEKF (recursive): same predict step as the EKF (already
+    exact for this group-affine motion model), but the update expresses the
+    residual in the estimate's body frame, which makes the point-cloud
+    measurement Jacobian state-independent (depends only on the fixed body
+    points, never on the current pose estimate) instead of being
+    re-linearized around the current rotation every step.
+
+  - Batch Gauss-Newton (smoother): jointly optimizes the *whole* trajectory
+    T_0..T_N at once against three factor types (an initial-pose prior, N
+    motion factors between consecutive poses, and (N+1)*n_points measurement
+    factors), generalizing the single-pose GN correction loop already used in
+    robot_imu_simulation.py to a multi-pose graph. Has access to the full
+    trajectory (not just causal history), so it can do at least as well as
+    the EKF.
+
+  - UKF (recursive): same predict/update structure as the EKF, but with no
+    Jacobians at all -- sigma points sampled around the current estimate are
+    retracted onto SE(3), pushed through the exact (not linearized)
+    motion_model/observation_model, and recombined into a new mean/
+    covariance. Genuinely different in character from the other three
+    methods here, which all rely on an analytical Jacobian somewhere.
+
+  - Vanilla KF (recursive): the odd one out -- reparameterizes the pose as a
+    redundant 12-dim ambient state [vec(R), t] instead of the minimal 6-dim
+    SE(3) tangent state, which makes the point-cloud observation model
+    exactly linear (fixed H, no Jacobian at all) but forces two compromises
+    the other methods avoid: the motion model needs a first-order
+    (small-angle) truncation of Exp(w), a real source of mean error the
+    EKF's exact group composition doesn't have; and nothing constrains R to
+    stay in SO(3), so it's explicitly re-projected back onto SO(3) via SVD
+    after every update. Included to make concrete what "just use a plain KF"
+    costs on a manifold-valued state, not because it's recommended.
+
+A pure dead-reckoning trajectory (motion model only, no point-cloud
+correction at all) is carried along as the "uncorrected" baseline, and also
+doubles as the batch solver's initial guess.
+
+Poses are represented as (4,4) numpy homogeneous transforms; tangent vectors
+follow the [vx,vy,vz,wx,wy,wz] (translation-first) convention used throughout
+this codebase.
+'''
+
+import argparse
+import os
+import sys
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from lie_utils import skew, se3_exp, se3_log, se3_inv, se3_adjoint, compute_se3_inv_right_jacobian, se3_right_jacobian, rotation_geodesic_error
+from utils import measure_performance, true_body_rates, unscented_weights, unscented_sigma_offsets
+
+def make_body_point_cloud(n_points, rng, half_extent=0.5):
+    """A fixed, non-degenerate set of body-frame landmark points (the object's
+    known geometry), sampled inside a small cube so the full 6-DoF pose stays
+    observable from the point correspondences alone.
+    Arguments:
+        n_points: number of points to generate
+        rng: numpy random number generator
+        half_extent: half the side length of the cube in which to sample points
+    Returns:
+        body_points: (n_points, 3) array of points in the object's body frame
+    """
+    return rng.uniform(-half_extent, half_extent, size=(n_points, 3))
+
+
+def motion_model(T_prev, twist, dt, J_self=None, J_tau=None):
+    """Constant body-twist SE(3) motion model: T_pred = T_prev (+) Exp(twist*dt).
+    twist = [vx,vy,vz,wx,wy,wz]. If given, J_self/J_tau are filled with the
+    Jacobians of T_pred wrt T_prev and wrt the tangent increment, respectively
+    (analytical right-plus Jacobians -- used for EKF covariance propagation and
+    for chaining the GN motion-factor Jacobian).
+    Arguments:
+        T_prev: previous pose (4,4)
+        twist: body-frame twist (6-vector)
+        dt: time step (s)
+        J_self: optional (6,6) array to fill with dT_pred/dT_prev
+        J_tau: optional (6,6) array to fill with dT_pred/dtau
+    Returns:
+        T_pred: predicted pose (4,4)
+    """
+    w = twist * dt
+    T_local = se3_exp(w)
+    T_pred = T_prev @ T_local
+    if J_self is not None:
+        J_self[:] = se3_adjoint(se3_inv(T_local))
+        J_tau[:] = se3_right_jacobian(w)
+    return T_pred
+
+
+def observation_model(T, body_points, with_jacobian=False):
+    """Point-cloud observation model: predicts every body point transformed
+    into the world frame by T. Returns predicted points (M,3) and, if
+    requested, the stacked (3M,6) Jacobian wrt a right-perturbation of T
+    (the point-action Jacobian [R | -R@skew(p)] -- used by both the EKF
+    update and the GN measurement factors).
+    Arguments:
+        T: pose (4,4)
+        body_points: (M,3) array of points in the object's body frame
+        with_jacobian: if True, also return the stacked Jacobian (3M,6)
+    Returns:
+        pred: (M,3) array of predicted points in the world frame
+        J: (3M,6) Jacobian of pred wrt a right-perturbation of T, or None if with_jacobian=False
+    """
+    R, t = T[0:3, 0:3], T[0:3, 3]
+    n_points = len(body_points)
+    pred = body_points @ R.T + t
+    J = None
+    if with_jacobian:
+        J = np.zeros((3 * n_points, 6))
+        for i, p in enumerate(body_points):
+            J[3 * i:3 * i + 3, 0:3] = R
+            J[3 * i:3 * i + 3, 3:6] = -R @ skew(p)
+    return pred, J
+
+
+def generate_ground_truth_and_data(duration, dt, n_points, vel_noise_std, gyro_noise_std,
+                                    point_noise_std, rng, half_extent=0.5):
+    """Builds the true trajectory (exp-map integration of noise-free inputs)
+    and the noisy inputs/point-cloud measurements a tracker would actually
+    receive.
+    Arguments:
+        duration: total simulation time (s)
+        dt: time step (s)
+        n_points: number of body-frame point-cloud landmarks
+        vel_noise_std: std-dev of Gaussian noise added to the true body-frame linear velocity (m/s)
+        gyro_noise_std: std-dev of Gaussian noise added to the true body-frame angular velocity (rad/s)
+        point_noise_std: std-dev of Gaussian noise added to the predicted world-frame point-cloud measurements (m)
+        rng: numpy random number generator
+        half_extent: half the side length of the cube in which to sample body-frame points
+    Returns:
+        body_points: (M,3) array of points in the object's body frame
+        T_true: list of true poses (4,4)
+        u_meas: (N,6) array of noisy body-frame twists
+        z: list of noisy point-cloud measurements (M,3)
+    """
+    n_steps = int(duration / dt)
+    body_points = make_body_point_cloud(n_points, rng, half_extent)
+
+    T_true = [np.eye(4)]
+    u_meas = np.zeros((n_steps, 6))
+    z = [observation_model(T_true[0], body_points)[0]
+         + rng.normal(0.0, point_noise_std, (n_points, 3))]
+
+    for k in range(n_steps):
+        t = k * dt
+        omega_true, v_true = true_body_rates(t)
+        twist_true = np.concatenate([v_true, omega_true])
+
+        T_true.append(motion_model(T_true[-1], twist_true, dt))
+
+        noise = np.concatenate([
+            rng.normal(0.0, vel_noise_std, 3),
+            rng.normal(0.0, gyro_noise_std, 3),
+        ])
+        u_meas[k] = twist_true + noise
+
+        pred, _ = observation_model(T_true[-1], body_points)
+        z.append(pred + rng.normal(0.0, point_noise_std, (n_points, 3)))
+
+    return body_points, T_true, u_meas, z
+
+
+def run_dead_reckoning(T_init, u_meas, dt):
+    """Prior-only baseline: propagate the motion model, never look at the
+    point-cloud measurements.
+    Arguments:
+        T_init: initial pose (4,4)
+        u_meas: (N,6) array of noisy body-frame twists
+        dt: time step (s)
+    Returns:
+        T_list: list of predicted poses (4,4)
+    """
+    T_list = [T_init]
+    for k in range(len(u_meas)):
+        T_list.append(motion_model(T_list[-1], u_meas[k], dt))
+    return T_list
+
+
+class PointCloudEKF:
+    """Encapsulates the EKF pose estimate T and its 6x6 right-perturbation
+    tangent covariance P, with a motion-model predict step and a point-cloud
+    observation-model update step -- see run_ekf's docstring.
+    """
+
+    def __init__(self, T_init, P_init, body_points, dt, Q_tangent, point_noise_std):
+        """
+        Arguments:
+            T_init: initial pose (4,4)
+            P_init: initial 6x6 tangent covariance (numpy array)
+            body_points: (M,3) array of points in the object's body frame
+            dt: time step (s)
+            Q_tangent: 6x6 tangent covariance of the motion-model twist increment (numpy array)
+            point_noise_std: std-dev of Gaussian noise added to the predicted world-frame
+                point-cloud measurements (m)
+        """
+        self.T = T_init.copy()
+        self.P = P_init.copy()
+        self.body_points = body_points
+        self.dt = dt
+        self.Q_tangent = Q_tangent
+        self.R_diag = point_noise_std ** 2 * np.eye(3 * len(body_points))
+
+    def predict(self, u):
+        """Exact group-composition mean, linearized (6x6) covariance propagation.
+        Arguments:
+            u: noisy body-frame twist (6,)
+        """
+        J_self, J_tau = np.zeros((6, 6)), np.zeros((6, 6))
+        self.T = motion_model(self.T, u, self.dt, J_self, J_tau)
+        self.P = J_self @ self.P @ J_self.T + J_tau @ self.Q_tangent @ J_tau.T
+
+    def measurement_update(self, z):
+        """World-frame point residual, Jacobian re-derived at the current estimate.
+        Arguments:
+            z: noisy point-cloud measurement (M,3)
+        """
+        pred, H = observation_model(self.T, self.body_points, with_jacobian=True)
+        r = (z - pred).reshape(-1)
+        self._correct(r, H)
+
+    def _correct(self, r, H):
+        """Shared Kalman correction, applied as a right perturbation T @ Exp(K r)
+        -- kept private since each subclass's residual/Jacobian pair is the
+        actual interface this script's callers reason about.
+        """
+        S = H @ self.P @ H.T + self.R_diag
+        K = self.P @ H.T @ np.linalg.inv(S)
+        self.T = self.T @ se3_exp(K @ r)
+        self.P = (np.eye(6) - K @ H) @ self.P
+
+    def step(self, u, z):
+        """Perform one filter step: predict with twist u, then update with measurement z."""
+        self.predict(u)
+        self.measurement_update(z)
+
+    def state(self):
+        """Return copies of the current pose estimate and covariance."""
+        return self.T.copy(), self.P.copy()
+
+
+def run_ekf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_std):
+    """Recursive EKF: alternates a motion-model predict step (mean + 6x6
+    tangent covariance) with a point-cloud observation-model update step.
+    Only ever holds the current (T, P) -- no memory of past states.
+    Arguments:
+        T_init: initial pose (4,4)
+        P_init: initial 6x6 tangent covariance (numpy array)
+        u_meas: (N,6) array of noisy body-frame twists
+        z: list of noisy point-cloud measurements (M,3)
+        body_points: (M,3) array of points in the object's body frame
+        dt: time step (s)
+        Q_tangent: 6x6 tangent covariance of the motion-model twist increment (numpy array)
+        point_noise_std: std-dev of Gaussian noise added to the predicted world-frame point-cloud measurements (m)
+    Returns:
+        T_list: list of estimated poses (4,4)
+    """
+    kf = PointCloudEKF(T_init, P_init, body_points, dt, Q_tangent, point_noise_std)
+    T, _ = kf.state()
+    T_list = [T]
+    for k in range(len(u_meas)):
+        kf.step(u_meas[k], z[k + 1])
+        T, _ = kf.state()
+        T_list.append(T)
+    return T_list
+
+
+class PointCloudIEKF(PointCloudEKF):
+    """Left-invariant EKF: inherits PointCloudEKF's predict step unchanged
+    (already exact for this group-affine motion model) and overrides only the
+    update, which uses a body-frame residual against a fixed, state-independent
+    Jacobian [I | -skew(p_i)] built once here -- see run_iekf's docstring.
+    """
+
+    def __init__(self, T_init, P_init, body_points, dt, Q_tangent, point_noise_std):
+        """Same arguments as PointCloudEKF.__init__."""
+        super().__init__(T_init, P_init, body_points, dt, Q_tangent, point_noise_std)
+        self.H = np.zeros((3 * len(body_points), 6))
+        for i, p in enumerate(body_points):
+            self.H[3 * i:3 * i + 3, 0:3] = np.eye(3)
+            self.H[3 * i:3 * i + 3, 3:6] = -skew(p)
+
+    def measurement_update(self, z):
+        """Body-frame residual z_body = T^-1 @ z against the fixed Jacobian.
+        Arguments:
+            z: noisy point-cloud measurement (M,3)
+        """
+        R_pred, t_pred = self.T[0:3, 0:3], self.T[0:3, 3]
+        r = ((z - t_pred) @ R_pred - self.body_points).reshape(-1)
+        self._correct(r, self.H)
+
+
+def run_iekf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_std):
+    """Left-invariant EKF: identical predict step to `run_ekf` (already exact for
+    this group-affine motion model), but the update expresses the residual in the
+    estimate's body frame -- z_body = T_pred^-1 @ z -- instead of the world frame.
+    That makes the measurement Jacobian [I | -skew(p_i)] state-independent (only
+    depends on the fixed body points, never on the current rotation estimate), so
+    it's precomputed once outside the loop instead of being re-derived from R_pred
+    every step.
+
+    Note: with isotropic point-noise covariance (R_diag = sigma^2 * I), the
+    world-frame (EKF) and body-frame (here) residual/Jacobian pairs differ only by
+    a per-point orthogonal rotation (R_pred). It cancels exactly out of the
+    correction K r and the posterior covariance P (K itself differs by that
+    rotation: K_world = K_body @ blkdiag(R_pred)^T) -- so this produces the *exact
+    same* corrections as run_ekf every step, not just similar ones. The real benefit here
+    is computational (H is fixed, no per-step Jacobian rebuild) and structural
+    (state-independent linearization), not different accuracy on this benchmark.
+    Arguments:
+        T_init: initial pose (4,4)
+        P_init: initial 6x6 tangent covariance (numpy array)
+        u_meas: (N,6) array of noisy body-frame twists
+        z: list of noisy point-cloud measurements (M,3)
+        body_points: (M,3) array of points in the object's body frame
+        dt: time step (s)
+        Q_tangent: 6x6 tangent covariance of the motion-model twist increment (numpy array)
+        point_noise_std: std-dev of Gaussian noise added to the predicted world-frame point-cloud measurements (m)
+    Returns:
+        T_list: list of estimated poses (4,4)
+    """
+    kf = PointCloudIEKF(T_init, P_init, body_points, dt, Q_tangent, point_noise_std)
+    T, _ = kf.state()
+    T_list = [T]
+    for k in range(len(u_meas)):
+        kf.step(u_meas[k], z[k + 1])
+        T, _ = kf.state()
+        T_list.append(T)
+    return T_list
+
+
+class PointCloudUKF:
+    """Encapsulates the UKF pose estimate T and its 6x6 tangent covariance P,
+    with sigma points retracted through the exact motion_model /
+    observation_model instead of their linearizations -- see run_ukf's
+    docstring for the mean and sigma-point-redraw choices.
+    """
+
+    def __init__(self, T_init, P_init, body_points, dt, Q_tangent, point_noise_std,
+                 ukf_alpha, ukf_beta, ukf_kappa):
+        """
+        Arguments:
+            T_init, P_init, body_points, dt, Q_tangent, point_noise_std: as in
+                PointCloudEKF.__init__
+            ukf_alpha: unscented-transform spread parameter
+            ukf_beta: unscented-transform prior-knowledge parameter (2 is optimal for Gaussian priors)
+            ukf_kappa: unscented-transform secondary scaling parameter
+        """
+        self.T = T_init.copy()
+        self.P = P_init.copy()
+        self.body_points = body_points
+        self.dt = dt
+        self.Q_tangent = Q_tangent
+        self.R_diag = point_noise_std ** 2 * np.eye(3 * len(body_points))
+        self.n = 6
+        self.lambda_, self.w_m, self.w_c = unscented_weights(self.n, ukf_alpha, ukf_beta, ukf_kappa)
+
+    def predict(self, u):
+        """Propagate sigma points through the exact motion model; the predicted
+        mean is the central sigma point's own propagation.
+        Arguments:
+            u: noisy body-frame twist (6,)
+        """
+        n = self.n
+        offsets = unscented_sigma_offsets(self.P, self.lambda_)
+        T_pred_mean = motion_model(self.T, u, self.dt)
+
+        xi_pred = np.zeros((2 * n + 1, n))
+        for i in range(1, 2 * n + 1):
+            T_sigma = self.T @ se3_exp(offsets[i])
+            T_pred_sigma = motion_model(T_sigma, u, self.dt)
+            xi_pred[i] = se3_log(se3_inv(T_pred_mean) @ T_pred_sigma)
+
+        P_pred = self.Q_tangent.copy()
+        for i in range(2 * n + 1):
+            P_pred += self.w_c[i] * np.outer(xi_pred[i], xi_pred[i])
+
+        self.T, self.P = T_pred_mean, P_pred
+
+    def measurement_update(self, z):
+        """Fresh sigma points around the predicted mean, pushed through the
+        exact observation model.
+        Arguments:
+            z: noisy point-cloud measurement (M,3)
+        """
+        n = self.n
+        n_points = len(self.body_points)
+        offsets_upd = unscented_sigma_offsets(self.P, self.lambda_)
+        z_sigma = np.zeros((2 * n + 1, 3 * n_points))
+        for i in range(2 * n + 1):
+            T_upd_sigma = self.T @ se3_exp(offsets_upd[i])
+            pred_i, _ = observation_model(T_upd_sigma, self.body_points)
+            z_sigma[i] = pred_i.reshape(-1)
+
+        z_hat = self.w_m @ z_sigma
+        P_zz = self.R_diag.copy()
+        P_xz = np.zeros((n, 3 * n_points))
+        for i in range(2 * n + 1):
+            dz = z_sigma[i] - z_hat
+            P_zz += self.w_c[i] * np.outer(dz, dz)
+            P_xz += self.w_c[i] * np.outer(offsets_upd[i], dz)
+
+        r = z.reshape(-1) - z_hat
+        K = P_xz @ np.linalg.inv(P_zz)
+        self.T = self.T @ se3_exp(K @ r)
+        self.P = self.P - K @ P_zz @ K.T
+
+    def step(self, u, z):
+        """Perform one filter step: predict with twist u, then update with measurement z."""
+        self.predict(u)
+        self.measurement_update(z)
+
+    def state(self):
+        """Return copies of the current pose estimate and covariance."""
+        return self.T.copy(), self.P.copy()
+
+
+def run_ukf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_std,
+            ukf_alpha, ukf_beta, ukf_kappa):
+    """Recursive UKF: a manifold unscented transform via right-perturbation
+    retraction, alternating a predict step and an update step exactly like
+    run_ekf/run_iekf, but with no Jacobians at all -- sigma points are
+    retracted through the *exact* nonlinear motion_model/observation_model
+    instead of a linearization of them.
+
+    Note: on a Lie group there is no linear average of poses, so the
+    predicted mean is taken to be the central sigma point's own propagation
+    (T_pred_mean = motion_model(T_est, u, dt)) -- this is exact, not an
+    approximation, since that call *is* sigma point 0's propagation; the
+    approximation is in measuring every other sigma point's spread relative
+    to this reference via Log() rather than an iterative Frechet mean, the
+    standard simplification used by practical UKF-on-manifolds
+    implementations. Sigma points are also *redrawn* at the update step from
+    (T_pred_mean, P_pred) rather than reusing the predict-step sigma points,
+    because Q_tangent is injected additively into P_pred after recombination
+    (no augmented-noise sigma dimensions) -- reusing the predict sigma points
+    would understate the true post-predict spread and bias the filter
+    overconfident.
+    Arguments:
+        T_init: initial pose (4,4)
+        P_init: initial 6x6 tangent covariance (numpy array)
+        u_meas: (N,6) array of noisy body-frame twists
+        z: list of noisy point-cloud measurements (M,3)
+        body_points: (M,3) array of points in the object's body frame
+        dt: time step (s)
+        Q_tangent: 6x6 tangent covariance of the motion-model twist increment (numpy array)
+        point_noise_std: std-dev of Gaussian noise added to the predicted world-frame point-cloud measurements (m)
+        ukf_alpha: unscented-transform spread parameter
+        ukf_beta: unscented-transform prior-knowledge parameter (2 is optimal for Gaussian priors)
+        ukf_kappa: unscented-transform secondary scaling parameter
+    Returns:
+        T_list: list of estimated poses (4,4)
+    """
+    kf = PointCloudUKF(T_init, P_init, body_points, dt, Q_tangent, point_noise_std,
+                       ukf_alpha, ukf_beta, ukf_kappa)
+    T, _ = kf.state()
+    T_list = [T]
+    for k in range(len(u_meas)):
+        kf.step(u_meas[k], z[k + 1])
+        T, _ = kf.state()
+        T_list.append(T)
+    return T_list
+
+
+def se3_tangent_to_ambient_jacobian(R):
+    """(12,6) sensitivity of the ambient [vec(R) (9,), t (3,)] representation to a right SE(3)
+    tangent perturbation [v, w] applied at rotation R: dR = R @ skew(w), dt = R @ v. Used by
+    `run_vanilla_kf` both to lift the 6x6 tangent P_init into the 12-dim ambient covariance and
+    to build the per-step process-noise injection matrix -- unlike the transition matrix built by
+    `vanilla_kf_transition_matrix`, this one genuinely needs the current rotation estimate,
+    because the twist is defined in the body frame.
+    Arguments:
+        R: rotation (3,3)
+    Returns:
+        J: (12,6) Jacobian, columns 0:3 wrt the linear (v) part, 3:6 wrt the angular (w) part
+    """
+    J = np.zeros((12, 6))
+    for j in range(3):
+        e = np.zeros(3)
+        e[j] = 1.0
+        J[9:12, j] = R @ e
+        J[0:9, 3 + j] = (R @ skew(e)).flatten()
+    return J
+
+
+def vanilla_kf_transition_matrix(twist, dt):
+    """(12,12) state-transition matrix of the *first-order* (small-angle) approximation
+    Exp(w) ~= I + skew(w) of the motion model, applied to the ambient [vec(R) (9,), t (3,)]
+    state: R_pred = R_prev @ (I + skew(w)), t_pred = t_prev + R_prev @ v (w, v = angular/linear
+    parts of twist*dt). This map is exactly linear in the ambient state for a *known* twist
+    input, so -- unlike an EKF Jacobian, which linearizes a nonlinear map via finite/analytical
+    differentiation -- applying it to each of the 12 standard basis vectors recovers the exact
+    matrix, valid for any (R,t), not just the current estimate: A_k depends only on the known
+    input, never on the running state.
+
+    This first-order truncation of Exp is the real accuracy cost of using a vanilla (linear) KF
+    here at all: the EKF's predict step composes T_pred = T_prev @ Exp(w) exactly (only its
+    covariance propagation is linearized), while this mean itself is only approximate, with error
+    growing with the per-step rotation magnitude.
+    Arguments:
+        twist: body-frame twist (6-vector)
+        dt: time step (s)
+    Returns:
+        A: (12,12) state-transition matrix
+    """
+    w, v = twist[3:6] * dt, twist[0:3] * dt
+    M = np.eye(3) + skew(w)
+    A = np.zeros((12, 12))
+    for i in range(12):
+        x = np.zeros(12)
+        x[i] = 1.0
+        R, t = x[0:9].reshape(3, 3), x[9:12]
+        A[:, i] = np.concatenate([(R @ M).flatten(), t + R @ v])
+    return A
+
+
+class VanillaKF:
+    """Encapsulates the vanilla (linear) KF's redundant 12-dim ambient state
+    x = [vec(R) (9,), t (3,)] and its 12x12 covariance P, with a fixed, exact
+    measurement matrix H built once here -- see run_vanilla_kf's docstring.
+    """
+
+    def __init__(self, T_init, P_init, body_points, dt, Q_tangent, point_noise_std):
+        """
+        Arguments:
+            T_init, body_points, dt, Q_tangent, point_noise_std: as in
+                PointCloudEKF.__init__
+            P_init: initial 6x6 tangent covariance, lifted here into the
+                12-dim ambient covariance
+        """
+        n_points = len(body_points)
+        self.dt = dt
+        self.Q_tangent = Q_tangent
+        self.R_diag = point_noise_std ** 2 * np.eye(3 * n_points)
+
+        # Fixed, exact, state-independent measurement matrix: pred = H @ x, never rebuilt.
+        self.H = np.zeros((3 * n_points, 12))
+        for i, p in enumerate(body_points):
+            self.H[3 * i, 0:3], self.H[3 * i, 9] = p, 1.0
+            self.H[3 * i + 1, 3:6], self.H[3 * i + 1, 10] = p, 1.0
+            self.H[3 * i + 2, 6:9], self.H[3 * i + 2, 11] = p, 1.0
+
+        R0, t0 = T_init[0:3, 0:3], T_init[0:3, 3]
+        self.x = np.concatenate([R0.flatten(), t0])
+        J0 = se3_tangent_to_ambient_jacobian(R0)
+        self.P = J0 @ P_init @ J0.T
+
+    def predict(self, u):
+        """First-order (small-angle) linear transition A_k, with process noise
+        injected through the current rotation estimate.
+        Arguments:
+            u: noisy body-frame twist (6,)
+        """
+        R_prev = self.x[0:9].reshape(3, 3)
+        A = vanilla_kf_transition_matrix(u, self.dt)
+        J = se3_tangent_to_ambient_jacobian(R_prev)
+        Q12 = J @ self.Q_tangent @ J.T
+
+        self.x = A @ self.x
+        self.P = A @ self.P @ A.T + Q12
+
+    def measurement_update(self, z):
+        """Exactly linear update, then re-project R back onto SO(3) via SVD.
+        Arguments:
+            z: noisy point-cloud measurement (M,3)
+        """
+        r = z.reshape(-1) - self.H @ self.x
+        S = self.H @ self.P @ self.H.T + self.R_diag
+        K = self.P @ self.H.T @ np.linalg.inv(S)
+        x_upd = self.x + K @ r
+        self.P = (np.eye(12) - K @ self.H) @ self.P
+
+        # --- Re-orthogonalize R (SO(3) projection) ---
+        U, _, Vt = np.linalg.svd(x_upd[0:9].reshape(3, 3))
+        sign = 1.0 if np.linalg.det(U @ Vt) >= 0.0 else -1.0
+        R_fixed = U @ np.diag([1.0, 1.0, sign]) @ Vt
+        self.x = np.concatenate([R_fixed.flatten(), x_upd[9:12]])
+
+    def step(self, u, z):
+        """Perform one filter step: predict with twist u, then update with measurement z."""
+        self.predict(u)
+        self.measurement_update(z)
+
+    def state(self):
+        """Return the current pose estimate (4,4), rebuilt from the ambient
+        state, and a copy of the 12x12 ambient covariance.
+        """
+        T = np.eye(4)
+        T[0:3, 0:3], T[0:3, 3] = self.x[0:9].reshape(3, 3), self.x[9:12]
+        return T, self.P.copy()
+
+
+def run_vanilla_kf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_std):
+    """Vanilla (linear) KF: reparameterizes the pose as a redundant 12-dim ambient state
+    x = [vec(R) (9,), t (3,)] instead of the minimal 6-dim SE(3) tangent state used by every
+    other method here, so that a textbook linear predict/update recursion can be applied without
+    any Jacobian re-linearization at every step.
+
+    This buys two genuine simplifications over the EKF: the point-cloud observation model
+    pred_i = R@p_i + t is *exactly* linear in x, so its (3M,12) matrix H is fixed and built once
+    (see `run_iekf`'s analogous state-independent-H trick); and the motion model's transition
+    matrix A_k (`vanilla_kf_transition_matrix`) depends only on the known twist input, never on
+    the running estimate.
+
+    But it also introduces two costs the other methods don't have, both bolted on rather than
+    part of "vanilla" KF theory proper:
+      1. A_k is only exact for the *first-order* (small-angle) truncation of Exp(w) -- unlike the
+         EKF's exact group-composition mean, this filter's point estimate itself accumulates a
+         real approximation error that grows with per-step rotation.
+      2. Nothing in a linear KF constrains R to stay in SO(3) (12 numbers estimating a 3-DoF
+         rotation manifold plus 3-DoF translation) -- R drifts off orthonormal every update and
+         is explicitly re-projected back onto SO(3) via SVD after each step, feeding the
+         corrected value back into the recursion. Skipping this quickly produces a matrix that no
+         longer represents any rotation at all.
+    Arguments:
+        T_init: initial pose (4,4)
+        P_init: initial 6x6 tangent covariance (numpy array)
+        u_meas: (N,6) array of noisy body-frame twists
+        z: list of noisy point-cloud measurements (M,3)
+        body_points: (M,3) array of points in the object's body frame
+        dt: time step (s)
+        Q_tangent: 6x6 tangent covariance of the motion-model twist increment (numpy array)
+        point_noise_std: std-dev of Gaussian noise added to the predicted world-frame point-cloud measurements (m)
+    Returns:
+        T_list: list of estimated poses (4,4)
+    """
+    kf = VanillaKF(T_init, P_init, body_points, dt, Q_tangent, point_noise_std)
+    T, _ = kf.state()
+    T_list = [T]
+    for k in range(len(u_meas)):
+        kf.step(u_meas[k], z[k + 1])
+        T, _ = kf.state()
+        T_list.append(T)
+    return T_list
+
+
+def run_batch_gn(T_init_list, T_prior0, P_init, u_meas, z, body_points, dt, Q_tangent,
+                  point_noise_std, gn_tol, gn_max_iters):
+    """Batch Gauss-Newton smoother: jointly optimizes the whole trajectory
+    T_0..T_N against a prior factor on T_0, N motion factors, and
+    (N+1)*n_points measurement factors, all built from the same
+    motion_model/observation_model as the EKF.
+    Arguments:
+        T_init_list: list of initial pose guesses (4,4)
+        T_prior0: prior pose on T_0 (4,4)
+        P_init: 6x6 tangent covariance of the prior on T_0 (numpy array)
+        u_meas: (N,6) array of noisy body-frame twists
+        z: list of noisy point-cloud measurements (M,3)
+        body_points: (M,3) array of points in the object's body frame
+        dt: time step (s)
+    Returns:
+        T_est: list of estimated poses (4,4)
+    """
+    n_poses = len(T_init_list)
+    dof = 6 * n_poses
+
+    Omega_prior = np.linalg.inv(P_init)
+    Omega_motion = np.linalg.inv(Q_tangent)
+    omega_point = 1.0 / point_noise_std ** 2
+
+    T_est = list(T_init_list)
+
+    for it in range(gn_max_iters):
+        H = np.zeros((dof, dof))
+        g = np.zeros(dof)
+
+        # --- Prior factor on T_0 ---
+        e0 = se3_log(se3_inv(T_prior0) @ T_est[0])
+        Jp = compute_se3_inv_right_jacobian(e0)
+        H[0:6, 0:6] += Jp.T @ Omega_prior @ Jp
+        g[0:6] += -Jp.T @ Omega_prior @ e0
+
+        # --- Motion factors between consecutive poses ---
+        for k in range(1, n_poses):
+            Jc_self, Jc_tau = np.zeros((6, 6)), np.zeros((6, 6))
+            T_pred = motion_model(T_est[k - 1], u_meas[k - 1], dt, Jc_self, Jc_tau)
+
+            e_k = se3_log(se3_inv(T_pred) @ T_est[k])
+            Ja = compute_se3_inv_right_jacobian(e_k)
+            Jb = -compute_se3_inv_right_jacobian(-e_k)
+
+            J_prev = Jb @ Jc_self  # d e_k / d T_est[k-1], chained through T_pred
+            J_curr = Ja            # d e_k / d T_est[k]
+
+            c0, c1 = 6 * (k - 1), 6 * k
+            H[c0:c0 + 6, c0:c0 + 6] += J_prev.T @ Omega_motion @ J_prev
+            H[c0:c0 + 6, c1:c1 + 6] += J_prev.T @ Omega_motion @ J_curr
+            H[c1:c1 + 6, c0:c0 + 6] += J_curr.T @ Omega_motion @ J_prev
+            H[c1:c1 + 6, c1:c1 + 6] += J_curr.T @ Omega_motion @ J_curr
+            g[c0:c0 + 6] += -J_prev.T @ Omega_motion @ e_k
+            g[c1:c1 + 6] += -J_curr.T @ Omega_motion @ e_k
+
+        # --- Measurement factors at every pose ---
+        for k in range(n_poses):
+            pred, Jm = observation_model(T_est[k], body_points, with_jacobian=True)
+            e_meas = (z[k] - pred).reshape(-1)
+            Jm = -Jm  # d(z - h(T))/dT = -dh/dT
+
+            c = 6 * k
+            H[c:c + 6, c:c + 6] += omega_point * (Jm.T @ Jm)
+            g[c:c + 6] += -omega_point * (Jm.T @ e_meas)
+
+        H += np.eye(dof) * 1e-6
+        delta = np.linalg.solve(H, g)
+
+        for k in range(n_poses):
+            T_est[k] = T_est[k] @ se3_exp(delta[6 * k:6 * k + 6])
+
+        step_norm = np.linalg.norm(delta)
+        if step_norm < gn_tol:
+            print(f"    Batch GN converged after {it + 1} iteration(s) (|delta| < {gn_tol})")
+            break
+    else:
+        print(f"    Batch GN reached max iterations ({gn_max_iters}) without full convergence")
+
+    return T_est
+
+
+def pose_errors(T_true_list, T_est_list):
+    """Rotation geodesic error (deg) and position error (m), per step.
+    Arguments:
+        T_true_list: list of true poses (4,4)
+        T_est_list: list of estimated poses (4,4)
+    Returns:
+        rot_err: (N+1,) array of rotation errors (deg), one per pose
+        pos_err: (N+1,) array of position errors (m), one per pose
+    """
+    n = len(T_true_list)
+    rot_err, pos_err = np.zeros(n), np.zeros(n)
+    for k in range(n):
+        rot_err[k] = np.degrees(rotation_geodesic_error(T_true_list[k][0:3, 0:3], T_est_list[k][0:3, 0:3]))
+        pos_err[k] = np.linalg.norm(T_true_list[k][0:3, 3] - T_est_list[k][0:3, 3])
+    return rot_err, pos_err
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+
+    parser.add_argument("--duration", type=float, default=5.0, help="Simulation length in seconds")
+    parser.add_argument("--dt", type=float, default=0.1, help="Motion/measurement step interval in seconds")
+    parser.add_argument("--n-points", type=int, default=20, help="Number of body-frame point-cloud landmarks")
+
+    parser.add_argument("--vel-noise-std", type=float, default=0.05, help="Input linear-velocity noise std-dev (m/s)")
+    parser.add_argument("--gyro-noise-std", type=float, default=0.02, help="Input angular-velocity noise std-dev (rad/s)")
+    parser.add_argument("--point-noise-std", type=float, default=0.03, help="Point-cloud measurement noise std-dev (m)")
+    parser.add_argument("--init-pose-noise-std", type=float, default=0.1, help="Std-dev used to perturb the initial pose guess and set the prior/EKF-init covariance")
+
+    parser.add_argument("--gn-tol", type=float, default=1e-6, help="Batch Gauss-Newton convergence tolerance")
+    parser.add_argument("--gn-max-iters", type=int, default=20, help="Maximum batch Gauss-Newton iterations")
+
+    parser.add_argument("--ukf-alpha", type=float, default=1.0, help="UKF unscented-transform spread parameter")
+    parser.add_argument("--ukf-beta", type=float, default=2.0, help="UKF unscented-transform prior-knowledge parameter (2 is optimal for Gaussian priors)")
+    parser.add_argument("--ukf-kappa", type=float, default=-3.0, help="UKF unscented-transform secondary scaling parameter (default gives n+kappa=3 for this script's 6-dim tangent state)")
+
+    parser.add_argument("--seed", type=int, default=0, help="RNG seed")
+
+    parser.add_argument("--out", type=str, default=None, help="Save the figure to this path instead of showing it")
+
+    args = parser.parse_args()
+
+    rng = np.random.default_rng(args.seed)
+
+    body_points, T_true, u_meas, z = generate_ground_truth_and_data(
+        args.duration, args.dt, args.n_points, args.vel_noise_std, args.gyro_noise_std,
+        args.point_noise_std, rng,
+    )
+
+    # Shared, uncertain initial pose guess for every method (EKF init and GN prior).
+    init_offset = rng.normal(0.0, args.init_pose_noise_std, 6)
+    T_init = T_true[0] @ se3_exp(init_offset)
+    P_init = args.init_pose_noise_std ** 2 * np.eye(6)
+
+    # Process noise covariance of the twist *rate*; the tangent increment fed to
+    # motion_model is twist*dt, so its covariance is dt**2 times this.
+    Q_rate = np.diag(np.concatenate([
+        [args.vel_noise_std ** 2] * 3,
+        [args.gyro_noise_std ** 2] * 3,
+    ]))
+    Q_tangent = args.dt ** 2 * Q_rate
+
+    n_steps = len(u_meas)
+
+    print("Running dead-reckoning baseline (motion model only, no point-cloud correction)...")
+    T_dr, time_dr, mem_dr = measure_performance(
+        run_dead_reckoning, T_init, u_meas, args.dt, n_steps=n_steps)
+
+    print("Running recursive EKF (motion-model predict + point-cloud observation-model update)...")
+    T_ekf, time_ekf, mem_ekf = measure_performance(
+        run_ekf, T_init, P_init, u_meas, z, body_points, args.dt, Q_tangent, args.point_noise_std,
+        n_steps=n_steps)
+
+    print("Running invariant EKF (body-frame residual, state-independent measurement Jacobian)...")
+    T_iekf, time_iekf, mem_iekf = measure_performance(
+        run_iekf, T_init, P_init, u_meas, z, body_points, args.dt, Q_tangent, args.point_noise_std,
+        n_steps=n_steps)
+
+    print("Running batch Gauss-Newton (joint optimization over the whole trajectory)...")
+    T_gn, time_gn, mem_gn = measure_performance(
+        run_batch_gn, T_dr, T_init, P_init, u_meas, z, body_points, args.dt, Q_tangent,
+        args.point_noise_std, args.gn_tol, args.gn_max_iters, n_steps=n_steps)
+
+    print("Running UKF (manifold unscented transform via right-perturbation retraction)...")
+    T_ukf, time_ukf, mem_ukf = measure_performance(
+        run_ukf, T_init, P_init, u_meas, z, body_points, args.dt, Q_tangent, args.point_noise_std,
+        args.ukf_alpha, args.ukf_beta, args.ukf_kappa, n_steps=n_steps)
+
+    print("Running vanilla KF (linear predict/update over a redundant 12-dim [vec(R), t] ambient state)...")
+    T_vkf, time_vkf, mem_vkf = measure_performance(
+        run_vanilla_kf, T_init, P_init, u_meas, z, body_points, args.dt, Q_tangent, args.point_noise_std,
+        n_steps=n_steps)
+
+    rot_err_dr, pos_err_dr = pose_errors(T_true, T_dr)
+    rot_err_ekf, pos_err_ekf = pose_errors(T_true, T_ekf)
+    rot_err_iekf, pos_err_iekf = pose_errors(T_true, T_iekf)
+    rot_err_gn, pos_err_gn = pose_errors(T_true, T_gn)
+    rot_err_ukf, pos_err_ukf = pose_errors(T_true, T_ukf)
+    rot_err_vkf, pos_err_vkf = pose_errors(T_true, T_vkf)
+
+    print("\nFinal / RMS errors:")
+    for name, rot_err, pos_err in [
+        ("Dead-reckoning", rot_err_dr, pos_err_dr),
+        ("EKF (recursive)", rot_err_ekf, pos_err_ekf),
+        ("IEKF (invariant)", rot_err_iekf, pos_err_iekf),
+        ("Batch GN", rot_err_gn, pos_err_gn),
+        ("UKF (unscented)", rot_err_ukf, pos_err_ukf),
+        ("Vanilla KF", rot_err_vkf, pos_err_vkf),
+    ]:
+        print(f"  {name:<18s} final rot={rot_err[-1]:7.3f} deg, pos={pos_err[-1]:7.4f} m | "
+              f"RMS rot={np.sqrt(np.mean(rot_err**2)):7.3f} deg, pos={np.sqrt(np.mean(pos_err**2)):7.4f} m")
+
+    print("\nAverage time (per-step) and peak memory (whole-run) per approach, empirical:")
+    for name, avg_time, avg_mem in [
+        ("Dead-reckoning", time_dr, mem_dr),
+        ("EKF (recursive)", time_ekf, mem_ekf),
+        ("IEKF (invariant)", time_iekf, mem_iekf),
+        ("Batch GN", time_gn, mem_gn),
+        ("UKF (unscented)", time_ukf, mem_ukf),
+        ("Vanilla KF", time_vkf, mem_vkf),
+    ]:
+        print(f"  {name:<18s} avg time={avg_time * 1e6:9.2f} µs/step | peak mem={avg_mem / 1024.0:9.3f} KB")
+
+    t_hist = np.arange(len(T_true)) * args.dt
+    fig, (ax_rot, ax_pos, ax_traj) = plt.subplots(3, 1, figsize=(9, 11))
+
+    for ax, err_dr, err_ekf, err_iekf, err_gn, err_ukf, err_vkf, ylabel in [
+        (ax_rot, rot_err_dr, rot_err_ekf, rot_err_iekf, rot_err_gn, rot_err_ukf, rot_err_vkf, "Rotation error (deg)"),
+        (ax_pos, pos_err_dr, pos_err_ekf, pos_err_iekf, pos_err_gn, pos_err_ukf, pos_err_vkf, "Position error (m)"),
+    ]:
+        ax.plot(t_hist, err_dr, label="Dead-reckoning (prior only)", color="tab:gray")
+        ax.plot(t_hist, err_ekf, label="EKF (recursive)", color="tab:red")
+        ax.plot(t_hist, err_iekf, label="IEKF (invariant)", color="tab:green")
+        ax.plot(t_hist, err_gn, label="Batch Gauss-Newton", color="tab:blue")
+        ax.plot(t_hist, err_ukf, label="UKF (unscented)", color="tab:purple")
+        ax.plot(t_hist, err_vkf, label="Vanilla KF (linear, ambient state)", color="tab:orange")
+        ax.set_ylabel(ylabel)
+        ax.set_yscale("log")
+        ax.legend()
+    ax_rot.set_title("Point-cloud pose tracking: prior-only vs. EKF vs. invariant EKF vs. batch Gauss-Newton vs. UKF vs. vanilla KF")
+    ax_pos.set_xlabel("Time (s)")
+
+    def xy(T_list):
+        pts = np.array([T[0:3, 3] for T in T_list])
+        return pts[:, 0], pts[:, 1]
+
+    ax_traj.plot(*xy(T_true), label="Ground truth", color="black", linewidth=2)
+    ax_traj.plot(*xy(T_dr), label="Dead-reckoning (prior only)", color="tab:gray", linestyle="--")
+    ax_traj.plot(*xy(T_ekf), label="EKF (recursive)", color="tab:red", linestyle="--")
+    ax_traj.plot(*xy(T_iekf), label="IEKF (invariant)", color="tab:green", linestyle="--")
+    ax_traj.plot(*xy(T_gn), label="Batch Gauss-Newton", color="tab:blue", linestyle="--")
+    ax_traj.plot(*xy(T_ukf), label="UKF (unscented)", color="tab:purple", linestyle="--")
+    ax_traj.plot(*xy(T_vkf), label="Vanilla KF (linear, ambient state)", color="tab:orange", linestyle="--")
+    ax_traj.set_xlabel("x (m)")
+    ax_traj.set_ylabel("y (m)")
+    ax_traj.axis("equal")
+    ax_traj.legend()
+
+    fig.tight_layout()
+    if args.out:
+        fig.savefig(args.out, dpi=150)
+        print(f"\nSaved figure to {args.out}")
+    else:
+        plt.show()
+
+
+if __name__ == "__main__":
+    main()

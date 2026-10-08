@@ -48,7 +48,7 @@ timing/peak-memory measurement helper every script's benchmark printout uses).
 
 ### [use_numpy/](use_numpy/) - Plain numpy, hand-rolled Lie-group math
 
-- [lie_utils.py](use_numpy/lie_utils.py): shared module of the hand-rolled Lie-group helpers (`skew`, `rotation_geodesic_error`, `so3_exp`, `so3_right_jacobian`, `se3_exp`, `se3_log`, `se3_inv`, `se3_adjoint`, `se3_ad`, `compute_so3_inv_right_jacobian`, `compute_se3_inv_right_jacobian`, `se3_right_jacobian`), imported by 10 of the other 14 scripts in this directory (`imu_integration_comparison.py`, `robot_imu_simulation.py`, `imu_preintegration.py`, `pointcloud_pose_tracking.py`, `pose_graph.py`, `pose_graph_incremental.py`, `bundle_adjustment.py`, `bundle_adjustment_advanced.py`, `pnp_estimation.py`, and `sliding_window_marginalization.py`) - none keeps its own inline copy of the skew/Jacobian helpers. The remaining 4 (`bayes_tree_construction.py`, `friction_anisotropic_ekf.py`, `inchworm_zupt_ekf.py`, `saltation_matrix_ekf.py`) don't need Lie-group math for what they do.
+- [lie_utils.py](use_numpy/lie_utils.py): shared module of the hand-rolled Lie-group helpers (`skew`, `rotation_geodesic_error`, `so3_exp`, `so3_right_jacobian`, `se3_exp`, `se3_log`, `se3_inv`, `se3_adjoint`, `se3_ad`, `compute_so3_inv_right_jacobian`, `compute_se3_inv_right_jacobian`, `se3_right_jacobian`; also grouped under short names as static methods of `SO3`/`SE3`, e.g. `SE3.exp`, `SE3.log`, `SO3.inv_right_jacobian` - the same functions on plain arrays, not an object API like manif's), imported by 10 of the other 14 scripts in this directory (`imu_integration_comparison.py`, `robot_imu_simulation.py`, `imu_preintegration.py`, `pointcloud_pose_tracking.py`, `pose_graph.py`, `pose_graph_incremental.py`, `bundle_adjustment.py`, `bundle_adjustment_advanced.py`, `pnp_estimation.py`, and `sliding_window_marginalization.py`) - none keeps its own inline copy of the skew/Jacobian helpers. The remaining 4 (`bayes_tree_construction.py`, `friction_anisotropic_ekf.py`, `inchworm_zupt_ekf.py`, `saltation_matrix_ekf.py`) don't need Lie-group math for what they do. (These counts exclude the `*_v2.py` variants below; `pointcloud_pose_tracking_v2.py` imports `lie_utils.py` too.)
 - [imu_integration_comparison.py](use_numpy/imu_integration_comparison.py): naive Euler-angle vs. $SO(3)$ exp-map orientation integration.
 - [robot_imu_simulation.py](use_numpy/robot_imu_simulation.py): high-rate IMU propagation + a low-rate Gauss-Newton position-only correction against a noisy GPS-style fix (the correction's Jacobian has a structurally zero angular block, so orientation is never touched by it, only ever [dead-reckoned](docs/optimization/factor_graph.md#2-why-do-we-need-it) by the IMU), reusing `lie_utils.py`'s $SE(3)$ $Exp$ math.
 - [imu_preintegration.py](use_numpy/imu_preintegration.py): IMU pre-integration - compresses a burst of high-frequency IMU samples into one relative measurement plus first-order bias Jacobians, then shows an instant Taylor-expansion correction when the bias estimate changes, without re-integrating.
@@ -77,6 +77,7 @@ timing/peak-memory measurement helper every script's benchmark printout uses).
 - [inchworm_zupt_ekf.py](use_numpy/inchworm_zupt_ekf.py): a 1D point mass crawling through a known anchor(dwell)/extend gait cycle ([docs/filtering/inchworm_zupt_ekf.md](docs/filtering/inchworm_zupt_ekf.md)), comparing three zero-velocity-update (ZUPT) policies - `never`, `always`, `phase_conditional` - via the same Monte Carlo NEES pattern as `saltation_matrix_ekf.py`. State $x=[p,v]\in\mathbb{R}^2$.
 - [friction_anisotropic_ekf.py](use_numpy/friction_anisotropic_ekf.py): a crawling unicycle on a friction-anisotropic pad ([docs/filtering/friction_anisotropic_ekf.md](docs/filtering/friction_anisotropic_ekf.md)), comparing `isotropic`/`fixed_anisotropic`/`heading_aware` process-noise policies for the position block of $Q$ as the (exact, noise-free) heading rotates through a full loop. Ordinary EKF throughout (heading itself is exact, so no manifold/linearization question is at stake).
 - [sliding_window_marginalization.py](use_numpy/sliding_window_marginalization.py): gives [docs/optimization/marginalization.md](docs/optimization/marginalization.md) its accompanying script - streams a pure odometry chain, marginalizes the oldest pose via the Schur complement whenever a `--window-size` cap would be exceeded, and compares the resulting bounded-memory solve against `run_full_batch_growing`'s unbounded re-solve-from-scratch baseline across a sweep of trajectory lengths, reusing `pose_graph.py`/`pose_graph_incremental.py`'s building blocks.
+- `*_v2.py` ([pointcloud_pose_tracking_v2.py](use_numpy/pointcloud_pose_tracking_v2.py), [saltation_matrix_ekf_v2.py](use_numpy/saltation_matrix_ekf_v2.py), [inchworm_zupt_ekf_v2.py](use_numpy/inchworm_zupt_ekf_v2.py), [friction_anisotropic_ekf_v2.py](use_numpy/friction_anisotropic_ekf_v2.py)): class-based versions of those four scripts. Each recursive filter is a class with `predict`/`measurement_update`/`step`/`state` methods, and its `run_*` function is a short loop over `step()`; everything else is unchanged. Same command-line flags, and outputs bit-identical to the original. `tests/` and `assets/make_figures.py` use the originals.
 
 ### [use_manif/](use_manif/) - `manifpy` counterparts (8 of the 14 simulations)
 
@@ -232,6 +233,7 @@ Prints final/RMS rotation+position error per method, plus each method's empirica
 #### Scripts
 
 - [use_numpy/pointcloud_pose_tracking.py](use_numpy/pointcloud_pose_tracking.py)
+- [use_numpy/pointcloud_pose_tracking_v2.py](use_numpy/pointcloud_pose_tracking_v2.py): class-based version, same output
 
 - [use_manif/pointcloud_pose_tracking.py](use_manif/pointcloud_pose_tracking.py)
 
@@ -520,6 +522,7 @@ Plain $\mathbb{R}^6$ state (position/velocity, no rotation) - no `use_manif/` co
 #### Scripts
 
 - [use_numpy/saltation_matrix_ekf.py](use_numpy/saltation_matrix_ekf.py)
+- [use_numpy/saltation_matrix_ekf_v2.py](use_numpy/saltation_matrix_ekf_v2.py): class-based version, same output
 
 #### Usage
 
@@ -564,6 +567,7 @@ Findings:
 #### Scripts
 
 - [use_numpy/inchworm_zupt_ekf.py](use_numpy/inchworm_zupt_ekf.py)
+- [use_numpy/inchworm_zupt_ekf_v2.py](use_numpy/inchworm_zupt_ekf_v2.py): class-based version, same output
 
 #### Usage
 
@@ -602,6 +606,7 @@ uv run python use_numpy/inchworm_zupt_ekf.py --duration 10.0 --dt 0.05 --t-ancho
 #### Scripts
 
 - [use_numpy/friction_anisotropic_ekf.py](use_numpy/friction_anisotropic_ekf.py)
+- [use_numpy/friction_anisotropic_ekf_v2.py](use_numpy/friction_anisotropic_ekf_v2.py): class-based version, same output
 
 #### Usage
 

@@ -270,3 +270,33 @@ def compute_se3_inv_right_jacobian(error_vector):
         6x6 inverse right Jacobian (numpy array)
     """
     return np.linalg.inv(se3_right_jacobian(error_vector))
+
+
+class SO3:
+    """Groups the SO(3) helpers above under short, consistent names
+    (SO3.exp, SO3.hat, ...). Every method is the module-level function
+    itself (a staticmethod alias), taking and returning the same plain numpy
+    arrays -- nothing here holds state, and existing callers of the
+    functions are unaffected. Not an object API on rotations: use_manif/
+    already demonstrates that style via manifpy.
+    """
+    hat = staticmethod(skew)
+    exp = staticmethod(so3_exp)
+    right_jacobian = staticmethod(so3_right_jacobian)
+    inv_right_jacobian = staticmethod(compute_so3_inv_right_jacobian)
+    geodesic_error = staticmethod(rotation_geodesic_error)
+
+
+class SE3:
+    """Groups the SE(3) helpers above under short, consistent names
+    (SE3.exp, SE3.log, SE3.inv, ...), [v,omega] tangent convention. Same
+    staticmethod-alias design as SO3: identical functions on plain numpy
+    arrays, no state.
+    """
+    exp = staticmethod(se3_exp)
+    log = staticmethod(se3_log)
+    inv = staticmethod(se3_inv)
+    adjoint = staticmethod(se3_adjoint)
+    ad = staticmethod(se3_ad)
+    right_jacobian = staticmethod(se3_right_jacobian)
+    inv_right_jacobian = staticmethod(compute_se3_inv_right_jacobian)
