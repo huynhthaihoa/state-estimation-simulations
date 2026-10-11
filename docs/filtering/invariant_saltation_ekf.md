@@ -68,7 +68,7 @@ To move between the two coordinate systems: a right-invariant perturbation $`X' 
 T(X) = \begin{bmatrix} I & 0 & 0 \\ -v^\wedge & I & 0 \\ -p^\wedge & 0 & I \end{bmatrix}
 ```
 
-(`world_to_invariant_map`). The chain rule, with the two coordinate charts based at the pre- and post-impact states $`X^-`$ and $`X^+`$, gives
+(`world_to_invariant_map`). The chain rule, with the two sets of local coordinates based at the pre- and post-impact states $`X^-`$ and $`X^+`$, gives
 
 ```math
 \Xi_{RI} = T(X^+)^{-1}\,\Xi_{\text{world}}\,T(X^-)

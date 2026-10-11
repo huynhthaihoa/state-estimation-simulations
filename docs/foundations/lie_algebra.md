@@ -319,11 +319,46 @@ So a velocity changes frame exactly like a position. **Tiny example:** a drone f
 ```
 
 **Why not store $`R`$ in $`SO(3)`$ and $`v`$, $`p`$ as plain vectors?** Both hold the same numbers; the difference is what the group product buys the filter.
-- With this product, one IMU step over $`h`$ is $`X^+ = \Gamma\, f(X)\, \Upsilon`$. Here $`\Gamma`$ is a fixed matrix holding gravity, $`f(R, v, p) = (R, v, p + v h)`$ respects the group product, and $`\Upsilon`$ holds the IMU increments. Systems of this form are called **group-affine**.
+- With this product, one IMU step over $`h`$ is $`X^+ = \Gamma\, f(X)\, \Upsilon`$. Here $`\Gamma`$ is a fixed matrix holding gravity, $`f(R, v, p) = (R, v, p + v h)`$ respects the group product (a **group automorphism**: $`f(X_1 X_2) = f(X_1)\,f(X_2)`$), and $`\Upsilon`$ holds the IMU increments. Systems of this form are called **group-affine**.
 - For a group-affine system, the **invariant error** $`\eta = \hat X X^{-1}`$ between estimate and truth evolves in the same way whatever the trajectory, and its logarithm evolves through a constant matrix, even for large errors. This is the basis of the **invariant EKF** (Barrau & Bonnabel, 2017).
 - With separate pieces, the error dynamics depend on the current estimate. In [invariant_saltation_ekf.md §6](../filtering/invariant_saltation_ekf.md#6-results-consistency-through-the-bounces), an EKF built that way is overconfident before any bounce (NEES 14-19 against a consistent 9), while the invariant EKF on $`SE_2(3)`$ is close to consistent.
 
 In code: `se23_make`, `se23_parts`, `se23_inv`, `se23_exp`, `se23_log` and `se23_adjoint` in [use_numpy/lie_utils.py](../../use_numpy/lie_utils.py), and `manif.SE_2_3`, whose tangent order is (position, rotation, velocity).
+
+### 11.2 The adjoint: moving a small motion between frames
+
+A small motion can be written in the robot's own frame or in the world frame. The **adjoint** $`\mathrm{Ad}_T`$ converts one into the other:
+
+```math
+T\,\mathrm{Exp}(\xi) = \mathrm{Exp}(\mathrm{Ad}_T\,\xi)\,T
+```
+
+So a nudge applied on the right of $`T`$ (in the robot frame) equals the nudge $`\mathrm{Ad}_T\,\xi`$ applied on the left (in the world frame).
+
+- For $`SO(3)`$: $`\mathrm{Ad}_R = R`$, which just rotates the axis of the small rotation.
+- For $`SE(3)`$, with $`T = (R, t)`$ and the translation-first order $`\xi = (\rho, \phi)`$ of §11:
+
+```math
+\mathrm{Ad}_T = \begin{bmatrix} R & t^\wedge R \\ 0 & R \end{bmatrix}
+```
+
+**Tiny example:** the robot stands at $`t = (2, 0, 0)`$, facing world $`+y`$ (yawed by 90°).
+- "1 cm forward" in its frame, $`\rho = (0.01, 0, 0)`$, becomes 1 cm along world $`+y`$: the $`R`$ blocks only relabel the axes.
+- "Turn 0.01 rad in place", $`\phi = (0, 0, 0.01)`$, becomes the same turn plus a 2 cm shift along world $`-y`$. A point at the world origin, rigidly attached and 2 m from the pivot, swings sideways, like a door handle swinging about its hinge. That is the $`t^\wedge R`$ block.
+
+Filters use $`\mathrm{Ad}`$ to carry a covariance from one frame to another, and pose-graph Jacobians use it to move a perturbation from one pose to another.
+
+**The little adjoint.** $`\mathrm{ad}_\xi`$ is the adjoint's small-motion version, with $`\mathrm{Ad}_{\mathrm{Exp}(\xi)} = \exp(\mathrm{ad}_\xi)`$:
+
+```math
+\mathrm{ad}_\xi = \begin{bmatrix} \phi^\wedge & \rho^\wedge \\ 0 & \phi^\wedge \end{bmatrix}
+```
+
+- It measures how two small motions fail to commute. $`\mathrm{ad}_{\xi_1}\,\xi_2`$ is the **Lie bracket** $`[\xi_1, \xi_2]`$, the vee of $`\xi_1^\wedge \xi_2^\wedge - \xi_2^\wedge \xi_1^\wedge`$. For rotations it is the cross product $`\phi_1 \times \phi_2`$.
+- **Example:** rotating 0.01 rad about $`x`$ then about $`y`$, versus in the other order, ends about $`10^{-4}`$ rad apart, about $`z`$: $`(0.01, 0, 0) \times (0, 0.01, 0) = (0, 0, 10^{-4})`$.
+- It is what the series for the Jacobians are built from, e.g. $`J_r(\xi) = \sum_{n \ge 0} \frac{(-\mathrm{ad}_\xi)^n}{(n+1)!}`$ ([jacobian.md §11](jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space)).
+
+In code: `se3_adjoint`, `se3_ad`, `se3_right_jacobian` in [use_numpy/lie_utils.py](../../use_numpy/lie_utils.py); for $`SE_2(3)`$, `se23_adjoint` (§11.1).
 
 ---
 
@@ -352,7 +387,7 @@ We then apply that motion to the drone's current pose:
 
 $$\boxed{ \text{current pose} + \text{small motion} \rightarrow \text{new pose}}$$
 
-except that the "+" is replaced by the appropriate Lie-group operation.
+except that the "+" is replaced by a group operation. This update is called a **retraction**, often written $`T \oplus \xi = T\,\mathrm{Exp}(\xi)`$ (some docs write $`\boxplus`$).
 
 ---
 
@@ -370,6 +405,7 @@ We could optimize $x,y,z,\text{roll},\text{pitch},\text{yaw}$ directly, but Eule
 | $\mathfrak{so}(3)$ | Small rotational motions  |
 | $SE(3)$ | All possible 3D poses     |
 | $\mathfrak{se}(3)$ | Small 6-DoF pose motions  |
+| $`SE(2)`$ | All possible 2D poses $`(x, y, \theta)`$, 3 DoF: the planar case of $`SE(3)`$, e.g. in 2D pose graphs; $`SO(2)`$ is its rotation part |
 | $`SE_2(3)`$ | All possible poses with velocity (§11.1) |
 | $`\mathfrak{se}_2(3)`$ | Small 9-DoF changes of pose and velocity |
 
@@ -385,7 +421,7 @@ In optimization we typically have an error $\text{error} = f(T)$ and want to kno
 
 $$f(T\exp(\delta\xi^\wedge)) \approx f(T)+J\delta\xi$$
 
-where $J$ is the **Jacobian with respect to the Lie-algebra perturbation**. Whether the perturbation is applied on the right, as here, or on the left changes $J$; [jacobian.md §11](jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space) explains the left and right Jacobians this leads to.
+where $J$ is the **Jacobian with respect to the Lie-algebra perturbation**. Whether the perturbation is applied on the right, as here, or on the left changes $J$; [jacobian.md §11](jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space) explains the left and right Jacobians this leads to. Most docs here perturb on the right. The exception is [invariant_saltation_ekf.md](../filtering/invariant_saltation_ekf.md), which perturbs on the left to match its right-invariant error ([left_right_invariant.md](../filtering/left_right_invariant.md#1-the-setup) explains the pairing).
 
 That's why Lie algebra appears everywhere in modern SLAM: it gives optimization algorithms a **locally Euclidean 6D space** to work in, while the actual pose remains a valid element of $SE(3)$.
 
