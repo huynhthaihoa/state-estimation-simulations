@@ -2,15 +2,15 @@
 
 ## Intuition
 
-[hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) tracks a bouncing *point mass*: a plain vector state, where the only subtlety at a bounce is timing - a perturbed trajectory hits the ground a little earlier or later, and the saltation matrix accounts for that. This note lifts the same bouncing system to a **tumbling rigid body carrying an IMU**, whose state lives on the Lie group $`SE_2(3)`$, and tracks it with a **right-invariant EKF (RIEKF)** - the filter of choice for IMU-driven robots because, between events, its error dynamics do not depend on the trajectory at all.
+[hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) tracks a bouncing **point mass**: a plain vector state, where the only subtlety at a bounce is timing - a perturbed trajectory hits the ground a little earlier or later, and the saltation matrix accounts for that. This note lifts the same bouncing system to a **tumbling rigid body carrying an IMU**, whose state lives on the Lie group $`SE_2(3)`$, and tracks it with a **right-invariant EKF (RIEKF)** - the filter of choice for IMU-driven robots because, between events, its error dynamics **do not depend on the trajectory at all**. Why $`SE_2(3)`$: the IMU drives the velocity, so the state must hold it next to the pose, and storing it as a second column of the pose matrix is exactly what gives the RIEKF that trajectory-independence ([lie_algebra.md §11.1](../foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity)).
 
-A bounce breaks that property. The reset "reflect the velocity off the ground" does not commute with the group structure, so the effect of a bounce on the *invariant error* depends on where the body is and how it moves. Two things therefore have to be right at every bounce: the impact-timing correction (as for the point mass) and this state dependence. The script compares filters that get neither, one, or both right.
+A bounce breaks that property. The reset "reflect the velocity off the ground" does not commute with the group structure, so the effect of a bounce on the **invariant error** depends on where the body is and how it moves. Two things therefore have to be right at every bounce: the impact-timing correction (as for the point mass) and this state dependence. The script compares filters that get neither, one, or both right.
 
 Implemented in [use_numpy/invariant_saltation_ekf.py](../../use_numpy/invariant_saltation_ekf.py) and, with the group math delegated to the `manif` library, [use_manif/invariant_saltation_ekf.py](../../use_manif/invariant_saltation_ekf.py), which orders the 9-vectors as (position, rotation, velocity) instead of the (rotation, velocity, position) used below; tests in [tests/use_numpy/test_invariant_saltation_ekf.py](../../tests/use_numpy/test_invariant_saltation_ekf.py) and [tests/use_manif/test_invariant_saltation_ekf.py](../../tests/use_manif/test_invariant_saltation_ekf.py).
 
 ## 1. The system
 
-State, with $`R`$ body-to-world rotation, $`v`$ velocity, $`p`$ position (an **extended pose**; $`SE_2(3)`$ is the group of such matrices):
+State, with $`R`$ body-to-world rotation, $`v`$ velocity, $`p`$ position (an **extended pose**; $`SE_2(3)`$ is the group of such matrices, introduced in [lie_algebra.md §11.1](../foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity)):
 
 ```math
 X = \begin{bmatrix} R & v & p \\ 0 & 1 & 0 \\ 0 & 0 & 1 \end{bmatrix} \in SE_2(3)
@@ -26,7 +26,7 @@ Sensors: noisy IMU readings every step, and every few steps the body-frame posit
 
 With $`\hat X`$ the filter's estimate, the right-invariant error is $`\eta = \hat X X^{-1}`$, parameterized by $`\xi = \log(\eta) = (\xi_R, \xi_v, \xi_p) \in \mathbb{R}^9`$ (so the truth is $`X = \exp(-\xi)\,\hat X`$; $`\exp`$/$`\log`$ are the group's exponential and logarithm maps, [glossary](../glossary.md#1-geometry-and-lie-groups)). Two exact properties make it the natural filter here (Barrau & Bonnabel 2017; Hartley et al. 2020):
 
-**Propagation is trajectory-independent.** IMU kinematics are *group-affine*: over a step $`h`$ with constant readings, $`X^+ = \Gamma_h\, f_h(X)\, \Upsilon_h`$ (in this section $`^+`$ means one step later; from §4 on it means just after the impact), where $`f_h(R,v,p) = (R, v, p + v h)`$ is a group automorphism, $`\Gamma_h = (I, g h, \tfrac12 g h^2)`$ carries gravity and $`\Upsilon_h`$ carries the body-frame IMU increments (`propagate_mean`). The error then evolves as $`\eta^+ = \Gamma_h f_h(\eta) \Gamma_h^{-1}`$, independently of $`X`$, and its logarithm evolves *exactly linearly* - even for large errors:
+**Propagation is trajectory-independent.** IMU kinematics are **group-affine**: over a step $`h`$ with constant readings, $`X^+ = \Gamma_h\, f_h(X)\, \Upsilon_h`$ (in this section $`^+`$ means one step later; from §4 on it means just after the impact), where $`f_h(R,v,p) = (R, v, p + v h)`$ is a group automorphism, $`\Gamma_h = (I, g h, \tfrac12 g h^2)`$ carries gravity and $`\Upsilon_h`$ carries the body-frame IMU increments (`propagate_mean`). The error then evolves as $`\eta^+ = \Gamma_h f_h(\eta) \Gamma_h^{-1}`$, independently of $`X`$, and its logarithm evolves *exactly linearly* - even for large errors:
 
 ```math
 \xi^+ = \Phi(h)\,\xi, \qquad \Phi(h) = e^{A h}, \qquad A = \begin{bmatrix} 0 & 0 & 0 \\ g^\wedge & 0 & 0 \\ 0 & I & 0 \end{bmatrix}
@@ -88,7 +88,7 @@ The invariant-naive choice is the tempting one: it applies the reset to $`\xi_v`
 
 ## 5. Verification against the exact hybrid map
 
-The ground truth for "the right Jacobian" is the exact *fixed-time* hybrid map: start above the ground, flow to the crossing, reset, flow to a fixed later time $`T`$ (a time, not the map $`T(X)`$ of §4), with every perturbed trajectory using the same IMU inputs. Call this map $`\Psi`$. Its Jacobian in invariant coordinates, by central finite differences of $`\log(\Psi(\exp(\xi) X_0)\,\Psi(X_0)^{-1})`$, is compared with $`\Phi(T - \tau)\, \Xi\, \Phi(\tau)`$, where $`\tau`$ is the crossing time and $`\Xi`$ each treatment's bounce matrix (`test_saltation_matrix_ri_matches_finite_differences`, three random seeds):
+The ground truth for "the right Jacobian" is the exact **fixed-time hybrid map**: start above the ground, flow to the crossing, reset, flow to a fixed later time $`T`$ (a time, not the map $`T(X)`$ of §4), with every perturbed trajectory using the same IMU inputs. Call this map $`\Psi`$. Its Jacobian in invariant coordinates, by central finite differences of $`\log(\Psi(\exp(\xi) X_0)\,\Psi(X_0)^{-1})`$, is compared with $`\Phi(T - \tau)\, \Xi\, \Phi(\tau)`$, where $`\tau`$ is the crossing time and $`\Xi`$ each treatment's bounce matrix (`test_saltation_matrix_ri_matches_finite_differences`, three random seeds):
 
 | Treatment | max abs. difference from finite differences |
 |---|---|

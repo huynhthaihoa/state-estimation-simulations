@@ -13,7 +13,7 @@ $$\eta_R = X \hat X^{-1} \qquad \text{(right-invariant error)}$$
 
 **Convention note.** Barrau & Bonnabel (2017, Eqs. 5-6) define the inverses, $\eta^L = X^{-1}\hat X$ and $\eta^R = \hat X X^{-1}$. Inverting an error doesn't change which frame changes it ignores, so everything below holds for both; only the sign of the small error vector $\xi$ flips.
 
-**Naming trap.** The perturbation $`X = \hat X\,\mathrm{Exp}(\xi)`$ used throughout this repo is what Solà et al. and the `manif` library call "right-plus" ($\hat X \oplus \xi$), because $\mathrm{Exp}(\xi)$ multiplies on the right. It is the **left**-invariant error: $\eta_L = \hat X^{-1}X = \mathrm{Exp}(\xi)$. "Right" in "right-plus" says where the increment is applied; "left" in "left-invariant" says which frame change the error ignores. This is why `run_iekf` in `pointcloud_pose_tracking.py` is a left-invariant filter.
+**Naming trap.** The perturbation $`X = \hat X\,\mathrm{Exp}(\xi)`$ used in most of this repo is what Solà et al. and the `manif` library call "right-plus" ($\hat X \oplus \xi$), because $\mathrm{Exp}(\xi)$ multiplies on the right. It is the **left**-invariant error: $\eta_L = \hat X^{-1}X = \mathrm{Exp}(\xi)$. "Right" in "right-plus" says where the increment is applied; "left" in "left-invariant" says which frame change the error ignores. This is why `run_iekf` in `pointcloud_pose_tracking.py` is a left-invariant filter. The exception, [invariant_saltation_ekf.md](invariant_saltation_ekf.md), perturbs on the left, $`X = \exp(-\xi)\,\hat X`$, and is a right-invariant filter.
 
 ---
 

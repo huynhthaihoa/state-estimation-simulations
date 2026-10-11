@@ -285,6 +285,46 @@ $$T_{\text{new}} = T_{\text{old}}\exp(\xi^\wedge)$$
 
 This is the foundation of many **pose-graph optimization, bundle adjustment, visual-inertial estimation, and SLAM** implementations.
 
+### 11.1 Extended poses: pose plus velocity
+
+A filter driven by an IMU needs velocity as well as pose: the accelerometer changes the velocity, and only the velocity changes the position. **$`SE_2(3)`$**, the group of **extended poses**, stores the velocity $`v`$ as a second column next to the position $`p`$:
+
+```math
+X = \begin{bmatrix} R & v & p \\ 0 & 1 & 0 \\ 0 & 0 & 1 \end{bmatrix} \in SE_2(3)
+```
+
+- It has 9 degrees of freedom: 3 for rotation, 3 for velocity, 3 for position.
+- The "2" counts the vector columns. Adding $`K`$ more (for example, foot-contact points) gives $`SE_{K+2}(3)`$.
+
+**Composition and inverse** work column by column, as for $`SE(3)`$:
+
+```math
+X_1 X_2 = (R_1 R_2,\; v_1 + R_1 v_2,\; p_1 + R_1 p_2), \qquad X^{-1} = (R^\top,\; -R^\top v,\; -R^\top p)
+```
+
+So a velocity changes frame exactly like a position. **Tiny example:** a drone flies at 2 m/s forward in its own frame, $`X_2 = (I,\, (2, 0, 0),\, 0)`$. That frame is yawed by 90° in the world, $`X_1 = (R_z(90^\circ),\, 0,\, 0)`$. The velocity of $`X_1 X_2`$ is $`R_1 v_2 = (0, 2, 0)`$: 2 m/s along the world $`y`$ axis.
+
+**Tangent space.** A small change is a 9-vector $`\xi = (\phi, \nu, \rho)`$: rotation, velocity, position. This rotation-first order is the one [invariant_saltation_ekf.md](../filtering/invariant_saltation_ekf.md) uses; note that §11 above orders the $`SE(3)`$ vector translation-first. The hat and exponential maps are
+
+```math
+\xi^\wedge = \begin{bmatrix} \phi^\wedge & \nu & \rho \\ 0 & 0 & 0 \\ 0 & 0 & 0 \end{bmatrix}, \qquad
+\exp(\xi^\wedge) = \begin{bmatrix} \exp(\phi^\wedge) & J_l(\phi)\,\nu & J_l(\phi)\,\rho \\ 0 & 1 & 0 \\ 0 & 0 & 1 \end{bmatrix}
+```
+
+- $`J_l(\phi)`$ is the $`SO(3)`$ left Jacobian ([jacobian.md §11](jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space)). It is the same matrix as the $`V`$ of §11, so both columns are bent exactly like the $`SE(3)`$ translation: with $`\phi = (0, 0, \pi/2)`$, $`\nu = (1, 0, 0)`$ becomes $`(0.637,\ 0.637,\ 0)`$.
+- The **adjoint** moves a perturbation from one side of $`X`$ to the other, $`X \exp(\xi^\wedge) = \exp\big((\mathrm{Ad}_X\, \xi)^\wedge\big)\, X`$, with
+
+```math
+\mathrm{Ad}_X = \begin{bmatrix} R & 0 & 0 \\ v^\wedge R & R & 0 \\ p^\wedge R & 0 & R \end{bmatrix}
+```
+
+**Why not store $`R`$ in $`SO(3)`$ and $`v`$, $`p`$ as plain vectors?** Both hold the same numbers; the difference is what the group product buys the filter.
+- With this product, one IMU step over $`h`$ is $`X^+ = \Gamma\, f(X)\, \Upsilon`$. Here $`\Gamma`$ is a fixed matrix holding gravity, $`f(R, v, p) = (R, v, p + v h)`$ respects the group product, and $`\Upsilon`$ holds the IMU increments. Systems of this form are called **group-affine**.
+- For a group-affine system, the **invariant error** $`\eta = \hat X X^{-1}`$ between estimate and truth evolves in the same way whatever the trajectory, and its logarithm evolves through a constant matrix, even for large errors. This is the basis of the **invariant EKF** (Barrau & Bonnabel, 2017).
+- With separate pieces, the error dynamics depend on the current estimate. In [invariant_saltation_ekf.md §6](../filtering/invariant_saltation_ekf.md#6-results-consistency-through-the-bounces), an EKF built that way is overconfident before any bounce (NEES 14-19 against a consistent 9), while the invariant EKF on $`SE_2(3)`$ is close to consistent.
+
+In code: `se23_make`, `se23_parts`, `se23_inv`, `se23_exp`, `se23_log` and `se23_adjoint` in [use_numpy/lie_utils.py](../../use_numpy/lie_utils.py), and `manif.SE_2_3`, whose tangent order is (position, rotation, velocity).
+
 ---
 
 ## 12. A physical analogy
@@ -330,6 +370,8 @@ We could optimize $x,y,z,\text{roll},\text{pitch},\text{yaw}$ directly, but Eule
 | $\mathfrak{so}(3)$ | Small rotational motions  |
 | $SE(3)$ | All possible 3D poses     |
 | $\mathfrak{se}(3)$ | Small 6-DoF pose motions  |
+| $`SE_2(3)`$ | All possible poses with velocity (§11.1) |
+| $`\mathfrak{se}_2(3)`$ | Small 9-DoF changes of pose and velocity |
 
 $$\boxed{SO(3) \underset{\exp}{\overset{\log}{\rightleftarrows}} \mathfrak{so}(3)}$$
 
@@ -360,3 +402,5 @@ In pictures: the state sits on $SE(3)$ (curved), we zoom in to $\xi \in \mathbb{
 ## 17. References
 
 1. Solà, J., Deray, J., & Atchuthan, D. (2018). *A micro Lie theory for state estimation in robotics*. arXiv:1812.01537. https://doi.org/10.48550/arXiv.1812.01537 - the standard modern reference for the $SO(3)$/$`SE(3)`$ $Exp$/$`Log`$ conventions used throughout this doc, written by (among others) the author of the `manif` library this repo's `use_manif/` scripts are built on.
+2. Barrau, A., & Bonnabel, S. (2017). *The Invariant Extended Kalman Filter as a Stable Observer*. IEEE Transactions on Automatic Control, 62(4), 1797–1812. https://arxiv.org/abs/1410.1465 - group-affine systems and the trajectory-independent invariant error used in §11.1.
+3. Hartley, R., Ghaffari, M., Eustice, R. M., & Grizzle, J. W. (2020). *Contact-Aided Invariant Extended Kalman Filtering for Robot State Estimation*. The International Journal of Robotics Research, 39(4), 402–430. https://doi.org/10.1177/0278364919894385 - $`SE_2(3)`$ and $`SE_{K+2}(3)`$ for IMU-driven robots (§11.1).
