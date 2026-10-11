@@ -48,14 +48,14 @@ identical in every other respect:
     hybrid map on SE_2(3) (tests/use_numpy/test_invariant_saltation_ekf.py),
     where the other two are wrong by O(1).
 
-A fourth filter, "saltation_timing", adds what the saltation matrix leaves
+A further RIEKF, "saltation_timing", adds what the saltation matrix leaves
 out: the contact detector's own timing error. At each detected bounce it adds
 `s^2 w w^T` to the covariance, where `w = T(X+)^-1 (f+ - DR f-)` is how much
 the post-impact state moves per second of timing error
 (`impact_timing_direction_ri`) and `s` is the detector's timing-error RMS.
 With exact detection (the default) it is identical to "saltation".
 
-A fifth filter -- an ordinary error-state EKF in world-perturbation
+One more filter -- an ordinary error-state EKF in world-perturbation
 coordinates (`R = Exp(dtheta) R_hat, v = v_hat + dv, p = p_hat + dp`), with
 the saltation correction -- is the non-invariant baseline: its propagation and
 measurement Jacobians depend on the estimate.

@@ -10,29 +10,29 @@ Implemented in [use_numpy/invariant_saltation_ekf.py](../../use_numpy/invariant_
 
 ## 1. The system
 
-State, with $`R`$ body-to-world rotation, $`v`$ velocity, $`p`$ position:
+State, with $`R`$ body-to-world rotation, $`v`$ velocity, $`p`$ position (an **extended pose**; $`SE_2(3)`$ is the group of such matrices):
 
 ```math
 X = \begin{bmatrix} R & v & p \\ 0 & 1 & 0 \\ 0 & 0 & 1 \end{bmatrix} \in SE_2(3)
 ```
 
-- **Flow** (between bounces), driven by the gyro $`\omega`$ and accelerometer $`a`$ (body frame) and gravity $`g`$: $`\dot R = R\,\omega^\wedge`$, $`\dot v = R\,a + g`$, $`\dot p = v`$. The true body spins at a constant rate and, in free flight, the accelerometer reads zero specific force, so translation is exactly ballistic.
+- **Flow** (between bounces), driven by the gyro $`\omega`$ and accelerometer $`a`$ (body frame) and gravity $`g`$: $`\dot R = R\,\omega^\wedge`$, $`\dot v = R\,a + g`$, $`\dot p = v`$, where $`\omega^\wedge`$ is the skew-symmetric matrix of $`\omega`$ (the **hat** operator, [glossary](../glossary.md#1-geometry-and-lie-groups)). The true body spins at a constant rate and, in free flight, the accelerometer reads zero specific force, so translation is exactly ballistic.
 - **Guard**: the ground, $`p_z = 0`$, crossed while descending. The crossing time is the root of a quadratic in closed form (`crossing_time`).
-- **Reset**: $`(R, v, p) \mapsto (R,\, M v,\, p)`$ with $`M = I - (1+e)\,n n^\top`$ and $`n = e_z`$ - the normal velocity is reflected and scaled by the restitution $`e`$; rotation, position and the body rate are unchanged (`reset_map`).
+- **Reset**: $`(R, v, p) \mapsto (R,\, M v,\, p)`$ with $`M = I - (1+e)\,n n^\top`$ and $`n = e_z`$, the vertical unit vector - the normal velocity is reflected and scaled by the **coefficient of restitution** $`e`$, the ratio of rebound speed to impact speed (0.8 by default: a body falling onto the ground at 10 m/s vertically rebounds at 8 m/s; the horizontal velocity is kept); rotation, position and the body rate are unchanged (`reset_map`).
 
-Sensors: noisy IMU readings every step, and every few steps the body-frame positions of four known landmarks, $`y_i = R^\top (\ell_i - p) + \nu`$.
+Sensors: noisy IMU readings every step, and every few steps the body-frame positions of four known landmarks, $`y_i = R^\top (\ell_i - p) + \nu`$, where $`\ell_i`$ is landmark $`i`$'s world position and $`\nu`$ the measurement noise, with covariance $`N`$.
 
 ## 2. Why the RIEKF is attractive between bounces
 
-The right-invariant error is $`\eta = \hat X X^{-1}`$, parameterized by $`\xi = \log(\eta) = (\xi_R, \xi_v, \xi_p) \in \mathbb{R}^9`$ (so the truth is $`X = \exp(-\xi)\,\hat X`$). Two exact properties make it the natural filter here (Barrau & Bonnabel 2017; Hartley et al. 2020):
+With $`\hat X`$ the filter's estimate, the right-invariant error is $`\eta = \hat X X^{-1}`$, parameterized by $`\xi = \log(\eta) = (\xi_R, \xi_v, \xi_p) \in \mathbb{R}^9`$ (so the truth is $`X = \exp(-\xi)\,\hat X`$; $`\exp`$/$`\log`$ are the group's exponential and logarithm maps, [glossary](../glossary.md#1-geometry-and-lie-groups)). Two exact properties make it the natural filter here (Barrau & Bonnabel 2017; Hartley et al. 2020):
 
-**Propagation is trajectory-independent.** IMU kinematics are *group-affine*: over a step $`h`$ with constant readings, $`X^+ = \Gamma_h\, f_h(X)\, \Upsilon_h`$, where $`f_h(R,v,p) = (R, v, p + v h)`$ is a group automorphism, $`\Gamma_h = (I, g h, \tfrac12 g h^2)`$ carries gravity and $`\Upsilon_h`$ carries the body-frame IMU increments (`propagate_mean`). The error then evolves as $`\eta^+ = \Gamma_h f_h(\eta) \Gamma_h^{-1}`$, independently of $`X`$, and its logarithm evolves *exactly linearly* - even for large errors:
+**Propagation is trajectory-independent.** IMU kinematics are *group-affine*: over a step $`h`$ with constant readings, $`X^+ = \Gamma_h\, f_h(X)\, \Upsilon_h`$ (in this section $`^+`$ means one step later; from §4 on it means just after the impact), where $`f_h(R,v,p) = (R, v, p + v h)`$ is a group automorphism, $`\Gamma_h = (I, g h, \tfrac12 g h^2)`$ carries gravity and $`\Upsilon_h`$ carries the body-frame IMU increments (`propagate_mean`). The error then evolves as $`\eta^+ = \Gamma_h f_h(\eta) \Gamma_h^{-1}`$, independently of $`X`$, and its logarithm evolves *exactly linearly* - even for large errors:
 
 ```math
 \xi^+ = \Phi(h)\,\xi, \qquad \Phi(h) = e^{A h}, \qquad A = \begin{bmatrix} 0 & 0 & 0 \\ g^\wedge & 0 & 0 \\ 0 & I & 0 \end{bmatrix}
 ```
 
-`propagation_matrix` builds $`\Phi`$; the test `test_invariant_error_propagates_exactly_even_for_large_errors` checks $`\log(\hat X^+ (X^+)^{-1}) = \Phi\,\xi`$ to $`10^{-10}`$ for a finite $`\xi`$. IMU noise enters in the body frame, so its covariance is mapped by the adjoint: $`P^+ = \Phi P \Phi^\top + \mathrm{Ad}_{\hat X^+} Q_b \mathrm{Ad}_{\hat X^+}^\top`$.
+`propagation_matrix` builds $`\Phi`$; the test `test_invariant_error_propagates_exactly_even_for_large_errors` checks $`\log(\hat X^+ (X^+)^{-1}) = \Phi\,\xi`$ to $`10^{-10}`$ for a finite $`\xi`$. IMU noise enters in the body frame with covariance $`Q_b`$, so it is mapped by the **adjoint** $`\mathrm{Ad}_{\hat X^+}`$ ([glossary](../glossary.md#1-geometry-and-lie-groups)), and the covariance $`P`$ of $`\xi`$ propagates as $`P^+ = \Phi P \Phi^\top + \mathrm{Ad}_{\hat X^+} Q_b \mathrm{Ad}_{\hat X^+}^\top`$.
 
 **The landmark measurement is right-invariant.** Written homogeneously, $`y_i = X^{-1} b_i`$ with $`b_i = (\ell_i, 0, 1)`$. The residual $`r_i = \hat R\,y_i + \hat p - \ell_i`$ then satisfies $`r_i \approx \xi_R^\wedge \ell_i + \xi_p`$, i.e.
 
@@ -40,21 +40,21 @@ The right-invariant error is $`\eta = \hat X X^{-1}`$, parameterized by $`\xi = 
 H_i = \begin{bmatrix} -\ell_i^\wedge & 0 & I \end{bmatrix}
 ```
 
-- constant, whatever the estimate (`measurement_jacobian_ri`), with noise $`\hat R N \hat R^\top`$. The ordinary world-frame EKF's $`H`$ depends on $`\hat R`$ and $`\hat p`$ instead (`measurement_jacobian_world`).
+This $`H_i`$ is constant, whatever the estimate (`measurement_jacobian_ri`), with noise $`\hat R N \hat R^\top`$. The ordinary world-frame EKF's $`H`$ depends on $`\hat R`$ and $`\hat p`$ instead (`measurement_jacobian_world`).
 
 ## 3. What the bounce breaks
 
-A map $`\phi`$ preserves this structure only if it is a group automorphism, $`\phi(X_1 X_2) = \phi(X_1)\,\phi(X_2)`$. For the reset, the velocity block of $`X_1 X_2`$ is $`v_1 + R_1 v_2`$, so
+A map $`\phi`$ preserves this structure only if it is a group automorphism, $`\phi(X_1 X_2) = \phi(X_1)\,\phi(X_2)`$. For the reset, the velocity block of $`X_1 X_2`$ is $`v_1 + R_1 v_2`$; the rotation and position blocks are untouched by the reset, so the velocity block of the difference $`\phi(X_1 X_2) - \phi(X_1)\phi(X_2)`$ is all that remains:
 
 ```math
-\phi(X_1 X_2) - \phi(X_1)\phi(X_2) \;\to\; M R_1 v_2 - R_1 M v_2
+M (v_1 + R_1 v_2) - (M v_1 + R_1 M v_2) = M R_1 v_2 - R_1 M v_2
 ```
 
-which vanishes only when $`M R_1 = R_1 M`$, i.e. when $`R_1`$ is a rotation about the vertical axis. For a tumbling body it is not (`reset_is_automorphism_gap`: about 0.87 for a random pair in the test, exactly 0 for a vertical-axis rotation). Consequence: unlike $`\Phi`$, the Jacobian of a bounce in invariant coordinates depends on the state.
+This vanishes for every $`v_2`$ only when $`M R_1 = R_1 M`$, i.e. when $`R_1`$ maps the vertical axis to itself or to its opposite: a rotation about the vertical axis, or a half-turn about a horizontal one. For a tumbling body it is not (`reset_is_automorphism_gap`: about 0.87 for a random pair in the test, exactly 0 for a vertical-axis rotation). Consequence: unlike $`\Phi`$, the Jacobian of a bounce in invariant coordinates depends on the state.
 
 ## 4. The saltation matrix on the group
 
-The saltation matrix has its textbook form in coordinates where the state is a plain vector. Use world-perturbation coordinates around a base state, $`\delta = (\delta\theta, \delta v, \delta p)`$ with $`R' = \mathrm{Exp}(\delta\theta) R`$, $`v' = v + \delta v`$, $`p' = p + \delta p`$. There the vector field is $`f = (R\omega,\; R a + g,\; v)`$, the guard gradient $`D g`$ picks $`\delta p_z`$, the reset Jacobian is $`DR = \mathrm{blockdiag}(I, M, I)`$, and (Kong et al. 2024, Def. 2, time-invariant guard and reset):
+The saltation matrix has its textbook form in coordinates where the state is a plain vector. Use world-perturbation coordinates around a base state, $`\delta = (\delta\theta, \delta v, \delta p)`$ with $`R' = \mathrm{Exp}(\delta\theta) R`$ ($`\mathrm{Exp}`$ maps a rotation vector to a rotation, [glossary](../glossary.md#1-geometry-and-lie-groups)), $`v' = v + \delta v`$, $`p' = p + \delta p`$. There the vector field is $`f = (R\omega,\; R a + g,\; v)`$, the guard gradient $`D g`$ picks $`\delta p_z`$, the reset Jacobian is $`DR = \mathrm{blockdiag}(I, M, I)`$, and, with $`f^-`$ and $`f^+`$ the vector field just before and just after the impact (Kong et al. 2024, Def. 2, time-invariant guard and reset):
 
 ```math
 \Xi_{\text{world}} = DR + \frac{\left(f^+ - DR\, f^-\right) D g}{D g\, f^-}
@@ -68,13 +68,13 @@ To move between the two coordinate systems: a right-invariant perturbation $`X' 
 T(X) = \begin{bmatrix} I & 0 & 0 \\ -v^\wedge & I & 0 \\ -p^\wedge & 0 & I \end{bmatrix}
 ```
 
-(`world_to_invariant_map`). The chain rule, with the two coordinate charts based at the pre- and post-impact states, gives
+(`world_to_invariant_map`). The chain rule, with the two coordinate charts based at the pre- and post-impact states $`X^-`$ and $`X^+`$, gives
 
 ```math
 \Xi_{RI} = T(X^+)^{-1}\,\Xi_{\text{world}}\,T(X^-)
 ```
 
-(`saltation_matrix_ri`). Because $`v^+ = M v^- \neq v^-`$, the two $`T`$ factors do not cancel - this is the state dependence of §3, made explicit.
+(`saltation_matrix_ri`). The two $`T`$ factors do not cancel. Even for the reset Jacobian alone, $`T(X^+)^{-1} DR\, T(X^-)`$ differs from the shortcut $`\mathrm{blockdiag}(I, M, I)`$ in one block: the velocity error picks up $`\big((M v^-)^\wedge - M\,(v^-)^\wedge\big)\,\xi_R`$. That term depends on the impact velocity (its largest entries are $`(1+e)\,|v_z^-|`$, 12.6 for a 7 m/s vertical impact speed) and is nonzero even when the velocity is purely vertical - this is the state dependence of §3, made explicit.
 
 Three bounce treatments are compared in the RIEKF, identical in everything else:
 
@@ -88,7 +88,7 @@ The invariant-naive choice is the tempting one: it applies the reset to $`\xi_v`
 
 ## 5. Verification against the exact hybrid map
 
-The ground truth for "the right Jacobian" is the exact *fixed-time* hybrid map: start above the ground, flow to the crossing, reset, flow to a fixed later time $`T`$, with every perturbed trajectory using the same IMU inputs. Its Jacobian in invariant coordinates, by central finite differences of $`\log(\Psi(\exp(\xi) X_0)\,\Psi(X_0)^{-1})`$, is compared with $`\Phi(T - \tau)\, \Xi\, \Phi(\tau)`$ (`test_saltation_matrix_ri_matches_finite_differences`, three random seeds):
+The ground truth for "the right Jacobian" is the exact *fixed-time* hybrid map: start above the ground, flow to the crossing, reset, flow to a fixed later time $`T`$ (a time, not the map $`T(X)`$ of §4), with every perturbed trajectory using the same IMU inputs. Call this map $`\Psi`$. Its Jacobian in invariant coordinates, by central finite differences of $`\log(\Psi(\exp(\xi) X_0)\,\Psi(X_0)^{-1})`$, is compared with $`\Phi(T - \tau)\, \Xi\, \Phi(\tau)`$, where $`\tau`$ is the crossing time and $`\Xi`$ each treatment's bounce matrix (`test_saltation_matrix_ri_matches_finite_differences`, three random seeds):
 
 | Treatment | max abs. difference from finite differences |
 |---|---|
@@ -102,7 +102,7 @@ The saltation matrix is exact up to the finite-difference step; the other two ar
 
 Defaults: 5 m drop, restitution 0.8, body rate $`(1.0, -0.6, 2.0)`$ rad/s, IMU at 100 Hz (gyro noise 0.02 rad/s, accel noise 0.3 m/s² per sample), landmarks at 10 Hz (0.05 m noise), four true bounces at 1.01, 2.63, 3.92 and 4.96 s. A fourth filter is the non-invariant baseline: an error-state EKF in world-perturbation coordinates with $`\Xi_{\text{world}}`$ at bounces. (The fifth filter of §7, saltation + timing noise, is identical to the saltation one with exact contact detection, so it is left out of this section's tables.)
 
-**Mode matching.** At one or two ticks around each impact, the truth has bounced and the estimate has not yet (or vice versa); there the velocity error is of order $`(1+e)|v_z|`$ - tens of m/s - and NEES reaches about $`10^5`$ for every filter alike. That is an artifact of comparing a hybrid estimate with a hybrid truth at fixed ticks, not of the covariance treatment ([hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) reports the same shared spike). `run_monte_carlo_consistency` therefore scores a tick only when the filter has resolved the same number of bounces as the truth, and reports the excluded fraction: 0.14-0.16% of (trial, tick) pairs here, for all four filters.
+**Mode matching.** At one or two ticks around each impact, the truth has bounced and the estimate has not yet (or vice versa); there the velocity error is of order $`(1+e)|v_z|`$ - tens of m/s - and **NEES** ([glossary](../glossary.md#2-uncertainty-and-probability)) reaches about $`10^5`$ for every filter alike. That is an artifact of comparing a hybrid estimate with a hybrid truth at fixed ticks, not of the covariance treatment ([hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) reports the same shared spike). `run_monte_carlo_consistency` therefore scores a tick only when the filter has resolved the same number of bounces as the truth, and reports the excluded fraction: 0.14-0.16% of (trial, tick) pairs here, for all four filters.
 
 Monte Carlo average NEES over mode-matched ticks, 200 trials, seed 0 (a consistent 9-DoF filter averages 9; the 95% interval for a 200-trial average is [8.42, 9.60]):
 
@@ -124,15 +124,19 @@ With landmarks only every 25 steps (`--meas-every 25`), so the post-bounce covar
 
 What this shows:
 - **The invariant-naive shortcut is clearly overconfident after bounces** (NEES 1.5-1.8× the consistent value), and recovers only slowly, over several measurement updates.
-- **Reset-Jacobian vs. saltation is a modest gap**, as for the point mass: both are close to consistent, and only the saltation-corrected filter stays inside the 95% interval in the sparse-measurement case. Getting the state dependence right matters more here than the timing correction.
+- **Reset-Jacobian vs. saltation is a modest gap**, as for the point mass: both are close to consistent, and in the sparse-measurement case only the saltation-corrected filter's after-bounce NEES stays inside the 95% interval (before the first bounce, all three RIEKFs sit slightly above it, at 10.22). Getting the state dependence right matters more here than the timing correction.
 - **The world-frame EKF is inconsistent before any bounce** (NEES 14-19), most likely because its propagation and measurement Jacobians are evaluated at a poor initial estimate, which the invariant filter's constant $`\Phi`$ and $`H`$ avoid - the usual invariant-filter advantage, independent of the hybrid event (not isolated further here).
 - **RMS errors are nearly identical** across the three RIEKFs (e.g. 1.29° / 0.12 m/s / 0.11 m in the single default run): as in [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md), the effect is in whether the reported uncertainty can be trusted, not in the point estimate.
 
 ![Three panels from invariant_saltation_ekf.py: height of the bouncing body for the ground truth and the filters (the dashed saltation + timing noise line coincides with saltation here); single-run position error; Monte Carlo average NEES over time with the consistent value of 9 and its 95% interval, the invariant-naive filter spiking after each bounce and the world-frame EKF elevated before the first bounce](../../assets/invariant_saltation_ekf.png)
 
+The same run, animated. The top panel shows the tumbling body bouncing among the four landmarks, with a sight line to each landmark whenever a measurement arrives. All four position estimates stay within a few centimeters of the truth, so their markers overlap. The difference is in the bottom panel: the invariant-naive filter's NEES jumps to about 18 at the first bounce and needs about 1 s to fall back inside the 95% band (about 0.4 s after the next two bounces, whose spikes are smaller). No single state component's standard deviation is plotted, because none shows the problem: the naive filter's mistake is the missing rotation-velocity coupling of §4, and its horizontal-velocity standard deviation after a bounce is actually *larger* than the others' (0.067 vs. 0.049 m/s just after the first one).
+
+![Animation of the default run: top, a 3D view of the tumbling box bouncing on the ground among four landmarks, with dashed sight lines at each landmark measurement and overlapping position-estimate markers; bottom, the Monte Carlo average NEES of the four filters drawn up to the current time, with the invariant-naive filter spiking after each bounce and the world-frame EKF elevated before the first one](../../assets/invariant_saltation_ekf.gif)
+
 ## 7. Contact-detection jitter
 
-Everything above assumes each filter applies the bounce exactly when its own estimate reaches the ground. A real contact detector (an accelerometer spike, as in [Čížek et al., 2018](hybrid_saltation_ekf.md#11-references), or a force threshold) adds its own latency and jitter. `--detect-time-bias`/`--detect-time-noise-std` model this the same way as [hybrid_saltation_ekf.md §8](hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter): a bounce found at $`\tau`$ inside a tick is applied at
+Everything above assumes each filter applies the bounce exactly when its own estimate reaches the ground. A real contact detector (an accelerometer spike, as in [Čížek et al., 2018](hybrid_saltation_ekf.md#11-references), or a force threshold) adds its own latency and jitter. `--detect-time-bias`/`--detect-time-noise-std` model this the same way as [hybrid_saltation_ekf.md §8](hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter): a bounce found at $`\tau`$ inside a tick is applied at $`\tau_{\text{detect}}`$ instead, with detection bias $`b_{\text{detect}}`$ and jitter standard deviation $`\sigma_{\text{detect}}`$ (the two flags):
 
 ```math
 \tau_{\text{detect}} = \text{clip}\big(\tau + b_{\text{detect}} + \mathcal{N}(0,\,\sigma_{\text{detect}}^2)\,,\ 0,\ \tau_{\text{remain}}\big)
@@ -140,7 +144,7 @@ Everything above assumes each filter applies the bounce exactly when its own est
 
 (`detected_crossing_time`; $`\tau_{\text{remain}}`$ is the time left in the tick). Mean and covariance are both reset there, so a late detection resets slightly below the ground and an early one slightly above it. Each filter draws its jitter from its own random generator, spawned from the run's seed, so a sweep at a fixed seed changes only the jitter: the IMU noise, measurements and initial errors stay the same. The descending-crossings-only rule of `crossing_time` keeps a below-ground reset from triggering a spurious second bounce.
 
-**The timing term.** The saltation matrix accounts for how a *state* error moves the impact time, but not for an error in the detected time itself. Resetting $`\delta`$ seconds late means flowing with $`f^-`$ past the guard and then resetting, instead of resetting and flowing with $`f^+`$. To first order the post-impact state is then off by $`-w\,\delta`$, with
+**The timing term.** The saltation matrix accounts for how a *state* error moves the impact time, but not for an error in the detected time itself. Resetting $`\delta`$ seconds late (here $`\delta`$ is a time, not the perturbation of §4) means flowing with $`f^-`$ past the guard and then resetting, instead of resetting and flowing with $`f^+`$. To first order the post-impact state is then off by $`-w\,\delta`$, with
 
 ```math
 w = T(X^+)^{-1}\left(f^+ - DR\, f^-\right)
@@ -158,7 +162,7 @@ at each bounce. That is the fifth filter, "saltation + timing noise" (reset mode
 
 | Detection error | RIEKF, invariant-naive | RIEKF, reset-Jacobian | RIEKF, saltation | RIEKF, saltation + timing noise | World-frame EKF, saltation |
 |---|---|---|---|---|---|
-| exact (§6) | 13.98 | 9.56 | 9.03 | 9.03 | 9.54 |
+| exact (as in §6, but a 4-seed mean) | 13.98 | 9.56 | 9.03 | 9.03 | 9.54 |
 | $`\sigma_{\text{detect}} = 1`$ ms | 14.92 | 10.49 | 10.60 | **9.01** | 11.34 |
 | $`\sigma_{\text{detect}} = 2`$ ms | 17.31 | 12.86 | 14.58 | **8.92** | 15.71 |
 | $`\sigma_{\text{detect}} = 5`$ ms | 26.92 | 22.55 | 30.99 | **8.68** | 32.86 |
