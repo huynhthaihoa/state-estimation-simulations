@@ -327,7 +327,7 @@ In code: `se23_make`, `se23_parts`, `se23_inv`, `se23_exp`, `se23_log` and `se23
 
 ### 11.2 The adjoint: moving a small motion between frames
 
-A small motion can be written in the robot's own frame or in the world frame. The **adjoint** $`\mathrm{Ad}_T`$ converts one into the other:
+A small motion can be written in **the robot's own frame** or in **the world frame**. The **adjoint** $`\mathrm{Ad}_T`$ converts one into the other:
 
 ```math
 T\,\mathrm{Exp}(\xi) = \mathrm{Exp}(\mathrm{Ad}_T\,\xi)\,T
