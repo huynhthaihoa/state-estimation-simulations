@@ -690,6 +690,7 @@ With contact-detection jitter (`--detect-time-noise-std`, doc §7), every filter
 #### Scripts
 
 - [use_numpy/invariant_saltation_ekf.py](use_numpy/invariant_saltation_ekf.py)
+- [use_numpy/invariant_saltation_ekf_v2.py](use_numpy/invariant_saltation_ekf_v2.py): class-based version, same output
 - [use_manif/invariant_saltation_ekf.py](use_manif/invariant_saltation_ekf.py)
 - [use_numpy/animate_invariant_saltation_ekf.py](use_numpy/animate_invariant_saltation_ekf.py): animated GIF of the default run, embedded in [invariant_saltation_ekf.md](docs/filtering/invariant_saltation_ekf.md); render with `uv run python use_numpy/animate_invariant_saltation_ekf.py --out assets/invariant_saltation_ekf.gif`
 
