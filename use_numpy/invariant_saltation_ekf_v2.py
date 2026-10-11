@@ -75,6 +75,10 @@ point-mass model of saltation_matrix_ekf.py (`detected_crossing_time`); and
 the run stops well
 before the bounces become small (`step_hybrid_ri`/`step_hybrid_world` raise if an impact
 is slower than `min_bounce_speed`, instead of modeling the settling phase).
+
+This v2 steps each filter through the `Filter` class (predict / update /
+state); everything else, including the output, is that of
+invariant_saltation_ekf.py.
 '''
 
 import argparse
@@ -622,15 +626,29 @@ def update_world(X, P, y, landmarks, meas_noise_std):
     return X, I_KH @ P @ I_KH.T + K @ N @ K.T
 
 
+FILTERS = ("invariant_naive", "reset_jacobian", "saltation", "saltation_timing", "world_saltation")
+
+
 class Filter:
-    """Base class for the filters in this script. Subclasses must implement
-    predict() and update() with the same signature as step_hybrid_ri/step_hybrid_world
-    and update_ri/update_world, respectively.
+    """One of FILTERS, stepped tick by tick: the four RIEKFs (named by their
+    bounce treatment, see step_hybrid_ri) or the world-frame EKF
+    ("world_saltation", see step_hybrid_world). "saltation_timing" assumes a
+    detection-time error RMS of hypot(detect_time_bias, detect_time_noise_std),
+    i.e. it is tuned to the true detector.
+    Arguments:
+        name: one of FILTERS
+        X_init: (5,5) initial estimate
+        P_init: (9,9) initial covariance, in that filter's own error coordinates
+        dt, e, g_vec, landmarks, *_noise_std: as step_hybrid_ri and update_ri
+        detect_time_bias, detect_time_noise_std, detect_rng: contact-detection
+            error, see detected_crossing_time
     """
 
     def __init__(self, name, X_init, P_init, dt, e, g_vec, landmarks,
-               gyro_noise_std, accel_noise_std, meas_noise_std,
-               detect_time_bias=0.0, detect_time_noise_std=0.0, detect_rng=None):
+                 gyro_noise_std, accel_noise_std, meas_noise_std,
+                 detect_time_bias=0.0, detect_time_noise_std=0.0, detect_rng=None):
+        if name not in FILTERS:
+            raise ValueError(f"unknown filter {name!r}; expected one of {FILTERS}")
         self.name = name
         self.X = X_init.copy()
         self.P = P_init.copy()
@@ -644,36 +662,50 @@ class Filter:
         self.detect_time_bias = detect_time_bias
         self.detect_time_noise_std = detect_time_noise_std
         self.detect_rng = detect_rng
-        self.nb = 0  # cumulative number of bounces resolved
+        self.n_bounces = 0  # cumulative number of bounces resolved
 
     def predict(self, gyro, accel):
+        """Propagates through one IMU step, resolving any bounce inside it.
+        Arguments:
+            gyro, accel: (3,) IMU readings for this step
+        """
         if self.name == "world_saltation":
-            self.X, self.P, self.nb = step_hybrid_world(self.X, self.P, gyro, accel, self.dt, self.e, self.g_vec,
-                                     self.gyro_noise_std, self.accel_noise_std,
-                                     self.detect_time_bias, self.detect_time_noise_std, self.detect_rng)
+            self.X, self.P, nb = step_hybrid_world(
+                self.X, self.P, gyro, accel, self.dt, self.e, self.g_vec,
+                self.gyro_noise_std, self.accel_noise_std,
+                detect_time_bias=self.detect_time_bias, detect_time_noise_std=self.detect_time_noise_std,
+                detect_rng=self.detect_rng)
         else:
-            self.X, self.P, self.nb = step_hybrid_ri(self.X, self.P, gyro, accel, self.dt, self.e, self.g_vec, self.gyro_noise_std, self.accel_noise_std, self.name,
-                              self.detect_time_bias, self.detect_time_noise_std, self.detect_rng)
+            self.X, self.P, nb = step_hybrid_ri(
+                self.X, self.P, gyro, accel, self.dt, self.e, self.g_vec,
+                self.gyro_noise_std, self.accel_noise_std, reset_mode=self.name,
+                detect_time_bias=self.detect_time_bias, detect_time_noise_std=self.detect_time_noise_std,
+                detect_rng=self.detect_rng,
+                timing_noise_std=np.hypot(self.detect_time_bias, self.detect_time_noise_std))
+        self.n_bounces += nb
 
-    def update(self, measurement):
+    def update(self, y):
+        """Landmark measurement update.
+        Arguments:
+            y: (L,3) body-frame landmark measurements
+        """
         if self.name == "world_saltation":
-            self.X, self.P = update_world(self.X, self.P, measurement, self.landmarks, self.meas_noise_std)
+            self.X, self.P = update_world(self.X, self.P, y, self.landmarks, self.meas_noise_std)
         else:
-            self.X, self.P = update_ri(self.X, self.P, measurement, self.landmarks, self.meas_noise_std)
+            self.X, self.P = update_ri(self.X, self.P, y, self.landmarks, self.meas_noise_std)
 
     def state(self):
-        return self.X, self.P, self.nb
-    
-
-FILTERS = ("invariant_naive", "reset_jacobian", "saltation", "saltation_timing", "world_saltation")
+        """Returns:
+            copies of X (5,5) and P (9,9), and the cumulative number of bounces resolved
+        """
+        return self.X.copy(), self.P.copy(), self.n_bounces
 
 
 def run_filter(name, X_init, P_init, gyro, accel, meas, dt, e, g_vec, landmarks,
                gyro_noise_std, accel_noise_std, meas_noise_std,
                detect_time_bias=0.0, detect_time_noise_std=0.0, detect_rng=None):
-    """Runs one of FILTERS over the whole data set. "saltation_timing" assumes
-    a detection-time error RMS of hypot(detect_time_bias,
-    detect_time_noise_std), i.e. it is tuned to the true detector.
+    """Runs one of FILTERS over the whole data set with a Filter: predict every
+    tick, update whenever a landmark measurement arrives.
     Arguments:
         name: one of FILTERS
         X_init: (5,5) initial estimate
@@ -687,19 +719,19 @@ def run_filter(name, X_init, P_init, gyro, accel, meas, dt, e, g_vec, landmarks,
         X_list: list of (5,5) estimates, P_list: list of (9,9) covariances
         bounce_count: (N,) cumulative number of bounces the filter has resolved, per tick
     """
-    filter = Filter(name, X_init, P_init, dt, e, g_vec, landmarks,
-                    gyro_noise_std, accel_noise_std, meas_noise_std,
-                    detect_time_bias, detect_time_noise_std, detect_rng)
-    X, P = X_init.copy(), P_init.copy()
-    X_list, P_list, counts = [X], [P], [0]
+    filt = Filter(name, X_init, P_init, dt, e, g_vec, landmarks,
+                  gyro_noise_std, accel_noise_std, meas_noise_std,
+                  detect_time_bias, detect_time_noise_std, detect_rng)
+    X, P, n_bounces = filt.state()
+    X_list, P_list, counts = [X], [P], [n_bounces]
     for k in range(len(gyro)):
-        filter.predict(gyro[k], accel[k])
+        filt.predict(gyro[k], accel[k])
         if k + 1 in meas:
-            filter.update(meas[k + 1])
-        X, P, nb = filter.state()
+            filt.update(meas[k + 1])
+        X, P, n_bounces = filt.state()
         X_list.append(X)
         P_list.append(P)
-        counts.append(counts[-1] + nb)
+        counts.append(n_bounces)
     return X_list, P_list, np.array(counts)
 
 
