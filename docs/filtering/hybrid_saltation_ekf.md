@@ -449,6 +449,8 @@ matching the true (own-crossing-time) answer to within second-order error. This 
 
 ---
 
+**Follow-up on a Lie group:** [invariant_saltation_ekf.md](invariant_saltation_ekf.md) lifts this bounce to a tumbling rigid body with an IMU on $`SE_2(3)`$, tracked by a right-invariant EKF; there the reset is also not a group automorphism, which adds a state-dependent part to the bounce Jacobian on top of the timing correction derived here.
+
 ## 11. References
 
 1. Kong, N. J., Payne, J. J., Zhu, J., & Johnson, A. M. (2024). *Saltation Matrices: The Essential Tool for Linearizing Hybrid Dynamical Systems*. Proceedings of the IEEE, 112(6), 585–608. https://doi.org/10.1109/JPROC.2024.3440211 (preprint: arXiv:2306.06862) - a modern tutorial/survey on saltation matrices - its Definition 2 (Eq. 9) is exactly the boxed $\Xi(x^-)$ derived in §4, $f^{+}$ term included, and its Eq. 34 composes it with flow Jacobians into the monodromy matrix discussed in §9.

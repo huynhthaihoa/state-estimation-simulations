@@ -208,6 +208,114 @@ def compute_so3_inv_right_jacobian(omega):
     return I3 + 0.5 * omega_skew + coeff * omega_skew_sq
 
 
+def so3_log(R):
+    """Logarithm of a rotation matrix: the rotation vector phi with
+    so3_exp(phi) = R (angle in [0, pi)).
+    Arguments:
+        R: (3,3) rotation matrix
+    Returns:
+        phi: (3,) rotation vector
+    """
+    cos_theta = np.clip((np.trace(R) - 1.0) / 2.0, -1.0, 1.0)
+    theta = np.arccos(cos_theta)
+    w = 0.5 * np.array([R[2, 1] - R[1, 2], R[0, 2] - R[2, 0], R[1, 0] - R[0, 1]])
+    if theta < 1e-9:
+        return w
+    return theta / np.sin(theta) * w
+
+
+def so3_left_jacobian(phi):
+    """Left Jacobian of SO(3), J_l(phi) = sum_k (phi^)^k / (k+1)!.
+    Arguments:
+        phi: (3,) rotation vector
+    Returns:
+        J: (3,3) left Jacobian
+    """
+    theta = np.linalg.norm(phi)
+    K = skew(phi)
+    if theta < 1e-9:
+        return np.eye(3) + 0.5 * K
+    return (np.eye(3) + (1.0 - np.cos(theta)) / theta ** 2 * K
+            + (theta - np.sin(theta)) / theta ** 3 * K @ K)
+
+
+def se23_make(R, v, p):
+    """Builds the (5,5) SE_2(3) matrix from its rotation, velocity and position.
+    Arguments:
+        R: (3,3) rotation, v: (3,) velocity, p: (3,) position
+    Returns:
+        X: (5,5) SE_2(3) element
+    """
+    X = np.eye(5)
+    X[0:3, 0:3] = R
+    X[0:3, 3] = v
+    X[0:3, 4] = p
+    return X
+
+
+def se23_parts(X):
+    """Splits an SE_2(3) matrix into (R, v, p) copies.
+    Arguments:
+        X: (5,5) SE_2(3) element
+    Returns:
+        R: (3,3), v: (3,), p: (3,)
+    """
+    return X[0:3, 0:3].copy(), X[0:3, 3].copy(), X[0:3, 4].copy()
+
+
+def se23_inv(X):
+    """Closed-form inverse: (R, v, p)^-1 = (R^T, -R^T v, -R^T p).
+    Arguments:
+        X: (5,5) SE_2(3) element
+    Returns:
+        X_inv: (5,5) inverse
+    """
+    R, v, p = se23_parts(X)
+    return se23_make(R.T, -R.T @ v, -R.T @ p)
+
+
+def se23_exp(xi):
+    """Exponential map, xi = (xi_R, xi_v, xi_p) -> (Exp(xi_R), J_l xi_v, J_l xi_p).
+    Arguments:
+        xi: (9,) tangent vector
+    Returns:
+        X: (5,5) SE_2(3) element
+    """
+    J = so3_left_jacobian(xi[0:3])
+    return se23_make(so3_exp(xi[0:3]), J @ xi[3:6], J @ xi[6:9])
+
+
+def se23_log(X):
+    """Logarithm map, the inverse of se23_exp.
+    Arguments:
+        X: (5,5) SE_2(3) element
+    Returns:
+        xi: (9,) tangent vector
+    """
+    R, v, p = se23_parts(X)
+    phi = so3_log(R)
+    J_inv = np.linalg.inv(so3_left_jacobian(phi))
+    return np.concatenate([phi, J_inv @ v, J_inv @ p])
+
+
+def se23_adjoint(X):
+    """(9,9) adjoint, Ad_X xi = vee(X hat(xi) X^-1):
+    [[R, 0, 0], [v^ R, R, 0], [p^ R, 0, R]].
+    Arguments:
+        X: (5,5) SE_2(3) element
+    Returns:
+        Ad: (9,9) adjoint matrix
+    """
+    R, v, p = se23_parts(X)
+    Ad = np.zeros((9, 9))
+    Ad[0:3, 0:3] = R
+    Ad[3:6, 0:3] = skew(v) @ R
+    Ad[3:6, 3:6] = R
+    Ad[6:9, 0:3] = skew(p) @ R
+    Ad[6:9, 6:9] = R
+    return Ad
+
+
 def se3_ad(xi):
     """
     The 6x6 "little adjoint" ad(xi) of an SE(3) tangent vector -- the linear
@@ -285,6 +393,8 @@ class SO3:
     right_jacobian = staticmethod(so3_right_jacobian)
     inv_right_jacobian = staticmethod(compute_so3_inv_right_jacobian)
     geodesic_error = staticmethod(rotation_geodesic_error)
+    log = staticmethod(so3_log)
+    left_jacobian = staticmethod(so3_left_jacobian)
 
 
 class SE3:
@@ -300,3 +410,17 @@ class SE3:
     ad = staticmethod(se3_ad)
     right_jacobian = staticmethod(se3_right_jacobian)
     inv_right_jacobian = staticmethod(compute_se3_inv_right_jacobian)
+
+
+class SE23:
+    """Groups the SE_2(3) helpers above under short, consistent names
+    (SE23.exp, SE23.log, SE23.inv, ...), [xi_R, xi_v, xi_p] tangent
+    convention (rotation first, unlike SE3). Same staticmethod-alias design
+    as SO3: identical functions on plain numpy arrays, no state.
+    """
+    make = staticmethod(se23_make)
+    parts = staticmethod(se23_parts)
+    inv = staticmethod(se23_inv)
+    exp = staticmethod(se23_exp)
+    log = staticmethod(se23_log)
+    adjoint = staticmethod(se23_adjoint)

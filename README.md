@@ -14,7 +14,7 @@ A collection of from-scratch simulations exploring **pose/state estimation**, mo
  - How the **front-end** turns camera observations into poses for the estimator: Perspective-n-Point (PnP) pose recovery, and triangulation inside bundle adjustment
  - How filtering copes with **non-smooth motion** (ground-contact events, anchor/extend gaits, heading-dependent friction), checked with Monte Carlo NEES consistency tests
 
-Two implementation styles run side by side for 8 of the 14 simulations (the other 6 are NumPy-only; §C says which and why), split into sibling directories with matching filenames:
+Two implementation styles run side by side for 9 of the 15 simulations (the other 6 are NumPy-only; §C says which and why), split into sibling directories with matching filenames:
 - [use_numpy/](use_numpy/): skew-symmetric matrices, $Exp$/$`Log`$ maps, and Jacobians written out by hand (Rodrigues' formula, the $SE(3)$ exponential/logarithm, the analytical inverse right Jacobian), shared across scripts via [use_numpy/lie_utils.py](use_numpy/lie_utils.py).
 - [use_manif/](use_manif/): the same math delegated to the [`manif`](https://github.com/artivis/manif) Lie-theory library's Python bindings (`T.rplus`, `T.rminus`, `T.act`, all with analytical Jacobians returned as out-parameters), so no manifold formula is hand-rolled.
 
@@ -48,7 +48,7 @@ timing/peak-memory measurement helper every script's benchmark printout uses).
 
 ### [use_numpy/](use_numpy/) - Plain numpy, hand-rolled Lie-group math
 
-- [lie_utils.py](use_numpy/lie_utils.py): shared module of the hand-rolled Lie-group helpers (`skew`, `rotation_geodesic_error`, `so3_exp`, `so3_right_jacobian`, `se3_exp`, `se3_log`, `se3_inv`, `se3_adjoint`, `se3_ad`, `compute_so3_inv_right_jacobian`, `compute_se3_inv_right_jacobian`, `se3_right_jacobian`; also grouped under short names as static methods of `SO3`/`SE3`, e.g. `SE3.exp`, `SE3.log`, `SO3.inv_right_jacobian` - the same functions on plain arrays, not an object API like manif's), imported by 10 of the other 14 scripts in this directory (`imu_integration_comparison.py`, `robot_imu_simulation.py`, `imu_preintegration.py`, `pointcloud_pose_tracking.py`, `pose_graph.py`, `pose_graph_incremental.py`, `bundle_adjustment.py`, `bundle_adjustment_advanced.py`, `pnp_estimation.py`, and `sliding_window_marginalization.py`) - none keeps its own inline copy of the skew/Jacobian helpers. The remaining 4 (`bayes_tree_construction.py`, `friction_anisotropic_ekf.py`, `inchworm_zupt_ekf.py`, `saltation_matrix_ekf.py`) don't need Lie-group math for what they do. (These counts exclude the `*_v2.py` and `animate_*.py` scripts below; `pointcloud_pose_tracking_v2.py` and `animate_bundle_adjustment.py` import `lie_utils.py` too.)
+- [lie_utils.py](use_numpy/lie_utils.py): shared module of the hand-rolled Lie-group helpers (`skew`, `rotation_geodesic_error`, `so3_exp`, `so3_right_jacobian`, `se3_exp`, `se3_log`, `se3_inv`, `se3_adjoint`, `se3_ad`, `compute_so3_inv_right_jacobian`, `compute_se3_inv_right_jacobian`, `se3_right_jacobian`; plus `so3_log`, `so3_left_jacobian` and the $`SE_2(3)`$ helpers `se23_make`, `se23_parts`, `se23_inv`, `se23_exp`, `se23_log`, `se23_adjoint`; also grouped under short names as static methods of `SO3`/`SE3`/`SE23`, e.g. `SE3.exp`, `SE3.log`, `SO3.inv_right_jacobian`, `SE23.exp` - the same functions on plain arrays, not an object API like manif's), imported by 11 of the other 15 scripts in this directory (`imu_integration_comparison.py`, `robot_imu_simulation.py`, `imu_preintegration.py`, `pointcloud_pose_tracking.py`, `pose_graph.py`, `pose_graph_incremental.py`, `bundle_adjustment.py`, `bundle_adjustment_advanced.py`, `pnp_estimation.py`, `sliding_window_marginalization.py`, and `invariant_saltation_ekf.py`) - none keeps its own inline copy of the skew/Jacobian helpers. The remaining 4 (`bayes_tree_construction.py`, `friction_anisotropic_ekf.py`, `inchworm_zupt_ekf.py`, `saltation_matrix_ekf.py`) don't need Lie-group math for what they do. (These counts exclude the `*_v2.py` and `animate_*.py` scripts below; `pointcloud_pose_tracking_v2.py` and `animate_bundle_adjustment.py` import `lie_utils.py` too.)
 - [imu_integration_comparison.py](use_numpy/imu_integration_comparison.py): naive Euler-angle vs. $SO(3)$ exp-map orientation integration.
 - [robot_imu_simulation.py](use_numpy/robot_imu_simulation.py): high-rate IMU propagation + a low-rate Gauss-Newton position-only correction against a noisy GPS-style fix (the correction's Jacobian has a structurally zero angular block, so orientation is never touched by it, only ever [dead-reckoned](docs/optimization/factor_graph.md#2-why-do-we-need-it) by the IMU), reusing `lie_utils.py`'s $SE(3)$ $Exp$ math.
 - [imu_preintegration.py](use_numpy/imu_preintegration.py): IMU pre-integration - compresses a burst of high-frequency IMU samples into one relative measurement plus first-order bias Jacobians, then shows an instant Taylor-expansion correction when the bias estimate changes, without re-integrating.
@@ -74,15 +74,16 @@ timing/peak-memory measurement helper every script's benchmark printout uses).
   - Guards against Gauss-Newton divergence (Levenberg-Marquardt damping) and the point-behind-camera reflection ambiguity (`passes_cheirality`/`cull_invalid_points`), which a weakly-constrained, forward-motion scene can hit but `bundle_adjustment.py`'s densely-observed toy scene never does.
 - [pnp_estimation.py](use_numpy/pnp_estimation.py): Perspective-n-Point (PnP) - triangulation's inverse ([docs/frontend/triangulation_pnp.md](docs/frontend/triangulation_pnp.md)): given known 3D points and their observed pixels, recovers the unknown camera pose via a closed-form linear DLT initial guess (specialized to known intrinsics), then a few Gauss-Newton iterations against the true reprojection error.
 - [saltation_matrix_ekf.py](use_numpy/saltation_matrix_ekf.py): a bouncing point mass ([docs/filtering/hybrid_saltation_ekf.md](docs/filtering/hybrid_saltation_ekf.md)) tracked through discrete ground-contact events by a naive EKF (reset-Jacobian-only covariance handling) vs. a saltation-matrix-corrected EKF, plus a Monte Carlo NEES consistency check, and `--detect-time-bias`/`--detect-time-noise-std` params quantifying what happens once contact-detection timing itself is uncertain (doc §8). Plain $\mathbb{R}^6$ state (position/velocity, no rotation).
+- [invariant_saltation_ekf.py](use_numpy/invariant_saltation_ekf.py): the bounce of `saltation_matrix_ekf.py` lifted to a tumbling IMU-carrying rigid body on $`SE_2(3)`$ ([docs/filtering/invariant_saltation_ekf.md](docs/filtering/invariant_saltation_ekf.md)), tracked by right-invariant EKFs that differ only in how the covariance crosses a bounce (invariant-naive, reset-Jacobian, saltation, and saltation + a timing-noise term for contact-detection jitter), plus a world-frame EKF baseline; Monte Carlo NEES over mode-matched ticks, with optional contact-detection bias/jitter.
 - [inchworm_zupt_ekf.py](use_numpy/inchworm_zupt_ekf.py): a 1D point mass crawling through a known anchor(dwell)/extend gait cycle ([docs/filtering/inchworm_zupt_ekf.md](docs/filtering/inchworm_zupt_ekf.md)), comparing three zero-velocity-update (ZUPT) policies - `never`, `always`, `phase_conditional` - via the same Monte Carlo NEES pattern as `saltation_matrix_ekf.py`. State $x=[p,v]\in\mathbb{R}^2$.
 - [friction_anisotropic_ekf.py](use_numpy/friction_anisotropic_ekf.py): a crawling unicycle on a friction-anisotropic pad ([docs/filtering/friction_anisotropic_ekf.md](docs/filtering/friction_anisotropic_ekf.md)), comparing `isotropic`/`fixed_anisotropic`/`heading_aware` process-noise policies for the position block of $Q$ as the (exact, noise-free) heading rotates through a full loop. Ordinary EKF throughout (heading itself is exact, so no manifold/linearization question is at stake).
 - [sliding_window_marginalization.py](use_numpy/sliding_window_marginalization.py): gives [docs/optimization/marginalization.md](docs/optimization/marginalization.md) its accompanying script - streams a pure odometry chain, marginalizes the oldest pose via the Schur complement whenever a `--window-size` cap would be exceeded, and compares the resulting bounded-memory solve against `run_full_batch_growing`'s unbounded re-solve-from-scratch baseline across a sweep of trajectory lengths, reusing `pose_graph.py`/`pose_graph_incremental.py`'s building blocks.
 - `*_v2.py` ([pointcloud_pose_tracking_v2.py](use_numpy/pointcloud_pose_tracking_v2.py), [saltation_matrix_ekf_v2.py](use_numpy/saltation_matrix_ekf_v2.py), [inchworm_zupt_ekf_v2.py](use_numpy/inchworm_zupt_ekf_v2.py), [friction_anisotropic_ekf_v2.py](use_numpy/friction_anisotropic_ekf_v2.py)): class-based versions of those four scripts. Each recursive filter is a class with `predict`/`measurement_update`/`step`/`state` methods, and its `run_*` function is a short loop over `step()`; `pointcloud_pose_tracking_v2.py`'s batch Gauss-Newton smoother is a `BatchGNSmoother` class instead (`linearize` with one method per factor type, `retract`, `solve`). Everything else is unchanged. Same command-line flags, and outputs bit-identical to the original. `tests/` and `assets/make_figures.py` use the originals.
 - `animate_*.py` ([animate_saltation_ekf.py](use_numpy/animate_saltation_ekf.py), [animate_inchworm_zupt_ekf.py](use_numpy/animate_inchworm_zupt_ekf.py), [animate_friction_anisotropic_ekf.py](use_numpy/animate_friction_anisotropic_ekf.py), [animate_bundle_adjustment.py](use_numpy/animate_bundle_adjustment.py), [animate_sliding_window_marginalization.py](use_numpy/animate_sliding_window_marginalization.py)): each re-runs one simulation's default case and writes an animated GIF (the simulated system itself plus the quantity that separates the methods, e.g. reported uncertainty or NEES). The GIFs live in `assets/` and are embedded in the matching doc next to its static figure. They import the simulation's own functions (the saltation one uses `saltation_matrix_ekf_v2.py`'s `HybridEKF`), take its scene/noise flags plus `--fps`, `--dpi` and `--out`, and need no `ffmpeg` (matplotlib's Pillow writer). The inchworm and friction ones re-run the 500-trial Monte Carlo, about 1-1.5 min each. `tests/` does not cover them.
 
-### [use_manif/](use_manif/) - `manifpy` counterparts (8 of the 14 simulations)
+### [use_manif/](use_manif/) - `manifpy` counterparts (9 of the 15 simulations)
 
-The other 6 scripts are NumPy-only because there is nothing backend-specific to compare:
+The other 6 scripts are NumPy-only:
 - `bayes_tree_construction.py`: pure index/graph bookkeeping, so the result is structurally identical in either backend.
 - `saltation_matrix_ekf.py`, `inchworm_zupt_ekf.py`, `friction_anisotropic_ekf.py`: plain Euclidean states (no manifold question).
 - `pnp_estimation.py`, `sliding_window_marginalization.py`: single implementation; the PnP recipe and the bounded-vs-unbounded scaling result are backend-agnostic.
@@ -95,6 +96,7 @@ The other 6 scripts are NumPy-only because there is nothing backend-specific to 
 - [pose_graph_incremental.py](use_manif/pose_graph_incremental.py): same incremental-vs-batch comparison as the `use_numpy` version, with edge Jacobians obtained by chaining `manifpy`'s own `compose`/`rminus` Jacobian out-parameters instead of `lie_utils.py`.
 - [bundle_adjustment.py](use_manif/bundle_adjustment.py): same three solvers as the `use_numpy` version, with camera-pose Jacobians obtained by chaining `manifpy`'s own `inverse`/`act` Jacobian out-parameters instead of a hand-rolled closed form; landmarks stay plain numpy $\mathbb{R}^3$ vectors (manif has no notion of those), same as `pointcloud_pose_tracking.py`.
 - [bundle_adjustment_advanced.py](use_manif/bundle_adjustment_advanced.py): same Local + Global BA comparison as the `use_numpy` version, with camera-pose Jacobians obtained by chaining `manifpy`'s own `inverse`/`act` Jacobian out-parameters, matching `bundle_adjustment.py`'s own manif version.
+- [invariant_saltation_ekf.py](use_manif/invariant_saltation_ekf.py): same five filters (and contact-detection model) as the `use_numpy` version, with the state a `manif.SE_2_3` object: Exp/Log, composition, `adj()` (IMU noise into the invariant error), `act()` (landmark measurements) and `lplus`/`lminus` (the right-invariant error and correction) come from manif, and mean propagation is the group-affine product $`\Gamma\, f_h(X)\, \Upsilon`$. The transition matrix $`\Phi`$, the world-to-invariant map $`T(X)`$, the saltation matrix and $`H`$ stay hand-derived (manif has no notion of them). All matrices use manif's tangent order (position, rotation, velocity) instead of the `use_numpy` order (rotation, velocity, position). Given the same data and initial estimate, both versions give the same estimates and the same covariances once reordered, to about $`10^{-14}`$ (checked in the tests).
 
 ### Root
 
@@ -663,5 +665,51 @@ uv run python use_numpy/sliding_window_marginalization.py --nodes-per-side-sweep
 - `--anchor-weight`: information weight of the node-0 gauge-fixing prior (default `1e6`)
 - `--gn-tol`: Gauss-Newton convergence tolerance (default `1e-6`)
 - `--gn-max-iters`: maximum Gauss-Newton iterations per solve (default `10`)
+- `--seed`: RNG seed
+- `--out`: save the figure to this path instead of showing it (default: show)
+
+### 15. Invariant EKF on SE_2(3) through a bounce
+
+#### Purpose
+
+`docs/filtering/invariant_saltation_ekf.md` lifts §11's bouncing point mass to a **tumbling rigid body carrying an IMU**, with state $`X = (R, v, p) \in SE_2(3)`$, tracked by a **right-invariant EKF (RIEKF)**. Between bounces the RIEKF's error dynamics are exactly linear and trajectory-independent ($`\Phi = e^{A h}`$ with constant $`A`$), and body-frame landmark measurements give a constant $`H`$. The bounce $`(R, v, p) \mapsto (R, M v, p)`$ is not a group automorphism, so its Jacobian in invariant coordinates is state-dependent.
+
+Five filters, identical apart from the bounce treatment or the error coordinates:
+- **RIEKF, invariant-naive**: $`\mathrm{blockdiag}(I, M, I)`$ - applies the reset to the velocity error as if it were an automorphism.
+- **RIEKF, reset-Jacobian**: $`T(X^+)^{-1} DR\, T(X^-)`$ - correct state dependence, no impact-timing correction.
+- **RIEKF, saltation**: $`\Xi_{RI} = T(X^+)^{-1} \Xi_{\text{world}} T(X^-)`$ - both; matches a finite-difference ground truth of the exact hybrid map on $`SE_2(3)`$ to about $`10^{-9}`$ (the other two are off by order one).
+- **RIEKF, saltation + timing noise**: saltation plus $`s^2 w w^\top`$ at each bounce, where $`w = T(X^+)^{-1}(f^+ - DR\, f^-)`$ is how far the post-impact state moves per second of contact-detection timing error and $`s`$ is that error's RMS. Identical to saltation with exact detection (the default).
+- **World-frame EKF, saltation**: the non-invariant baseline.
+
+Results (Monte Carlo NEES over mode-matched ticks, 200 trials; consistent value 9, 95% interval [8.42, 9.60]): after bounces the invariant-naive filter is overconfident (13.45 at the defaults, 16.44 with `--meas-every 25`), reset-Jacobian and saltation are close to consistent (9.33/8.89 and 10.36/9.37), and the world-frame EKF is already inconsistent before the first bounce (14.01/18.92). RMS errors are nearly identical across the RIEKFs - the effect is in the reported uncertainty.
+
+With contact-detection jitter (`--detect-time-noise-std`, doc §7), every filter without the timing term becomes overconfident after bounces, the saltation one more than the reset-Jacobian one from 2 ms of jitter on (30.99 vs. 22.55 at 5 ms, seeds 0-3), while saltation + timing noise stays consistent (8.68-9.03 from 0 to 5 ms).
+
+![Three panels from invariant_saltation_ekf.py: height of the bouncing body for the ground truth and the filters, single-run position error, and Monte Carlo average NEES over time against the consistent value of 9](assets/invariant_saltation_ekf.png)
+
+#### Scripts
+
+- [use_numpy/invariant_saltation_ekf.py](use_numpy/invariant_saltation_ekf.py)
+- [use_manif/invariant_saltation_ekf.py](use_manif/invariant_saltation_ekf.py)
+
+#### Usage
+
+```
+uv run python use_numpy/invariant_saltation_ekf.py --duration 5.0 --dt 0.01 --meas-every 10 --restitution 0.8 --gravity 9.81 --drop-height 5.0 --init-velocity 1.0 0.5 0.0 --body-rate 1.0 -0.6 2.0 --gyro-noise-std 0.02 --accel-noise-std 0.3 --meas-noise-std 0.05 --init-rot-std-deg 5.0 --init-vel-std 0.2 --init-pos-std 0.1 --detect-time-bias 0.0 --detect-time-noise-std 0.0 --n-mc-trials 200 --seed 0
+```
+
+- `--duration`: simulation length in seconds (default `5.0`, four bounces) - the run raises an error if an impact gets slower than `min_bounce_speed`, rather than modeling the settling phase
+- `--dt`: IMU step in seconds (default `0.01`)
+- `--meas-every`: landmark measurement period, in IMU steps (default `10`)
+- `--restitution`: bounce restitution coefficient, 0-1 (default `0.8`)
+- `--gravity`: gravitational acceleration magnitude, $`\text{m/s}^2`$ (default `9.81`)
+- `--drop-height`: initial height, m (default `5.0`)
+- `--init-velocity`: initial velocity, m/s (default `1.0 0.5 0.0`)
+- `--body-rate`: constant true body angular rate, rad/s (default `1.0 -0.6 2.0`)
+- `--gyro-noise-std`/`--accel-noise-std`: IMU noise std-dev per sample, rad/s and $`\text{m/s}^2`$ (defaults `0.02`/`0.3`)
+- `--meas-noise-std`: landmark measurement noise std-dev, m (default `0.05`)
+- `--init-rot-std-deg`/`--init-vel-std`/`--init-pos-std`: initial right-invariant error std-devs (defaults `5.0` deg/`0.2` m/s/`0.1` m)
+- `--detect-time-bias`/`--detect-time-noise-std`: contact-detection timing offset (positive = late) and jitter std-dev, s (defaults `0.0`/`0.0`, exact detection); the bounce is applied at the detected time, clipped into the current tick
+- `--n-mc-trials`: number of Monte Carlo consistency trials (default `200`)
 - `--seed`: RNG seed
 - `--out`: save the figure to this path instead of showing it (default: show)
