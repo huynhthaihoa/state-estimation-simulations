@@ -99,7 +99,7 @@ A rotation matrix is a point in this space. Optimizing directly on it is inconve
 
 ## 6. Lie algebra: zoom in locally
 
-Now suppose we are at some rotation $R$. Instead of thinking about all possible rotations, we zoom in around $R$, where small rotations behave approximately like ordinary vectors. Every nearby rotation can be written as $R\exp(\delta\theta^\wedge)$ for a small 3-vector (where $`\delta\theta^\wedge`$ is the **hat operator**'s **skew-symmetric** matrix (equal to minus its transpose), Section 7, and $`\exp`$ the **matrix exponential**, Section 8; see the [glossary](../glossary.md#1-geometry-and-lie-groups)):
+Now suppose we are at some rotation $R$. Instead of thinking about all possible rotations, we zoom in around $R$, where small rotations behave approximately like ordinary vectors. Every nearby rotation can be written as $R\exp(\delta\theta^\wedge)$ for a small 3-vector $\delta\theta$. Here $`\delta\theta^\wedge`$ is its skew-symmetric matrix (§7) and $`\exp`$ the matrix exponential (§8); see the [glossary](../glossary.md#1-geometry-and-lie-groups):
 
 ```math
 \delta\theta =\begin{bmatrix}\delta\theta_x\\ 
@@ -114,7 +114,7 @@ The space these small motions live in is the Lie algebra $\mathfrak{so}(3)$.
 Technically:
 
 - $\mathfrak{so}(3)$ is the tangent space *at the identity*; its elements are $3\times3$ skew-symmetric matrices.
-- The 3-vector $\delta\theta$ holds their coordinates, related by the hat operator of Section 7.
+- The 3-vector $\delta\theta$ holds their coordinates, related by the hat operator of §7.
 - Near some other $R$ we reuse the same algebra by composing with $R$, as above, so no separate algebra is needed at every point.
 
 ---
@@ -129,11 +129,11 @@ We will meet this matrix:
 -\delta\theta_y & \delta\theta_x & 0 \end{bmatrix}
 ```
 
-The map $(\cdot)^\wedge : \mathbb{R}^3 \rightarrow \mathfrak{so}(3)$ is called the **hat operator**. The reason for the odd shape is its key property:
+The map $(\cdot)^\wedge : \mathbb{R}^3 \rightarrow \mathfrak{so}(3)$ is the hat operator ([glossary](../glossary.md#1-geometry-and-lie-groups)). The odd shape comes from its key property:
 
 $$\delta\theta^\wedge v = \delta\theta \times v$$
 
-so the matrix is just the **cross product** written as a matrix.
+so the matrix is the cross product written as a matrix.
 
 ---
 
@@ -161,7 +161,7 @@ small rotation                  actual rotation
  └──────────────────────────────►│
 ```
 
-**Notation.** Other docs in this repo, the Solà et al. reference, and the `manif` library write the same maps directly on vectors, with capital letters: $`\mathrm{Exp}(\delta\theta) = \exp(\delta\theta^\wedge)`$ and $`\mathrm{Log}(R) = \log(R)^\vee`$ (the vee operator is defined in Section 9).
+**Notation.** Other docs in this repo, the Solà et al. reference, and the `manif` library write the same maps directly on vectors, with capital letters: $`\mathrm{Exp}(\delta\theta) = \exp(\delta\theta^\wedge)`$ and $`\mathrm{Log}(R) = \log(R)^\vee`$ (the vee operator is defined in §9).
 
 This is exact for any rotation vector, not just small ones. With $\theta = \lVert\delta\theta\rVert$ it has a closed form (Rodrigues' formula), the same kind of expression as the Jacobians in [jacobian.md §11.4](jacobian.md#114-closed-form-for-so3):
 
@@ -169,13 +169,13 @@ This is exact for any rotation vector, not just small ones. With $\theta = \lVer
 \exp(\delta\theta^\wedge) = I + \frac{\sin\theta}{\theta}\,\delta\theta^\wedge + \frac{1-\cos\theta}{\theta^2}\,(\delta\theta^\wedge)^2
 ```
 
-For a small rotation it reduces to $R \approx I+\delta\theta^\wedge$, the first-order form behind the small update $R\exp(\delta\theta^\wedge)$ of Section 10.
+For a small rotation it reduces to $R \approx I+\delta\theta^\wedge$, the first-order form behind the small update $R\exp(\delta\theta^\wedge)$ of §10.
 
 ---
 
 ## 9. The logarithm map
 
-The **logarithm map** does the reverse of Section 8: it turns an actual transformation back into a local motion.
+The **logarithm map** does the reverse of §8: it turns an actual transformation back into a local motion.
 
 ```text
 Lie group                       Lie algebra
@@ -194,8 +194,8 @@ $$\delta\theta^\wedge = \log(R_1^{-1}R_2)$$
 and $\log$ undoes the exponential map: $\log(\exp(\delta\theta^\wedge)) = \delta\theta^\wedge$.
 
 - This holds as long as $`\|\delta\theta\| < \pi`$ (at exactly $\pi$, $\log$ is ambiguous).
-- Beyond that range, multiple $\delta\theta$'s map to the same $R$ (the exponential is periodic per rotation axis), and $\log$ recovers only the one on its **principal branch** (the one with norm at most $`\pi`$).
-- To pull the plain vector out of the skew-symmetric matrix we apply the inverse of the hat operator, the **vee operator** $(\cdot)^\vee$, so $\delta\theta = (\log(R))^\vee$.
+- Beyond that range, several $\delta\theta$ map to the same $R$ (the exponential is periodic per rotation axis), and $\log$ recovers only the one on its **principal branch** (norm at most $`\pi`$).
+- The inverse of the hat operator, the **vee operator** $(\cdot)^\vee$, pulls the plain vector out of the skew-symmetric matrix: $\delta\theta = (\log(R))^\vee$.
 
 **Worked number: a 90° yaw.** Take $\delta\theta = (0,0,\pi/2)$, a turn about the vertical $`z`$ axis. Then
 
@@ -211,7 +211,7 @@ so Exp builds the matrix and Log recovers the original 3-vector (checked numeric
 
 This is how we turn "the difference between two poses" into a plain vector we can measure, weight, and feed into a least-squares solver, which is what pose-graph optimization does with every edge residual.
 
-The same idea applies to $SE(3)$: $\xi^\wedge = \log(T_1^{-1}T_2)$ (where $`\xi = [\rho, \phi]`$ is the 6-vector defined in Section 11; the [glossary](../glossary.md#1-geometry-and-lie-groups) writes it $[v, \omega]$) gives the 6D motion that separates two poses $T_1$ and $T_2$.
+The same idea applies to $SE(3)$: $\xi^\wedge = \log(T_1^{-1}T_2)$ (where $`\xi = [\rho, \phi]`$ is the 6-vector defined in §11; the [glossary](../glossary.md#1-geometry-and-lie-groups) writes it $[v, \omega]$) gives the 6D motion that separates two poses $T_1$ and $T_2$.
 
 ---
 
@@ -254,22 +254,22 @@ So one 6D vector represents a tiny change in the entire robot pose:
 └── rotation:     φ  (Δrx Δry Δrz)
 ```
 
-Just like $\mathfrak{so}(3)$ has a hat operator (Section 7), $\mathfrak{se}(3)$ has its own, turning the 6-vector $\xi$ into a $4\times4$ matrix, where $\phi^\wedge$ is the same $3\times3$ skew-symmetric block as before:
+Just like $\mathfrak{so}(3)$ has a hat operator (§7), $\mathfrak{se}(3)$ has its own, turning the 6-vector $\xi$ into a $4\times4$ matrix, where $\phi^\wedge$ is the same $3\times3$ skew-symmetric block as before:
 
 ```math
 \xi^\wedge = \begin{bmatrix} \phi^\wedge & \rho\\ 
 0 & 0 \end{bmatrix}
 ```
 
-**Easy to get wrong:** $\exp(\xi^\wedge)$ is *not* "exponentiate the rotation part and copy the translation unchanged." Rotation and translation are coupled: sweeping a small rotation while translating traces a curve, not a straight line. The closed form is
+**Easy to get wrong:** $\exp(\xi^\wedge)$ is *not* "exponentiate the rotation part and copy the translation unchanged." Rotation and translation are coupled: translating while rotating traces a curve, not a straight line. The closed form is
 
 ```math
 \exp(\xi^\wedge) = \begin{bmatrix} \exp(\phi^\wedge) & V\rho\\ 
 0 & 1 \end{bmatrix}
 ```
 
-- $V$ is a $3\times3$ matrix, built purely from $\phi$, that "bends" the raw translation $\rho$ to account for the coupling. Its exact formula isn't the point here.
-- We can't glue the $SO(3)$ exponential and the raw translation together; the $SE(3)$ exponential genuinely mixes the two.
+- $V$ is a $3\times3$ matrix, built purely from $\phi$, that "bends" the raw translation $\rho$ to account for the coupling. Its exact formula isn't needed here.
+- The $SO(3)$ exponential and the raw translation cannot be glued together: the $SE(3)$ exponential mixes the two.
 - The log map has the mirror-image subtlety: recovering $\rho$ from a pose needs $V^{-1}$, not just the translation column.
 
 **Tiny example:** drive forward at 1 m/s while turning left at 90°/s, for 1 s.
@@ -319,9 +319,10 @@ So a velocity changes frame exactly like a position. **Tiny example:** a drone f
 ```
 
 **Why not store $`R`$ in $`SO(3)`$ and $`v`$, $`p`$ as plain vectors?** Both hold the same numbers; the difference is what the group product buys the filter.
-- With this product, one IMU step over $`h`$ is $`X^+ = \Gamma\, f(X)\, \Upsilon`$. Here $`\Gamma`$ is a fixed matrix holding gravity, $`f(R, v, p) = (R, v, p + v h)`$ respects the group product (a **group automorphism**: $`f(X_1 X_2) = f(X_1)\,f(X_2)`$), and $`\Upsilon`$ holds the IMU increments. Systems of this form are called **group-affine**.
+
+- With this product, one IMU step over $`h`$ is $`X^+ = \Gamma\, f(X)\, \Upsilon`$. Here $`\Gamma`$ is a fixed matrix holding gravity, $`f(R, v, p) = (R, v, p + v h)`$ respects the group product (a **group automorphism**: $`f(X_1 X_2) = f(X_1)\,f(X_2)`$), and $`\Upsilon`$ holds the IMU increments. Systems of this form are [group-affine](../glossary.md#1-geometry-and-lie-groups).
 - For a group-affine system, the **invariant error** $`\eta = \hat X X^{-1}`$ between estimate and truth evolves in the same way whatever the trajectory, and its logarithm evolves through a constant matrix, even for large errors. This is the basis of the **invariant EKF** (Barrau & Bonnabel, 2017).
-- With separate pieces, the error dynamics depend on the current estimate. In [invariant_saltation_ekf.md §6](../filtering/invariant_saltation_ekf.md#6-results-consistency-through-the-bounces), an EKF built that way is overconfident before the body's first bounce on the ground (NEES 14-19 against a consistent 9), while the invariant EKF on $`SE_2(3)`$ is close to consistent.
+- With separate pieces, the error dynamics depend on the current estimate. In [invariant_saltation_ekf.md §6](../filtering/invariant_saltation_ekf.md#6-results-consistency-through-the-bounces), the world-frame EKF is overconfident before the body's first bounce on the ground (NEES 14-19 against a consistent 9), while the invariant EKF on $`SE_2(3)`$ is close to consistent. That document attributes the gap most likely to Jacobians evaluated at a poor initial estimate, and does not isolate it further.
 
 In code: `se23_make`, `se23_parts`, `se23_inv`, `se23_exp`, `se23_log` and `se23_adjoint` in [use_numpy/lie_utils.py](../../use_numpy/lie_utils.py), and `manif.SE_2_3`, whose tangent order is (position, rotation, velocity).
 
@@ -387,7 +388,7 @@ We then apply that motion to the drone's current pose:
 
 $$\boxed{ \text{current pose} + \text{small motion} \rightarrow \text{new pose}}$$
 
-except that the "+" is replaced by a group operation. This update is called a **retraction**, often written $`T \oplus \xi = T\,\mathrm{Exp}(\xi)`$ (some docs write $`\boxplus`$).
+except that the "+" is replaced by a group operation. This update is a [retraction](../glossary.md#1-geometry-and-lie-groups), often written $`T \oplus \xi = T\,\mathrm{Exp}(\xi)`$ (some docs write $`\boxplus`$).
 
 ---
 
@@ -397,7 +398,7 @@ We could optimize $x,y,z,\text{roll},\text{pitch},\text{yaw}$ directly, but Eule
 
 ---
 
-## 14. The four objects
+## 14. Groups and Lie algebras at a glance
 
 | Concept   | Intuition                 |
 | --------- | ------------------------- |
@@ -423,7 +424,7 @@ $$f(T\exp(\delta\xi^\wedge)) \approx f(T)+J\delta\xi$$
 
 where $J$ is the **Jacobian with respect to the Lie-algebra perturbation**. Whether the perturbation is applied on the right, as here, or on the left changes $J$; [jacobian.md §11](jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space) explains the left and right Jacobians this leads to. Most docs here perturb on the right. The exception is [invariant_saltation_ekf.md](../filtering/invariant_saltation_ekf.md), which perturbs on the left to match its right-invariant error ([left_right_invariant.md](../filtering/left_right_invariant.md#1-the-setup) explains the pairing).
 
-That's why Lie algebra appears everywhere in modern SLAM: it gives optimization algorithms a **locally Euclidean 6D space** to work in, while the actual pose remains a valid element of $SE(3)$.
+That's why Lie algebra is common in modern SLAM: it gives optimization algorithms a **locally Euclidean 6D space** to work in, while the actual pose remains a valid element of $SE(3)$.
 
 ---
 
@@ -431,12 +432,12 @@ That's why Lie algebra appears everywhere in modern SLAM: it gives optimization 
 
 > **A Lie group represents the actual robot state (rotation/pose), while its Lie algebra represents small changes around that state, allowing us to use ordinary vector calculus and optimization without breaking the geometry of the state.**
 
-In pictures: the state sits on $SE(3)$ (curved), we zoom in to $\xi \in \mathbb{R}^6$ (flat, the tree of Section 11), and $\exp()$ brings the result back as a new valid pose.
+In pictures: the state sits on $SE(3)$ (curved), we zoom in to $\xi \in \mathbb{R}^6$ (flat, the 6-vector of §11), and $\exp()$ brings the result back as a new valid pose.
 
 ---
 
 ## 17. References
 
-1. Solà, J., Deray, J., & Atchuthan, D. (2018). *A micro Lie theory for state estimation in robotics*. arXiv:1812.01537. https://doi.org/10.48550/arXiv.1812.01537 - the standard modern reference for the $SO(3)$/$`SE(3)`$ $Exp$/$`Log`$ conventions used throughout this doc, written by (among others) the author of the `manif` library this repo's `use_manif/` scripts are built on.
+1. Solà, J., Deray, J., & Atchuthan, D. (2018). *A micro Lie theory for state estimation in robotics*. arXiv:1812.01537. https://doi.org/10.48550/arXiv.1812.01537 - the standard modern reference for the $SO(3)$/$`SE(3)`$ $`\mathrm{Exp}`$/$`\mathrm{Log}`$ conventions used throughout this doc, written by (among others) the author of the `manif` library this repo's `use_manif/` scripts are built on.
 2. Barrau, A., & Bonnabel, S. (2017). *The Invariant Extended Kalman Filter as a Stable Observer*. IEEE Transactions on Automatic Control, 62(4), 1797–1812. https://arxiv.org/abs/1410.1465 - group-affine systems and the trajectory-independent invariant error used in §11.1.
 3. Hartley, R., Ghaffari, M., Eustice, R. M., & Grizzle, J. W. (2020). *Contact-Aided Invariant Extended Kalman Filtering for Robot State Estimation*. The International Journal of Robotics Research, 39(4), 402–430. https://doi.org/10.1177/0278364919894385 - $`SE_2(3)`$ and $`SE_{K+2}(3)`$ for IMU-driven robots (§11.1).

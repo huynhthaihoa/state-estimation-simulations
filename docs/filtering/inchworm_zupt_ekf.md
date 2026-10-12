@@ -83,9 +83,9 @@ $`\sigma_{\text{process}}`$ is the assumed acceleration-disturbance standard dev
 
 **Measurement updates** (`_kf_update`): both updates go through the same standard linear-Gaussian update and differ only in $z$, $H$ and $R$ (the measurement, the **measurement Jacobian** and the **measurement-noise covariance**, [glossary](../glossary.md#6-kalman-filter-family)):
 
-$$
+```math
 r = z - H x^{-}, \qquad S = H P^{-} H^\top + R, \qquad K = P^{-} H^\top S^{-1}
-$$
+```
 
 Here $`r`$ is the **innovation**, $`S`$ its covariance and $`K`$ the **Kalman gain** ([glossary](../glossary.md#6-kalman-filter-family)).
 
@@ -98,7 +98,7 @@ x^{+} = x^{-} + K r, \qquad P^{+} = (I - K H)\,P^{-}
 | Position | `measurement_update_position` | noisy position reading | $`\begin{bmatrix} 1 & 0 \end{bmatrix}`$ | $`\sigma_{\text{pos}}^2`$ | every tick |
 | ZUPT | `measurement_update_zupt` | $0$ (pseudo-measurement) | $`\begin{bmatrix} 0 & 1 \end{bmatrix}`$ | $`\sigma_{\text{zupt}}^2`$ | depends on the variant |
 
-ZUPT is a **pseudo-measurement**: no sensor produces that $z = 0$. The filter is simply told "velocity is zero, give or take $\sigma_{\text{zupt}}$", which is only true if the robot really is stationary. The script's defaults are $\sigma_{\text{pos}} = 0.02$ m and $\sigma_{\text{zupt}} = 0.01$ m/s. Because the two measurement noises are independent, running the ZUPT update right after the position update in the same tick gives the same result as one joint update with both rows of $H$ stacked.
+ZUPT is a pseudo-measurement: no sensor produces that $z = 0$. The filter is simply told "velocity is zero, give or take $\sigma_{\text{zupt}}$", which is only true if the robot really is stationary. The script's defaults are $\sigma_{\text{pos}} = 0.02$ m and $\sigma_{\text{zupt}} = 0.01$ m/s. Because the two measurement noises are independent, running the ZUPT update right after the position update in the same tick gives the same result as one joint update with both rows of $H$ stacked.
 
 **The ZUPT update, written out.** With $`H = \begin{bmatrix} 0 & 1 \end{bmatrix}`$ everything reduces to scalars. Write the predicted covariance as
 
@@ -128,7 +128,7 @@ Three things follow directly from these formulas:
 
 - **It corrects position too, through the cross-covariance.** $P_{pv}$ is how the filter has learned that position and velocity errors move together. If the velocity estimate turns out too high, the position estimate has probably drifted ahead too, so $p$ gets pulled back as well (for positive $P_{pv}$). This is how a velocity-only pseudo-measurement also affects position.
 
-- **It always makes the filter more confident, whether or not the claim is true.** $P_{vv}^{+}$ is always smaller than both $P_{vv}$ and $R_{\text{zupt}}$. Nothing in the update checks whether the robot is stationary. So when `always` applies it during extend, the filter reports a velocity standard deviation of at most 0.01 m/s while the true velocity is up to $v_{\text{extend}} = 0.1$ m/s away from the zero it was just told. That built-in overconfidence drives the large `always` NEES values in §3 (**NEES** is the normalized estimation error squared, 2 on average for a consistent 2-state filter, [glossary](../glossary.md#2-uncertainty-and-probability)).
+- **It always makes the filter more confident, whether or not the claim is true.** $P_{vv}^{+}$ is always smaller than both $P_{vv}$ and $R_{\text{zupt}}$. Nothing in the update checks whether the robot is stationary. So when `always` applies it during extend, the filter reports a velocity standard deviation of at most 0.01 m/s while the true velocity is up to $v_{\text{extend}} = 0.1$ m/s away from the zero it was just told. That built-in overconfidence drives the large `always` NEES values in §3 (**NEES**, 2 on average for a consistent 2-state filter, [glossary](../glossary.md#2-uncertainty-and-probability)).
 
 ---
 
@@ -151,7 +151,7 @@ A ramp only helps if it is gentle enough. The rule: compare the true ramp accele
 
 The defaults' $t_{\text{extend}}$ gives 12 cruise and 20 anchor ticks, enough to settle before being measured. The $40\times$ case is far worse, but $3.3\times$ is still a real mismatch, not a negligible one: §3 shows it sets every variant's NEES level and drives the `never`-vs-`phase_conditional` comparison.
 
-The lesson matches the **Zeno**-regime pitfall (infinitely many jumps in finite time) in [`hybrid_saltation_ekf.md` §7](hybrid_saltation_ekf.md#7-two-things-worth-knowing-before-reusing-this-pattern): pick simulation parameters with real margin under a hard failure mode, not by trial against the first numbers that come out.
+The lesson matches the **Zeno**-regime pitfall ([glossary](../glossary.md#7-hybrid-discontinuous-systems)) in [`hybrid_saltation_ekf.md` §7](hybrid_saltation_ekf.md#7-two-things-worth-knowing-before-reusing-this-pattern): pick simulation parameters with real margin under a hard failure mode, not by trial against the first numbers that come out.
 
 The headline NEES comparison below excludes the ramp ticks themselves (`is_cruise` excludes them, matching `is_anchor`'s own definition). They are a shared transition cost all three variants pay alike, not the phenomenon being measured, the same convention `hybrid_saltation_ekf.md` uses for its shared bounce-tick spike.
 
@@ -171,7 +171,7 @@ One might expect `always` to match `phase_conditional` during genuine anchor tic
 
 *Figure: `use_numpy/inchworm_zupt_ekf.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py inchworm_zupt_ekf`.*
 
-The same run, animated over five anchor/extend cycles. The top strip shows the point mass crawling along its track, gold while anchored and green while extending, with a gray footprint at each anchor point and each policy's position estimate below it; `always` falls several centimetres behind (position **RMS** (root-mean-square) error 0.060 m vs 0.015-0.016 m). The middle panel shows each policy's velocity estimate with its ±2σ band: `always` collapses its band during motion, and `phase_conditional` tightens only on anchor ticks. The bottom panel shows the Monte Carlo NEES building up cycle by cycle; `always` climbs to about 900, and none of the three is consistent at these defaults (§3).
+The same run, animated over five anchor/extend cycles. The top strip shows the point mass crawling along its track, gold while anchored and green while extending, with a gray footprint at each anchor point and each policy's position estimate below it; `always` falls several centimetres behind (position **RMS** error 0.060 m vs 0.015-0.016 m). The middle panel shows each policy's velocity estimate with its ±2σ band: `always` collapses its band during motion, and `phase_conditional` tightens only on anchor ticks. The bottom panel shows the Monte Carlo NEES building up cycle by cycle; `always` climbs to a per-tick peak of about 940, and none of the three is consistent at these defaults.
 
 ![Animation of the inchworm gait over five cycles: top, the point mass crawling along its track with its anchor footprints and the three position estimates; middle, true velocity and the never, always and phase_conditional estimates with their ±2-sigma bands, anchor phases shaded; bottom, each policy's Monte Carlo averaged NEES on a log scale against the expected value 2](../../assets/inchworm_zupt_ekf.gif)
 
@@ -183,7 +183,7 @@ The same run, animated over five anchor/extend cycles. The top strip shows the p
 | `always` | ~299 | ~521 | ~0.060 m/s |
 | `phase_conditional` | ~6.1 | ~16.4 | ~0.043-0.045 m/s |
 
-A consistent 2-DoF filter averages $\text{NEES} = 2$; for an average over 500 trials the 95% interval is about $[1.83, 2.18]$. None of the three is consistent: the three non-`always` windows (6.0-16.4) sit at ~3-8× that value.
+A consistent 2-DoF filter averages $\text{NEES} = 2$; for an average over 500 trials the 95% interval is about $[1.83, 2.18]$. None of the three is consistent: the four non-`always` windows (6.0-16.4) sit at ~3-8× that value.
 
 **Why every variant is overconfident: the ramps.** The truth has no random disturbance at all. Its only departure from the filters' constant-velocity model is the ramp acceleration, $`v_{\text{extend}}/t_{\text{ramp}} = 0.5\,\text{m/s}^2`$, against the assumed $`\sigma_{\text{process}} = 0.15\,\text{m/s}^2`$ (the $3.3\times$ of §2). Two checks at seed 0 confirm this is the whole story:
 

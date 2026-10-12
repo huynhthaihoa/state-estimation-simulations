@@ -94,7 +94,7 @@ This tells us:
 
 > **If I slightly perturb the robot's $(x, y, \theta)$, how much will the camera measurement $(u, v)$ change?**
 
-So we can think of the Jacobian as a **sensitivity table**. This $H$ is schematic: its entries depend on the camera model. Section 4 works out a concrete one, differentiating with respect to the 3D point rather than the pose, so it is labeled $J$.
+So we can think of the Jacobian as a **sensitivity table**. This $H$ is schematic: its entries depend on the camera model. §4 works out a concrete one, differentiating with respect to the 3D point rather than the pose, so it is labeled $J$.
 
 ---
 
@@ -121,7 +121,7 @@ Putting every partial derivative together gives the full Jacobian:
 0 & f/Z & -fY/Z^2 \end{bmatrix}}
 ```
 
-Notice the zeros: $\partial u/\partial Y = 0$ and $\partial v/\partial X = 0$, because horizontal image position ($u$) doesn't depend on vertical 3D position ($Y$) at all, and vice versa for $v$ and $X$. This is the projection Jacobian a visual-SLAM or bundle-adjustment system computes at every reprojected point (a 3D point projected into the image with current estimates), with $(X, Y, Z)$ the point in *camera* coordinates; it is then chained with the Jacobians of the world-to-camera transform to get derivatives with respect to the pose and the world-frame point.
+Notice the zeros: $\partial u/\partial Y = 0$ and $\partial v/\partial X = 0$, because horizontal image position ($u$) doesn't depend on vertical 3D position ($Y$) at all, and vice versa for $v$ and $X$. This is the projection Jacobian a visual-SLAM or bundle-adjustment system computes at every reprojected point, with $(X, Y, Z)$ the point in *camera* coordinates. It is then chained with the Jacobians of the world-to-camera transform to get derivatives with respect to the pose and the world-frame point.
 
 ---
 
@@ -172,11 +172,11 @@ The EKF does exactly this around its current estimate.
 
 ## 7. Jacobian $\approx$ "local translator"
 
-The mountain idea of Section 6, written as an equation. Let $\delta x$ be a slight change of the robot state ("I slightly changed my robot state"). The Jacobian converts it into $\delta z$, the approximate change in the sensor measurement:
+The mountain idea of §6, written as an equation. Let $\delta x$ be a slight change of the robot state ("I slightly changed my robot state"). The Jacobian converts it into $\delta z$, the approximate change in the sensor measurement:
 
 $$\boxed{\delta z \approx H\delta x}$$
 
-That is why Jacobians are everywhere in EKF, ESKF, IEKF, bundle adjustment, **nonlinear least squares** (minimizing summed squared residuals of nonlinear models), factor graphs, visual odometry and SLAM.
+That is why Jacobians appear throughout EKF, ESKF, IEKF, bundle adjustment, [nonlinear least squares](../glossary.md#3-least-squares-optimization), factor graphs, visual odometry and SLAM.
 
 ---
 
@@ -190,7 +190,7 @@ This is also a key weakness of the EKF: if the function is highly nonlinear, the
 
 ## 9. Connecting this back to IEKF
 
-The pieces above connect back to the IEKF directly.
+The pieces above connect directly to the IEKF.
 
 ### KF
 
@@ -218,7 +218,7 @@ So instead of blindly asking "What is the derivative with respect to my state ve
 
 That's one reason Lie groups and Jacobians become so tightly connected in modern SLAM.
 
-A manifold perturbation on its own isn't yet what makes a filter **invariant**: error-state filters such as the ESKF and MEKF (multiplicative EKF, which perturbs attitude by composition) already perturb on the manifold. The IEKF goes one step further and picks the specific error that ignores a change of world or body frame (left- or right-invariant), which is what makes its linearization independent of the current estimate for **group-affine** dynamics (dynamics under which the invariant error evolves on its own, whatever the trajectory; see [lie_algebra.md §11.1](lie_algebra.md#111-extended-poses-pose-plus-velocity)). See [kf_ekf_iekf.md §5](../filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error) and [left_right_invariant.md](../filtering/left_right_invariant.md).
+A manifold perturbation on its own isn't yet what makes a filter **invariant**: error-state filters such as the ESKF and MEKF (multiplicative EKF, which perturbs attitude by composition) already perturb on the manifold. The IEKF goes one step further and picks a left- or right-[invariant](../glossary.md#1-geometry-and-lie-groups) error. For **group-affine** dynamics ([glossary](../glossary.md#1-geometry-and-lie-groups)) this makes its linearization independent of the current estimate; see [lie_algebra.md §11.1](lie_algebra.md#111-extended-poses-pose-plus-velocity)). See [kf_ekf_iekf.md §5](../filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error) and [left_right_invariant.md](../filtering/left_right_invariant.md).
 
 ---
 
@@ -234,23 +234,23 @@ In the EKF specifically:
 
 ## 11. Left and right Jacobians: sensitivity on a curved space
 
-Section 9 mentioned that manifold-aware filters (error-state filters and the IEKF) perturb the state by composition instead of just subtracting vectors. This section makes that concrete for rotations, and explains where the **left Jacobian** $J_l$ and **right Jacobian** $J_r$ come from.
+§9 mentioned that manifold-aware filters (error-state filters and the IEKF) perturb the state by composition instead of subtracting vectors. This section makes that concrete for rotations and explains where the **left Jacobian** $J_l$ and **right Jacobian** $J_r$ come from.
 
 ### 11.1 Why plain addition breaks
 
 Everywhere above, perturbing an input meant simple addition: $x \to x + \delta x$. That works because $x$ lives in a vector space.
 
-A rotation $R \in SO(3)$ does not. There is no such thing as $R + \delta R$ - the result generally isn't even a valid rotation. Instead, a small perturbation $\delta\varphi \in \mathbb{R}^3$ is turned into a rotation via the **exponential map** (turning a rotation vector, axis times angle, into a rotation matrix), $\text{Exp}(\delta\varphi)$, and then **composed** (matrix-multiplied) with $R$:
+A rotation $R \in SO(3)$ does not. There is no such thing as $R + \delta R$ - the result generally isn't even a valid rotation. Instead, a small perturbation $\delta\varphi \in \mathbb{R}^3$ is turned into a rotation via the exponential map $\text{Exp}(\delta\varphi)$ (rotation vector to rotation matrix; see the [glossary](../glossary.md#1-geometry-and-lie-groups)), and then **composed** (matrix-multiplied) with $R$:
 
 ```math
 R' = \text{Exp}(\delta\varphi)\,R \qquad \text{or} \qquad R' = R\,\text{Exp}(\delta\varphi)
 ```
 
-Both are valid ways to perturb $R$ - but they are not the same $R'$ in general, because matrix multiplication doesn't commute. That non-commutativity, together with the nonlinearity of $\text{Exp}$ (Section 11.2), is the reason the left and right versions differ. On a vector space the distinction never comes up, because addition commutes.
+Both are valid ways to perturb $R$ - but they are not the same $R'$ in general, because matrix multiplication doesn't commute. That non-commutativity, together with the nonlinearity of $\text{Exp}$ (§11.2), is the reason the left and right versions differ. On a vector space the distinction never comes up, because addition commutes.
 
 ### 11.2 The actual question being asked
 
-Suppose we have a rotation built from $\varphi$, i.e. $\text{Exp}(\varphi)$, and we nudge its argument: $\text{Exp}(\varphi + \delta\varphi)$. Because $\text{Exp}$ is a curved, nonlinear map (just like $u = fX/Z$ in Section 4), we cannot simply distribute the addition. We can still ask the usual sensitivity question - "how does the output change?" - and express the answer as a small rotation composed onto $\text{Exp}(\varphi)$, either on the left or on the right:
+Suppose we have a rotation built from $\varphi$, i.e. $\text{Exp}(\varphi)$, and we nudge its argument: $\text{Exp}(\varphi + \delta\varphi)$. Because $\text{Exp}$ is a curved, nonlinear map (just like $u = fX/Z$ in §4), we cannot simply distribute the addition. We can still ask the usual sensitivity question - "how does the output change?" - and express the answer as a small rotation composed onto $\text{Exp}(\varphi)$, either on the left or on the right:
 
 ```math
 \text{Exp}(\varphi+\delta\varphi)\;\approx\;\text{Exp}\big(J_l(\varphi)\,\delta\varphi\big)\cdot\text{Exp}(\varphi) \qquad\text{(left)}
@@ -260,14 +260,14 @@ Suppose we have a rotation built from $\varphi$, i.e. $\text{Exp}(\varphi)$, and
 \text{Exp}(\varphi+\delta\varphi)\;\approx\;\text{Exp}(\varphi)\cdot\text{Exp}\big(J_r(\varphi)\,\delta\varphi\big) \qquad\text{(right)}
 ```
 
-So $J_l$ and $J_r$ are still what Section 10 says a Jacobian is - a local sensitivity map, "small change in input → small change in output" - applied to the exponential map instead of a vector-valued function, and reported by which side the resulting perturbation attaches to.
+So $J_l$ and $J_r$ are still what §10 says a Jacobian is - a local sensitivity map, "small change in input → small change in output" - applied to the exponential map instead of a vector-valued function, and reported by which side the resulting perturbation attaches to.
 
 ### 11.3 The intuition: compass vs. steering wheel
 
 - **Right Jacobian** $J_r(\varphi)$: the extra rotation is applied after $\text{Exp}(\varphi)$, so it's expressed in the object's **own current (body) frame**. Like turning a car's steering wheel a bit more - "a bit more" is relative to however the car is already pointed.
 - **Left Jacobian** $J_l(\varphi)$: the extra rotation is applied before, so it's expressed in the **fixed world/global frame**. Like someone nudging our heading by a fixed compass bearing, regardless of which way we're facing.
 
-Near the identity ($\varphi \to 0$) there's no rotation yet to disagree about "whose frame," so $J_l(0) = J_r(0) = I$. This is the flat-tangent-plane picture of Section 6: at the identity the manifold looks flat. The distinction only shows up when we linearize away from the identity, around some existing rotation.
+Near the identity ($\varphi \to 0$) there's no rotation yet to disagree about "whose frame," so $J_l(0) = J_r(0) = I$. This is the flat-tangent-plane picture of [lie_algebra.md §6](lie_algebra.md#6-lie-algebra-zoom-in-locally): at the identity the manifold looks flat. The distinction only shows up when we linearize away from the identity, around some existing rotation.
 
 ### 11.4 Closed form for $SO(3)$
 
@@ -297,16 +297,16 @@ J_l \approx \begin{bmatrix} 0.637 & -0.637 & 0\\
 0 & 0 & 1 \end{bmatrix}
 ```
 
-Notice $J_r = J_l^\top$, as the identity predicts. Plugging $\theta \to 0$ into the same formulas collapses both matrices to $I$, confirming Section 11.3.
+Notice $J_r = J_l^\top$, as the identity predicts. Plugging $\theta \to 0$ into the same formulas collapses both matrices to $I$, confirming §11.3.
 
 ### 11.6 Where this actually matters
 
-- **IMU preintegration** (preintegration summarizes the IMU samples between two keyframes into one relative-motion measurement): the effect of a small change in gyroscope bias is naturally expressed in the sensor's own (body) frame, so bias-correction Jacobians in preintegration use $J_r$ - worked out end-to-end in [imu_preintegration.md](../optimization/imu_preintegration.md).
+- **[IMU preintegration](../glossary.md#5-slam-system)**: the effect of a small change in gyroscope bias is naturally expressed in the sensor's own (body) frame, so bias-correction Jacobians in preintegration use $J_r$ - worked out end-to-end in [imu_preintegration.md](../optimization/imu_preintegration.md).
 - **Covariance propagation on the manifold**: a rotation's uncertainty is a covariance on the tangent vector $\delta\varphi$, and what it numerically means depends on whether $\delta\varphi$ is defined via $`R\,\text{Exp}(\delta\varphi)`$ (right) or $`\text{Exp}(\delta\varphi)\, R`$ (left).
-  - Converting between them is a multiplication by $R$ (the **adjoint** re-expresses a tangent vector from one frame in another; for rotations it is $R$ itself): $`\text{Exp}(\delta\varphi_{\text{left}})\,R = R\,\text{Exp}(\delta\varphi_{\text{right}})`$ gives $`\delta\varphi_{\text{left}} = R\,\delta\varphi_{\text{right}}`$.
+  - Converting between them is a multiplication by $R$ (the [adjoint](lie_algebra.md#112-the-adjoint-moving-a-small-motion-between-frames), which for rotations is $R$ itself): $`\text{Exp}(\delta\varphi_{\text{left}})\,R = R\,\text{Exp}(\delta\varphi_{\text{right}})`$ gives $`\delta\varphi_{\text{left}} = R\,\delta\varphi_{\text{right}}`$.
   - Hence $`\Sigma_{\text{left}} = R\,\Sigma_{\text{right}}R^\top`$: a change of frame, not a change of the underlying uncertainty.
-  - The Section 11.4 identity $`J_l = R\,J_r`$ follows from the same fact.
-- **Factor graphs/bundle adjustment on $SE(3)$**: residual Jacobians w.r.t. a pose depend on which perturbation convention (left vs. right) the library uses, and the update must apply the step with the same convention. Mixing them computes wrong step directions: the optimization converges slowly, converges to the wrong place, or diverges, all while the code runs without error.
+  - The §11.4 identity $`J_l = R\,J_r`$ follows from the same fact.
+- **Factor graphs/bundle adjustment on $SE(3)$**: residual Jacobians w.r.t. a pose depend on which perturbation convention (left vs. right) the library uses, and the update must apply the step with the same convention. Mixing them gives wrong step directions: the optimization can converge slowly, converge to the wrong place, or diverge, all while the code runs without error.
 
 ### 11.7 One-sentence intuition
 
@@ -316,4 +316,4 @@ Notice $J_r = J_l^\top$, as the identity predicts. Plugging $\theta \to 0$ into 
 
 ## 12. References
 
-1. Solà, J., Deray, J., & Atchuthan, D. (2018). *A micro Lie theory for state estimation in robotics*. arXiv:1812.01537. https://doi.org/10.48550/arXiv.1812.01537 - the standard modern reference for $J_l$/$`J_r`$ and the left/right perturbation conventions behind Section 11, written by (among others) the author of the `manif` library that this repo's `use_manif/` scripts are built on.
+1. Solà, J., Deray, J., & Atchuthan, D. (2018). *A micro Lie theory for state estimation in robotics*. arXiv:1812.01537. https://doi.org/10.48550/arXiv.1812.01537 - the standard modern reference for $J_l$/$`J_r`$ and the left/right perturbation conventions behind §11, written by (among others) the author of the `manif` library that this repo's `use_manif/` scripts are built on.

@@ -56,7 +56,7 @@ Three questions organize the whole map:
 
 1. **What does the front-end hand over?** Constraints, not a final answer. See [frontend_backend.md §1](frontend_backend.md#1-slam-front-end---extracting-constraints).
 2. **Does the back-end keep the past?** Filtering folds it away, smoothing keeps it and can revise it. See [filtering_smoothing.md §9](filtering_smoothing.md#9-the-precise-distinction).
-3. **How is the smoothing problem solved?** Linearize, then solve a sparse linear system, either from scratch (batch) or by updating the previous solution (incremental). See [nonlinear_least_square.md §9](optimization/nonlinear_least_square.md#9-this-is-exactly-where-gaussnewton-comes-from) and [isam_optimization.md §2](optimization/isam_optimization.md#2-the-incremental-idea).
+3. **How is the smoothing problem solved?** Linearize, then solve a sparse linear system, either from scratch (batch) or by updating the previous solution (incremental). See [nonlinear_least_square.md §9](optimization/nonlinear_least_square.md#9-this-is-exactly-where-gauss-newton-comes-from) and [isam_optimization.md §2](optimization/isam_optimization.md#2-the-incremental-idea).
 
 ---
 
@@ -244,7 +244,7 @@ Every estimator here that faces a nonlinear model, except the sigma-point UKF an
   marginalization ────┘     ...and the linearization point matters (FEJ, relinearization)
 ```
 
-The EKF linearizes once per predict/update step, at the current estimate. GN/LM re-linearize every iteration. iSAM2 re-linearizes only variables that moved enough ([isam2_optimization.md §10](optimization/isam2_optimization.md#10-selective-relinearization)). Marginalization freezes a linearization point for good in general; this repo's prior re-linearizes the Jacobian and freezes only $\Omega$ and $X_\mathrm{ref}$ (the prior's frozen reference pose) ([marginalization.md §6](optimization/marginalization.md#6-the-consistency-gotcha-why-fej-exists)).
+The EKF linearizes once per predict/update step, at the current estimate. GN/LM relinearize every iteration. iSAM2 relinearizes only variables that moved enough ([isam2_optimization.md §10](optimization/isam2_optimization.md#10-selective-relinearization)). Marginalization freezes a linearization point for good in general; this repo's prior relinearizes the Jacobian and freezes only $\Omega$ and $X_\mathrm{ref}$ (the prior's frozen reference pose) ([marginalization.md §6](optimization/marginalization.md#6-the-consistency-gotcha-why-fej-exists)).
 
 ### 6.2 Where the error is defined
 
@@ -274,7 +274,7 @@ A filter is the extreme case of the temporal column: it marginalizes every past 
 
 ### 6.4 Loop closure
 
-Loop closure is the event that separates SLAM from odometry, and every layer has something to say about it:
+Loop closure is what lets SLAM correct accumulated drift, which odometry alone cannot. Every layer has a role in it:
 
 | Layer | What happens | Doc |
 |---|---|---|
@@ -283,7 +283,7 @@ Loop closure is the event that separates SLAM from odometry, and every layer has
 | Robust costs | A false closure is down-weighted | [pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures) |
 | iSAM | The new row sweeps through the factorization and causes fill-in; a batch relinearize-and-reorder step cleans it up | [isam_optimization.md §6](optimization/isam_optimization.md#6-but-what-about-loop-closure) |
 | Bayes tree/iSAM2 | The affected path reaches much further toward the root | [bayes_tree.md §8](optimization/bayes_tree.md#8-even-more-interesting-loop-closure), [isam2_optimization.md §9](optimization/isam2_optimization.md#9-but-what-about-loop-closure) |
-| Local vs. global BA | Drift the measurements can't see is cured only by a loop or an absolute sensor; Global BA also removes inter-window inconsistency. In this repo's loop run, Local+Global is unstable | [bundle_adjustment.md §13.3](optimization/bundle_adjustment.md#133-what-local-ba-cant-fix-and-what-can), [§13.6](optimization/bundle_adjustment.md#136-in-this-repo) |
+| Local vs. global BA | Drift the measurements can't see is cured only by a loop or an absolute sensor; global BA also removes inter-window inconsistency. In this repo's loop run, Local+Global is unstable | [bundle_adjustment.md §13.3](optimization/bundle_adjustment.md#133-what-local-ba-cant-fix-and-what-can), [§13.6](optimization/bundle_adjustment.md#136-in-this-repo) |
 
 ### 6.5 Consistency, not just accuracy
 

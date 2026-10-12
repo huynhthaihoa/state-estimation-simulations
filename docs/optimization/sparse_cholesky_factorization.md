@@ -1,6 +1,6 @@
 # Sparse Cholesky Factorization
 
-Sparse Cholesky factorization is essentially **Cholesky factorization designed to avoid doing unnecessary work on zeros**.
+Sparse Cholesky factorization is **Cholesky factorization designed to avoid unnecessary work on zeros**.
 
 For a symmetric positive-definite matrix $A$, ordinary Cholesky decomposes:
 
@@ -10,7 +10,7 @@ where $L$ is lower triangular. Column by column, its entries are:
 
 $$L_{jj} = \sqrt{A_{jj} - \sum_{k=1}^{j-1} L_{jk}^2}, \qquad L_{ij} = \frac{1}{L_{jj}}\left(A_{ij} - \sum_{k=1}^{j-1} L_{ik}L_{jk}\right)\ \ (i>j)$$
 
-That sum over earlier columns $k$ is the whole story behind fill-in (Section 3): even when $A_{ij}=0$, $L_{ij}$ can come out nonzero if $i$ and $j$ share an already-eliminated neighbor $k$ (a variable whose column of $`L`$ is already computed) with $L_{ik}, L_{jk} \neq 0$.
+That sum over earlier columns $k$ is the whole story behind fill-in (§3): even when $A_{ij}=0$, $L_{ij}$ can come out nonzero if $i$ and $j$ share an already-eliminated neighbor $k$ (a variable whose column of $`L`$ is already computed) with $L_{ik}, L_{jk} \neq 0$.
 
 For example:
 
@@ -28,7 +28,7 @@ L = \begin{bmatrix} 2 & 0 & 0\\
 0 & 1.5 & \sqrt{3.75} \end{bmatrix}
 ```
 
-The key problem is that **large optimization problems often contain mostly zeros**.
+The key observation is that **large optimization problems often contain mostly zeros**.
 
 ---
 
@@ -92,12 +92,14 @@ $$H\Delta x = -b$$
 - Weighted, these become $H = J^\top\Omega J$ and $b = J^\top\Omega r$.
 - $\Omega$ is the information matrix from [factor_graph.md §4](factor_graph.md#4-optimization-means-minimizing-all-those-errors), the same quantity as $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty).
 
-We need $H$ to be symmetric positive definite, and that isn't automatic. If every factor is relative (odometry, loop closures, reprojections with no prior), some motion of the whole solution leaves the cost unchanged (a **gauge freedom**). $H$ is then only positive *semi*-definite, and Cholesky breaks down on a zero **pivot** (the quantity under the square root in $`L_{jj}`$).
+We need $H$ to be symmetric positive definite, and that isn't automatic. If every factor is relative (odometry, loop closures, reprojections with no prior), some motion of the whole solution leaves the cost unchanged (a [gauge freedom](../glossary.md#3-least-squares-optimization)). $H$ is then only positive *semi*-definite, and Cholesky breaks down on a zero **pivot** (the quantity under the square root in $`L_{jj}`$).
 
 **Tiny example (toy case):** two poses joined by one odometry factor give $`H=\begin{bmatrix}1&-1\\-1&1\end{bmatrix}`$.
 - Moving both poses together changes nothing, so $`H`$ has rank 1.
 - Cholesky's second pivot is $`H_{22}-L_{21}^2=1-1=0`$, so it fails.
 - Anchoring pose 1 adds 1 to $`H_{11}`$: the first pivot becomes 2, the second becomes $`1-(1/\sqrt2)^2=0.5`$, and the factorization works.
+
+Gauge in practice:
 
 - **Pose graphs:** the gauge is a rigid motion of the whole trajectory. Anchoring one pose fixes it ([pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive)).
 - **Monocular BA:** the gauge also includes uniform rescaling of the scene (7 DoF), which one anchored pose can't pin. The repo's BA scripts fix two cameras instead ([bundle_adjustment.md §14](bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment)).
@@ -135,13 +137,13 @@ L = \begin{bmatrix} * & 0 & 0 \\
 * & [*] & * \end{bmatrix}
 ```
 
-where $[*]$ marks the entry that was zero in $H$. That newly created nonzero is called **fill-in**. It comes straight from the formula at the top: $`L_{32} = (H_{32} - L_{31}L_{21}) / L_{22}`$, and $H_{32} = 0$ doesn't help when $L_{31}$ and $L_{21}$ are both nonzero.
+where $[*]$ marks the entry that was zero in $H$. That newly created nonzero is [fill-in](../glossary.md#4-graphs-sparsity-and-solvers). It comes straight from the formula at the top: $`L_{32} = (H_{32} - L_{31}L_{21}) / L_{22}`$, and $H_{32} = 0$ doesn't help when $L_{31}$ and $L_{21}$ are both nonzero.
 
 Eliminate the **hub** (variable 1, connected to both others) last instead (order 2, 3, 1, so variable 1 becomes the last row and column), and $L$ has no fill at all. §5 turns this into a general rule.
 
 **Tiny example:** take $`H=\begin{bmatrix}4&2&2\\2&5&0\\2&0&5\end{bmatrix}`$ (variable 1 is the hub, $`H_{32}=0`$).
 - Order 1, 2, 3 gives $`L_{21}=1`$, $`L_{31}=1`$, so $`L_{32}=(0-1\cdot1)/2=-0.5`$. That is fill-in: a nonzero where $`H`$ had a zero.
-- Order 2, 3, 1 (hub last) gives $`L_{21}=0`$ (diagonal of $`L`$: 2.236, 2.236, 1.549), so the zero stays a zero.
+- Order 2, 3, 1 (hub last) gives zero for the entry of $`L`$ linking variables 2 and 3 (diagonal of $`L`$: 2.236, 2.236, 1.549), so the zero stays a zero.
 - Same matrix, same answer, different amount of nonzeros in $`L`$.
 
 So:
@@ -152,7 +154,7 @@ So:
 
 ## 4. Why does fill-in happen?
 
-The intuitive way to see it is through **variable elimination**. Take this graph:
+The intuitive way to see it is through [variable elimination](../glossary.md#4-graphs-sparsity-and-solvers). Take this graph:
 
 ```text
 1 ─ 2 ─ 3
@@ -166,7 +168,7 @@ Now eliminate variable 2. Because 2 connects both 1 and 3, after removing 2 we n
 1 ───── 3
 ```
 
-So elimination creates a new edge $1 \leftrightarrow 3$, which corresponds to a new nonzero in the Cholesky factor. That is **fill-in**.
+So elimination creates a new edge $1 \leftrightarrow 3$, which corresponds to a new nonzero in the Cholesky factor. That is fill-in.
 
 ---
 
@@ -177,9 +179,11 @@ Take §4's chain `1 ─ 2 ─ 3` again:
 - Eliminate **2 first**: we create the edge `1 ─ 3`, so there is fill-in.
 - Eliminate **1 first**: only `2 ─ 3` remains, so there is no fill-in.
 
-So the **order in which variables are eliminated** dramatically affects the amount of computation and memory required.
+So the **order in which variables are eliminated** strongly affects the computation and memory required.
 
-Both examples follow the same rule: eliminating a variable connects all of its remaining neighbors, so eliminate variables with few neighbors first and hubs last. Finding the truly optimal order is NP-hard (no known polynomial-time algorithm), so solvers use heuristics built on that rule:
+Both examples follow one rule: eliminating a variable connects all of its remaining neighbors. So eliminate variables with few neighbors first and hubs last.
+
+Finding the truly optimal order is NP-hard (no known polynomial-time algorithm), so solvers use heuristics built on that rule:
 
 - **AMD** (Approximate Minimum Degree): repeatedly eliminate the variable with the fewest remaining neighbors.
 - **COLAMD**: the same idea, computed from the columns of $J$ without forming $H$. It is a common choice for batch solvers.

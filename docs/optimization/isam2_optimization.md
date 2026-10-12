@@ -104,7 +104,7 @@ iSAM2 improves on the original iSAM with three ideas:
 
 ### 6.1 iSAM vs. iSAM2, side by side
 
-iSAM2 solves the same problem as iSAM, on the same factorization: iSAM's **square-root information matrix** $R$ (the triangular factor with $`H=R^\top R`$) and iSAM2's Bayes tree hold the same numbers (for the same variable ordering and linearization point), just organized differently. What changes is how much each one can do *incrementally*:
+iSAM2 solves the same problem as iSAM, on the same factorization. iSAM's **square-root information matrix** $R$ (the triangular factor with $`H=R^\top R`$) and iSAM2's Bayes tree hold the same numbers, for the same variable ordering and linearization point. They are just organized differently. What changes is how much each one can do *incrementally*:
 
 | | iSAM (Kaess et al. 2008) | iSAM2 (Kaess et al. 2012) |
 | --- | --- | --- |
@@ -124,9 +124,13 @@ This repo implements the iSAM column minus COLAMD reordering, with loop closures
 
 ## 7. Bayes tree - the most important intuition
 
-Quick recap first: **Sparse Cholesky factorization** splits $H$ into $H = LL^\top$ ($L$ lower-triangular), so solving $H\Delta x=-g$ becomes two cheap triangular solves instead of one matrix inversion. "Sparse" means most of $H$ is already zero - two poses only interact if a factor directly connects them - so the factorization skips arithmetic on entries it already knows are zero. The one catch: eliminating a variable can turn some of those zeros into nonzeros ("fill-in"), which is why elimination/variable order matters (§12). Full derivation in [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md); a worked elimination example in [`elimination_tree.md`](elimination_tree.md).
+Quick recap: [Cholesky](../glossary.md#4-graphs-sparsity-and-solvers) factorization splits $H$ into $H = LL^\top$ ($L$ lower-triangular). Solving $H\Delta x=-g$ then takes two cheap triangular solves instead of one matrix inversion.
 
-So after linearization, SLAM hands you exactly the $H\Delta x=-g$ system above, and that sparse-elimination process is run for real. Conceptually:
+- $H$ is sparse: two poses only interact if a factor directly connects them, so the factorization skips arithmetic on known zeros.
+- Eliminating a variable can turn some of those zeros into nonzeros ([fill-in](../glossary.md#4-graphs-sparsity-and-solvers)), which is why the [variable ordering](../glossary.md#4-graphs-sparsity-and-solvers) matters (§12).
+- Full derivation: [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md). Worked elimination example: [`elimination_tree.md`](elimination_tree.md).
+
+After linearization, SLAM gives exactly the $H\Delta x=-g$ system above, and this sparse elimination is run on it. Conceptually:
 
 ```text
 Factor graph
@@ -138,9 +142,9 @@ Cholesky/QR
 Bayes tree
 ```
 
-The **Bayes tree** is a tree representation of that factorization - built by eliminating variables one at a time and recording which remaining variables each elimination step's result depends on - that makes incremental updates easier: given a new [factor](../glossary.md#4-graphs-sparsity-and-solvers), iSAM2 can walk straight to the affected part of the tree instead of recomputing everything.
+The **Bayes tree** ([glossary](../glossary.md#4-graphs-sparsity-and-solvers)) is a tree representation of that factorization. Given a new [factor](../glossary.md#4-graphs-sparsity-and-solvers), iSAM2 can walk straight to the affected part of the tree instead of recomputing everything.
 
-This doc only needs that one-sentence version. For the full mechanism - how elimination produces the tree, cliques, the probabilistic interpretation, and a worked loop-closure example on a correctly-drawn tree - see [`bayes_tree.md`](bayes_tree.md).
+This doc needs only that. For how elimination produces the tree, the cliques, the probabilistic interpretation and a worked loop-closure example, see [`bayes_tree.md`](bayes_tree.md).
 
 ---
 
@@ -237,14 +241,18 @@ The exact behavior depends on the graph and ordering, but that is the intuition.
 
 ## 12. Variable ordering is also crucial
 
-The amount of computation in sparse Cholesky depends heavily on **variable ordering**, which decides two things at once:
+The amount of computation in sparse Cholesky depends heavily on the [variable ordering](../glossary.md#4-graphs-sparsity-and-solvers), which decides two things at once:
 
 - **Fill-in**: how dense the factorization gets ([sparse_cholesky_factorization.md](sparse_cholesky_factorization.md)).
 - **Where each variable sits in the Bayes tree.** The last variable eliminated becomes the root, and an update's affected region is the path from the touched cliques up to the root (§8-§9).
 
-A fixed order can be fine for one and terrible for the other. This repo's own example ([bayes_tree.md §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo)) eliminates a square loop of 16 poses oldest first. Fill-in stays small (no **separator**, the variables a clique shares with its parent, larger than 2), but the tree comes out as a single chain with the first pose at the bottom, so a loop closure touching the first pose invalidates all 16 variables.
+A fixed order can be fine for one and terrible for the other. This repo's own example ([bayes_tree.md §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo)) eliminates a square loop of 16 poses oldest first. Fill-in stays small (no **separator**, the variables a clique shares with its parent, larger than 2). But the tree comes out as a single chain with the first pose at the bottom, so a loop closure touching the first pose invalidates all 16 variables.
 
-iSAM2 therefore reorders as it goes. Each time it re-eliminates the affected part of the tree, it picks a new order for just those variables with **constrained COLAMD (CCOLAMD)**: a fill-reducing ordering, constrained so that the variables touched by the newest factors are eliminated last. They end up near the root, where the next measurement (which usually involves the same recent variables) disturbs only a few cliques.
+iSAM2 therefore reorders as it goes. Each time it re-eliminates the affected part of the tree, it picks a new order for just those variables with **constrained COLAMD (CCOLAMD)**.
+
+- CCOLAMD is a fill-reducing ordering, constrained so that the variables touched by the newest factors are eliminated last.
+- Those variables end up near the root.
+- The next measurement usually involves the same recent variables, so it disturbs only a few cliques.
 
 ```text
 new measurement → affected variables → reorder them → re-eliminate affected region → update Bayes tree
@@ -368,15 +376,22 @@ The cleverness is that iSAM2 determines **which parts need computational attenti
 
 ## 19. Where this is implemented in this repo
 
-Partially - and it's worth being precise about which part:
+Partially. The Bayes-tree construction is implemented; the rest is not:
 - [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds the elimination tree underlying this doc's §7 Bayes tree (symbolic elimination over this repo's pose-graph topology, via `symbolic_eliminate`/`bayes_tree_affected_path` in `utils.py`).
 - It keeps one node per variable and never merges them into cliques, so its affected counts are counts of variables, not cliques. The tree is built once from all edges, the loop-closure edge included, and then queried per edge.
 - It quantifies §9's "small vs. large affected region" claim with a computed example instead of only prose: with the default 16 nodes (`--nodes-per-side 4`), the newest odometry edge affects 2/16 variables and the loop-closure edge affects 16/16.
-- A genuinely useful finding (details in [`bayes_tree.md` §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo)): with a *fixed* elimination order (oldest node first, since §12's variable reordering is explicitly not implemented), this repo's loop-closure edge produces the worst possible case - the entire tree, not just a subtree, gets invalidated.
+- Finding (details in [`bayes_tree.md` §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo)): with a *fixed* elimination order (oldest node first, since §12's variable reordering is explicitly not implemented), this repo's loop-closure edge produces the worst possible case - the entire tree, not just a subtree, gets invalidated.
 
-**§10 selective relinearization and §12 variable reordering (CCOLAMD) remain unimplemented** - no numeric solve is integrated with the tree above. That's still [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`)'s job, and it implements the original **iSAM v1** mechanism described in [`isam_optimization.md`](isam_optimization.md) instead - incremental Givens-rotation QR row insertion into a running square-root-information matrix, plus periodic/loop-closure-triggered full relinearization, with no Bayes tree involved at all. Its own module docstring explicitly calls out the Bayes tree and COLAMD as out of scope; see [`isam_optimization.md` §14](isam_optimization.md#14-where-this-is-implemented-in-this-repo) for exactly where that line is drawn.
+**§10 selective relinearization and §12 variable reordering (CCOLAMD) remain unimplemented.** No numeric solve is integrated with the tree above.
 
-So this page's Bayes tree now has a real, runnable counterpart, but iSAM2 as a whole - the tree, selective relinearization, and dynamic reordering working together against an actual numeric solve - is still the conceptual target no single script in `use_numpy/`/`use_manif/` reaches.
+[`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`) implements the original **iSAM v1** mechanism from [`isam_optimization.md`](isam_optimization.md) instead:
+- incremental Givens-rotation QR row insertion into a running square-root-information matrix;
+- periodic and loop-closure-triggered full relinearization;
+- no Bayes tree.
+
+Its module docstring explicitly calls out the Bayes tree and COLAMD as out of scope; see [`isam_optimization.md` §14](isam_optimization.md#14-where-this-is-implemented-in-this-repo) for exactly where that line is drawn.
+
+So this page's Bayes tree has a runnable counterpart. iSAM2 as a whole (the tree, selective relinearization and dynamic reordering working together against a numeric solve) is still not reached by any single script in `use_numpy/` or `use_manif/`.
 
 ---
 

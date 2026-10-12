@@ -6,7 +6,7 @@ We can tell by looking at the model equations, not the data. Write the two model
 x_{k+1} = f(x_k, u_k) + w_k \qquad z_k = h(x_k) + v_k
 ```
 
-The system is linear only if both $f$ and $h$ are linear in the state $x$, meaning they can be written as $f = F x + G u$ and $h = H x$, where $F$, $G$, $H$ don't depend on $x$. Here $`u_k`$ is the control input, $`w_k`$ the process noise and $`v_k`$ the measurement noise ([glossary](../glossary.md#6-kalman-filter-family)), and $`G`$ maps the input into the state. If either one isn't, the system is nonlinear, and the plain KF is no longer the exact answer.
+The system is linear only if both $f$ and $h$ are linear in the state $x$, meaning they can be written as $f = F x + G u$ and $h = H x$, where $F$, $G$, $H$ don't depend on $x$. Here $`u_k`$ is the control input, $`w_k`$ the process noise and $`v_k`$ the measurement noise ([glossary](../glossary.md#6-kalman-filter-family)), and $`G`$ maps the input into the state. If either $f$ or $h$ isn't linear, the system is nonlinear and the plain KF is no longer the exact answer.
 
 ## 1. Three ways to tell
 
@@ -30,11 +30,13 @@ The first two tests are exact. The third is a heuristic for spotting what will f
   - the state is a minimal parameterization (angles, tangent-space error) or must satisfy the $SO(3)$ constraint;
   - the angular velocity or a bias is itself a state, so it multiplies $R$.
 
-  With a known body twist, $R_{k+1} = R_k\,\mathrm{Exp}(\omega\,\Delta t)$ is linear in $\mathrm{vec}(R_k)$. The vanilla KF in [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) is inexact only because it truncates the exponential and needs an **SVD** (singular value decomposition) re-projection onto $SO(3)$ (snapping the matrix back to the nearest rotation). For **group-affine** dynamics ([lie_algebra.md §11.1](../foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity)), a well-chosen invariant error evolves independently of the state estimate (Barrau & Bonnabel 2017, [kf_ekf_iekf.md §11](kf_ekf_iekf.md#11-references)).
+  With a known body twist, $R_{k+1} = R_k\,\mathrm{Exp}(\omega\,\Delta t)$ is linear in $\mathrm{vec}(R_k)$. The vanilla KF in [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) is inexact only for two reasons. It truncates the exponential, and it needs an **SVD** (singular value decomposition) re-projection onto $SO(3)$ (snapping the matrix back to the nearest rotation).
+
+  For [group-affine dynamics](../glossary.md#1-geometry-and-lie-groups) ([lie_algebra.md §11.1](../foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity)), a well-chosen invariant error evolves independently of the state estimate (Barrau & Bonnabel 2017, [kf_ekf_iekf.md §11](kf_ekf_iekf.md#11-references)).
 
 ## 3. "How nonlinear" matters in practice
 
-Almost every real robot model is nonlinear. The useful question is whether it's nonlinear *over the region our uncertainty covers*. A quick numerical check: take a step $\delta$ about the size of our standard deviation and measure the linearization error, where $`J`$ is the Jacobian of $`f`$ at $`\hat x`$ ([glossary](../glossary.md#3-least-squares-optimization))
+Almost every real robot model is nonlinear. The useful question is whether it's nonlinear *over the region our uncertainty covers*. A quick numerical check: take a step $\delta$ about the size of our standard deviation and measure the linearization error, where $`J`$ is the Jacobian of $`f`$ at $`\hat x`$ ([glossary](../glossary.md#3-least-squares-optimization)):
 
 ```math
 \lVert f(\hat x + \delta) - f(\hat x) - J\delta \rVert
@@ -43,22 +45,22 @@ Almost every real robot model is nonlinear. The useful question is whether it's 
 Compare that to the process or measurement noise.
 
 - **Much smaller than the noise**: the EKF is fine.
-- **Comparable to the noise or larger**: the Jacobian changes a lot within our uncertainty (for example, a large heading uncertainty, or a landmark close to the camera). Consider the UKF, an **iterated update** (re-linearizing several times within one measurement update), or an invariant or manifold formulation.
+- **Comparable to the noise or larger**: the Jacobian changes a lot within our uncertainty (for example, a large heading uncertainty, or a landmark close to the camera). Consider the UKF, an **iterated update** (repeated [relinearization](../glossary.md#3-least-squares-optimization) within one measurement update), or an invariant or manifold formulation.
 
 $P$ (the state covariance) changes over time, so the answer does too. Check at the worst moments:
 
 - right after initialization, when $P$ is large;
-- after long [dead-reckoning](../glossary.md#5-slam-system);
+- after long [dead reckoning](../glossary.md#5-slam-system);
 - just before a loop closure;
 - when landmarks are close to the camera.
 
-A filter can be effectively linear in steady state and badly nonlinear at startup, which is where iterated updates, the UKF and invariant formulations earn their keep.
+A filter can be effectively linear in steady state and badly nonlinear at startup, which is where iterated updates, the UKF and invariant formulations help.
 
 The same question comes up in optimization, where every [Gauss-Newton](../optimization/gauss_newton.md) step trusts a linearization up to the size of that step instead of up to our uncertainty. There it is answered after the fact, by checking whether the real cost went down: that's [Levenberg-Marquardt's accept/reject test](../optimization/levenberg_marquardt.md#6-how-does-lm-decide-whether-to-be-cautious). The rest of this page is the filter's version of the question.
 
 ## 4. How do you know whether it's nonlinear over your uncertainty region?
 
-The test is always the same: compare the part the linearization leaves out with the noise the filter already expects. Small leftover means a good linear approximation over our uncertainty region. Four ways to check, from cheapest to most thorough:
+The test is always the same: compare the part the linearization leaves out with the noise the filter already expects. Small leftover means a good linear approximation over our uncertainty region. Four ways to check:
 
 ### 4.1 Analytic: the second-order term
 
@@ -78,7 +80,7 @@ Compare both with the noise the model already carries: $R$ for $h$, $Q$ for $f$.
 - **Small**: the bias and the extra spread $`\sqrt{\tfrac12\mathrm{tr}(\nabla^2 f_i\,P\,\nabla^2 f_i\,P)}`$ are both much smaller than $`\sqrt{R_{ii}}`$ (the sensor's own standard deviation), so the linearization is adequate.
 - **Comparable or larger**, in either: the model is effectively nonlinear at this uncertainty.
 
-**Range sensor example (2D)**: the Hessian of $`h = \lVert p - L\rVert`$ is $`(I - uu^\top)/r`$, where $u$ is the unit line-of-sight vector (not the control input), $`p`$ the position, $`L`$ the landmark, $`r`$ the range $`\lVert p-L\rVert`$ and $`\sigma_p`$ the position standard deviation. It has curvature $1/r$ across the line of sight, so the bias is about $\sigma_p^2 / (2r)$ (in 3D there are two perpendicular directions, which gives $\sigma_p^2 / r$). With $\sigma_p = 1$ m and $\sigma_{\text{range}} = 0.1$ m:
+**Range sensor example (2D)**: the Hessian of $`h = \lVert p - L\rVert`$ is $`(I - uu^\top)/r`$. Here $u$ is the unit line-of-sight vector (not the control input), $`p`$ the position, $`L`$ the landmark, $`r`$ the range $`\lVert p-L\rVert`$ and $`\sigma_p`$ the position standard deviation. It has curvature $1/r$ across the line of sight, so the bias is about $\sigma_p^2 / (2r)$ (in 3D there are two perpendicular directions, which gives $\sigma_p^2 / r$). With $\sigma_p = 1$ m and $\sigma_{\text{range}} = 0.1$ m:
 
 | Range $r$ | Bias | Extra spread $\sqrt{\tfrac12 / r^2}$ | vs. 0.1 m noise |
 | --- | --- | --- | --- |
@@ -99,7 +101,7 @@ Some quick scalings, each giving the dropped second-order term relative to the f
 - Toy case: $\hat\theta = 0$, $\theta \sim \mathcal N(0, 0.5^2)$, so $\sigma_\theta = 0.5$ rad.
 - $\cos\theta$ has a flat top at $0$: an error of $+0.5$ and an error of $-0.5$ both push it below $1$.
 - The errors do not cancel. Exactly, $`E[\cos\theta] = e^{-\sigma_\theta^2/2} = 0.8825`$, about 11.8% below $1$.
-- This matches the $\sigma_\theta^2/2 = 12.5\%$ in the table, which is the first-order estimate of the same bias.
+- This matches the $\sigma_\theta^2/2 = 12.5\%$ in the table, which is the leading-order estimate of the same bias.
 - A linearization at $\hat\theta = 0$ predicts exactly $1$, so it misses this shift.
 
 ### 4.2 Numerical: sample and compare (works for any model)
@@ -125,7 +127,7 @@ print(np.abs(res.mean(0)) / np.sqrt(np.diag(R)),  # mean bias, in sensor sigmas
 
 This prints a bias of about 2.7σ and an extra spread of about 3.9σ at 2 m: clearly nonlinear. The bias is a little above §4.1's 0.25 m estimate because terms beyond second order still matter when $\sigma_p / r = 0.5$. With `x_hat = [50, 0]` it prints about 0.1σ and 0.14σ: effectively linear.
 
-For a cheaper version, use 2n+1 sigma points instead of 5000 samples. If the UKF's predicted mean and covariance differ noticeably from the EKF's, nonlinearity matters.
+For a cheaper version, use $`2n+1`$ sigma points instead of 5000 samples. If the UKF's predicted mean and covariance differ noticeably from the EKF's, nonlinearity matters.
 
 ### 4.3 Jacobian drift
 
@@ -148,8 +150,8 @@ Run the filter and check whether its reported uncertainty is believable (**consi
 
 A consistent filter's NEES averages the state dimension $n$ (NIS: the measurement dimension). Which bound to compare against depends on what we look at:
 
-- **One run**: a single NEES value is **chi-square** (a sum of squared standard-normal values) with $n$ degrees of freedom, so its 95% upper bound is wide (7.81 for $n = 3$).
-- **An average over $N$ Monte Carlo runs**: $N$ times the average is chi-square with $nN$ degrees of freedom, so the interval is much tighter, about $`n \pm 1.96\sqrt{2n/N}`$. The scripts compute it with the **Wilson-Hilferty approximation** (a closed-form estimate of chi-square quantiles) (`averaged_nees_bounds(n, N)`). For $N = 500$:
+- **One run**: a single NEES value is **chi-square** ([glossary](../glossary.md#2-uncertainty-and-probability)) with $n$ degrees of freedom, so its 95% upper bound is wide (7.81 for $n = 3$).
+- **An average over $N$ Monte Carlo runs**: $N$ times the average is chi-square with $nN$ degrees of freedom, so the interval is much tighter, about $`n \pm 1.96\sqrt{2n/N}`$. The scripts compute it with `averaged_nees_bounds(n, N)`, which uses the **Wilson-Hilferty approximation** (a closed-form estimate of chi-square quantiles). For $N = 500$:
 
 | Script | $n$ | 95% band |
 | --- | --- | --- |

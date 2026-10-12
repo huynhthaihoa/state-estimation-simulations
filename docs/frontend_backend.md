@@ -2,7 +2,7 @@
 
 In **SLAM** ([glossary](glossary.md#5-slam-system)), the terms **front-end** and **back-end** describe two major parts of the system.
 
-A simple way to think about them is:
+Think of them as:
 
 > **Front-end: "What happened between these observations?"**
 
@@ -67,7 +67,7 @@ meaning:
 
 > "The camera moved approximately this much from frame 1 to frame 2."
 
-So the front-end produces **constraints**, rather than necessarily producing the final globally optimal trajectory.
+So the front-end produces **constraints**, not necessarily the final globally optimal trajectory.
 
 ---
 
@@ -97,15 +97,15 @@ For example:
 \min_{\mathbf{x}} \frac12\sum_i \|r_i(\mathbf{x})\|^2
 ```
 
-where $r_i$ is the error associated with a measurement.
+where $r_i$ is the [residual](glossary.md#3-least-squares-optimization) of measurement $i$.
 
-**Intuition:** a residual is the gap between what the model predicts and what was measured. Toy case: the model predicts a landmark at pixel 100, the camera sees it at 103, so the residual has size 3. The sign convention varies, but the squared cost does not care.
+**Intuition:** the residual is the gap between prediction and measurement. Toy case: the model predicts a landmark at pixel 100, the camera sees it at 103, so the residual has size 3. The sign convention varies, but the squared cost does not care.
 
 Two levels to keep apart:
 
 **Problem formulations** (what we optimize):
 
-- **[Bundle Adjustment](optimization/bundle_adjustment.md)**
+- **[Bundle adjustment](optimization/bundle_adjustment.md)**
 - **[Pose-graph optimization](optimization/pose_graph_optimization.md)**
 - **[Factor-graph optimization](optimization/factor_graph.md)**
 - **[Nonlinear least squares](optimization/nonlinear_least_square.md)** - the general form behind all of them
@@ -155,11 +155,18 @@ It generates a constraint between the *non-consecutive* poses $x_0$ and $x_4$: a
 The **back-end then optimizes the entire trajectory** so that all constraints are satisfied as well as possible.
 
 **Tiny example** (toy case: translation only, equal weights, loop closure fully trusted):
+
 - The loop closure says $x_4$ should sit back at $x_0$, but the drifted estimate is 0.4 m away.
 - That 0.4 m is spread over the 4 odometry steps, 0.1 m per step.
 - So $x_1, x_2, x_3, x_4$ move back by 0.1, 0.2, 0.3, 0.4 m. Later poses carry more of the drift, so they move more.
 
-In practice, "loop closure" really spans both stages: the front-end/place-recognition module (which matches the current view against stored ones) detects the candidate match, while the back-end verifies it and folds it into the global optimization - which is why the diagrams above disagree: the third and fourth diagrams put "loop closure" inside the back-end, the second sends a loop-closure constraint out of the front-end, and the first draws it as a feedback box between the two.
+In practice, "loop closure" spans both stages. The front-end place-recognition module (which matches the current view against stored ones) detects the candidate match. The back-end verifies it and folds it into the global optimization.
+
+This is why the diagrams above disagree:
+
+- The third and fourth put "loop closure" inside the back-end.
+- The second sends a loop-closure constraint out of the front-end.
+- The first draws it as a feedback box from the back-end to the front-end.
 
 ---
 
@@ -195,7 +202,7 @@ Sensors ──→ Tracking ──→ Constraints
                   Updated SLAM state
 ```
 
-Separately, note that **front-end errors become constraints for the back-end**. If data association or motion estimation is wrong, a plain least-squares optimizer will fit the bad constraint and converge to the wrong solution. Back-ends therefore often use robust costs ([glossary](glossary.md#3-least-squares-optimization); Huber, Cauchy, DCS) that down-weight constraints that disagree strongly with the rest; see [optimization/pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
+**Front-end errors become constraints for the back-end.** If data association or motion estimation is wrong, a plain least-squares optimizer tries to satisfy the bad constraint and can converge to a wrong solution. Back-ends therefore often use robust costs ([glossary](glossary.md#3-least-squares-optimization); Huber, Cauchy, DCS) that down-weight constraints that disagree strongly with the rest; see [optimization/pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
 
 ---
 

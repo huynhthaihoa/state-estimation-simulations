@@ -35,7 +35,7 @@ We want to adjust $x_1$ and $l_1$ so that the error becomes smaller.
 
 ## 2. Why not just use [Gauss-Newton](gauss_newton.md)?
 
-Gauss-Newton linearizes the error, $e(x+\Delta x)\approx e(x)+J\Delta x$ (where $`J`$ is the **Jacobian** of $`e`$, [glossary](../glossary.md#3-least-squares-optimization)), then solves
+Gauss-Newton linearizes the error, $e(x+\Delta x)\approx e(x)+J\Delta x$ (with $`J`$ the [Jacobian](../glossary.md#3-least-squares-optimization) of $`e`$), then solves
 
 $$\boxed{J^\top J\Delta x=-J^\top e}$$
 
@@ -64,7 +64,7 @@ Current
        diverge
 ```
 
-(The step's *direction* is still downhill whenever $J$ has full column rank: for $f = \tfrac12\|e\|^2$, $\Delta x^\top\nabla f = -\|J\Delta x\|^2 < 0$ unless we're already at a stationary point. The problem is the step's *length*. And when $J^\top J$ is singular or nearly so, the step can become huge or not exist at all.)
+The step's *direction* is still downhill whenever $J$ has full column rank: for $f = \tfrac12\|e\|^2$, $\Delta x^\top\nabla f = -\|J\Delta x\|^2 < 0$ unless we're already at a stationary point. The problem is the step's *length*. When $J^\top J$ is singular or nearly so, the step can also become huge or not exist at all.
 
 ---
 
@@ -142,7 +142,7 @@ gradient-descent-like            Gauss-Newton-like
 LM never measures how far it is from the solution - it can't know that. Instead, $\lambda$ follows **how well the last step worked**:
 
 - **Error decreased** (e.g. 100 → 60): **accept** the step, trust the linear model more, $\lambda \downarrow$. The next iteration is more Gauss-Newton-like.
-- **Error increased** (e.g. 100 → 150): **reject** the step, so $x$ stays exactly where it was. Then $\lambda \uparrow$ and re-solve for a shorter, more cautious step from the same point, repeating until the error actually decreases (or a retry limit is hit and the solver stops).
+- **Error increased** (e.g. 100 → 150): **reject** the step, so $x$ stays exactly where it was. Then $\lambda \uparrow$ and re-solve from the same point for a shorter, more cautious step. Repeat until the error decreases, or stop when a retry limit is hit.
 
 Because a bad step is never kept, the error never goes up from one accepted step to the next.
 
@@ -181,7 +181,9 @@ where:
 
 - $u$ = the pixel coordinates of the landmark in the image
 - $X$ = 3D landmark
-- $T$ = camera pose, written here as world-to-camera, so $TX$ is the landmark in the camera frame. [bundle_adjustment.md](bundle_adjustment.md) uses the inverse convention: a camera-to-world $T$, and $\pi(T^{-1}P)$ ($P$ there is the 3D point, written $`X`$ in this doc, not a covariance).
+- $T$ = camera pose, written here as world-to-camera, so $TX$ is the landmark in the camera frame.
+  - [bundle_adjustment.md](bundle_adjustment.md) uses the inverse convention: a camera-to-world $T$ and $\pi(T^{-1}P)$.
+  - $P$ there is the 3D point, written $`X`$ in this doc, not a covariance.
 - $\pi$ = camera projection
 
 The reprojection error is $e = \pi(TX)-z$ (prediction minus measurement, the same convention as [gauss_newton.md](gauss_newton.md)'s residual $r$), and we optimize:
@@ -207,7 +209,7 @@ Take the small factor graph from [factor_graph.md §5](factor_graph.md#5-why-cal
     x0    x1    x2
 ```
 
-Each factor produces an error $e_1(x), e_2(x), e_3(x), \dots$. Together, each weighted by its measurement's information matrix $\Omega_i$ (the same weighting as [factor_graph.md §4](factor_graph.md#4-optimization-means-minimizing-all-those-errors)):
+Each factor produces an error $e_1(x), e_2(x), e_3(x), \dots$. The total cost weights each error by its measurement's information matrix $\Omega_i$ (the same weighting as [factor_graph.md §4](factor_graph.md#4-optimization-means-minimizing-all-those-errors)):
 
 ```math
 E(x)=\frac12\sum_i e_i(x)^\top\Omega_i\, e_i(x)
@@ -296,8 +298,9 @@ Per script:
 
 - [`pose_graph.py`](../../use_numpy/pose_graph.py)'s `run_pose_graph_optimization` (both `use_numpy/` and `use_manif/`):
   - starts from `--damping` (default $0.01$); after an accepted step $\lambda \leftarrow \max(\lambda/2,\ 10^{-7})$, after a rejected one $\lambda \leftarrow \max(2\lambda,\ 10^{-6})$;
-  - adds a large constant, $10^6 I$, to the first pose's block of $H$ - pinning that pose removes the gauge freedom, so $H$ isn't singular to begin with;
-  - reused by [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) for its batch baseline (its incremental solver runs plain Gauss-Newton), and by [`sliding_window_marginalization.py`](../../use_numpy/sliding_window_marginalization.py) with an initial damping of $0$, so its first step is a pure Gauss-Newton step (after that, the floors above keep $\lambda \ge 10^{-7}$).
+  - adds a large constant, $10^6 I$, to the first pose's block of $H$. Pinning that pose removes the [gauge freedom](../glossary.md#3-least-squares-optimization), so $H$ isn't singular to begin with;
+  - reused by [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) for its batch baseline (its incremental solver runs plain Gauss-Newton);
+  - reused by [`sliding_window_marginalization.py`](../../use_numpy/sliding_window_marginalization.py) with an initial damping of $0$, so its first step is a pure Gauss-Newton step. After that, the floors above keep $\lambda \ge 10^{-7}$.
 - [`bundle_adjustment_advanced.py`](../../use_numpy/bundle_adjustment_advanced.py) (both versions):
   - starts from $\lambda = 10^{-3}$; halves it (floor $10^{-7}$) after an accepted step and doubles it (no floor) after a rejected one;
   - weights all reprojection residuals equally;

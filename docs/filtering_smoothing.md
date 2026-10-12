@@ -76,11 +76,11 @@ The filter takes the estimate at $t_3$, propagates it forward, incorporates $z_4
 
 ### What the filter forgets
 
-Once the filter has moved on, it generally **doesn't go back and reconsider old states**. It essentially says:
+Once the filter has moved on, it generally **doesn't go back and reconsider old states**. It says:
 
 > "I have compressed everything before $t_3$ into my current belief. Now let's continue."
 
-This makes filtering **naturally online and computationally efficient**.
+This makes filtering **naturally online** and, for small fixed-size states, computationally efficient (see the caveat in [§6](#6-the-computational-difference)).
 
 ### The big limitation of filtering
 
@@ -121,7 +121,9 @@ After:
      A ------------- E
 ```
 
-A pure filtering mindset is uncomfortable with this because it has already compressed the past: the old poses are no longer in its state, so it cannot move them. (An **EKF-SLAM** filter, an EKF whose state holds the current pose and every landmark, still benefits from the loop closure. Through the correlations in its covariance, it corrects the current pose and the whole landmark map; see [§9](#9-the-precise-distinction).)
+A pure filter cannot do this: it has already compressed the past, so the old poses are no longer in its state and it cannot move them.
+
+An **EKF-SLAM** filter (an EKF whose state holds the current pose and every landmark) still benefits from the loop closure. Through the correlations in its covariance, it corrects the current pose and the whole landmark map; see [§9](#9-the-precise-distinction).
 
 ---
 
@@ -218,7 +220,7 @@ The important point is:
 
 ## 4. Smoothing: optimization with a probabilistic interpretation
 
-**Smoothing** is closely related to optimization, but conceptually it is useful to distinguish them.
+**Smoothing** is closely related to optimization, but the two are worth distinguishing.
 
 Filtering asks:
 
@@ -254,7 +256,9 @@ x₀ x₁ x₂ x₃
   joint estimate
 ```
 
-Optimization is often used as the computational mechanism for obtaining this joint estimate. Strictly, least-squares optimization returns the single most likely trajectory (the MAP estimate, i.e. the peak of $`p(x_{0:t} \mid z_{0:t})`$), not the whole distribution; the uncertainty around it is usually approximated as a Gaussian whose information matrix is the Gauss-Newton Hessian $`J^\top \Sigma^{-1} J`$ at the solution, where $`J`$ is the stacked **Jacobian** of the residuals and $`\Sigma`$ is the measurement covariance ([glossary](glossary.md#3-least-squares-optimization)); with whitened Jacobians, simply $`J^\top J`$.
+Optimization is often the computational mechanism for obtaining this joint estimate. Strictly, least-squares optimization returns the single most likely trajectory (the MAP estimate, i.e. the peak of $`p(x_{0:t} \mid z_{0:t})`$), not the whole distribution.
+
+The uncertainty around it is usually approximated as a Gaussian. Its information matrix is the Gauss-Newton Hessian $`J^\top \Sigma^{-1} J`$ at the solution, where $`J`$ is the stacked **Jacobian** of the residuals and $`\Sigma`$ is the measurement covariance ([glossary](glossary.md#3-least-squares-optimization)). With whitened Jacobians, this is simply $`J^\top J`$.
 
 **Tiny example** (toy case: one scalar $x$, measurement $r = x - z$ with $\sigma = 0.5$):
 - Information $= 1/\sigma^2 = 4$, so the variance is $1/4 = 0.25$.
@@ -293,7 +297,7 @@ This gives us a useful trade-off:
 - **Sparse factor-graph smoothing** exploits the sparsity of the graph instead. With an incremental solver such as iSAM2 (Kaess et al., 2012), an odometry measurement only re-eliminates a small part of the Bayes tree near the newest pose.
 - **There is no guaranteed bound**: a loop closure can force re-elimination of most or all of the tree, and the cost depends on the fill-in of the sparse factorization. This repo's [`bayes_tree_construction.py`](../use_numpy/bayes_tree_construction.py) shows both cases on a 16-node square loop. Under its fixed oldest-first ordering, an odometry edge affects 2 of 16 variables and a loop-closure edge affects all 16; iSAM2 additionally reorders the affected part, so its real cost is lower (see [`bayes_tree.md` §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo)).
 
-The defensible claim is therefore that *most* updates in a typical SLAM graph (mostly odometry, occasionally a loop closure) are cheap under iSAM2, while EKF-SLAM pays $O(n^2)$ on every update. That is why large-scale SLAM moved from EKF-SLAM toward factor-graph smoothing.
+The defensible claim is therefore that *most* updates in a typical SLAM graph (mostly odometry, occasionally a loop closure) are cheap under iSAM2, while EKF-SLAM pays $O(n^2)$ on every update. This is a main reason large-scale SLAM moved from EKF-SLAM toward factor-graph smoothing.
 
 ---
 
@@ -313,7 +317,7 @@ x₀ ● ──■── ● landmark ──■── ● x₂
 x₀ ● ──■── ● x₁ ──■── ● x₂ ──■── ● x₃
 ```
 
-- A **unary (prior) factor** constrains a single variable directly. It removes gauge freedom (the whole solution could otherwise shift and rotate together, and in monocular BA also rescale) or injects an absolute measurement like GPS:
+- A **unary (prior) factor** constrains a single variable directly. It removes [gauge freedom](glossary.md#3-least-squares-optimization) or injects an absolute measurement like GPS:
 
 ```text
 ■ ── ● x₀ ──■── ● x₁ ──■── ● x₂
@@ -368,7 +372,7 @@ measurements ──►│  FILTER  │──► state             │
 
 ## 9. The precise distinction
 
-We are tempted to say:
+A common shorthand is:
 
 > "Filtering is local, optimization is global."
 
@@ -457,7 +461,7 @@ A filter asks this for both **smooth motion** and **hybrid motion**. The differe
 
 > **"Given the measurements before and after, what trajectory fits them all best?"**
 
-A smoother asks this for any motion. For **hybrid motion**, that includes the transition itself: **when** contact really happened, and what the state was at that moment. Measurements from after the transition often settle exactly the call a filter had to make blind.
+A smoother asks this for any motion. For **hybrid motion**, that includes the transition itself: **when** contact really happened, and what the state was at that moment. Measurements from after the transition often settle the call a filter had to make blind.
 
 ### Summary
 

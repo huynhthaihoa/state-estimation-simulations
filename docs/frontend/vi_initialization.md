@@ -1,8 +1,8 @@
 # Visual-inertial initialization
 
-> **Note**: A visual-inertial state estimator combines data from cameras and inertial measurement units (IMUs) to track the position, velocity, and orientation of a moving robot or device.
+> **Note**: A visual-inertial state estimator combines a camera with an [IMU](../glossary.md#5-slam-system) to track the position, velocity, and orientation of a moving robot or device.
 
-Before a visual-inertial estimator can run its normal loop (preintegrate IMU, optimize against camera constraints), we have to solve a chicken-and-egg bootstrapping problem: find **metric scale** (real-world units such as meters), gravity direction, initial velocity, and IMU bias, none of which a **monocular** (single) camera or a bias-corrupted IMU can give on its own.
+Before a visual-inertial estimator can run its normal loop (preintegrate IMU, optimize against camera constraints), it has to solve a chicken-and-egg bootstrapping problem. It must find **metric scale** (real-world units such as meters), gravity direction, initial velocity, and IMU bias. A **monocular** (single) camera or a bias-corrupted IMU cannot give any of these on its own.
 
 This builds on:
 - **IMU preintegration** ($\Delta R, \Delta v, \Delta p$ and their bias Jacobians) from [imu_preintegration.md](../optimization/imu_preintegration.md). This doc covers what must happen *before* that machinery can be trusted.
@@ -12,12 +12,12 @@ This builds on:
 
 ## 1. The bootstrapping problem
 
-Every other doc in this repo assumes a decent initial guess already exists: `pose_graph.py`'s optimizer starts from [dead-reckoning](../optimization/factor_graph.md#2-why-do-we-need-it), `bundle_adjustment_advanced.py`'s GN starts from a triangulated point, `pnp_estimation.py`'s GN starts from a linear DLT solve ([triangulation_pnp.md](triangulation_pnp.md)). Visual-inertial initialization is a place where *no* such starting point exists yet, and four unknowns must be pinned down before anything else can proceed:
+Every other doc in this repo assumes a decent initial guess already exists: `pose_graph.py`'s optimizer starts from [dead reckoning](../optimization/factor_graph.md#2-why-do-we-need-it), `bundle_adjustment_advanced.py`'s Gauss-Newton starts from a triangulated point, `pnp_estimation.py`'s Gauss-Newton starts from a linear DLT solve ([triangulation_pnp.md](triangulation_pnp.md)). Visual-inertial initialization has *no* such starting point yet. Four unknowns must be pinned down before anything else can proceed:
 
 - **Scale**: a monocular camera recovers structure and motion only up to an unknown positive scale factor. "This camera moved some distance $d$" could mean 1 meter or 100, and vision alone can't say which.
-- **Gravity direction**: the accelerometer senses specific force (acceleration minus gravity), so gravity enters the preintegration residual (see [imu_preintegration.md §7](../optimization/imu_preintegration.md#7-what-the-accompanying-scripts-actually-do-and-dont), where the demo omits it). Handling it requires knowing which way gravity points in the estimator's frame.
+- **Gravity direction**: the accelerometer senses specific force ([glossary](../glossary.md#5-slam-system)), so gravity enters the preintegration residual (see [imu_preintegration.md §7](../optimization/imu_preintegration.md#7-what-the-accompanying-scripts-actually-do-and-dont), where the demo omits it). Handling it requires knowing which way gravity points in the estimator's frame.
 - **Velocity**: the IMU measures acceleration, so integrating it gives velocity only up to an unknown starting value. Each keyframe's velocity must be recovered too.
-- **Bias** ($b_g$, $b_a$): `imu_preintegration.md §1`'s "Problem B". Every raw sample was integrated using *some* bias estimate, and an uninitialized (zero) guess can be badly wrong, especially for the gyroscope (the angular-rate sensor).
+- **Bias** ($b_g$, $b_a$): [imu_preintegration.md §1](../optimization/imu_preintegration.md#1-the-problem)'s "Problem B". Every raw sample was integrated using *some* bias estimate, and an uninitialized (zero) guess can be badly wrong, especially for the gyroscope.
 
 If any of these is wrong at the start, the optimizer's very first linearization is already off.
 
@@ -51,7 +51,7 @@ With a single (monocular) camera, SfM translations and structure are correct onl
 **Step 1 - gyroscope bias.**
 - Short vision-only SfM gives relative rotations between keyframes that don't depend on scale.
 - Each should match the corresponding preintegrated $\Delta R$ ([imu_preintegration.md §3](../optimization/imu_preintegration.md#3-what-gets-compressed)); any mismatch is explained by the still-unknown gyro bias.
-- $\Delta R$'s bias sensitivity is already a Jacobian ($J_{R,b_g}$, [imu_preintegration.md §4](../optimization/imu_preintegration.md#4-the-bias-sensitivity-jacobians)), so this is a small **linear least-squares** problem (minimize summed squared errors of a linear model) for $\delta b_g$ over all keyframe pairs in the window.
+- $\Delta R$'s bias sensitivity is already a Jacobian ($J_{R,b_g}$, [imu_preintegration.md §4](../optimization/imu_preintegration.md#4-the-bias-sensitivity-jacobians)), so this is a small **linear** [least-squares](../glossary.md#3-least-squares-optimization) problem for $\delta b_g$ over all keyframe pairs in the window.
 - It is solved once, in closed form, with no iteration, for the linearized (first-order) model.
 
 **Step 2 - gravity, scale, and velocities.**
@@ -66,27 +66,27 @@ With a single (monocular) camera, SfM translations and structure are correct onl
 
 **What the alignment needs from the data.** The solve only works if the motion reveals the unknowns, so real systems check before trusting it:
 
-- **Enough acceleration.** At constant velocity the accelerometer senses only gravity, and a scaled-up trajectory moving at a scaled-up constant speed fits the IMU data equally well, so scale is **unobservable** (no measurement can determine it; [glossary](../glossary.md#2-uncertainty-and-probability)). The window needs acceleration that is both non-zero and sufficiently varied.
+- **Enough acceleration.** At constant velocity the accelerometer senses only gravity, and a scaled-up trajectory moving at a scaled-up constant speed fits the IMU data equally well, so scale is [unobservable](../glossary.md#2-uncertainty-and-probability). The window needs acceleration that is both non-zero and sufficiently varied.
 - **Enough translation.** Under pure rotation the vision-only SfM has no parallax to recover structure and translation from, so there is nothing for the IMU to align against.
 - **Known camera-IMU extrinsics.** The alignment needs the rotation and offset between camera and IMU; VINS-Mono can estimate the extrinsic rotation online if it isn't calibrated.
 
-VINS-Mono, for example, checks for sufficient parallax (and the paper describes an IMU-excitation check, i.e. that the motion is varied enough to reveal the unknowns) and retries initialization with a later window if the current one isn't informative enough.
+VINS-Mono, for example, initializes only with stable feature tracking and sufficient parallax (more than 30 tracked features and 20 rotation-compensated pixels), and otherwise waits for new frames. The paper notes that acceleration excitation is needed for scale to be observable; the released code computes an IMU-excitation statistic but only logs a warning when it is low.
 
 ---
 
 ## 3. Why a mostly linear pipeline
 
-Every other estimator in this doc set (§1's list) linearizes *around* an existing decent guess and takes a Gauss-Newton/Levenberg-Marquardt step. At initialization there is no guess to linearize around, for scale or gravity in particular. So we solve mostly with **linear systems**: a cheap, robust way to get *some* usable estimate before anything trustworthy exists to seed an iterative solve.
+The other estimators in this doc set (§1's list) linearize *around* an existing decent guess and take a Gauss-Newton/Levenberg-Marquardt step. At initialization there is no guess to linearize around, for scale or gravity in particular. So we solve mostly with **linear systems**: a cheap, robust way to get *some* usable estimate before anything trustworthy exists to seed an iterative solve.
 
 It isn't the only design real systems use:
-- VINS-Mono's gravity refinement (Step 2) is itself a short iterative loop over the tangent-plane reparameterization (2 parameters moving along the plane that touches, at the current estimate, the sphere of gravity vectors with the known magnitude).
+- VINS-Mono's gravity refinement (Step 2) is itself a short iterative loop over a tangent-plane reparameterization. The 2 parameters move along the plane that touches, at the current estimate, the sphere of gravity vectors with the known magnitude.
 - ORB-SLAM3 (a visual-inertial SLAM system) instead estimates scale, gravity direction, velocities and IMU biases with an inertial-only MAP (maximum a posteriori: the most probable state given data and priors) optimization over keyframes from a vision-only initialization (Campos et al., 2020; see References), then refined jointly.
 
 ---
 
 ## 4. The hand-off
 
-Once §2 produces an initial scale, gravity direction, per-keyframe velocities, and gyroscope bias (the accelerometer bias still at its near-zero starting value), we are in the situation every other doc in this repo assumes. A reasonable starting point exists, `imu_preintegration.md`'s $(\Delta R, \Delta v, \Delta p)$ bundles (now scaled and bias-corrected) become real edges, and [factor_graph.md](../optimization/factor_graph.md)-style nonlinear optimization takes over. This doc stops at that hand-off.
+Once §2 produces an initial scale, gravity direction, per-keyframe velocities, and gyroscope bias (the accelerometer bias still at its near-zero starting value), we are in the situation every other doc in this repo assumes. A reasonable starting point now exists. [imu_preintegration.md](../optimization/imu_preintegration.md)'s $(\Delta R, \Delta v, \Delta p)$ bundles (now scaled and bias-corrected) become real edges, and [factor_graph.md](../optimization/factor_graph.md)-style nonlinear optimization takes over. This doc stops at that hand-off.
 
 ---
 

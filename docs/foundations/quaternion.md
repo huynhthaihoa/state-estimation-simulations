@@ -1,6 +1,6 @@
 # Quaternion intuitive explanation
 
-For **SLAM, state estimation, and robotics**, the most useful way to understand a quaternion is as a clever mathematical way to represent **3D orientation** without some of the problems of Euler angles.
+For SLAM, state estimation and robotics, a quaternion is best understood as a way to represent **3D orientation** without the problems of Euler angles.
 
 ---
 
@@ -12,10 +12,10 @@ Take a robot. It can point **left/right** (yaw), tilt **up/down** (pitch), and r
 
 But three angles cause two separate problems:
 
-- **Gimbal lock.** At certain orientations (for the common yaw-pitch-roll order, pitch $= \pm 90°$) two of the three rotation axes line up, and one degree of freedom disappears: different angle combinations give the same orientation, and small orientation changes can need large angle jumps. It's a singularity of the three-angle description, not of rotation itself.
+- **Gimbal lock.** At certain orientations (for the common yaw-pitch-roll order, pitch $= \pm 90°$) two of the three rotation axes line up, and one degree of freedom disappears. Different angle combinations then give the same orientation, and small orientation changes can need large angle jumps. It is a singularity of the three-angle description, not of rotation itself.
 - **Order conventions.** Rotating around X and then Y is not the same as around Y and then X, so every set of Euler angles only means something together with its convention (XYZ, ZYX, ...). Interpolating the three angles separately also gives awkward paths.
 
-Quaternions avoid gimbal lock, because a unit quaternion has no singular orientation. They don't make rotation order-independent (nothing can: composing rotations is inherently order-dependent, Section 13), but they make composition a single multiplication (once a convention is fixed).
+Unit quaternions avoid gimbal lock because no orientation is singular. They do not make rotation order-independent (nothing can: composing rotations is inherently order-dependent, §13), but once a convention is fixed, composition is a single multiplication.
 
 ---
 
@@ -43,7 +43,7 @@ $$
 q = (\cos45^\circ, 0, 0, \sin45^\circ) \approx (0.707,0,0,0.707)
 $$
 
-So a quaternion reads as **"rotate around this axis by this amount."** The four numbers are just a convenient encoding of that idea.
+So a quaternion reads as **"rotate around this axis by this amount."** The four numbers are a convenient encoding of that idea.
 
 > **Watch the component order and the convention.**
 >
@@ -67,7 +67,7 @@ $$
 
 ## 4. Read it as a 3D rotation, not a 4D point
 
-At first, it helps **not to think of a quaternion as "a point in 4D space"**. Think of it as a **compact representation of a 3D rotation**:
+Do not think of a quaternion as "a point in 4D space". Think of it as a **compact representation of a 3D rotation**:
 
 | Quaternion $(w,x,y,z)$ | Meaning |
 | --- | --- |
@@ -90,7 +90,7 @@ At zero rotation ($\theta = 0$), $w = \cos 0 = 1$ and $x = y = z = 0$, giving $q
 
 ## 6. Why are quaternions so useful in robotics?
 
-Suppose the IMU says "the robot rotated slightly during this 10 ms interval." We update the orientation $R_{k+1}=R_k\Delta R$. A rotation matrix ($`R \in SO(3)`$) needs **9 numbers**, while a quaternion needs only $q = (w,x,y,z)$ with the unit constraint. More importantly, composing rotations becomes quaternion multiplication, $q_{\text{new}}=q_{\text{old}}\otimes\Delta q$ (where $`\otimes`$ is the **quaternion product**, defined in Section 13, and $`\Delta q`$ is the quaternion of the small rotation $`\Delta R`$ measured over the interval, [glossary](../glossary.md#5-slam-system)):
+Suppose the [IMU](../glossary.md#5-slam-system) says "the robot rotated slightly during this 10 ms interval." We update the orientation $R_{k+1}=R_k\Delta R$. A rotation matrix ($`R \in SO(3)`$) needs **9 numbers**, while a quaternion needs only $q = (w,x,y,z)$ with the unit constraint. More importantly, composing rotations becomes quaternion multiplication, $q_{\text{new}}=q_{\text{old}}\otimes\Delta q$ (where $`\otimes`$ is the **quaternion product**, defined in §13, and $`\Delta q`$ is the quaternion of the small rotation $`\Delta R`$ measured over the interval):
 
 > **Quaternion multiplication = "apply one rotation after another."**
 
@@ -121,7 +121,7 @@ Now rotate it +90° around the Z-axis (Z pointing out of the page, so positive i
    └───┘
 ```
 
-Instead of storing "roll = ?, pitch = ?, yaw = 90°", we describe the transformation as **rotate 90° around this axis**. The quaternion stores exactly that, in a form that is convenient for chaining rotations.
+Instead of storing "roll = ?, pitch = ?, yaw = 90°", we describe the transformation as **rotate 90° around this axis**. The quaternion stores exactly that, in a form suited to chaining rotations.
 
 ---
 
@@ -140,9 +140,11 @@ r_{31} & r_{32} & r_{33} \end{bmatrix}
 has **9 elements**, even though a rotation has only 3 degrees of freedom, and they must satisfy several constraints: $R^\top R = I$ and $\det(R) = 1$. A quaternion has four numbers and one simple normalization constraint: $`\|q\| = 1`$. So quaternions are:
 
 - more compact
-- numerically convenient: rounding makes $\lVert q\rVert$ drift slowly from 1 over many multiplications, so implementations renormalize regularly, which is much cheaper than re-orthogonalizing a rotation matrix (making its columns perpendicular unit vectors again)
+- numerically convenient: rounding makes $\lVert q\rVert$ drift slowly from 1 over many multiplications, so implementations renormalize regularly.
+  This is much cheaper than re-orthogonalizing a rotation matrix (making its columns perpendicular unit vectors again)
 - efficient for composing rotations
-- easy to interpolate smoothly: slerp (spherical linear interpolation) $\text{slerp}(q_0, q_1, t)$ (from start orientation $`q_0`$ to end orientation $`q_1`$, with fraction $`t \in [0,1]`$) moves at constant angular speed along the shortest arc (choose the sign of $q_1$ so that $q_0 \cdot q_1 \ge 0$, see Section 10)
+- easy to interpolate smoothly: **slerp** (spherical linear interpolation), $\text{slerp}(q_0, q_1, t)$, runs from start orientation $`q_0`$ to end orientation $`q_1`$, with fraction $`t \in [0,1]`$.
+  It moves at constant angular speed along the shortest arc. This requires choosing the sign of $q_1$ so that $q_0 \cdot q_1 \ge 0$ (§10)
 - free of gimbal lock
 
 ---
@@ -173,12 +175,12 @@ R= \begin{bmatrix} 0 & -1 & 0\\
 
 ## 10. q and -q are the same rotation
 
-Strangely, $q$ and $-q$ represent **the exact same physical orientation**. For example, $q = (0.707, 0, 0, 0.707)$ and $-q = (-0.707, 0, 0, -0.707)$ are the same rotation.
+$q$ and $-q$ represent **the exact same physical orientation**. For example, $q = (0.707, 0, 0, 0.707)$ and $-q = (-0.707, 0, 0, -0.707)$ are the same rotation.
 
 This matters for **optimization, SLAM, [EKF](../glossary.md#6-kalman-filter-family), and Lie-group ([glossary](../glossary.md#1-geometry-and-lie-groups)) state estimation**, because treating quaternion components as ordinary Euclidean coordinates causes two problems:
 
 - **Additive updates break the unit-norm constraint.** Adding a small correction to $q$ leaves the unit sphere (the set of quaternions with norm 1).
-- **The double cover (each rotation has two quaternions, $`q`$ and $`-q`$) makes averaging and differencing ambiguous.** Averaging $q$ and $-q$ (the same rotation) gives $(0,0,0,0)$, which is not a rotation. Their component-wise difference is as large as possible.
+- **The double cover makes averaging and differencing ambiguous.** The **double cover** means each rotation has two quaternions, $`q`$ and $`-q`$. Averaging $q$ and $-q$ (the same rotation) gives $(0,0,0,0)$, which is not a rotation. Their component-wise difference is as large as possible.
 
 ---
 
@@ -210,8 +212,9 @@ It lives on the **unit quaternion manifold**. That's why modern VIO/SLAM systems
 
 The small error can be attached on either side, and both are common:
 
-- $`q_{\text{true}} = \delta q\otimes \hat q`$: the error is expressed in the world frame (fixed reference axes). In the terminology of [left_right_invariant.md](../filtering/left_right_invariant.md) this is a *right*-invariant error.
-- $`q_{\text{true}} = \hat q\otimes \delta q`$: the error is expressed in the body frame (axes attached to the robot). This is the *left*-invariant error, the convention of Solà's ESKF and of this repo's `run_iekf` (the $\hat X\,\mathrm{Exp}(\xi)$ form, where $`\hat X`$ is the estimated pose, $`\xi`$ the tangent-space error and $`\mathrm{Exp}`$ the exponential map, see the [glossary](../glossary.md#1-geometry-and-lie-groups)).
+- $`q_{\text{true}} = \delta q\otimes \hat q`$: the error is expressed in the world frame (fixed reference axes). In the terminology of [left_right_invariant.md](../filtering/left_right_invariant.md) this is a **right-invariant** error.
+- $`q_{\text{true}} = \hat q\otimes \delta q`$: the error is expressed in the body frame (axes attached to the robot). This is the **left-invariant** error, the convention of Solà's ESKF and of this repo's `run_iekf`.
+  `run_iekf` uses the $\hat X\,\mathrm{Exp}(\xi)$ form, with $`\hat X`$ the estimated pose and $`\xi`$ the tangent-space error (see the [glossary](../glossary.md#1-geometry-and-lie-groups)).
 
 This is the error-state idea of [extra_kf_variants.md §2](../filtering/extra_kf_variants.md#2-error-state-kalman-filter-eskf), and it leads directly into **SO(3), Lie groups, Lie algebra, and the Invariant EKF**.
 
@@ -219,15 +222,15 @@ This is the error-state idea of [extra_kf_variants.md §2](../filtering/extra_kf
 
 ## 12. Summary
 
-> **A quaternion is a clever four-number representation of a 3D rotation, essentially encoding "rotate by this angle around this axis," in a form that makes chaining and estimating rotations much easier.**
+> **A quaternion is a four-number representation of a 3D rotation that encodes "rotate by this angle around this axis," in a form that makes chaining and estimating rotations easier.**
 
-In a robotics context, it's worth organizing it as:
+In robotics, the learning order is:
 
 $$
 \boxed{ \text{Euler angles} \rightarrow \text{Quaternion} \rightarrow SO(3) \rightarrow \mathfrak{so}(3) \rightarrow \text{Lie-group state estimation} }
 $$
 
-That chain is a learning order, not a hierarchy: unit quaternions are a Lie group in their own right, and each rotation in $SO(3)$ corresponds to exactly two of them, $q$ and $-q$ (Section 10). Both groups share the same small-motion space, so the tools in [lie_algebra.md](lie_algebra.md) apply to either.
+That chain is an order of study, not a hierarchy: unit quaternions are a Lie group in their own right, and each rotation in $SO(3)$ corresponds to exactly two of them, $q$ and $-q$ (§10). Both groups share the same small-motion space, so the tools in [lie_algebra.md](lie_algebra.md) apply to either.
 
 The next question is **why quaternion multiplication actually performs rotation**.
 
@@ -243,7 +246,7 @@ The answer comes down to four observations.
 
 ### Step 1: the multiplication rule hides a dot product and a cross product
 
-Write a quaternion as a scalar part plus a vector part (here $`\mathbf{v}`$ is the vector part, not the velocity $v$ of Section 11):
+Write a quaternion as a scalar part plus a vector part (here $`\mathbf{v}`$ is the vector part, not the velocity $v$ of §11):
 
 $$
 q = (w, \mathbf{v}), \qquad \mathbf{v} = (x, y, z)
@@ -253,7 +256,7 @@ $$
 - Expand $`(w_1 + \mathbf{v}_1)(w_2 + \mathbf{v}_2)`$ term by term and collect the pieces.
 - The $`-1`$ from $`i^2`$ becomes the dot product, and the $`ij = k`$ terms become the cross product.
 
-In symbols, quaternion multiplication (the Hamilton product, built on the rule $i^2 = j^2 = k^2 = ijk = -1$) works out to:
+In symbols, quaternion multiplication (the Hamilton product) works out to:
 
 ```math
 q_1 \otimes q_2 = \left( w_1 w_2 - \mathbf{v}_1 \cdot \mathbf{v}_2,\; w_1 \mathbf{v}_2 + w_2 \mathbf{v}_1 + \mathbf{v}_1 \times \mathbf{v}_2 \right)
@@ -264,7 +267,7 @@ Look at what's inside:
 - a **dot product** $\mathbf{v}_1 \cdot \mathbf{v}_2$
 - a **cross product** $\mathbf{v}_1 \times \mathbf{v}_2$
 
-Those are exactly the ingredients of 3D rotation formulas. The cross product also makes the multiplication **order-dependent** ($q_1 \otimes q_2 \neq q_2 \otimes q_1$ in general) - just like the rotations in Section 1.
+Those are exactly the ingredients of 3D rotation formulas. The cross product also makes the multiplication **order-dependent** ($q_1 \otimes q_2 \neq q_2 \otimes q_1$ in general), just like the rotations in §1.
 
 ### Step 2: put the vector inside a quaternion, then "sandwich" it
 
@@ -280,7 +283,7 @@ $$
 \boxed{(0, \mathbf{v}') = q \otimes (0, \mathbf{v}) \otimes q^{\ast}}
 $$
 
-For a unit quaternion, $q \otimes q^{\ast} = (1, 0, 0, 0)$, so $q^{\ast}$ is also the inverse of $q$ - it undoes the rotation.
+For a unit quaternion, $q \otimes q^{\ast} = (1, 0, 0, 0)$, so $q^{\ast}$ is also the inverse of $q$ and undoes the rotation.
 
 Why two multiplications? Why not just $q \otimes (0, \mathbf{v})$?
 
@@ -293,10 +296,10 @@ Because multiplying from **one side** leaks out of 3D whenever the vector has a 
 
 Two things to notice:
 
-- The **Z-axis** (the rotation axis itself) picks up a nonzero $w = -0.707$ after one multiplication. It is no longer a pure quaternion, because the Z-axis is entirely along the rotation axis. The second multiplication by $q^{\ast}$ cancels the leak and returns it exactly to where it started, as a rotation should leave its own axis alone.
+- The **Z-axis** (the rotation axis itself) picks up a nonzero $w = -0.707$ after one multiplication. It stops being a pure quaternion because it lies along the rotation axis. The second multiplication by $q^{\ast}$ cancels the leak and returns the vector to where it started, as a rotation must leave its own axis fixed.
 - The **X-axis** (perpendicular to the axis) stays pure and lands on $(0.707, 0.707, 0)$ after one multiplication, rotated by only **45°**. The second multiplication adds another 45°, giving $(0, 1, 0)$: the full **90°**.
 
-So each side of the sandwich does **half** of the rotation. That is the reason for the half angle in Section 2.
+So each side of the sandwich does **half** of the rotation. That is the reason for the half angle in §2.
 
 ### Step 3: why the sandwich rotates by exactly $\theta$
 
@@ -314,7 +317,7 @@ $$
 q \otimes \mathbf{v}_{\parallel} \otimes q^{\ast} = \mathbf{v}_{\parallel} \otimes q \otimes q^{\ast} = \mathbf{v}_{\parallel}
 $$
 
-The axis doesn't move - exactly what a rotation around that axis should do.
+The axis does not move, as a rotation around that axis requires.
 
 **Perpendicular part.** Here $`\mathbf{u} \cdot \mathbf{v}_{\perp} = 0`$, and swapping the order of a cross product flips its sign. Plugging this into the Step 1 rule shows that $`\mathbf{u}`$ and $`\mathbf{v}_{\perp}`$ **anticommute**:
 
@@ -350,21 +353,21 @@ Putting both parts together:
 \boxed{q \otimes \mathbf{v} \otimes q^{\ast} = \mathbf{v}_{\parallel} + \cos\theta\,\mathbf{v}_{\perp} + \sin\theta\,(\mathbf{u} \times \mathbf{v}_{\perp})}
 ```
 
-This is exactly **Rodrigues' rotation formula** (the closed-form rotation of a vector about an axis by an angle) - the same rotation a rotation matrix would produce.
+This is exactly **Rodrigues' rotation formula** (the closed-form rotation of a vector about an axis by an angle), the same rotation a rotation matrix would produce.
 
 > **Each side of the sandwich turns the perpendicular part by $\theta/2$, so the quaternion stores $\theta/2$ in order to produce a rotation by $\theta$.**
 
 ### Step 4: two facts from earlier sections, now explained
 
-**Chaining rotations (Section 6).** The conjugate of a product reverses the order: $(p \otimes q)^{\ast} = q^{\ast} \otimes p^{\ast}$. So rotating by $q$ and then by $p$ (here $`p`$ is a second unit quaternion, not the position $p$ of Section 11) gives:
+**Chaining rotations (§6).** The conjugate of a product reverses the order: $(p \otimes q)^{\ast} = q^{\ast} \otimes p^{\ast}$. So rotating by $q$ and then by $p$ (here $`p`$ is a second unit quaternion, not the position $p$ of §11) gives:
 
 $$
 p \otimes \left(q \otimes \mathbf{v} \otimes q^{\ast}\right) \otimes p^{\ast} = (p \otimes q) \otimes \mathbf{v} \otimes (p \otimes q)^{\ast}
 $$
 
-Two rotations in a row are the single rotation $p \otimes q$. That's why "quaternion multiplication = apply one rotation after another" works. Note that the **rightmost** quaternion acts first, just like the rightmost matrix in $R_k \Delta R$.
+Two rotations in a row are the single rotation $p \otimes q$, which is why "quaternion multiplication = apply one rotation after another" works. The **rightmost** quaternion acts first, like the rightmost matrix in $R_k \Delta R$.
 
-**$q$ and $-q$ (Section 10).** Flip the sign of $q$, and the sign appears twice in the sandwich, so it cancels:
+**$q$ and $-q$ (§10).** Flip the sign of $q$, and the sign appears twice in the sandwich, so it cancels:
 
 $$
 (-q) \otimes \mathbf{v} \otimes (-q)^{\ast} = q \otimes \mathbf{v} \otimes q^{\ast}
@@ -374,7 +377,7 @@ So every rotation has exactly two quaternions, $q$ and $-q$. In angle terms: $\t
 
 ### Why 2D doesn't need a sandwich
 
-Compare with rotation in 2D using complex numbers. Multiplying by $e^{i\theta} = \cos\theta + i\sin\theta$ rotates a point by $\theta$ with **one** multiplication, because multiplying two complex numbers always gives another point in the same plane - nothing can leak out.
+In 2D, multiplying a complex number by $e^{i\theta} = \cos\theta + i\sin\theta$ rotates a point by $\theta$ with **one** multiplication. The product of two complex numbers always stays in the same plane, so nothing can leak out.
 
 In 3D, one quaternion multiplication leaks out of 3D whenever the vector has a component along the axis (Step 2), so a second multiplication is needed to cancel the leak, and the rotation angle gets split between the two sides.
 
@@ -391,4 +394,4 @@ In 3D, one quaternion multiplication leaks out of 3D whenever the vector has a c
 ## 14. References
 
 1. Diebel, J. (2006). *Representing Attitude: Euler Angles, Unit Quaternions, and Rotation Vectors*. Stanford University Technical Report. https://www.astro.rug.nl/software/kapteyn-beta/_downloads/attitude.pdf - a widely-cited technical reference covering the quaternion/Euler-angle/rotation-vector conversions and conventions this doc builds intuition for.
-2. Solà, J. (2017). *Quaternion kinematics for the error-state Kalman filter*. arXiv:1711.02508. https://arxiv.org/abs/1711.02508 - the Hamilton vs. JPL comparison in Section 2's note, and the body-frame quaternion error of Section 11.
+2. Solà, J. (2017). *Quaternion kinematics for the error-state Kalman filter*. arXiv:1711.02508. https://arxiv.org/abs/1711.02508 - the Hamilton vs. JPL comparison in the §2 note, and the body-frame quaternion error of §11.

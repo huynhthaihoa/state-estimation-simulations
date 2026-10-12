@@ -14,7 +14,7 @@ Suppose our sparse matrix has this structure, with each number a variable:
 
 We eliminate in the order $1 \rightarrow 2 \rightarrow 3 \rightarrow 4$:
 
-- Eliminating 1 leaves its information with its only neighbour, 2: `1 → 2`.
+- Eliminating 1 leaves its information with its only neighbor, 2: `1 → 2`.
 - Eliminating 2 passes it on to 3: `2 → 3`.
 - Eliminating 3 passes it on to 4: `3 → 4`.
 
@@ -33,13 +33,13 @@ This produces the **elimination tree**:
 1
 ```
 
-Here 2 is the **parent** of 1, 3 is the parent of 2, and so on.
+Here 2 is the **parent** of 1, 3 is the parent of 2, and so on. Information flows from child to parent.
 
 ---
 
 ## 2. Why call it a tree?
 
-Each variable has at most one parent: the earliest-eliminated variable among its later neighbours. Following parents only moves forward in the elimination order, so there are no cycles. A connected problem gives a single root; a disconnected graph gives a forest with several roots.
+Each variable has at most one parent: the earliest-eliminated variable among its later neighbors, counting the neighbors that fill-in creates (§3). Following parents only moves forward in the elimination order, so there are no cycles. A connected problem gives a single root; a disconnected graph gives a forest with several roots.
 
 For example:
 
@@ -51,9 +51,9 @@ For example:
    1   2
 ```
 
-might represent the dependencies created during elimination.
+could be the dependencies created during elimination.
 
-The important point is that the tree is **not necessarily the original graph**:
+The tree is **not necessarily the original graph**:
 
 - The original graph says who directly interacts with whom.
 - The elimination tree says who depends on whom during factorization (§5 compares them side by side).
@@ -62,7 +62,7 @@ The important point is that the tree is **not necessarily the original graph**:
 
 ## 3. Connecting it to sparse Cholesky
 
-We want $`H=LL^\top`$, where $`H`$ is the **Hessian** (information matrix) of the linearized problem ([glossary](../glossary.md#3-least-squares-optimization)) and $`L`$ is its lower-triangular Cholesky factor, computed by eliminating variables one by one. Take this graph:
+We want $`H=LL^\top`$, where $`H`$ is the [Hessian](../glossary.md#3-least-squares-optimization) (information matrix) of the linearized problem and $`L`$ is its lower-triangular Cholesky factor, computed by eliminating variables one by one. Take this graph:
 
 ```text
 1 ─ 2 ─ 3
@@ -70,9 +70,9 @@ We want $`H=LL^\top`$, where $`H`$ is the **Hessian** (information matrix) of th
     4
 ```
 
-- **Eliminate 1.** It has one neighbour, so 2 takes over its information and no fill-in appears: $\text{parent}(1)=2$.
-- **Eliminate 2.** It still has **two** neighbours, 3 and 4, which were never directly connected. Removing 2 forces them to pick up each other's dependency, so a new edge $3 \leftrightarrow 4$ appears (fill-in), and $\text{parent}(2)=3$.
-- **Eliminate 3.** Its only remaining neighbour is 4, via that fill-in edge: $\text{parent}(3)=4$.
+- **Eliminate 1.** It has one neighbor, so 2 takes over its information and no fill-in appears: $\text{parent}(1)=2$.
+- **Eliminate 2.** It still has **two** neighbors, 3 and 4, which were never directly connected. Removing 2 forces them to pick up each other's dependency, so a new edge $3 \leftrightarrow 4$ appears ([fill-in](../glossary.md#4-graphs-sparsity-and-solvers)), and $\text{parent}(2)=3$.
+- **Eliminate 3.** Its only remaining neighbor is 4, via that fill-in edge: $\text{parent}(3)=4$.
 
 The result is the same chain as §1's tree, but for a different reason. §1's chain came from a graph that was already a chain; here the 3–4 link exists only because eliminating 2 created it. That is §2's point: the tree is not the original graph.
 
@@ -137,7 +137,7 @@ x2 ─ factor ─ l3
    l1    l2
 ```
 
-$l_2$ touches both $x_1$ and $x_2$, so eliminating it creates a new fill-in link between them. That is why $x_1$ ends up as $x_2$'s child.
+$l_2$ touches both $x_1$ and $x_2$, so eliminating it creates a fill-in link between them. Then $x_1$ is the first remaining neighbor of $l_2$, so $\text{parent}(l_2)=x_1$, and the new fill-in link between $`x_1`$ and $`x_2`$ makes $x_2$ the parent of $x_1$.
 
 §11 shows where both sit in the full pipeline.
 
@@ -167,8 +167,8 @@ Suppose the tree looks like:
   2   3
 ```
 
-- Variables 2 and 3 can be processed before 4.
-- Similarly, 4 and 5 can potentially be processed independently before 6.
+- Variables 2 and 3 do not depend on each other, and both must be processed before 4.
+- Similarly, 4 and 5 are independent of each other, and both come before 6.
 
 The computational dependencies are visible immediately:
 
@@ -188,14 +188,14 @@ The two subtrees under 8, {6, 4, 5, 2, 3} and {7, 1}, share nothing until 8, so 
 
 ## 7. This becomes very important for iSAM2
 
-**iSAM2** ([details](isam2_optimization.md); an incremental solver that updates the previous solution as new measurements arrive) uses a [**Bayes tree**](bayes_tree.md), which is built directly from the elimination tree (the pipeline is drawn once, in §11).
+**iSAM2** ([details](isam2_optimization.md); an [incremental solver](../glossary.md#4-graphs-sparsity-and-solvers)) uses a [**Bayes tree**](bayes_tree.md), which is built directly from the elimination tree (the pipeline is drawn once, in §11).
 
 Concretely, a Bayes tree is the elimination tree with some of its nodes merged into **cliques**, where each clique stores the conditional density produced when its variables were eliminated ([bayes_tree.md §13](bayes_tree.md#13-one-more-important-concept-cliques)).
 
 - **Elimination tree:** "What depends on what?"
 - **Bayes tree:** "What probabilistic information is summarized by each clique?"
 
-This is why the Bayes tree is so useful for **incremental SLAM**.
+Because each clique summarizes only its own subtree, a new measurement changes just the cliques on the path from the touched variables to the root ([bayes_tree.md §7](bayes_tree.md#7-heres-where-it-becomes-powerful-for-isam2)). That is what makes the Bayes tree suit **incremental SLAM**.
 
 ---
 
@@ -217,7 +217,7 @@ x1 ─ x2 ─ x3 ─ x4 ─ x5
      l2        l3
 ```
 
-Suppose we eliminate $x_1$ and the landmarks first, then the remaining poses oldest first: $x_1$, $l_1$, $l_2$, $l_3$, $x_2$, $x_3$, $x_4$, $x_5$.
+Suppose we use the elimination order $x_1$, $l_1$, $l_2$, $l_3$, $x_2$, $x_3$, $x_4$, $x_5$: $x_1$ and the landmarks first, then the remaining poses oldest first.
 
 The elimination tree is:
 
@@ -233,7 +233,7 @@ The elimination tree is:
         x1  l1  l2
 ```
 
-The exact tree depends heavily on the elimination ordering:
+The tree depends on the elimination ordering:
 
 > **There isn't one universally fixed elimination tree for a problem. Change the ordering, and you can change the tree.**
 
@@ -277,7 +277,7 @@ Poses
 
 Landmarks never touch each other directly, so eliminating one only connects the poses that observe it. The structure stays much sparser. This is exactly bundle adjustment's Schur-complement trick ([bundle_adjustment.md §12](bundle_adjustment.md#12-block-sparsity-and-the-schur-complement)): eliminate every landmark first, then solve the much smaller camera-only system.
 
-The resulting $L$ has far fewer nonzeros (it's always $n \times n$), and the elimination tree is more manageable.
+The resulting $L$ has far fewer nonzeros. It is always $n \times n$, so only its sparsity changes.
 
 ---
 
@@ -336,7 +336,7 @@ The concepts above connect into one pipeline:
               Solve Δx
 ```
 
-The elimination structure then feeds the Bayes tree (§7) and iSAM2. Here $`J`$ is the Jacobian of the residuals, and $`\Omega`$ in $`H = J^\top \Omega J`$ is the measurement **information matrix** ([glossary](../glossary.md#2-uncertainty-and-probability)).
+The elimination structure then feeds the Bayes tree (§7) and iSAM2. Here $`J`$ is the Jacobian of the residuals, and $`\Omega`$ in $`H = J^\top \Omega J`$ is the measurement [information matrix](../glossary.md#2-uncertainty-and-probability).
 
 ### The simplest mental model
 

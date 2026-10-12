@@ -2,11 +2,11 @@
 
 ## Intuition
 
-[hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) tracks a bouncing **point mass**: a plain vector state, where the only subtlety at a bounce is timing - a perturbed trajectory hits the ground a little earlier or later, and the saltation matrix ([glossary](../glossary.md#7-hybrid-discontinuous-systems)) handles it. This note lifts the same bouncing system to a **tumbling rigid body carrying an IMU**, whose state lives on the Lie group $`SE_2(3)`$, and tracks it with a **right-invariant EKF (RIEKF)** - the filter of choice for IMU-driven robots because, between events, its error dynamics **do not depend on the trajectory at all**. 
+[hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) tracks a bouncing **point mass**: a plain vector state, where the only subtlety at a bounce is timing - a perturbed trajectory hits the ground a little earlier or later, and the saltation matrix ([glossary](../glossary.md#7-hybrid-discontinuous-systems)) handles it. This note lifts the same system to a **tumbling rigid body carrying an IMU**, whose state lives on the Lie group $`SE_2(3)`$, and tracks it with a **right-invariant EKF (RIEKF)**. Between bounces, the RIEKF's error dynamics do not depend on the trajectory at all (**trajectory independence**), which is why invariant filters are a common choice for IMU-driven robots.
 
-Why $`SE_2(3)`$: the IMU drives the velocity, so the state must hold it next to the pose, and storing it as a second column of the pose matrix is exactly what gives the RIEKF that trajectory-independence ([lie_algebra.md §11.1](../foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity)).
+Why $`SE_2(3)`$: the IMU drives the velocity, so the state must hold it next to the pose. Storing it as a second vector column next to the position is what gives the RIEKF its trajectory independence ([lie_algebra.md §11.1](../foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity)).
 
-A bounce breaks that property. The reset "reflect the velocity off the ground" does not commute with the group structure, so the effect of a bounce on the **invariant error** (the filter's error measured on the group, §2) depends on where the body is and how it moves. Two things therefore have to be right at every bounce: the **timing correction** (§4: a perturbed body lands earlier or later, as for the point mass) and this state dependence. The script compares filters that get neither, one, or both right.
+A bounce breaks trajectory independence. The reset (reverse the vertical velocity, scaled by the restitution coefficient $`e`$) is not a group automorphism (§3), so its effect on the **invariant error** (the filter's error measured on the group, §2) depends on the body's orientation and velocity at impact. Each bounce therefore needs two things right: the **timing correction** (§4: a perturbed body lands earlier or later, as for the point mass) and this **state dependence**. The script compares filters that get neither, one, or both right.
 
 Implemented in [use_numpy/invariant_saltation_ekf.py](../../use_numpy/invariant_saltation_ekf.py) and, with the group math delegated to the `manif` library, [use_manif/invariant_saltation_ekf.py](../../use_manif/invariant_saltation_ekf.py), which orders the 9-vectors as (position, rotation, velocity) instead of the (rotation, velocity, position) used below; tests in [tests/use_numpy/test_invariant_saltation_ekf.py](../../tests/use_numpy/test_invariant_saltation_ekf.py) and [tests/use_manif/test_invariant_saltation_ekf.py](../../tests/use_manif/test_invariant_saltation_ekf.py).
 
@@ -20,9 +20,9 @@ State, with $`R`$ body-to-world rotation, $`v`$ velocity, $`p`$ position (an **e
 X = \begin{bmatrix} R & v & p \\ 0 & 1 & 0 \\ 0 & 0 & 1 \end{bmatrix} \in SE_2(3)
 ```
 
-- **Flow** (between bounces), driven by the gyro $`\omega`$ and accelerometer $`a`$ (body frame) and gravity $`g`$: $`\dot R = R\,\omega^\wedge`$, $`\dot v = R\,a + g`$, $`\dot p = v`$, where $`\omega^\wedge`$ is the skew-symmetric matrix of $`\omega`$ (the **hat** operator, [glossary](../glossary.md#1-geometry-and-lie-groups)). The true body spins at a constant rate and, in free flight, the accelerometer reads zero **specific force** (it measures acceleration minus gravity, so a falling body reads zero), so translation is exactly ballistic.
+- **Flow** (between bounces), driven by the gyro $`\omega`$ and accelerometer $`a`$ (body frame) and gravity $`g`$: $`\dot R = R\,\omega^\wedge`$, $`\dot v = R\,a + g`$, $`\dot p = v`$, with $`\omega^\wedge`$ the [hat operator](../glossary.md#1-geometry-and-lie-groups) applied to $`\omega`$. The true body spins at a constant rate. In free flight the accelerometer reads zero **specific force** (it measures acceleration minus gravity, so a falling body reads zero), so translation is exactly ballistic.
 - **Guard**: the ground, $`p_z = 0`$, crossed while descending. The crossing time is the root of a quadratic in closed form (`crossing_time`).
-- **Reset**: $`(R, v, p) \mapsto (R,\, M v,\, p)`$ with $`M = I - (1+e)\,n n^\top`$ and $`n = e_z`$, the vertical unit vector - the normal velocity is reflected and scaled by the **coefficient of restitution** $`e`$, the ratio of rebound speed to impact speed (0.8 by default: a body falling onto the ground at 10 m/s vertically rebounds at 8 m/s; the horizontal velocity is kept); rotation, position and the body rate are unchanged (`reset_map`).
+- **Reset**: $`(R, v, p) \mapsto (R,\, M v,\, p)`$ with $`M = I - (1+e)\,n n^\top`$ and $`n = e_z`$, the vertical unit vector - the normal velocity is reflected and scaled by the **coefficient of restitution** $`e`$, the ratio of rebound speed to impact speed. With the default 0.8, a body hitting the ground at 10 m/s vertically rebounds at 8 m/s. The horizontal velocity, rotation, position and body rate are unchanged (`reset_map`).
 
 Sensors: noisy IMU readings every step, and every few steps the body-frame positions of four known landmarks, $`y_i = R^\top (\ell_i - p) + \nu`$, where $`\ell_i`$ is landmark $`i`$'s world position and $`\nu`$ the measurement noise, with covariance $`N`$.
 
@@ -30,7 +30,12 @@ Sensors: noisy IMU readings every step, and every few steps the body-frame posit
 
 With $`\hat X`$ the filter's estimate, the right-invariant error is $`\eta = \hat X X^{-1}`$, parameterized by $`\xi = \log(\eta) = (\xi_R, \xi_v, \xi_p) \in \mathbb{R}^9`$ (so the truth is $`X = \exp(-\xi)\,\hat X`$; $`\exp`$/$`\log`$ are the group's exponential and logarithm maps, [glossary](../glossary.md#1-geometry-and-lie-groups)). Two exact properties make it the natural filter here (Barrau & Bonnabel 2017; Hartley et al. 2020):
 
-**Propagation is trajectory-independent.** IMU kinematics are **group-affine**: over a step $`h`$ with constant readings, $`X^+ = \Gamma_h\, f_h(X)\, \Upsilon_h`$ (in this section $`^+`$ means one step later; from §4 on it means just after the impact), where $`f_h(R,v,p) = (R, v, p + v h)`$ is a **group automorphism** (it respects the group product, $`f_h(X_1 X_2) = f_h(X_1)\,f_h(X_2)`$), $`\Gamma_h = (I, g h, \tfrac12 g h^2)`$ carries gravity and $`\Upsilon_h`$ carries the body-frame IMU increments (`propagate_mean`). The error then evolves as $`\eta^+ = \Gamma_h f_h(\eta) \Gamma_h^{-1}`$, independently of $`X`$, and its logarithm evolves *exactly linearly* - even for large errors:
+**Propagation is trajectory-independent.** IMU kinematics are [group-affine](../glossary.md#1-geometry-and-lie-groups). Over a step $`h`$ with constant readings, $`X^+ = \Gamma_h\, f_h(X)\, \Upsilon_h`$ (in this section $`^+`$ means one step later; from §4 on, just after the impact). Here:
+- $`f_h(R,v,p) = (R, v, p + v h)`$ is a **group automorphism**: it respects the group product, $`f_h(X_1 X_2) = f_h(X_1)\,f_h(X_2)`$;
+- $`\Gamma_h = (I, g h, \tfrac12 g h^2)`$ carries gravity;
+- $`\Upsilon_h`$ carries the body-frame IMU increments (`propagate_mean`).
+
+The error then evolves as $`\eta^+ = \Gamma_h f_h(\eta) \Gamma_h^{-1}`$, independently of $`X`$, and its logarithm evolves *exactly linearly*, even for large errors:
 
 ```math
 \xi^+ = \Phi(h)\,\xi, \qquad \Phi(h) = e^{A h}, \qquad A = \begin{bmatrix} 0 & 0 & 0 \\ g^\wedge & 0 & 0 \\ 0 & I & 0 \end{bmatrix}
@@ -64,14 +69,14 @@ The saltation matrix has its textbook form in coordinates where the state is a p
 \Xi_{\text{world}} = DR + \frac{\left(f^+ - DR\, f^-\right) D g}{D g\, f^-}
 ```
 
-Only the position-rate component of $`f`$ changes across the reset ($`v \to M v`$); the rotation-rate and acceleration components are continuous, so in $`f^+ - DR f^-`$ they contribute $`0`$ and $`(I - M)(R a + g)`$ respectively (`saltation_matrix_world`).
+Across the reset, only the position-rate component of $`f`$ changes directly ($`v \to M v`$). In $`f^+ - DR f^-`$ the rotation-rate component contributes $`0`$, the velocity-rate component $`(I - M)(R a + g)`$ and the position-rate component $`(M - I)\,v^-`$ (`saltation_matrix_world`).
 
 **Timing correction.** The second term of $`\Xi_{\text{world}}`$. $`DR`$ alone assumes every nearby trajectory bounces at the same instant, but a body that is slightly higher lands slightly later. Worked number, for a vertical drop at 7 m/s with $`e = 0.8`$ and the truth 1 cm above the estimate:
 - the truth lands 1 cm / 7 m/s ≈ 1.4 ms later;
 - by then the estimate has already bounced and risen 5.6 m/s × 1.4 ms ≈ 0.8 cm;
 - so after both have bounced, the truth is about 0.8 cm *below* the estimate: the height error goes from +1 cm to about −0.8 cm ($`-e`$ times it, to first order), and a vertical-velocity error of about $`(1+e)\,g \times 1.4`$ ms ≈ 0.025 m/s appears.
 
-$`DR`$ alone would keep +1 cm. In the fraction, $`D g\,\delta / D g\,f^-`$ turns the state error into that shift of the impact time, and $`f^+ - DR\,f^-`$ (how the motion differs just after versus just before the bounce) turns the time shift back into a state error. This is about a timing error *caused by the state*; §7's **timing term** handles an error in the *detected* impact time.
+$`DR`$ alone would keep +1 cm. In the fraction, $`D g\,\delta / D g\,f^-`$ turns the state error into that shift of the impact time, and $`f^+ - DR\,f^-`$ (how the motion differs just after versus just before the bounce) turns the time shift back into a state error. This timing error is *caused by the state*. §7's **timing term** handles an error in the *detected* impact time.
 
 To move between the two coordinate systems: a right-invariant perturbation $`X' = \exp(\xi) X`$ has, to first order, $`\delta\theta = \xi_R`$, $`\delta v = \xi_v - v^\wedge \xi_R`$, $`\delta p = \xi_p - p^\wedge \xi_R`$, i.e. $`\delta = T(X)\,\xi`$ with
 
@@ -85,7 +90,7 @@ T(X) = \begin{bmatrix} I & 0 & 0 \\ -v^\wedge & I & 0 \\ -p^\wedge & 0 & I \end{
 \Xi_{RI} = T(X^+)^{-1}\,\Xi_{\text{world}}\,T(X^-)
 ```
 
-(`saltation_matrix_ri`). The two $`T`$ factors do not cancel. Even for the reset Jacobian alone, $`T(X^+)^{-1} DR\, T(X^-)`$ differs from the shortcut $`\mathrm{blockdiag}(I, M, I)`$ in one block: the velocity error picks up $`\big((M v^-)^\wedge - M\,(v^-)^\wedge\big)\,\xi_R`$. That term depends on the impact velocity (its largest entries are $`(1+e)\,|v_z^-|`$, 12.6 for a 7 m/s vertical impact speed) and is nonzero even when the velocity is purely vertical - this is the state dependence of §3, made explicit.
+(`saltation_matrix_ri`). The two $`T`$ factors do not cancel. Even for the reset Jacobian alone, $`T(X^+)^{-1} DR\, T(X^-)`$ differs from the shortcut $`\mathrm{blockdiag}(I, M, I)`$ in one block: the velocity error picks up $`\big((M v^-)^\wedge - M\,(v^-)^\wedge\big)\,\xi_R`$. That term depends on the impact velocity: its largest entries are $`(1+e)\,|v_z^-|`$, 12.6 for a 7 m/s vertical impact speed. It is nonzero even when the velocity is purely vertical. This is the state dependence of §3, made explicit.
 
 Three bounce treatments are compared in the RIEKF, identical in everything else:
 
@@ -141,13 +146,13 @@ What this shows:
 
 ![Three panels from invariant_saltation_ekf.py: height of the bouncing body for the ground truth and the filters (the dashed saltation + timing noise line coincides with saltation here); single-run position error; Monte Carlo average NEES over time with the consistent value of 9 and its 95% interval, the invariant-naive filter spiking after each bounce and the world-frame EKF elevated before the first bounce](../../assets/invariant_saltation_ekf.png)
 
-The same run, animated. The top panel shows the tumbling body bouncing among the four landmarks, with a sight line to each landmark whenever a measurement arrives. All four position estimates stay within a few centimeters of the truth, so their markers overlap. The difference is in the bottom panel: the invariant-naive filter's NEES jumps to about 18 at the first bounce and needs about 1 s to fall back inside the 95% band (about 0.4 s after the next two bounces, whose spikes are smaller). No single state component's standard deviation is plotted, because none shows the problem: the naive filter's mistake is the missing rotation-velocity coupling of §4, and its horizontal-velocity standard deviation after a bounce is actually *larger* than the others' (0.067 vs. 0.049 m/s just after the first one).
+The same run, animated. The top panel shows the tumbling body bouncing among the four landmarks, with a sight line to each landmark whenever a measurement arrives. All four position estimates stay within a few centimeters of the truth, so their markers overlap. The difference is in the bottom panel: the invariant-naive filter's NEES jumps to about 18 at the first bounce and needs about 1 s to fall back inside the 95% band (about 0.4 s after the next two bounces, whose spikes are smaller). No single state component's standard deviation is plotted, because none shows the problem. The naive filter's mistake is the missing rotation-velocity coupling of §4. Its horizontal-velocity standard deviation after a bounce is actually *larger* than the others' (0.067 vs. 0.049 m/s just after the first one).
 
 ![Animation of the default run: top, a 3D view of the tumbling box bouncing on the ground among four landmarks, with dashed sight lines at each landmark measurement and overlapping position-estimate markers; bottom, the Monte Carlo average NEES of the four filters drawn up to the current time, with the invariant-naive filter spiking after each bounce and the world-frame EKF elevated before the first one](../../assets/invariant_saltation_ekf.gif)
 
 ## 7. Contact-detection jitter
 
-Everything above assumes each filter applies the bounce exactly when its own estimate reaches the ground. A real contact detector (an accelerometer spike, as in [Čížek et al., 2018](hybrid_saltation_ekf.md#11-references), or a force threshold) adds its own latency and jitter. `--detect-time-bias`/`--detect-time-noise-std` model this the same way as [hybrid_saltation_ekf.md §8](hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter): a bounce found at $`\tau`$ inside a tick is applied at $`\tau_{\text{detect}}`$ instead, with detection bias $`b_{\text{detect}}`$ and jitter standard deviation $`\sigma_{\text{detect}}`$ (the two flags):
+Everything above assumes each filter applies the bounce exactly when its own estimate reaches the ground. A real contact detector (an accelerometer spike, as in [Čížek et al., 2018](hybrid_saltation_ekf.md#11-references), or a force threshold) adds its own latency and jitter. `--detect-time-bias`/`--detect-time-noise-std` model this as in [hybrid_saltation_ekf.md §8](hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter). A bounce found at $`\tau`$ inside a tick is applied at $`\tau_{\text{detect}}`$ instead, with detection bias $`b_{\text{detect}}`$ and jitter standard deviation $`\sigma_{\text{detect}}`$ (the two flags):
 
 ```math
 \tau_{\text{detect}} = \text{clip}\big(\tau + b_{\text{detect}} + \mathcal{N}(0,\,\sigma_{\text{detect}}^2)\,,\ 0,\ \tau_{\text{remain}}\big)
@@ -195,7 +200,7 @@ What this shows:
 - **No IMU biases.** Biases break the exact group-affine property: an invariant EKF that carries them anyway is called "imperfect", because its error dynamics then depend on the estimate again; leaving them out keeps the comparison about the bounce.
 - **The impact changes velocity only.** A real impact also changes the angular velocity; here the body rate is an input, continuous across the bounce.
 - **Contact detection is a timing error only** (§7), clipped into the current tick, and the timing term is given the true detector's $`s`$. A real filter would have to estimate $`s`$, and a detector can also miss an impact or fire without one, which is not modeled.
-- **Short runs only.** `step_hybrid_ri` raises if an impact is slower than `min_bounce_speed` rather than modeling the settling phase, where the bounces get ever shorter and, in the ideal model, infinitely many happen in finite time (**Zeno** behavior, [glossary](../glossary.md#7-hybrid-discontinuous-systems)).
+- **Short runs only.** `step_hybrid_ri` raises if an impact is slower than `min_bounce_speed` rather than modeling the settling phase, where the bounces get ever shorter (**Zeno** behavior, [glossary](../glossary.md#7-hybrid-discontinuous-systems)).
 - **Few numerical settings.** §6 shows the defaults and one variation, and §7 sweeps only the detection error. The qualitative pattern held in the runs tried, but the other parameters are not swept.
 
 ## 9. References

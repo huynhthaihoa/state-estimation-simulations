@@ -11,9 +11,14 @@ State lives on a Lie group, e.g. a pose $X \in SE(3)$ mapping body coordinates t
 $$\eta_L = \hat X^{-1} X \qquad \text{(left-invariant error)}$$
 $$\eta_R = X \hat X^{-1} \qquad \text{(right-invariant error)}$$
 
-**Convention note.** Barrau & Bonnabel (2017, Eqs. 5-6) define the inverses, $\eta^L = X^{-1}\hat X$ and $\eta^R = \hat X X^{-1}$. Inverting an error doesn't change which frame changes it ignores, so everything below holds for both; only the sign of the small error vector $\xi$ flips.
+**Convention note.** Barrau & Bonnabel (2017, Eqs. 18 and 25) define the inverses, $\eta^L = X^{-1}\hat X$ and $\eta^R = \hat X X^{-1}$. An inverted error ignores the same frame changes, so everything below holds for both. Only the sign of the small error vector $\xi$ flips.
 
-**Naming trap.** The perturbation $`X = \hat X\,\mathrm{Exp}(\xi)`$ used in most of this repo is what Solà et al. and the `manif` library call "right-plus" ($\hat X \oplus \xi$), because $\mathrm{Exp}(\xi)$ multiplies on the right. It is the **left**-invariant error: $\eta_L = \hat X^{-1}X = \mathrm{Exp}(\xi)$. "Right" in "right-plus" says where the increment is applied; "left" in "left-invariant" says which frame change the error ignores. This is why `run_iekf` in `pointcloud_pose_tracking.py` is a left-invariant filter. The exception, [invariant_saltation_ekf.md](invariant_saltation_ekf.md), perturbs on the left, $`X = \exp(-\xi)\,\hat X`$, and is a right-invariant filter.
+**Naming trap.** The perturbation $`X = \hat X\,\mathrm{Exp}(\xi)`$ used in most of this repo is what Solà et al. and the `manif` library call "right-plus" ($\hat X \oplus \xi$), because $\mathrm{Exp}(\xi)$ multiplies on the right. It is the **left**-invariant error: $\eta_L = \hat X^{-1}X = \mathrm{Exp}(\xi)$.
+
+- "Right" in "right-plus" says where the increment is applied.
+- "Left" in "left-invariant" says which frame change the error ignores.
+
+This is why `run_iekf` in `pointcloud_pose_tracking.py` is a left-invariant filter. The exception, [invariant_saltation_ekf.md](invariant_saltation_ekf.md), perturbs on the left, $`X = \exp(-\xi)\,\hat X`$, and is a right-invariant filter.
 
 ---
 
@@ -49,7 +54,7 @@ The pattern above is easiest to see on the rotation part alone, without the esti
 
 $$\hat\omega^b = R^\top\dot R \qquad \hat\omega^s = \dot RR^\top$$
 
-(hat denotes the skew-symmetric matrix built from the corresponding vector). Redefining the world frame by a fixed rotation is left-multiplication $R\mapsto R_0R$; redefining the body frame is right-multiplication $R\mapsto RR_0$. Each redefinition cancels out of exactly one of the two velocities:
+(with the [hat operator](../glossary.md#1-geometry-and-lie-groups) turning a vector into its skew-symmetric matrix). Redefining the world frame by a fixed rotation is left-multiplication $R\mapsto R_0R$; redefining the body frame is right-multiplication $R\mapsto RR_0$. Each redefinition cancels out of exactly one of the two velocities:
 
 | | Left-mult. ($R\mapsto R_0R$) | Right-mult. ($R\mapsto RR_0$) |
 |---|---|---|
@@ -69,7 +74,13 @@ So $\hat\omega^b$ plays the same role as $\eta_L$ above (indifferent to how we l
 
 ## 4. Why it actually matters (not just bookkeeping)
 
-The whole point of IEKF is that with the *right* choice of error, the linearized error dynamics stop depending on the current state estimate. The Jacobians can still change over time with known inputs (for example the gyro and accelerometer readings), but not with the estimate, unlike an ordinary EKF's. That is what gives IEKF its convergence guarantees (Barrau & Bonnabel 2017, Theorem 1: estimate-independent, **log-linear** error propagation: the error's Log obeys a linear equation), and it also helps consistency.
+The whole point of IEKF is that with the *right* choice of error, the linearized error dynamics stop depending on the current state estimate. The Jacobians can still change over time with known inputs (for example the gyro and accelerometer readings), but not with the estimate, unlike an ordinary EKF's. Barrau & Bonnabel (2017) build its convergence guarantee in three steps:
+
+- **Theorem 1**: for [group-affine](../glossary.md#1-geometry-and-lie-groups) dynamics, the error evolves independently of the trajectory.
+- **Theorem 2**, the **log-linear** property: the error's Log then obeys an exact linear equation, even for large errors.
+- **Theorem 4**: so the IEKF is a locally asymptotically stable observer around any trajectory, under the same conditions that make a linear Kalman filter stable.
+
+The log-linear property also helps consistency.
 
 Rule of thumb for picking one:
 
@@ -85,13 +96,13 @@ Rule of thumb for picking one:
 - **Why the pairing matters.** Rows 2 and 3 both involve a point and a world frame, but the measurement shapes differ ($X b$ vs. $X^{-1}d$) and pair with opposite errors (Barrau & Bonnabel call them left- and right-invariant observations). The wrong pairing does not give a constant Jacobian: $X b$ with $`X = \eta_R \hat X`$ gives $`h(X) = \eta_R \hat X b`$, whose Jacobian $`[\,I \;\; -(\hat X b)^\wedge\,]`$ contains the predicted point, hence the current estimate.
 - **Same contrast, side by side.** The EKF-vs-IEKF table in [kf_ekf_iekf.md, EKF vs. IEKF equations side by side](kf_ekf_iekf.md#ekf-vs-iekf-equations-side-by-side) shows it for $Xb$: the world-frame (EKF) $H$ contains $`R_{\text{pred}}`$, the body-frame (IEKF) $H$ does not.
 - **Repo check.** The point-cloud IEKF tests row 2. Its fixed $`H = [\,I \;\; -p_i^\wedge\,]`$ is in [pointcloud_pose_tracking_empirical_note.md §2](pointcloud_pose_tracking_empirical_note.md#2-ekf-vs-iekf-exact-by-construction), and [§1](pointcloud_pose_tracking_empirical_note.md#1-the-setup) of that note explains why the residual is left-invariant.
-- **Propagation rarely decides.** For "group-affine" dynamics, such as IMU [dead-reckoning](../optimization/factor_graph.md#2-why-do-we-need-it) of pose and velocity, Barrau & Bonnabel (2017) show that both errors evolve independently of the estimate. So the measurement shape usually picks the error: papers choose whichever makes *their* sensor model's Jacobian trajectory-independent. That is the real design criterion, not a fixed rule.
+- **Propagation rarely decides.** For group-affine dynamics, such as IMU [dead reckoning](../optimization/factor_graph.md#2-why-do-we-need-it) of pose and velocity, Barrau & Bonnabel (2017, Theorem 1) show that both errors then evolve independently of the trajectory: one does exactly when the other does. So the measurement shape usually picks the error: papers choose whichever makes *their* sensor model's Jacobian trajectory-independent. That is the design criterion, not a fixed rule.
 
 ---
 
 ## 5. References
 
-1. Barrau, A., & Bonnabel, S. (2017). *The Invariant Extended Kalman Filter as a Stable Observer*. IEEE Transactions on Automatic Control, 62(4), 1797-1812. https://doi.org/10.1109/TAC.2016.2594085 - the main reference. Its Eqs. 5-6 define the errors as inverses of this doc's (§1); it also covers the observation shapes and group-affine dynamics in §4.
+1. Barrau, A., & Bonnabel, S. (2017). *The Invariant Extended Kalman Filter as a Stable Observer*. IEEE Transactions on Automatic Control, 62(4), 1797-1812. https://doi.org/10.1109/TAC.2016.2594085 (arXiv: https://arxiv.org/abs/1410.1465) - the main reference. Numbering below follows arXiv v4. Eqs. 18 and 25 define the errors as inverses of this doc's (§1). §2.2 characterizes group-affine dynamics (condition (7), Theorem 1), §2.3 proves the log-linear property (Theorem 2), §3.1 pairs the two observation shapes with the left and right filters, and Theorem 4 (§3.4) is the convergence result.
 2. Bonnabel, S. (2007). *Left-invariant extended Kalman filter and attitude estimation*. 46th IEEE Conference on Decision and Control, 1027-1032. https://doi.org/10.1109/CDC.2007.4434662 - an early invariant-error formulation.
 3. Hartley, R., Ghaffari, M., Eustice, R. M., & Grizzle, J. W. (2020). *Contact-aided invariant extended Kalman filtering for robot state estimation*. International Journal of Robotics Research, 39(4), 402-430. https://doi.org/10.1177/0278364919894385 - the right-invariant legged-robot filter (§4, propagation bullet).
 4. Solà, J., Deray, J., & Atchuthan, D. (2018). *A micro Lie theory for state estimation in robotics*. arXiv:1812.01537. https://arxiv.org/abs/1812.01537 - the "right-plus" ($\oplus$) convention in §1, and the basis of `manif`.

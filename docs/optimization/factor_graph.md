@@ -9,7 +9,7 @@ A **factor graph** represents:
 It is a **bipartite** graph (edges join only nodes of different kinds) with two kinds of nodes (§6 spells out the distinction):
 
 - **Variables** = things we don't know: robot poses, landmarks, sensor biases, etc.
-- **Factors** = measurements/constraints: odometry (incremental motion from onboard sensors), camera observations, IMU, GPS, loop closures, etc.
+- **Factors** = measurements/constraints: [odometry](../glossary.md#5-slam-system), camera observations, IMU, GPS, loop closures, etc.
 
 ![A bipartite factor graph for a SLAM-style problem: robot poses x0..xn connected by odometry-measurement factors u1..un, with landmarks l1, l2 connected to poses via landmark-measurement factors m1..m4, plus a small "variable node/factor node" legend](../images/factor_graph_1.jpg)
 
@@ -37,7 +37,8 @@ Pose x0 ●─────────● x1 ──────● x2
 ```
 
 - The circles are **variables**.
-- In this sketch each labelled line stands for a **factor** joining the variables it touches (a **binary factor**: it touches two variables). The images above draw factors as their own nodes (dots or squares), which is how a unary factor such as a prior or GPS fix fits in: it touches just one variable.
+- In this sketch each labelled line stands for a **factor** joining the variables it touches. A **binary factor** touches two variables.
+- The images above draw factors as their own nodes (dots or squares). That is how a unary factor, such as a prior or GPS fix, fits in: it touches just one variable.
 
 ---
 
@@ -162,7 +163,7 @@ e_k^\top\Omega_k e_k
 }
 $$
 
-where $\Omega_k=\Sigma_k^{-1}$ is the **information matrix** (called $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty); downstream docs such as [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md) use $\Omega$).
+where $\Omega_k=\Sigma_k^{-1}$ is the [**information matrix**](../glossary.md#2-uncertainty-and-probability) (called $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty); downstream docs such as [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md) use $\Omega$).
 
 > **Note**: a precise sensor (small $\Sigma_k$) gives a *large* $\Omega_k$, so its error counts more in the sum; a noisy sensor (large $\Sigma_k$) gives a *small* $\Omega_k$ and is down-weighted. The term $e_k^\top\Omega_k e_k$ is a **squared Mahalanobis distance** - see the [glossary](../glossary.md#2-uncertainty-and-probability) for the definition and the isotropic special case where it collapses to plain squared error divided by a constant.
 
@@ -297,11 +298,11 @@ It can represent:
 
 So:
 
-> **Pose graph is essentially a special/simple case of a factor graph.**
+> **A pose graph is a special case of a factor graph.**
 
 ---
 
-## 8. Where Gauss–Newton enters
+## 8. Where Gauss-Newton enters
 
 Factor-graph optimization is usually a **nonlinear least-squares problem**.
 
@@ -313,11 +314,14 @@ We have:
 
 But the errors are nonlinear because poses involve rotations and transformations.
 
-So we linearize, where $`\oplus`$ is the **retraction** that applies a small update $`\Delta X`$ to a state ([glossary](../glossary.md#1-geometry-and-lie-groups)) and $`J`$ is the **Jacobian** of $`e`$ with respect to $`\Delta X`$ ([glossary](../glossary.md#3-least-squares-optimization)):
+So we linearize:
+
+- $`\oplus`$ is the **retraction** that applies a small update $`\Delta X`$ to a state ([glossary](../glossary.md#1-geometry-and-lie-groups)).
+- $`J`$ is the **Jacobian** of $`e`$ with respect to $`\Delta X`$ ([glossary](../glossary.md#3-least-squares-optimization)).
 
 $$e(X\oplus\Delta X)\approx e(X)+J\Delta X$$
 
-Then **[Gauss–Newton](gauss_newton.md)** solves (every factor's error stacked into $e$, its $\Omega_i$ blocks into $\Omega$):
+Then **[Gauss-Newton](gauss_newton.md)** solves (every factor's error stacked into $e$, its $\Omega_i$ blocks into $\Omega$):
 
 ```math
 J^\top \Omega J\,\Delta X = -J^\top \Omega\, e
@@ -332,7 +336,7 @@ Factor graph
      ↓
 Nonlinear least squares
      ↓
-Gauss–Newton/Levenberg–Marquardt
+Gauss-Newton/Levenberg-Marquardt
      ↓
 Linearization
      ↓
@@ -380,7 +384,7 @@ IMU says:
 x1 should be somewhere else┘
 ```
 
-The optimizer doesn't choose one measurement. It finds the configuration with the **best overall compromise**, weighted by measurement uncertainty (a **local optimum**: better than nearby solutions, not necessarily the best overall, so it relies on a good initial guess).
+The optimizer doesn't choose one measurement. It finds the configuration with the **best overall compromise**, weighted by measurement uncertainty. The result is a **local optimum**: better than nearby solutions, not necessarily the best overall. It therefore relies on a good initial guess.
 
 And when a loop closure arrives:
 
@@ -402,7 +406,7 @@ x0 ●──────────────● x5
 
 the optimizer can distribute the accumulated error across the entire trajectory.
 
-That's why graph optimization is so effective for SLAM.
+This is why graph optimization suits SLAM: one loop closure corrects the whole trajectory, not just the last pose.
 
 ---
 
@@ -438,7 +442,7 @@ The hierarchy:
 
 > **Nonlinear least squares** = mathematical formulation
 
-> **Gauss–Newton/LM** = optimization method
+> **Gauss-Newton/Levenberg-Marquardt** = optimization method
 
 > **Lie algebra** = convenient way to optimize poses on SE(3)
 

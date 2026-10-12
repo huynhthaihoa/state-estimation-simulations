@@ -8,7 +8,7 @@ Gauss-Newton and its damped variants, like [Levenberg-Marquardt](levenberg_marqu
 
 We want parameters $x$ that make some measurements fit as well as possible. In SLAM, for example: which robot pose $x$ best explains these sensor measurements?
 
-We define a **residual**:
+We define a [residual](../glossary.md#3-least-squares-optimization):
 
 $$r(x) = \text{prediction}(x) - \text{measurement}$$
 
@@ -64,7 +64,7 @@ Then we update and repeat:
 
 $$x_{\text{new}} = x_{\text{old}}+\Delta x$$
 
-> **Note**: solving it needs $J^\top J$ to be invertible, i.e. $J$ must have full column rank. In SLAM it isn't by default: some motions of the whole solution change no residual (a **gauge freedom**), so $J^\top J$ stays singular until something pins the solution down.
+> **Note**: solving it needs $J^\top J$ to be invertible, i.e. $J$ must have full column rank. In SLAM it isn't by default: some motions of the whole solution change no residual (a [gauge freedom](../glossary.md#3-least-squares-optimization)), so $J^\top J$ stays singular until something pins the solution down.
 >
 > - **Pose graphs**: shifting or rotating the whole trajectory together (6 DoF in 3D). Anchoring the first pose fixes it - `pose_graph.py` does this, "heavily anchoring node 0".
 > - **Monocular BA**: also uniformly rescaling the scene (7 DoF), which one pose can't pin. The BA scripts fix *two* cameras instead (a prior on cameras 0 and 1, or two hard-fixed keyframes); see [bundle_adjustment.md §14](bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment).
@@ -115,7 +115,7 @@ One step gets us much closer to $2$, and repeating converges rapidly.
 
 ## 7. Why is it called Gauss-Newton?
 
-**Newton's method** uses the **second derivative** (the Hessian) $H$ and solves $H\Delta x=-\nabla f$. For nonlinear least squares, the exact Hessian decomposes as:
+**Newton's method** uses the [Hessian](../glossary.md#3-least-squares-optimization) $H$ (the second derivatives of $f$) and solves $H\Delta x=-\nabla f$. For nonlinear least squares, the exact Hessian decomposes as:
 
 $$H=J^\top J + \sum_i r_i \nabla^2 r_i$$
 
@@ -167,7 +167,7 @@ $$
 
 Solve it → update all poses and landmarks → repeat.
 
-One caveat: landmarks $p_j\in\mathbb{R}^3$ really do just get $p_j \leftarrow p_j+\Delta p_j$. Poses $T_i$ don't - they live on the $SE(3)$ manifold ([glossary](../glossary.md#1-geometry-and-lie-groups)), so the update is a **retraction** (a step that stays on the manifold: the pose is updated through Exp instead of plain addition) through the exponential map, $T_i \leftarrow T_i\cdot\mathrm{Exp}(\Delta x_i)$, not plain addition. See [pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive) ("Why not just subtract poses?") and the full derivation there.
+One caveat: landmarks $p_j\in\mathbb{R}^3$ really do just get $p_j \leftarrow p_j+\Delta p_j$. Poses $T_i$ don't, because they live on the $SE(3)$ manifold ([glossary](../glossary.md#1-geometry-and-lie-groups)). Their update is a [retraction](../glossary.md#1-geometry-and-lie-groups) through the exponential map, $T_i \leftarrow T_i\cdot\mathrm{Exp}(\Delta x_i)$, not plain addition. See [pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive) ("Why not just subtract poses?") and the full derivation there.
 
 This is the core optimization mechanism behind many **[bundle adjustment](bundle_adjustment.md) and [graph-SLAM](pose_graph_optimization.md) systems**.
 
@@ -222,7 +222,7 @@ Gauss-Newton asks:
 
 $$J^\top J\Delta x=-J^\top r$$
 
-It uses much more information about the local geometry, so it can converge much faster near the solution - quadratically (each step's error is at most a constant times the square of the previous one) for zero-residual problems like §6's, where the term Gauss-Newton drops (§7) vanishes at the solution.
+It uses much more information about the local geometry, so it can converge much faster near the solution. For zero-residual problems like §6's, the term Gauss-Newton drops (§7) vanishes at the solution, and convergence is quadratic: each step's error is at most a constant times the square of the previous one.
 
 ---
 
@@ -235,7 +235,7 @@ It uses much more information about the local geometry, so it can converge much 
 | **Gauss-Newton**                                  | Use Jacobian structure to approximate curvature |
 | **[Levenberg-Marquardt](levenberg_marquardt.md)** | Gauss-Newton + damping for robustness           |
 
-SLAM systems typically use **Gauss-Newton/Levenberg-Marquardt + a sparse linear solver**, because SLAM produces large, **sparse** (mostly zero entries in $`J`$ and $`J^\top J`$) least-squares problems.
+SLAM systems typically use **Gauss-Newton/Levenberg-Marquardt + a sparse linear solver**, because SLAM produces large, [sparse](../glossary.md#4-graphs-sparsity-and-solvers) least-squares problems.
 
 ---
 

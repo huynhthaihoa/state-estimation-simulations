@@ -2,7 +2,7 @@
 
 ## Intuition
 
-A hybrid system alternates **ordinary smooth motion** (falling) with **sudden, instantaneous jumps** (bouncing), triggered the instant some condition is hit (touching the ground). The tricky part isn't the jump itself - it's that two nearby trajectories don't hit that condition at the same moment.
+A hybrid system alternates **ordinary smooth motion** (falling) with **sudden, instantaneous jumps** (bouncing), triggered the instant some condition is hit (touching the ground). The tricky part is not the jump itself: two nearby trajectories do not hit that condition at the same moment.
 
 Ball A (nominal) and ball B (starts 5 cm higher) fall together. B has farther to fall, so it lands a fraction of a second *later* than A and has picked up extra speed by then:
 
@@ -48,10 +48,11 @@ A **hybrid dynamical system** alternates **continuous flow** with **instantaneou
 
 - **State**: $x = (p, v) \in \mathbb{R}^6$ with $p, v \in \mathbb{R}^3$ - a point mass's position and velocity, plain $\mathbb{R}^6$ (no rotation, unlike most scripts in this repo).
 - **Flow**: $`\dot x = f(x) = \begin{bmatrix} v \\ (0,0,-g) \end{bmatrix}`$ - ordinary free-fall, affine in $x$ (linear plus a constant gravity term), so it can be integrated exactly.
-- **Guard**: $g(x) = p_z$. (The letter $g$ does double duty in this doc, following the saltation-matrix literature: $g(x)$ and its gradient $Dg$ are the guard, while a bare $g$ in the dynamics, as in $\tfrac12 g t^2$, is gravity, $9.81\ \text{m/s}^2$.) The system jumps whenever a falling trajectory reaches $g(x) = 0$ (touches the ground). Its gradient $Dg = \partial g/\partial x$ - which shows up throughout this doc, starting in §2 - is the constant row vector $(0,0,1,0,0,0)$ here: it just picks out the $p_z$ component.
-- **Reset map**: $R(x)$, applied at the guard - here, $`v_z \mapsto -e\,v_z`$ (an inelastic bounce with restitution $e$), position and horizontal velocity untouched. Throughout this doc, a superscript $-$/$`+`$ on a state, vector field or covariance (e.g. $x^{-}$, $f^{-}$, $x^{+}$, $f^{+}$, $P^{-}$, $P^{+}$) means "evaluated just before/after the reset" - see the notation table below.
+- **Guard**: $g(x) = p_z$. The system jumps whenever a falling trajectory reaches $g(x) = 0$ (touches the ground). Its gradient $Dg = \partial g/\partial x$ appears throughout this doc, starting in §2. Here it is the constant row vector $(0,0,1,0,0,0)$, which picks out the $p_z$ component.
+  - The letter $g$ does double duty, following the saltation-matrix literature: $g(x)$ and $Dg$ are the guard, while a bare $g$ in the dynamics, as in $\tfrac12 g t^2$, is gravity, $9.81\ \text{m/s}^2$.
+- **Reset map**: $R(x)$, applied at the guard - here, $`v_z \mapsto -e\,v_z`$ (an inelastic bounce with restitution $e$), position and horizontal velocity untouched. A superscript $-$/$`+`$ on a state, vector field or covariance (e.g. $x^{-}$, $f^{+}$, $P^{-}$, $P^{+}$) means "evaluated just before/after the reset" (see the notation table below).
 
-This is the canonical example (the word "saltation" is Latin for "leaping"), and the simplest analog of a foot-strike/ground-contact impact - a discrete velocity reset at a discrete contact event - without $SE(3)$'s rotational complexity layered on top.
+This is the canonical example (the word "saltation" is Latin for "leaping"). It is the simplest analog of a foot-strike impact, a discrete velocity reset at a discrete contact event, without the rotational complexity of $SE(3)$. The glossary defines [hybrid system, guard, reset map and saltation matrix](../glossary.md#7-hybrid-discontinuous-systems).
 
 **Notation used throughout this doc.** Several letters mean something different here than in the rest of the repo, or mean two things within this doc; the table settles each one.
 
@@ -130,7 +131,9 @@ S = H P_{k|k-1} H^\top + R_z, \qquad K = P_{k|k-1} H^\top S^{-1}
 x_{k|k} = x_{k|k-1} + K\,(z - H x_{k|k-1}), \qquad P_{k|k} = (I - K H)\,P_{k|k-1}
 ```
 
-Here $`x_{k|k-1}, P_{k|k-1}`$ are the output of this tick's hybrid predict and $`x_{k|k}, P_{k|k}`$ the updated estimate. The other filtering docs write these as $x^{-}/x^{+}$, but in this doc $-$/$`+`$ is reserved for the bounce, and $R$ for the reset map ($R_z$ is `measurement_update`'s `R` argument). The covariance uses the plain $`(I - KH)P_{k|k-1}`$ form, not the **Joseph form** $`(I - KH)P_{k|k-1}(I - KH)^\top + K R_z K^\top`$, which is algebraically the same but stays symmetric and positive definite under rounding. The default is $\sigma_z = 0.03$ m (`--pos-noise-std`).
+Here $`x_{k|k-1}, P_{k|k-1}`$ are the output of this tick's hybrid predict and $`x_{k|k}, P_{k|k}`$ the updated estimate. The other filtering docs write these as $x^{-}/x^{+}$, but here $-$/$`+`$ is reserved for the bounce, and $R$ for the reset map ($R_z$ is `measurement_update`'s `R` argument).
+
+The covariance uses the plain $`(I - KH)P_{k|k-1}`$ form, not the **Joseph form** $`(I - KH)P_{k|k-1}(I - KH)^\top + K R_z K^\top`$. The two are algebraically the same, but the Joseph form stays symmetric and positive definite under rounding. The default is $\sigma_z = 0.03$ m (`--pos-noise-std`).
 
 **Ground truth and Monte Carlo setup.**
 
@@ -287,7 +290,7 @@ Practical consequence: $\Xi$ does not drive $P$'s guard-normal row/column to a n
 
 ## 6. The empirical finding: a modest, real gap, not a dramatic one
 
-The intuitive story going in was that the naive $`P^{+} = DR\,P^{-}\,DR^\top`$ update would be measurably overconfident (too-small reported uncertainty) right after each bounce compared to the saltation-corrected one, and a Monte Carlo NEES consistency check would show it (NEES: a calibrated 6-DoF filter averages $\approx 6$, higher means overconfident, lower underconfident - see the [glossary](../glossary.md#2-uncertainty-and-probability)). The data does not bear that out.
+The intuitive story going in was that the naive $`P^{+} = DR\,P^{-}\,DR^\top`$ update would be measurably overconfident (too-small reported uncertainty) right after each bounce compared to the saltation-corrected one, and a Monte Carlo NEES consistency check would show it (see [NEES](../glossary.md#2-uncertainty-and-probability): a consistent 6-DoF filter averages $\approx 6$, higher means overconfident, lower underconfident). The data does not bear that out.
 
 Running `saltation_matrix_ekf.py` at its defaults (500 Monte Carlo trials, 3 well-separated bounces from a 5m drop at $e = 0.85$) and looking at NEES in the few ticks immediately following each bounce (excluding the shared spike at the bounce tick itself, which both filters exhibit for the mundane reason that the true trajectory is also close to its own crossing at that tick):
 
@@ -387,7 +390,7 @@ A likely reason (not tested here): the saltation update commits more strongly to
 Two notes on how §4's formula enters this section:
 
 - The naive column does not depend on §4's formula (its covariance update never uses `saltation_matrix`); only the saltation column, and so the ratio, does.
-- Because $`Dg\,\Xi = -e\,Dg`$ (§5) is not zero, the saltation filter never stakes *everything* on the detected crossing being exact. It is somewhat more sensitive to jitter than the naive update, not dramatically so.
+- Because $`Dg\,\Xi = -e\,Dg`$ (§5) is nonzero, the saltation update keeps some height variance rather than collapsing it at the detected crossing. It is still more sensitive to jitter than the naive update, by the ratios in the table above.
 
 ---
 

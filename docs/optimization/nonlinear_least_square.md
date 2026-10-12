@@ -46,7 +46,7 @@ Take errors $`[1,-2,3]`$:
 Absolute values, $`\sum_i|e_i|`$, would also stop the cancelling, so why squares? Two reasons:
 
 - **Easy to solve.** Once we linearize $e$ (§7), each step is a linear least-squares problem with a closed-form solution (normal equations, §8). $`|e|`$ has a kink at zero and no such structure.
-- **Statistically right.** For Gaussian measurement noise, minimizing squared error gives the **maximum-likelihood estimate** (the parameters under which the observed measurements are most probable), which is also why §12's weights are $`W_i=\Sigma_i^{-1}`$ (the weight $`W_i`$ and the measurement covariance $`\Sigma_i`$, both defined in §12).
+- **Statistically right.** For Gaussian measurement noise, minimizing squared error gives the **maximum-likelihood estimate**: the parameters under which the observed measurements are most probable. This is also why §12's weights are $`W_i=\Sigma_i^{-1}`$ ($`W_i`$ is the weight and $`\Sigma_i`$ the measurement covariance, both defined in §12).
 
 So $`\text{total error}=\sum_i e_i^2`$.
 
@@ -69,7 +69,9 @@ $$e_i = z_i-\pi(TX_i)$$
 where:
 
 - $z_i$ = the measured pixel coordinates of landmark $`i`$ (the measurement)
-- $T$ = camera pose, written here as world-to-camera, so $TX_i$ is the landmark in the camera frame. [bundle_adjustment.md](bundle_adjustment.md) uses the inverse convention: a camera-to-world $T$, and $\pi(T^{-1}P)$ ($P$ there is the 3D point, written $`X_i`$ here, not a covariance).
+- $T$ = camera pose, written here as world-to-camera, so $TX_i$ is the landmark in the camera frame.
+  - [bundle_adjustment.md](bundle_adjustment.md) uses the inverse convention: a camera-to-world $T$ and $\pi(T^{-1}P)$.
+  - $P$ there is the 3D point, written $`X_i`$ here, not a covariance.
 - $X_i$ = 3D landmark
 - $\pi$ = camera projection
 
@@ -85,7 +87,7 @@ The standard NLS problem is:
 \boxed{\min_x \frac12\sum_i \|e_i(x)\|^2}
 ```
 
-or, stacking all **residuals** (the error terms $`e_i`$):
+or, stacking all [residuals](../glossary.md#3-least-squares-optimization) $`e_i`$:
 
 ```math
 \boxed{\min_x \frac12\|e(x)\|^2}
@@ -170,7 +172,7 @@ There is generally no closed-form solution for $`\min_x\|e(x)\|^2`$, so we itera
 
 ## 7. The key trick: make the nonlinear problem locally linear
 
-This is where the **Jacobian** enters. At the current estimate $`x_k`$ we use a first-order **Taylor expansion** of the residual:
+This is where the [Jacobian](../foundations/jacobian.md) enters. At the current estimate $`x_k`$ we use a first-order **Taylor expansion** of the residual:
 
 $$e(x_k+\Delta x)\approx e(x_k)+J\Delta x,\qquad J=\frac{\partial e}{\partial x}$$
 
@@ -229,7 +231,7 @@ $$\boxed{x_{k+1}=x_k+\Delta x}$$
 
 ---
 
-## 9. This is exactly where [Gauss–Newton](gauss_newton.md) comes from
+## 9. This is exactly where [Gauss-Newton](gauss_newton.md) comes from
 
 The whole chain:
 
@@ -244,21 +246,21 @@ Linear least squares
         ↓
 JᵀJ Δx = -Jᵀe
         ↓
-Gauss–Newton step
+Gauss-Newton step
         ↓
 Update x
         ↓
 Repeat
 ```
 
-> **NLS is the problem. Gauss–Newton is one method for solving it.**
+> **NLS is the problem. Gauss-Newton is one method for solving it.**
 
 ---
 
-## 10. Where [Levenberg–Marquardt](levenberg_marquardt.md) fits
+## 10. Where [Levenberg-Marquardt](levenberg_marquardt.md) fits
 
 - NLS gives the problem $`\min_x\|e(x)\|^2`$.
-- Gauss–Newton gives the step $`J^\top J\Delta x=-J^\top e`$, which can occasionally be a bad step.
+- Gauss-Newton gives the step $`J^\top J\Delta x=-J^\top e`$, which can overshoot when the estimate is far from the solution ([levenberg_marquardt.md §2](levenberg_marquardt.md#2-why-not-just-use-gauss-newton)).
 - LM damps it:
 
 $$\boxed{(J^\top J+\lambda I)\Delta x=-J^\top e}$$
@@ -358,7 +360,12 @@ Almost every SLAM sensor gives a statement like:
 | GPS | $`e_{gps}(X_i)`$ |
 | Loop closure | $`e_{loop}(X_i,X_j)`$ |
 
-Here $`X_i`$ is now the $i$-th **pose** (not the landmark $`X_i`$ of §3), $`L_j`$ is the $j$-th landmark, $`v_i`$ the velocity at pose $i$, and $`b_i`$ the IMU bias at pose $i$ (not the intercept $`b`$ of §1; [glossary](../glossary.md#5-slam-system)).
+Here:
+
+- $`X_i`$ is now the $i$-th **pose** (not the landmark $`X_i`$ of §3)
+- $`L_j`$ is the $j$-th landmark
+- $`v_i`$ is the velocity at pose $i$
+- $`b_i`$ is the IMU bias at pose $i$ (not the intercept $`b`$ of §1; [glossary](../glossary.md#5-slam-system))
 
 Putting everything together (each term weighted by its $W_i$ as in §12, left out here for readability):
 
@@ -397,7 +404,7 @@ The concepts above organize into one map:
                           │
               ┌───────────┴───────────┐
               ↓                       ↓
-        Gauss–Newton           Levenberg–Marquardt
+        Gauss-Newton           Levenberg-Marquardt
               │                       │
           fast/local             damped/safer
               │                       │
@@ -438,18 +445,18 @@ $$
 Then:
 
 - **[Jacobian](../foundations/jacobian.md)** → tells us how residuals change when variables move.
-- **[Gauss–Newton](gauss_newton.md)** → linearizes NLS and solves for a step.
-- **[Levenberg–Marquardt](levenberg_marquardt.md)** → GN + damping for safer steps.
+- **[Gauss-Newton](gauss_newton.md)** → linearizes NLS and solves for a step.
+- **[Levenberg-Marquardt](levenberg_marquardt.md)** → GN + damping for safer steps.
 - **[Factor graph](factor_graph.md)** → organizes variables and residuals.
 - **[iSAM/iSAM2](isam_optimization.md)** → solves/updates the factor-graph NLS problem incrementally.
 
-Keeping **problem formulation vs optimization algorithm** straight is one of the most useful habits in SLAM.
+Keeping **problem formulation** and **optimization algorithm** separate is a useful habit in SLAM.
 
 ---
 
 ## 17. References
 
-1. Nocedal, J., & Wright, S. J. (2006). *Numerical Optimization* (2nd ed.). Springer Series in Operations Research and Financial Engineering. Springer. ISBN 978-0-387-30303-1 - the general nonlinear-least-squares/Gauss–Newton treatment behind §4 and §7–9.
+1. Nocedal, J., & Wright, S. J. (2006). *Numerical Optimization* (2nd ed.). Springer Series in Operations Research and Financial Engineering. Springer. ISBN 978-0-387-30303-1 - the general nonlinear-least-squares/Gauss-Newton treatment behind §4 and §7–9.
 2. Hartley, R., & Zisserman, A. (2004). *Multiple View Geometry in Computer Vision* (2nd ed.). Cambridge University Press. ISBN 978-0-521-54051-3 - the camera-projection/reprojection-error formalism (${z - \pi(TX)}$) behind §5.
 3. Triggs, B., McLauchlan, P. F., Hartley, R. I., & Fitzgibbon, A. W. (2000). *Bundle Adjustment - A Modern Synthesis*. In Vision Algorithms: Theory and Practice (LNCS vol. 1883, pp. 298–372). Springer. https://doi.org/10.1007/3-540-44480-7_21 - the bundle-adjustment application referenced in §5.
 4. Dellaert, F., & Kaess, M. (2017). *Factor Graphs for Robot Perception*. Foundations and Trends in Robotics, 6(1–2), 1–139. https://doi.org/10.1561/2300000043 - the factor-graph formulation of the NLS problem behind §11 and §14.

@@ -136,7 +136,7 @@ BA doesn't say "the cameras are correct, I'll fix the points" or "the points are
 
 > **"I'll adjust everything together until the entire reconstruction explains the image measurements as well as possible."**
 
-To see why both must move, look at the RMS-error (root mean square: the square root of the average squared error) panel of the figure in [Section 6.1](#61-the-ba-math-concretely): it compares **landmarks**-only (the 3D points being estimated), poses-only and joint bundle adjustment.
+To see why both must move, look at the RMS-error panel of the figure in [§6.1](#61-the-ba-math-concretely). It compares landmarks-only, poses-only and joint bundle adjustment.
 
 ---
 
@@ -165,7 +165,7 @@ With noise and imperfect estimates, they don't intersect perfectly:
 
 We can think of BA as adjusting the **bundle of rays** and the camera poses together until everything fits.
 
-(Recovering a single point from rays with already-known poses, rather than adjusting everything jointly, is triangulation on its own. See [frontend/triangulation_pnp.md](../frontend/triangulation_pnp.md) for the closed-form math this repo implements, plus its inverse problem, **PnP**: Perspective-n-Point, recovering a camera pose from known 3D points.)
+(Recovering a single point from rays with already-known poses, rather than adjusting everything jointly, is triangulation on its own. See [frontend/triangulation_pnp.md](../frontend/triangulation_pnp.md) for the closed-form math this repo implements, plus its inverse problem, PnP.)
 
 ![Two top-view panels from bundle_adjustment.py's defaults: rays back-projected through one landmark's measured pixels from all eight cameras, scattered at the noisy initial guess and meeting at one point after joint bundle adjustment](../../assets/bundle_adjustment_concept.png)
 
@@ -196,16 +196,16 @@ BA solves:
 
 where:
 
-- $T_i$ = pose of camera `i`, camera-to-world (as in Section 1)
+- $T_i$ = pose of camera `i`, camera-to-world (as in §1)
 - $P_j$ = 3D landmark `j`, in world coordinates
 - $z_{ij}$ = observed pixel
 - $\pi(T_i^{-1}P_j)$ = predicted pixel
 - $\mathcal{O}$ = the set of (camera, landmark) pairs that were actually observed - not every camera sees every landmark, so the sum only runs over real observations, not all $i,j$ combinations
 
 
-In plain English: **find the camera poses and 3D points that make the predicted image points match the actual image points as closely as possible.**
+In words: **find the camera poses and 3D points that make the predicted image points match the actual image points as closely as possible.**
 
-Real implementations usually wrap the squared reprojection error in a **robust loss** (e.g. Huber) instead of squaring it directly, so a handful of bad **feature matches** (wrong pairings of the same image point across images) can't drag the whole reconstruction toward them - see [pose_graph_optimization.md](pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures)'s "Robust loss functions" section for the exact same idea applied to pose graphs. `bundle_adjustment.py` keeps the plain, un-robustified squared error above, matching the objective as written here.
+Real implementations usually wrap the squared reprojection error in a **robust loss** (e.g. Huber) instead of squaring it directly, so a handful of bad **feature matches** (wrong pairings of the same image point across images) can't drag the whole reconstruction toward them. The ["Robust loss functions" section of pose_graph_optimization.md](pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures) applies the same idea to pose graphs. `bundle_adjustment.py` keeps the plain, un-robustified squared error above, matching the objective as written here.
 
 ### 6.1 The BA math, concretely
 
@@ -265,7 +265,7 @@ H\,\delta = g, \qquad H = \sum_{(i,j)} J^\top W J, \qquad g = \sum_{(i,j)} J^\to
 | `run_ba_poses_only` | one camera at a time (landmarks fixed): a separate $6\times6$ solve per camera | $J_{\text{pose}}$ | $1$ | $`10^{-9} I_6`$ |
 | `run_bundle_adjustment` | every pose and landmark: one dense system of size $6N + 3M$ | both blocks | $`\omega_{\text{px}} = 1/\sigma_{\text{px}}^2`$ | $`10^{-6} I`$ plus the gauge prior below |
 
-All three solvers then apply $`T_i \leftarrow T_i\,\mathrm{Exp}(\delta_i)`$ and $P_j \leftarrow P_j + \delta_j$. They stop when the step norm $`\|\delta\|`$ drops below `gn_tol`. The joint system has the arrow-head block structure described in Section 12, but the script solves it densely.
+All three solvers then apply $`T_i \leftarrow T_i\,\mathrm{Exp}(\delta_i)`$ and $P_j \leftarrow P_j + \delta_j$. They stop when the step norm $`\|\delta\|`$ drops below `gn_tol`. The joint system has the arrow-head block structure described in §12, but the script solves it densely.
 
 **Gauge prior** (`run_bundle_adjustment`): joint BA has a 7-DoF gauge freedom (rigid motion plus scale). The script fixes it with a prior factor on cameras 0 and 1. The prior mean $\bar T_k$ is each camera's own noisy initial guess:
 
@@ -293,7 +293,7 @@ Script defaults:
 - Camera: $f_x = f_y = 800$ px on a 640×480 image (about 44°×33° field of view).
 - Noise: $\sigma_{\text{pose}} = 0.1$, $\sigma_{\text{lm}} = 0.3$ m, $\sigma_{\text{px}} = 1$ px.
 - Solver: `gn_tol` = $10^{-6}$, at most 30 iterations.
-- `reprojection_rms` reports the RMS of $`\|z_{ij} - \pi(T_i^{-1}P_j)\|`$. It is unaffected by the Umeyama alignment of Section 14, because reprojection error is invariant to a **similarity transform** (rotation, translation and uniform scale).
+- `reprojection_rms` reports the RMS of $`\|z_{ij} - \pi(T_i^{-1}P_j)\|`$. It is unaffected by the Umeyama alignment of §14, because reprojection error is invariant to a **similarity transform** (rotation, translation and uniform scale).
 
 
 ---
@@ -400,15 +400,21 @@ Imagine a pile of photographs and a rough miniature 3D reconstruction. We ask: "
 - landmark 1 is too far away
 - landmark 2 is too high
 
-So we keep adjusting poses and landmarks, re-projecting and measuring the image error, until the reconstruction is as consistent with the images as possible (the loop in Section 8).
+So we keep adjusting poses and landmarks, reprojecting and measuring the image error, until the reconstruction is as consistent with the images as possible (the loop in §8).
 
 ---
 
 ## 12. Block sparsity and the Schur complement
 
-Section 10 named the sparsity that makes large BA tractable. Here are the mechanics. A residual for point $P_j$ seen by camera $T_i$ depends **only** on $T_i$ and $P_j$ (the diagram in Section 10).
+§10 named the sparsity that makes large BA tractable. Here are the mechanics. A residual for point $P_j$ seen by camera $T_i$ depends **only** on $T_i$ and $P_j$ (the diagram in §10).
 
-That gives the linearized normal-equations Hessian $`H = J^\top J`$ an **arrow-head** block structure: block-diagonal camera-camera blocks, block-diagonal point-point blocks, and camera-point coupling blocks, with no direct camera-camera or point-point coupling anywhere.
+That gives the linearized normal-equations Hessian $`H = J^\top J`$ an **arrow-head** block structure with three kinds of blocks:
+
+- camera-camera: block-diagonal;
+- point-point: block-diagonal;
+- camera-point: nonzero only where that camera observes that point.
+
+No two different cameras, and no two different points, are coupled directly.
 
 ```text
         Cameras          Points
@@ -440,22 +446,22 @@ It is the same style of sparsity exploitation that makes [`sparse_cholesky_facto
 
 $H = J^\top J$ above is the plain textbook form. The scripts' actual $H$ has extra terms:
 
-- `run_bundle_adjustment` weights every reprojection block by $\omega_{\text{px}} = 1/\sigma_{\text{px}}^2$, adds the gauge-prior blocks on cameras 0 and 1, and adds $10^{-6} I$ (see [Section 6.1](#61-the-ba-math-concretely)).
-- `run_windowed_gn_lm` in `bundle_adjustment_advanced.py` uses no weighting but solves $`(H + \lambda\,\mathrm{diag}(H))\,\delta = g`$ (see Section 13), where $`\lambda`$ is the **LM damping** factor ([glossary](../glossary.md#3-least-squares-optimization)).
-- All of these terms sit on diagonal blocks, so none changes the sparsity pattern.
+- `run_bundle_adjustment` weights every reprojection block by $\omega_{\text{px}} = 1/\sigma_{\text{px}}^2$, adds the gauge-prior blocks on cameras 0 and 1, and adds $10^{-6} I$ (see [§6.1](#61-the-ba-math-concretely)).
+- `run_windowed_gn_lm` in `bundle_adjustment_advanced.py` uses no weighting but solves $`(H + \lambda\,\mathrm{diag}(H))\,\delta = g`$ (see §13), where $`\lambda`$ is the **LM damping** factor ([glossary](../glossary.md#3-least-squares-optimization)).
+- None of these changes the sparsity pattern: the prior and damping touch only diagonal blocks, and the weights rescale blocks that already exist.
 
 ---
 
 ## 13. Local vs. Global Bundle Adjustment (real systems)
 
-Local BA and Global BA minimize the same reprojection objective from Section 6. Local BA uses only the window's own terms, with the other variables held fixed. The two differ in how much of the problem gets optimized at once, a choice driven by very different system constraints.
+Local BA and Global BA minimize the same reprojection objective from §6. Local BA uses only the window's own terms, with the other variables held fixed. The two differ in how much of the problem gets optimized at once, a choice driven by very different system constraints.
 
 | Metric | **Local BA** (e.g. ORB-SLAM) | **Global BA** (e.g. COLMAP) |
 | --- | --- | --- |
 | System paradigm | Visual SLAM (real-time, online) | **Structure-from-Motion** (SfM: reconstructing 3D structure and camera poses from many photos; offline, batch) |
 | Optimization scope | A local window of recent **keyframes** (selected frames kept in the optimization) + **covisible** neighbors (keyframes sharing landmarks) | Every registered camera pose and every 3D point |
 | Input | Sequential video with continuous tracking | Unordered photo collections (or long video) |
-| Frequency | Continuous, runs on every new keyframe | Periodic (e.g. every ~10-20% map growth) or a final pass |
+| Frequency | Continuous, runs on every new keyframe | Periodic (e.g. COLMAP's default: after ~10% growth in registered images or points) or a final pass |
 | Outlier handling | Fast local robust cost (Huber) + **chi-square gating** (rejecting observations whose weighted squared error exceeds a chi-square threshold) | Heavy re-triangulation, track merging/filtering |
 | Scaling | Roughly constant per window | Grows up to cubically with the number of camera poses (dense reduced system) |
 
@@ -468,7 +474,7 @@ Picture the map as a long chain of cameras linked by shared landmarks.
 
 - A new keyframe's measurements pull directly only on the landmarks it sees, and those landmarks are seen only by nearby keyframes.
 - The pull reaches further back only through more shared landmarks, weakening at every hop, so cameras far behind barely move.
-- Re-solving the whole map to move a handful of nearby poses wastes almost all of the work, and Sections 10-12 show how fast that work grows with the number of cameras.
+- Re-solving the whole map to move a handful of nearby poses wastes almost all of the work, and §10-§12 show how fast that work grows with the number of cameras.
 
 Local BA exploits this. It re-solves only the neighborhood the new keyframe actually affects and holds everything else where it is. That neighborhood stays roughly the same size however big the map gets, so each solve takes bounded, real-time-friendly time.
 
@@ -476,9 +482,9 @@ The price is in "holds everything else where it is." Each window treats the pose
 
 ### 13.2 Choosing the window: covisibility, not recency
 
-Which keyframes count as "the neighborhood"? The obvious answer, the last $N$ keyframes, fails whenever the camera turns around or revisits a place: an old keyframe that sees the same landmarks is more tightly coupled to the new one than a recent keyframe facing the other way.
+Which keyframes count as "the neighborhood"? The obvious answer, the last $`N`$ keyframes, fails whenever the camera turns around or revisits a place: an old keyframe that sees the same landmarks is more tightly coupled to the new one than a recent keyframe facing the other way.
 
-The right measure of coupling falls out of Section 12:
+The right measure of coupling falls out of §12:
 
 - After the Schur complement eliminates the landmarks, the reduced camera system has a nonzero block between cameras $i$ and $j$ exactly when they share at least one landmark.
 - The **covisibility graph** (keyframes as nodes, an edge wherever two keyframes share landmarks, weighted by how many) is that sparsity pattern, kept up to date as keyframes arrive.
@@ -503,7 +509,7 @@ The right measure of coupling falls out of Section 12:
 
 **Fixed, not marginalized.** The fixed keyframes do two jobs:
 
-- They pin the gauge, so the window can't slide, rotate or rescale as a whole (Section 14). Rescaling is blocked only when at least 2 keyframes are fixed.
+- They pin the gauge, so the window can't slide, rotate or rescale as a whole (§14). Rescaling is blocked only when at least 2 keyframes are fixed.
 - Their observations of the active points add constraints.
 
 But fixing a pose treats it as exactly known, which throws its uncertainty away. Two ways to handle the border:
@@ -529,7 +535,7 @@ Offline SfM pipelines sacrifice real-time speed for maximum accuracy. COLMAP, fo
 - once the model has grown by a set percentage, re-optimizes **every** camera and **every** point jointly in one large least-squares problem;
 - then uses the resulting global residuals to prune bad matches and re-triangulate points - something a local window can never do, since it never sees the whole map at once.
 
-The cost is that even after the Schur complement from Section 12, the reduced camera-only system still grows up to cubically with the number of camera poses - and assembling that Schur complement in the first place costs roughly linear time in the number of points/observations - so this can only run periodically or as a final step, not every frame.
+The cost: even after the Schur complement from §12, the reduced camera-only system grows up to cubically with the number of camera poses. Assembling that Schur complement also costs roughly linear time in the number of points and observations. So Global BA can only run periodically or as a final step, not every frame.
 
 
 ### 13.5 Choosing between them
@@ -569,16 +575,16 @@ So judge Global BA's benefit here from the aggregate statistics, not from any si
 
 **Why Global BA rarely helps on the open path.** §13.3 predicts the answer: most of the error is the kind Global BA can't see. A one-off check over seeds 0-4 at the script's defaults (not part of the test suite) confirms this, and finds a second, script-specific error source:
 
-- **Most of the final error is one transform of the whole map.** Aligning each final trajectory to ground truth with a single similarity transform (Umeyama, Section 14) removes 47-97% of the Local-only RMS position error over keyframes 2-49 (default seed: 1.27 m → 0.44 m). What remains, the inconsistency Global BA can actually fix, is small.
+- **Most of the final error is one transform of the whole map.** Aligning each final trajectory to ground truth with a single similarity transform (Umeyama, §14) removes 47-97% of the Local-only RMS position error over keyframes 2-49 (default seed: 1.27 m → 0.44 m). What remains, the inconsistency Global BA can actually fix, is small.
 - **That transform has two parts:**
   - **Orientation drift** of up to ~7° (0.9-7.3°), which stays even with a perfect anchor: §13.3's unobservable drift.
   - **Scale error.** Keyframes 0 and 1 are hard-fixed and keyframe 1 keeps its noisy front-end pose. The anchor pair sets the map's scale, and its errors (with keyframe 1's orientation error and window-to-window scale drift) contribute to the scale error. The Local-only fitted scale is off by up to ~19% (0.81-1.08).
-  - Re-running with keyframe 1 fixed at its true pose brings the scale within 3% of correct on three of the five seeds (the default seed stays at 1.25) and lowers the median final Local-only error from 2.92 m to 1.33 m. The mean doesn't improve, because seed 3 falls into a mirrored local minimum (a 171° orientation offset) once the anchor changes.
-- **Global BA can make the scale worse.** On seed 2 with the noisy anchor, Global BA pulls the rest of the map into agreement with the wrong baseline: the fitted scale goes from 0.89 to 0.67 and the final error from 2.92 m to 9.55 m. With keyframe 1 at its true pose, the same seed improves instead (1.33 m → 0.70 m).
+  - Re-running with keyframe 1 fixed at its true pose (only its initial pose is replaced; the rest of the front-end chain is unchanged) brings the scale within 3% of correct on three of the five seeds (the default seed stays at 1.25) and lowers the median final Local-only error from 2.92 m to 1.33 m. The mean doesn't improve, because seed 3 falls into a mirrored local minimum (a 171° orientation offset) once the anchor changes.
+- **Global BA can make the scale worse.** On seed 2 with the noisy anchor, Global BA pulls the rest of the map into agreement with the wrong baseline: the fitted scale goes from 0.90 to 0.67 and the final error from 2.92 m to 9.55 m. With keyframe 1 at its true pose, the same seed improves instead (1.33 m → 0.70 m).
 
 (Final errors are the script's own metric, RMS over the last 10 keyframes. The alignment figures use keyframes 2-49 on both sides.)
 
-The anchor choice mirrors real monocular SLAM, where the first two keyframes' baseline sets the map's otherwise arbitrary scale. That's why monocular results are normally scored after a similarity alignment (Section 14), and why this script's raw, unaligned error mostly measures drift and gauge rather than what BA itself can fix.
+The anchor choice mirrors real monocular SLAM, where the first two keyframes' baseline sets the map's otherwise arbitrary scale. That's why monocular results are normally scored after a similarity alignment (§14), and why this script's raw, unaligned error mostly measures drift and gauge rather than what BA itself can fix.
 
 
 
@@ -588,7 +594,7 @@ The anchor choice mirrors real monocular SLAM, where the first two keyframes' ba
 - **Global** (`run_global_ba`): every keyframe processed so far and every triangulated landmark are unknowns.
 - **Gauge**: keyframes 0 and 1 (`anchor_keyframes`) are never unknowns in either solve. Keyframe 0 starts at its true pose. Keyframe 1 keeps its front-end estimate. There is no prior factor.
 
-It uses the residual and Jacobians from [Section 6.1](#61-the-ba-math-concretely), unweighted ($W = I$). An observation from a fixed keyframe adds only its $J_{\text{point}}$ block. Each iteration solves a Levenberg-Marquardt system:
+It uses the residual and Jacobians from [§6.1](#61-the-ba-math-concretely), unweighted ($W = I$). An observation from a fixed keyframe adds only its $J_{\text{point}}$ block. Each iteration solves a Levenberg-Marquardt system:
 
 ```math
 \left(H + \lambda\,\mathrm{diag}(H)\right)\delta = g, \qquad \text{cost} = \sum \|z - \pi(T^{-1}P)\|^2
@@ -643,7 +649,7 @@ SLAM
               └── optimize 3D landmarks
 ```
 
-For **visual SLAM**, BA is essentially the workhorse behind *"make my entire reconstructed 3D world and camera trajectory agree with all the pixels/features I've observed."*
+For **visual SLAM**, BA is the workhorse behind *"make my entire reconstructed 3D world and camera trajectory agree with all the pixels/features I've observed."*
 
 ---
 

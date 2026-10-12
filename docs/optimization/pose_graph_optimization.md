@@ -1,6 +1,6 @@
 # Pose-graph optimization
 
-**Pose-graph optimization (PGO)** is one of the easiest SLAM ideas once we have the right mental picture:
+**Pose-graph optimization (PGO)** is easiest to grasp through one mental picture:
 
 > **Pose-graph optimization adjusts all robot poses so that the relative-motion and loop-closure constraints are as consistent as possible.**
 
@@ -10,7 +10,7 @@ Think of it as **"fixing the robot's entire trajectory using a network of geomet
 
 ## 1. First: what is a "pose"?
 
-A robot's **pose** is its position + orientation.
+A robot's [**pose**](../glossary.md#1-geometry-and-lie-groups) is its position + orientation.
 
 - 2D robot: $x_i = [x, y, \theta]$
 - 3D robot: $T_i \in SE(3)$, which holds a 3D position and a 3D orientation
@@ -74,7 +74,7 @@ Odometry has small errors, so chaining slightly wrong steps leaves the estimated
  x₄    x₀ ──── x₁
 ```
 
-Small errors accumulate with motion. This is called **drift**.
+Small errors accumulate with motion. This is [**drift**](../glossary.md#5-slam-system).
 
 ---
 
@@ -122,7 +122,7 @@ Every pose is a bead and every edge is a **rubber band** saying "you should be a
       ●─●
 ```
 
-That is essentially what optimization does.
+That is what optimization does.
 
 ---
 
@@ -170,7 +170,7 @@ In plain English:
 
 > **Find the poses that make all the measured relative transformations agree as much as possible.**
 
-One subtlety this formula hides: since every constraint is *relative*, rigidly translating and rotating the entire graph together leaves every $e_{ij}$ unchanged. The optimization has a flat direction with zero curvature, called **gauge freedom**. In practice we fix it by anchoring one pose (usually $T_0$), e.g. by giving it an enormous information weight, so the linear system solved at each step has a unique solution instead of infinitely many equally good ones.
+One subtlety this formula hides: since every constraint is *relative*, rigidly translating and rotating the entire graph together leaves every $e_{ij}$ unchanged. The cost therefore has flat directions with zero curvature: [**gauge freedom**](../glossary.md#3-least-squares-optimization). In practice we anchor one pose (usually $T_0$), e.g. by giving it an enormous information weight. The linear system solved at each step then has a unique solution instead of infinitely many equally good ones.
 
 **Intuition:** picture a square of poses drawn on the floor.
 - Slide or turn the whole square: every relative edge is unchanged, so the cost does not change.
@@ -232,7 +232,7 @@ Home ─ A ─ B ─ C ─────── D
         small corrections
 ```
 
-The trajectory becomes globally consistent. That is essentially what PGO does.
+The trajectory becomes globally consistent. That is what PGO does.
 
 ---
 
@@ -399,7 +399,7 @@ The global optimization minimizes the sum of squared Mahalanobis distances over 
 {F(X) = \sum_{(i,j) \in \mathcal{E}} r_{ij}(X)^\top \Omega_{ij} \, r_{ij}(X)}
 ```
 
-> **Note**: Mahalanobis distance measures how far a point is from the center (mean) of a distribution, accounting for the correlations and variances between variables. Here the "point" is the residual ${r_{ij}(X)}$, the "distribution" is the measurement noise model (mean $\mathbf{0}$, covariance ${\Sigma_{ij} = \Omega_{ij}^{-1}}$), and ${\Omega_{ij}}$ is exactly the inverse-covariance weighting that turns a plain squared-error sum into a squared Mahalanobis-distance sum. See the tilestats.com video and amit's Medium explainer cited in [§17](#17-references), and [the isotropic special case](../glossary.md#2-uncertainty-and-probability), where this weighting collapses to a uniform scale factor.
+> **Note**: [Mahalanobis distance](../glossary.md#2-uncertainty-and-probability) measures how far a point is from the center of a distribution, in units of its spread. Here the "point" is the residual ${r_{ij}(X)}$, the "distribution" is the measurement noise model (mean $\mathbf{0}$, covariance ${\Sigma_{ij} = \Omega_{ij}^{-1}}$), and ${\Omega_{ij}}$ is exactly the inverse-covariance weighting that turns a plain squared-error sum into a squared Mahalanobis-distance sum. See the tilestats.com video and amit's Medium explainer cited in [§17](#17-references), and [the isotropic special case](../glossary.md#2-uncertainty-and-probability), where this weighting collapses to a uniform scale factor.
 
 ### 15.4 Manifold Optimization and Linearization
 
@@ -483,7 +483,7 @@ Each pass is just row-by-row substitution - no matrix inversion needed.
 **Why "sparse" matters:**
 
 - Most pose pairs never share a constraint, so most of $H$'s off-diagonal blocks are exactly zero. Sparse Cholesky exploits that known zero pattern instead of doing dense arithmetic on zeros.
-- Eliminating a variable can turn some zeros into nonzeros, called **fill-in**. Example: eliminating $x_2$ out of a chain $x_1 - x_2 - x_3$ creates a new dependency between $x_1$ and $x_3$ even though they were never directly measured.
+- Eliminating a variable can turn some zeros into nonzeros, called [**fill-in**](../glossary.md#4-graphs-sparsity-and-solvers). Example: eliminating $x_2$ out of a chain $x_1 - x_2 - x_3$ creates a new dependency between $x_1$ and $x_3$ even though they were never directly measured.
 - The elimination order controls how much fill-in accumulates. See [`elimination_tree.md`](elimination_tree.md) for a worked elimination example, and [`isam2_optimization.md` §12](isam2_optimization.md#12-variable-ordering-is-also-crucial) for why iSAM2 cares about this.
 
 In practice a pure Gauss-Newton step can overshoot or diverge far from the solution, so a **Levenberg-Marquardt** damping term $\lambda$ is added to the Hessian's diagonal before solving. Both `pose_graph.py` implementations (`use_numpy/` and `use_manif/`) use the Marquardt-scaled form, which scales $\lambda$ by $H$'s own diagonal instead of adding $\lambda I$:
@@ -502,7 +502,7 @@ Larger $\lambda$ shrinks the step toward (diagonally scaled) gradient descent: s
 
 ### 15.6 Retraction/State Update
 
-Once the increment vector ${\boldsymbol{\delta}^*}$ is computed, the system updates the trajectory states on the ${\mathrm{SE}(3)}$ manifold. This kind of step, taken through Exp instead of addition, is a **retraction**:
+Once the increment vector ${\boldsymbol{\delta}^*}$ is computed, the system updates the trajectory states on the ${\mathrm{SE}(3)}$ manifold. This kind of step, taken through Exp instead of addition, is a [**retraction**](../glossary.md#1-geometry-and-lie-groups):
 
 ```math
 {T_i^{(k+1)} = T_i^{(k)} \cdot \mathrm{Exp}\left(\boldsymbol{\xi}_i^*\right), \quad \forall i \in \{1, \dots, N\}}
@@ -582,7 +582,7 @@ So $g = -b$ in §15.5's notation, and the code solves $`(H + \lambda \, \mathrm{
 
 ## 16. Robust loss functions used to handle false loop closures
 
-In Pose-Graph Optimization (PGO), standard nonlinear least squares relies on an $L_2$ squared-error norm ${F(x) = \sum r_{ij}^\top \Omega_{ij} r_{ij}}$. Under an $L_2$ loss, a single false loop closure (a severe **outlier**, i.e. a grossly wrong measurement) produces a massive residual $r_{ij}$ whose squared weight pulls the entire trajectory out of shape to satisfy the invalid edge.
+In PGO, standard nonlinear least squares relies on an $L_2$ squared-error norm ${F(x) = \sum r_{ij}^\top \Omega_{ij} r_{ij}}$. Under an $L_2$ loss, a single false loop closure (a severe [**outlier**](../glossary.md#3-least-squares-optimization)) produces a massive residual $r_{ij}$ whose squared weight pulls the entire trajectory out of shape to satisfy the invalid edge.
 
 Robust cost functions replace or reweight the standard $L_2$ norm to cap or reduce the influence of large residuals.
 
@@ -598,7 +598,7 @@ To integrate this into standard Gauss-Newton or Levenberg-Marquardt solvers with
 
 $$w(e) = \frac{1}{e} \frac{\partial \rho(e)}{\partial e}$$
 
-**Tiny example:** (here $`\delta`$ is the scalar Huber threshold, not the bold update vector $`\boldsymbol{\delta}`$ of §15.5; $`k`$ is the analogous Cauchy scale, see below) take $\delta = k = 1$ and one false loop closure with $e = 10$. Costs use the $\frac{1}{2}$ convention above.
+**Tiny example** (here $`\delta`$ is the scalar Huber threshold, not the bold update vector $`\boldsymbol{\delta}`$ of §15.5; $`k`$ is the analogous Cauchy scale, see below): take $\delta = k = 1$ and one false loop closure with $e = 10$. Costs use the $\frac{1}{2}$ convention above.
 
 - $L_2$: cost $\frac{1}{2}\cdot 10^2 = 50$, weight $1$. The edge dominates the whole graph.
 - Huber: cost $1\cdot(10 - 0.5) = 9.5$, weight $\frac{1}{10} = 0.1$.

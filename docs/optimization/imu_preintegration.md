@@ -1,11 +1,11 @@
 # IMU preintegration
 
-An IMU (Inertial Measurement Unit: a gyroscope for angular rate plus an accelerometer for linear acceleration, sampled at 100-1000 Hz) produces **hundreds of raw samples between two keyframes** ([glossary](../glossary.md#5-slam-system)). IMU preintegration compresses them into **one relative-motion factor**, and lets that factor be recomputed instantly when the bias estimate changes, without re-touching a single raw sample.
+An [IMU](../glossary.md#5-slam-system) sampled at 100-1000 Hz produces **hundreds of raw samples between two keyframes**. IMU preintegration compresses them into **one relative-motion factor**. When the bias estimate changes, the factor is corrected instantly, without re-touching a single raw sample.
 
 It builds on two earlier ideas:
 
 - The **node/edge language** from [pose_graph_optimization.md](pose_graph_optimization.md#2-where-do-the-edges-come-from): an edge is a relative-motion constraint between two nodes.
-- The **right Jacobian** from [jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space): $`\text{Exp}(\varphi+\delta\varphi) \approx \text{Exp}(\varphi)\cdot\text{Exp}\big(J_r(\varphi)\,\delta\varphi\big)`$, where the extra rotation is composed on the *right*, i.e. in the object's own body frame.
+- The **right Jacobian** from [jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space): $`\text{Exp}(\varphi+\delta\varphi) \approx \text{Exp}(\varphi)\cdot\text{Exp}\big(J_r(\varphi)\,\delta\varphi\big)`$, where the extra rotation is composed on the right, i.e. in the object's own body frame.
 
 ---
 
@@ -14,7 +14,7 @@ It builds on two earlier ideas:
 An IMU reports angular rate and acceleration at 100-1000 Hz. The keyframes or loop closures that a pose-graph or bundle-adjustment back-end optimizes over arrive at about 1-10 Hz. That gap means 10-1000 raw samples per keyframe, and it causes two problems:
 
 - **Problem A - too many samples.** One node per raw sample would add 100+ nodes per second, and the back-end only needs the *net* relative motion between keyframes.
-- **Problem B - bias re-linearization.** The **gyro/accel biases ($b_g$, $b_a$)** are part of the optimized state, and the optimizer changes them on essentially every iteration. Every raw sample was integrated with the *old* bias, so in principle each segment must be re-integrated (100+ samples, for every IMU segment, every iteration).
+- **Problem B - bias relinearization.** The **gyro/accel biases ($b_g$, $b_a$)** are part of the optimized state, and the optimizer changes them at each iteration. Every raw sample was integrated with the *old* bias, so in principle every IMU segment must be re-integrated (100+ samples per segment, every iteration).
 
 Preintegration solves both:
 
@@ -55,7 +55,7 @@ At every raw IMU sample, [`use_numpy/imu_preintegration.py`](../../use_numpy/imu
 ```
 
 **Why the start-of-window frame?** Think of a trip summary like "go 3 m forward, turn 20° left".
-- It holds wherever the trip starts. It does not depend on the start place.
+- It holds wherever the trip starts.
 - In the same way, $\Delta p, \Delta v, \Delta R$ stay valid when the optimizer moves the start pose or velocity.
 - Only a bias change needs the Jacobian correction (§4).
 
@@ -63,7 +63,11 @@ Here $\tilde\omega, \tilde v$ are the raw sensor readings (gyro rate and acceler
 
 - **Update order matters.** Every right-hand side uses the value from *before* this step. $\Delta p$ needs the old $\Delta v$ and old $\Delta R$, and $\Delta v$ needs the old $\Delta R$. So $\Delta p$ is updated first, then $\Delta v$, then $\Delta R$ last. The code does this by saving `R_prev` before touching `self.delta_R`.
 - **Rotations compose, they don't add.** $\Delta R$'s update is the $\text{Exp}$-map composition from [jacobian.md §11.1](../foundations/jacobian.md#111-why-plain-addition-breaks): each micro-step's tiny rotation is *composed onto* the running $\Delta R$.
-- **Labelling quirk.** The scripts call their linear input a commanded *velocity* (`--linear-vel`), but the recursions treat it as an accelerometer reading: $\tilde v$ is integrated twice, into $\Delta v$ and then $\Delta p$. With the defaults, one second of "1 m/s" gives $\Delta p_x \approx 0.48$ m. That is $\tfrac12 a t^2$ for $a = 1$ m/s², shortened slightly by the turn, not the roughly 1 m a true velocity would give. So we read $\tilde v$ as an acceleration in m/s². The math is the standard accelerometer recursion minus the gravity term (§4), and the $\Delta R$ recursion, which is what this doc is about, is unaffected.
+- **Labelling quirk.** The scripts call their linear input a commanded *velocity* (`--linear-vel`), but the recursions treat it as an accelerometer reading: $\tilde v$ is integrated twice, into $\Delta v$ and then $\Delta p$.
+  - With the defaults, one second of "1 m/s" gives $\Delta p_x \approx 0.48$ m.
+  - That is $\tfrac12 a t^2$ for $a = 1$ m/s², shortened slightly by the turn. A true velocity would give roughly 1 m.
+  - So we read $\tilde v$ as an acceleration in m/s².
+  - The math is the standard accelerometer recursion minus the gravity term (§4). The $\Delta R$ recursion, which is what this doc is about, is unaffected.
 
 ---
 
@@ -82,7 +86,7 @@ These are the "sensitivity map" from [jacobian.md §3](../foundations/jacobian.m
   - The tilt grows as $`0.01\,t`$ rad, so about 0.01 rad at the end.
   - Sideways velocity error: $`\int a\,\theta\,dt = 0.005`$ m/s.
   - Sideways position error: about $`0.01/6 \approx 0.0017`$ m.
-- This is the effect that $`J_{v,b_g}`$ and $`J_{p,b_g}`$ (the $`[\tilde v-b_a]_\times J_{R,b_g}`$ terms below, where $`[\cdot]_\times`$ is the skew-symmetric **hat** matrix, [glossary](../glossary.md#1-geometry-and-lie-groups)) capture.
+- This is the effect that $`J_{v,b_g}`$ and $`J_{p,b_g}`$ (the $`[\tilde v-b_a]_\times J_{R,b_g}`$ terms below, with $`[\cdot]_\times`$ the [hat operator](../glossary.md#1-geometry-and-lie-groups)) capture.
 
 ```math
 J_{p,b_g} \leftarrow J_{p,b_g} + J_{v,b_g}\,dt - \tfrac{1}{2}\Delta R\,[\tilde v-b_a]_\times J_{R,b_g}\,dt^2 \qquad J_{p,b_a} \leftarrow J_{p,b_a} + J_{v,b_a}\,dt - \tfrac{1}{2}\Delta R\,dt^2
@@ -110,7 +114,7 @@ J_{R,b_g} \leftarrow dR^\top J_{R,b_g} - J_r\,dt
 **Implementation notes.**
 
 - Both `lie_utils.py` helpers switch to first-order forms when $\theta = \lVert(\tilde\omega-b_g)dt\rVert < 10^{-6}$: `so3_exp` returns $`I + [\phi]_\times`$ and `so3_right_jacobian` returns $`I - \tfrac{1}{2}[\phi]_\times`$. Otherwise they use the closed forms (Rodrigues and the $J_r$ formula from [jacobian.md §11.4](../foundations/jacobian.md#114-closed-form-for-so3)).
-- The demo omits two things a real preintegrated factor needs. There is **no gravity term** (a real accelerometer's **specific force**, the acceleration minus gravity that it measures, must have gravity removed, usually in the residual, [glossary](../glossary.md#3-least-squares-optimization)). There is **no preintegrated noise covariance**: the script propagates the bias Jacobians but not Forster et al.'s $\Sigma$ recursion, so the bundle carries no uncertainty.
+- The demo omits two things a real preintegrated factor needs. There is **no gravity term**: a real accelerometer measures specific force ([glossary](../glossary.md#5-slam-system)), so gravity must be removed, usually in the residual. There is **no preintegrated noise covariance**: the script propagates the bias Jacobians but not Forster et al.'s $\Sigma$ recursion, so the bundle carries no uncertainty.
 - The demo builds its raw readings as the commanded twist plus the *estimated* bias, so $`\tilde v - b_a`$ and $`\tilde\omega - b_g`$ equal the commanded values exactly.
 
 ---
@@ -139,14 +143,14 @@ A preintegrated bundle becomes one **edge** in the sense of [pose_graph_optimiza
                       IMU factor
 ```
 
-A full VIO (Visual-Inertial Odometry)/VI-SLAM back-end (GTSAM's `CombinedImuFactor`, ORB-SLAM3, VINS-Mono, etc.) builds a residual comparing this corrected bundle with what the two nodes' current estimates imply: the same "measured vs. predicted, then `Log`" pattern as [pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive). Because the bias correction is $O(1)$, the residual and its Jacobian can be re-evaluated at every optimizer iteration without revisiting the raw 100+ Hz stream.
+A full VIO/VI-SLAM back-end ([glossary](../glossary.md#5-slam-system)) (GTSAM's `CombinedImuFactor`, ORB-SLAM3, VINS-Mono, etc.) builds a residual comparing this corrected bundle with what the two nodes' current estimates imply: the same "measured vs. predicted, then `Log`" pattern as [pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive). Because the bias correction is $O(1)$, the residual and its Jacobian can be re-evaluated at every optimizer iteration without revisiting the raw 100+ Hz stream.
 
 ---
 
 ## 7. What the accompanying scripts actually do (and don't)
 
 - **`imu_preintegration.py`** (both [`use_numpy/`](../../use_numpy/imu_preintegration.py) and [`use_manif/`](../../use_manif/imu_preintegration.py)) implements §3-§5: compress raw samples into a bundle, track the bias Jacobians, apply the $O(1)$ correction. The two versions are line-for-line equivalent (`use_manif`'s docstring spells out the correspondence: its `rplus()` returns the same `dR`/right-Jacobian pair the numpy version computes by hand). **Neither builds the graph residual of §6**; both stop at compression plus correction.
-- **`robot_imu_simulation.py`** is related but different: it [dead-reckons](factor_graph.md#2-why-do-we-need-it) noisy body-twist readings directly on $SE(3)$ every micro-step (chaining `se3_exp`, no bundle, no bias Jacobians). Its "IMU" reports a 6-D velocity twist, so there is no accelerometer, no bias and no gravity. It periodically runs a small damped [Gauss-Newton](gauss_newton.md) correction against a separate GPS-like position fix. It is about *twist dead-reckoning + periodic on-manifold correction*, not preintegration.
+- **`robot_imu_simulation.py`** is related but different: it [dead-reckons](factor_graph.md#2-why-do-we-need-it) noisy body-twist readings directly on $SE(3)$ every micro-step (chaining `se3_exp`, no bundle, no bias Jacobians). Its "IMU" reports a 6-D velocity twist, so there is no accelerometer, no bias and no gravity. It periodically runs a small damped [Gauss-Newton](gauss_newton.md) correction against a separate GPS-like position fix. It is about *twist dead reckoning + periodic on-manifold correction*, not preintegration.
 - **`imu_integration_comparison.py`** is also related but different. Like [pointcloud_pose_tracking_empirical_note.md](../filtering/pointcloud_pose_tracking_empirical_note.md), it is an empirical comparison note, not a concept explainer: it plots naive Euler-angle (vector-space) integration against proper $SO(3)$ Exp-map integration. The Exp-map estimate still drifts from gyro noise, just far less: with the defaults, it ends at about 0.47° rotation error vs. about 70.8° for naive. Each method is scored against its own noise-free ground truth (§7.1). No bias correction is involved.
 
 ![Two panels from imu_preintegration.py: the preintegrated position change built up sample by sample from keyframe i to keyframe j, and a log-scale bar chart comparing how much a bias update changes each preintegrated quantity with the error of the first-order Jacobian correction against a full re-integration](../../assets/imu_preintegration.png)
@@ -225,14 +229,14 @@ The loop stops when $\lVert\delta\xi\rVert$ drops below `gn_tol` ($10^{-6}$) or 
 
 The $10^{-4} I$ damping is required, not cosmetic:
 
-- $J$'s angular block is zero, so $J^\top \Omega J$ has rank 3 and plain Gauss-Newton's normal matrix would be singular. The damping makes it solvable and leaves the rotational part of $\delta\xi$ at exactly zero, so orientation is never corrected; only the IMU dead-reckoning sets it.
+- $J$'s angular block is zero, so $J^\top \Omega J$ has rank 3 and plain Gauss-Newton's normal matrix would be singular. The damping makes it solvable and leaves the rotational part of $\delta\xi$ at exactly zero, so orientation is never corrected; only the IMU dead reckoning sets it.
 - $\Omega = 400 I$ dwarfs the damping, so each solve moves $t_{est}$ essentially all the way onto the noisy $z$. The post-correction error is then about the size of the fix noise, and can exceed the pre-correction error (seed 0, second 1: 0.0050 m before, 0.0785 m after).
 
 ---
 
 ## 8. One-sentence summary
 
-> **Preintegration turns "re-run 100+ raw IMU samples every time the bias estimate changes" into "one matrix-vector multiply," by tracking - while integrating - exactly how sensitive the compressed relative-motion bundle is to the bias, using the same right-Jacobian machinery ([jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space)) that converts a tangent-space nudge into a body-frame rotation.**
+> **Preintegration turns "re-run 100+ raw IMU samples every time the bias estimate changes" into "one matrix-vector multiply," by tracking, while integrating, the first-order sensitivity of the compressed relative-motion bundle to the bias, using the same right-Jacobian machinery ([jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space)) that converts a tangent-space nudge into a body-frame rotation.**
 
 ---
 

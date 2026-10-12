@@ -22,7 +22,12 @@ This builds directly on:
 | Residual | Reprojection error (§2) | Reprojection error (§3) |
 | Implemented in this repo | `bundle_adjustment_advanced.py`'s `triangulate_landmark`/`refine_landmark_gn` | `pnp_estimation.py`'s `linear_pnp_dlt`/`refine_pose_gn` |
 
-Both are front-end problems in the [front-end/back-end split](../frontend_backend.md): a front-end needs to turn "I see this pixel" into either a 3D map point (triangulation, to grow the map) or a camera pose (PnP, to localize against an already-known map) *before* any back-end optimization ([bundle_adjustment.md](../optimization/bundle_adjustment.md), [pose_graph_optimization.md](../optimization/pose_graph_optimization.md)) can refine it further.
+Both are front-end problems in the [front-end/back-end split](../frontend_backend.md). The front-end turns "I see this pixel" into one of two things:
+
+- a 3D map point (triangulation, to grow the map);
+- a camera pose (PnP, to localize against an already-known map).
+
+Only then can back-end optimization ([bundle_adjustment.md](../optimization/bundle_adjustment.md), [pose_graph_optimization.md](../optimization/pose_graph_optimization.md)) refine it further.
 
 ![Two panels: triangulation, where rays from eight known cameras through their measured pixels meet at one unknown point, and PnP, where rays from 20 known 3D points converge on the unknown camera centre recovered by the linear DLT and Gauss-Newton](../../assets/pnp_estimation_concept.png)
 
@@ -53,7 +58,10 @@ Camera 1               Camera 2
 Then we polish and validate:
 
 - **Polish.** `refine_landmark_gn` runs a few Gauss-Newton iterations on the *true* nonlinear reprojection error, seeded from the closed-form guess (the same "linear guess, then GN polish" pattern used throughout this repo).
-- **Validate.** `passes_cheirality` checks the **cheirality** condition: the point has positive depth (its $`z`$ coordinate in the camera frame) in every observing camera. Since `pixel = f*x/z` is invariant to negating a camera-frame point's $x,y,z$ together, the Gauss-Newton step on a weakly-constrained point (few observers, little **parallax**: the angle between the rays from different cameras to the point) can walk to a *reflection* behind a camera that still fits every pixel almost exactly (see the `refine_landmark_gn` and `passes_cheirality` docstrings).
+- **Validate.** `passes_cheirality` checks the **cheirality** condition: the point has positive depth (its $`z`$ coordinate in the camera frame) in every observing camera.
+  - The reason: `pixel = f*x/z` is invariant to negating a camera-frame point's $x,y,z$ together.
+  - A weakly-constrained point has few observers and little **parallax** (the angle between the rays from different cameras to the point).
+  - For such a point, the Gauss-Newton step can walk to a *reflection* behind a camera that still fits every pixel almost exactly (see the `refine_landmark_gn` and `passes_cheirality` docstrings).
 - **Reject.** A point failing the check is never committed to the map (see the [`bundle_adjustment_advanced.py` README description](../../README.md#7-local--global-bundle-adjustment-bounded-windows-vs-whole-map-re-solves)). It stays pending until another observation gives it more parallax.
 
 **The triangulation math, concretely.** Poses are camera-to-world: observer $k$ has rotation $R_k$ and camera center $o_k$ (its translation). `triangulate_landmark` rotates each pixel's calibrated ray into the world frame and normalizes it:
@@ -63,7 +71,9 @@ Then we polish and validate:
 d_k = \frac{R_k \tilde d_k}{\left\| R_k \tilde d_k \right\|}
 ```
 
-Here $`u_k, v_k`$ are the pixel coordinates of the observation in camera $`k`$, $`(c_x, c_y)`$ the principal point (the pixel where the optical axis meets the image) and $`(f_x, f_y)`$ the focal lengths in pixels (the **intrinsics**). In the next block, $`A`$ and $`b`$ are the normal-equation matrix and vector of the closest-point problem (the linear system $`AP = b`$, whose solution minimizes the summed squared distances from the point to the rays) and $`P_0`$ is the initial point estimate (here $`A`$ is not the DLT matrix of §3).
+Here $`u_k, v_k`$ are the pixel coordinates of the observation in camera $`k`$, $`(c_x, c_y)`$ is the principal point (the pixel where the optical axis meets the image) and $`(f_x, f_y)`$ are the focal lengths in pixels (the **intrinsics**).
+
+In the next block, $`A`$ and $`b`$ are the normal-equation matrix and vector of the closest-point problem. The linear system $`AP = b`$ has the point that minimizes the summed squared distances to the rays as its solution. $`P_0`$ is the initial point estimate. This $`A`$ is not the DLT matrix of §3.
 
 $$
 A = \sum_k \left(I - d_k d_k^\top\right), \qquad
@@ -71,11 +81,11 @@ b = \sum_k \left(I - d_k d_k^\top\right) o_k, \qquad
 P_0 = \left(A + 10^{-9} I\right)^{-1} b
 $$
 
-- **Conditioning** (how strongly noise is amplified into the answer). The depth error along the rays grows as the parallax (baseline, the distance between camera centers) shrinks.
+- **Conditioning** (how strongly noise is amplified into the answer). The depth error along the rays grows as the baseline (the distance between camera centers) shrinks, because a shorter baseline means less parallax.
 - **Tiny example** (toy case: two rectified cameras (parallel optical axes, offset sideways), baseline $`B`$, focal length $`f`$, depth $`Z`$, pixel noise $`\sigma`$). Depth error is about $`Z^2\sigma/(fB)`$. With $`f=800`$ px, $`Z=10`$ m, $`\sigma=1`$ px: $`B=1`$ m gives 0.125 m of error, and $`B=0.1`$ m gives 1.25 m. A 10 times smaller baseline means a 10 times larger depth error.
 - **The $10^{-9} I$ term.** It keeps the solve defined when all rays are parallel. The depth along the rays is then arbitrary (the term pins the point's coordinate along the ray direction to 0, measured from the world origin).
 
-`refine_landmark_gn` then runs Gauss-Newton on the point alone (here $`P`$ is the 3D point being refined, $`\delta`$ is its step, $`z_k`$ is the observed pixel and $`\pi`$ is the camera projection to pixels; $`\delta`$ is a different step in the PnP refinement of §3), with $J_{\text{point}}$ from [bundle_adjustment.md Section 6.1](../optimization/bundle_adjustment.md#61-the-ba-math-concretely):
+`refine_landmark_gn` then runs Gauss-Newton on the point alone (here $`P`$ is the 3D point being refined, $`\delta`$ is its step, $`z_k`$ is the observed pixel and $`\pi`$ is the camera projection to pixels; $`\delta`$ is a different step in the PnP refinement of §3), with $J_{\text{point}}$ from [bundle_adjustment.md §6.1](../optimization/bundle_adjustment.md#61-the-ba-math-concretely):
 
 $$
 \left(\sum_k J_{\text{point},k}^\top J_{\text{point},k} + 10^{-9} I\right)\delta = \sum_k J_{\text{point},k}^\top r_k, \qquad
@@ -83,7 +93,7 @@ r_k = z_k - \pi\left(R_k^\top (P - o_k)\right), \qquad
 P \leftarrow P + \delta
 $$
 
-It stops when the step norm drops below `gn_tol`. `passes_cheirality` then requires a strictly positive depth in every observer, using `point_depth`:
+It stops when the step norm drops below `gn_tol`, or earlier if the point's depth becomes non-positive in any observer. `passes_cheirality` then requires a strictly positive depth in every observer, using `point_depth`:
 
 $$
 \left[R_k^\top (P - o_k)\right]_z > 0 \quad \text{for every observer } k
@@ -131,7 +141,7 @@ The recovered $3\times3$ block is only a *scaled, possibly reflected* rotation -
 
 With noise-free pixels, this recovers the true pose to floating-point precision.
 
-`refine_pose_gn` then runs Gauss-Newton on the true reprojection error, updating the pose ($`T`$ is the camera pose, $`z_i`$ the observed pixel of point $`P_i`$ and $`\pi`$ the same projection as above) via a right-multiplicative correction $T \leftarrow T\cdot\mathrm{Exp}(\delta)$ (Exp turns a small 6-vector into a pose, see [glossary](../glossary.md#1-geometry-and-lie-groups)) - following `refine_landmark_gn`'s loop (minus its early exit on non-positive depth), solving a $6\times6$ system for the pose instead of a $3\times3$ system for the point. It uses the same $J_{\text{pose}}$ as bundle adjustment ([bundle_adjustment.md Section 6.1](../optimization/bundle_adjustment.md#61-the-ba-math-concretely)), for the pose step $\delta = [\delta v, \delta\omega]$ (not the point step $\delta$ of §2):
+`refine_pose_gn` then runs Gauss-Newton on the true reprojection error. It follows `refine_landmark_gn`'s loop (minus its early exit on non-positive depth) and solves a $6\times6$ system for the pose instead of a $3\times3$ system for the point. Here $`T`$ is the camera pose, $`z_i`$ the observed pixel of point $`P_i`$ and $`\pi`$ the same projection as above. The pose is updated by a right-multiplicative correction $T \leftarrow T\cdot\mathrm{Exp}(\delta)$ ([Exp](../glossary.md#1-geometry-and-lie-groups) turns a small 6-vector into a pose). It uses the same $J_{\text{pose}}$ as bundle adjustment ([bundle_adjustment.md §6.1](../optimization/bundle_adjustment.md#61-the-ba-math-concretely)), for the pose step $\delta = [\delta v, \delta\omega]$ (not the point step $\delta$ of §2):
 
 $$
 \left(\sum_i J_{\text{pose},i}^\top J_{\text{pose},i} + 10^{-9} I_6\right)\delta = \sum_i J_{\text{pose},i}^\top r_i, \qquad
@@ -157,7 +167,7 @@ With noise, neither linear step is accurate enough alone; the Gauss-Newton refin
 
 `linear_pnp_dlt` is the simplest *correct* version of linear PnP, not a production algorithm. It needs $n \geq 6$ correspondences for $A$ to reach rank 11 (§3). Its limits are about accuracy, not cost:
 
-- **Cost is not the issue.** A version linear in $n$ would take the SVD of the fixed $12\times12$ matrix $A^\top A$ (or use `full_matrices=False`). Our code takes the SVD of the full $2n\times12$ matrix $A$ directly, which is fine at these sizes.
+- **Cost is not the issue.** A version linear in $n$ would take the SVD of the fixed $12\times12$ matrix $A^\top A$ (or use `full_matrices=False`). Our code calls `np.linalg.svd(A)` on the full $2n\times12$ matrix $A$ with NumPy's default `full_matrices=True`, which also builds a $2n\times2n$ factor $U$: fine at these sizes, but quadratic in $n$ in time and memory.
 - **Accuracy is.** It solves for 12 unconstrained numbers and minimizes an **algebraic error** (the size of $`Ax`$, which is easy to minimize, rather than the pixel error), ignoring that 9 of them must form a rotation until the orthogonalization step afterwards. More points help, but with few points, noticeable noise, or points close to a plane it is less accurate than purpose-built solvers.
 - **Exactly coplanar points break it.** $A$ then loses rank and the null space is no longer one-dimensional; planar scenes need a **homography**-based method (a homography is the projective map between a plane and its image) instead.
 
