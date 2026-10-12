@@ -132,7 +132,7 @@ For every edge we have the **measured relative transformation** $z_{ij}$ between
 
 $${\text{error}_{ij} = z_{ij}^{-1}(T_i^{-1}T_j)}$$
 
-That comparison is still a **group element** ($SE(2)$/$`SE(3)`$, not a plain vector), so to measure "how big" it is - and to compute the Jacobians the optimizer needs - we take its **Log map**, which turns it into a tangent-space vector:
+That comparison is still a **group element** ($SE(2)$/$`SE(3)`$, not a plain vector), so to measure "how big" it is - and to compute the Jacobians the optimizer needs - we take its **Log map**, which turns it into a tangent-space vector ([glossary](../glossary.md#1-geometry-and-lie-groups)):
 
 $${e_{ij} = \text{Log}(\text{error}_{ij}) = \text{Log}\big(z_{ij}^{-1}(T_i^{-1}T_j)\big)}$$
 
@@ -280,6 +280,7 @@ Odometry edge     Loop closure
      Corrected trajectory
 ```
 
+- Input sensors: **LiDAR** is a laser scanner that measures distances to surrounding surfaces.
 - The **front-end** says: "I think I moved like this."
 - The **back-end** says: "Let's see whether all those estimates make sense together."
 - Keeping the two separate is a core design choice in SLAM.
@@ -296,7 +297,7 @@ For example, if one measurement is highly reliable (weight $w_1 = 100$) and anot
 
 $${\min_X \sum_{(i,j) \in \mathcal{E}} e_{ij}^\top \Omega_{ij} e_{ij}}$$
 
-where $`X`$ is the set of all node poses (defined in §15.1) and $\Omega_{ij}$ is related to the **information/covariance** of the measurement. This is why sensor uncertainty matters.
+where $`X`$ is the set of all node poses (defined in §15.1) and $\Omega_{ij}$ is related to the **information/covariance** of the measurement ([glossary](../glossary.md#2-uncertainty-and-probability)). This is why sensor uncertainty matters.
 
 Caveat about the accompanying scripts:
 
@@ -341,7 +342,7 @@ This doc covers only PGO (with BA in §8 as the contrast); filtering is shown he
 
 > **Pose-graph optimization is like taking a trajectory made of slightly inaccurate pieces, connecting those pieces with constraints - including loop closures - and then moving the poses around until the entire graph becomes as geometrically consistent as possible.**
 
-Precisely, **PGO is a sparse nonlinear least-squares problem over poses on $SE(2)$ or $SE(3)$**. The natural next step is to see **why we need Lie groups/Lie algebra and how Gauss-Newton or Levenberg-Marquardt moves the poses during optimization**.
+Precisely, **PGO is a sparse nonlinear least-squares problem over poses on $SE(2)$ or $SE(3)$**. The natural next step is to see **why we need Lie groups/Lie algebra ([glossary](../glossary.md#1-geometry-and-lie-groups)) and how Gauss-Newton or Levenberg-Marquardt (both explained in §15.5) moves the poses during optimization**.
 
 ---
 
@@ -471,7 +472,7 @@ Stacking all residuals into a global residual vector $`\mathbf{r}(X)`$ and Jacob
 
 Here $F$ has no $\frac{1}{2}$ (as in the code's `cost`), while $b$ is the gradient of $\frac{1}{2}F$. The factor 2 cancels on both sides of the step, so $H\boldsymbol{\delta}^* = -b$ is unchanged.
 
-Because edges only connect adjacent or loop-closing keyframes, $H$ is extremely **sparse** and block-structured. It is typically solved using Sparse Cholesky Factorization (${\mathrm{LL}^\top}$ or ${\mathrm{LDL}^\top}$) or Conjugate Gradients in solvers like GTSAM or g2o - see [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) for the full derivation.
+Because edges only connect adjacent or loop-closing keyframes, $H$ is extremely **sparse** and block-structured. It is typically solved using Sparse Cholesky Factorization (${\mathrm{LL}^\top}$ or ${\mathrm{LDL}^\top}$) or Conjugate Gradients (an iterative linear solver) in solvers like GTSAM or g2o (open-source graph-optimization libraries) - see [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) for the full derivation.
 
 **What that factorization is doing:** $H$ is symmetric positive-definite once the gauge is fixed (e.g. the node-0 anchor; it is singular otherwise, see §7), and Cholesky factorization writes it as $H = LL^\top$ with $L$ lower-triangular. Solving $H\boldsymbol{\delta}^* = -b$ then becomes two cheap triangular solves instead of one general one:
 
@@ -501,7 +502,7 @@ Larger $\lambda$ shrinks the step toward (diagonally scaled) gradient descent: s
 
 ### 15.6 Retraction/State Update
 
-Once the increment vector ${\boldsymbol{\delta}^*}$ is computed, the system updates the trajectory states on the ${\mathrm{SE}(3)}$ manifold:
+Once the increment vector ${\boldsymbol{\delta}^*}$ is computed, the system updates the trajectory states on the ${\mathrm{SE}(3)}$ manifold. This kind of step, taken through Exp instead of addition, is a **retraction**:
 
 ```math
 {T_i^{(k+1)} = T_i^{(k)} \cdot \mathrm{Exp}\left(\boldsymbol{\xi}_i^*\right), \quad \forall i \in \{1, \dots, N\}}
@@ -581,13 +582,13 @@ So $g = -b$ in §15.5's notation, and the code solves $`(H + \lambda \, \mathrm{
 
 ## 16. Robust loss functions used to handle false loop closures
 
-In Pose-Graph Optimization (PGO), standard nonlinear least squares relies on an $L_2$ squared-error norm ${F(x) = \sum r_{ij}^\top \Omega_{ij} r_{ij}}$. Under an $L_2$ loss, a single false loop closure (a severe outlier) produces a massive residual $r_{ij}$ whose squared weight pulls the entire trajectory out of shape to satisfy the invalid edge.
+In Pose-Graph Optimization (PGO), standard nonlinear least squares relies on an $L_2$ squared-error norm ${F(x) = \sum r_{ij}^\top \Omega_{ij} r_{ij}}$. Under an $L_2$ loss, a single false loop closure (a severe **outlier**, i.e. a grossly wrong measurement) produces a massive residual $r_{ij}$ whose squared weight pulls the entire trajectory out of shape to satisfy the invalid edge.
 
 Robust cost functions replace or reweight the standard $L_2$ norm to cap or reduce the influence of large residuals.
 
 ### 16.1 The M-Estimator Framework (Iteratively Reweighted Least Squares)
 
-Instead of minimizing the squared cost $e^2$ (where $e = \sqrt{r^\top \Omega r}$ is the normalized residual scalar), M-estimators minimize a robust kernel $\rho(e)$. Kernels are conventionally written with a $\frac{1}{2}$ (e.g. $\rho = \frac{1}{2}e^2$ for $L_2$, as in Huber below), while §15.3's $F$ has none. A constant factor changes neither the minimizer nor the weights $w(e)$.
+Instead of minimizing the squared cost $e^2$ (where $e = \sqrt{r^\top \Omega r}$ is the normalized residual scalar), **M-estimators** (estimators that replace squared error with a robust cost) minimize a robust kernel $\rho(e)$. Kernels are conventionally written with a $\frac{1}{2}$ (e.g. $\rho = \frac{1}{2}e^2$ for $L_2$, as in Huber below), while §15.3's $F$ has none. A constant factor changes neither the minimizer nor the weights $w(e)$.
 
 ```math
 \min_{X} \sum_{(i,j) \in \mathcal{E}} \rho\left( \sqrt{r_{ij}(X)^\top \Omega_{ij} \, r_{ij}(X)} \right)
@@ -608,7 +609,7 @@ $$w(e) = \frac{1}{e} \frac{\partial \rho(e)}{\partial e}$$
 
 #### Huber Loss
 
-Huber acts as quadratic ($L_2$) for small residuals (inliers) and linear ($L_1$) for residuals exceeding a threshold $\delta$:
+Huber acts as quadratic ($L_2$) for small residuals (**inliers**, i.e. measurements consistent with the assumed noise) and linear ($L_1$) for residuals exceeding a threshold $\delta$:
 
 ```math
 \rho(e) = \begin{cases} \frac{1}{2} e^2 & \text{if } \vert{}e\vert{} \le \delta \\ 
@@ -629,7 +630,7 @@ $$\rho(e) = \frac{k^2}{2} \ln\left(1 + \frac{e^2}{k^2}\right), \quad w(e) = \fra
 
 ### 16.3 Dynamic Covariance Scaling (DCS)
 
-Dynamic Covariance Scaling (Agarwal et al., 2013) is specifically designed for pose-graph optimization. It is still a reweighting scheme - like §16.1's IRLS, it rescales each edge's information matrix at every iteration - but its weight is a closed-form $s_{ij}$ derived from Switchable Constraints, rather than from a chosen kernel $\rho$.
+Dynamic Covariance Scaling (Agarwal et al., 2013) is specifically designed for pose-graph optimization. It is still a reweighting scheme - like §16.1's IRLS, it rescales each edge's information matrix at every iteration - but its weight is a closed-form $s_{ij}$ derived from **Switchable Constraints** (a method that gives each edge a switch variable that can turn it off), rather than from a chosen kernel $\rho$.
 
 DCS adds a dynamic scaling parameter $s_{ij} \in (0, 1]$ directly to the information matrix $\Omega_{ij}$:
 

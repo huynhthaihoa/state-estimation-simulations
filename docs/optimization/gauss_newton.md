@@ -1,6 +1,6 @@
 # Gauss-Newton Optimization
 
-Gauss-Newton and its damped variants, like [Levenberg-Marquardt](levenberg_marquardt.md), are the core optimizers behind **SLAM, [bundle adjustment](bundle_adjustment.md), and [pose-graph optimization](pose_graph_optimization.md)**. This doc builds the intuition for Gauss-Newton.
+Gauss-Newton and its damped variants, like [Levenberg-Marquardt](levenberg_marquardt.md), are the core optimizers behind **SLAM, [bundle adjustment](bundle_adjustment.md), and [pose-graph optimization](pose_graph_optimization.md)** ([glossary](../glossary.md#5-slam-system)). This doc builds the intuition for Gauss-Newton.
 
 ---
 
@@ -69,7 +69,7 @@ $$x_{\text{new}} = x_{\text{old}}+\Delta x$$
 > - **Pose graphs**: shifting or rotating the whole trajectory together (6 DoF in 3D). Anchoring the first pose fixes it - `pose_graph.py` does this, "heavily anchoring node 0".
 > - **Monocular BA**: also uniformly rescaling the scene (7 DoF), which one pose can't pin. The BA scripts fix *two* cameras instead (a prior on cameras 0 and 1, or two hard-fixed keyframes); see [bundle_adjustment.md §14](bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment).
 >
-> [Levenberg-Marquardt](levenberg_marquardt.md)'s damping (its §4-§5) also keeps the system solvable.
+> [Levenberg-Marquardt](levenberg_marquardt.md)'s damping (its §4-§5; [glossary](../glossary.md#3-least-squares-optimization)) also keeps the system solvable.
 
 > **Note on signs**: some docs in this repo, such as [bundle_adjustment.md §6.1](bundle_adjustment.md#61-the-ba-math-concretely), write the residual the other way round, $r = \text{measurement} - \text{prediction}$, and take $J$ as the Jacobian of the *prediction*. That $J$ is minus the Jacobian of their residual, so their equation reads $J^\top J\Delta x = +J^\top r$. It's the same step as $J^\top J\Delta x = -J^\top r$ above, just written with different sign conventions.
 
@@ -153,7 +153,7 @@ The residual is $r_{ij} = h(T_i,p_j)-z_{ij}$, and the SLAM problem becomes:
 
 where $\mathcal{O}$ is the set of pose-landmark pairs that were actually observed (not every landmark is seen from every pose).
 
-> **Note**: real systems also weight each residual by its measurement's information matrix, $`r_{ij}^\top\Omega_{ij}\,r_{ij}`$ instead of $\|r_{ij}\|^2$, so precise sensors count more - left out here for readability. See [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty) and [factor_graph.md](factor_graph.md).
+> **Note**: real systems also weight each residual by its measurement's information matrix ([glossary](../glossary.md#2-uncertainty-and-probability)), $`r_{ij}^\top\Omega_{ij}\,r_{ij}`$ instead of $\|r_{ij}\|^2$, so precise sensors count more - left out here for readability. See [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty) and [factor_graph.md](factor_graph.md).
 
 This is a huge nonlinear problem. Gauss-Newton linearizes every measurement function around the current estimates of the poses and landmarks:
 
@@ -167,7 +167,7 @@ $$
 
 Solve it → update all poses and landmarks → repeat.
 
-One caveat: landmarks $p_j\in\mathbb{R}^3$ really do just get $p_j \leftarrow p_j+\Delta p_j$. Poses $T_i$ don't - they live on the $SE(3)$ manifold, so the update is a **retraction** through the exponential map, $T_i \leftarrow T_i\cdot\mathrm{Exp}(\Delta x_i)$, not plain addition. See [pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive) ("Why not just subtract poses?") and the full derivation there.
+One caveat: landmarks $p_j\in\mathbb{R}^3$ really do just get $p_j \leftarrow p_j+\Delta p_j$. Poses $T_i$ don't - they live on the $SE(3)$ manifold ([glossary](../glossary.md#1-geometry-and-lie-groups)), so the update is a **retraction** (a step that stays on the manifold: the pose is updated through Exp instead of plain addition) through the exponential map, $T_i \leftarrow T_i\cdot\mathrm{Exp}(\Delta x_i)$, not plain addition. See [pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive) ("Why not just subtract poses?") and the full derivation there.
 
 This is the core optimization mechanism behind many **[bundle adjustment](bundle_adjustment.md) and [graph-SLAM](pose_graph_optimization.md) systems**.
 
@@ -212,7 +212,7 @@ and takes a chosen step:
 
 $$\Delta x=-\alpha\nabla f$$
 
-where $\alpha$ is the learning rate.
+where $\alpha$ is the learning rate (the step size).
 
 ### Gauss-Newton
 
@@ -222,7 +222,7 @@ Gauss-Newton asks:
 
 $$J^\top J\Delta x=-J^\top r$$
 
-It uses much more information about the local geometry, so it can converge much faster near the solution - quadratically for zero-residual problems like §6's, where the term Gauss-Newton drops (§7) vanishes at the solution.
+It uses much more information about the local geometry, so it can converge much faster near the solution - quadratically (each step's error is at most a constant times the square of the previous one) for zero-residual problems like §6's, where the term Gauss-Newton drops (§7) vanishes at the solution.
 
 ---
 
@@ -235,7 +235,7 @@ It uses much more information about the local geometry, so it can converge much 
 | **Gauss-Newton**                                  | Use Jacobian structure to approximate curvature |
 | **[Levenberg-Marquardt](levenberg_marquardt.md)** | Gauss-Newton + damping for robustness           |
 
-SLAM systems typically use **Gauss-Newton/Levenberg-Marquardt + a sparse linear solver**, because SLAM produces large, sparse least-squares problems.
+SLAM systems typically use **Gauss-Newton/Levenberg-Marquardt + a sparse linear solver**, because SLAM produces large, **sparse** (mostly zero entries in $`J`$ and $`J^\top J`$) least-squares problems.
 
 ---
 

@@ -13,13 +13,13 @@ heading = 0°        heading = 45°        heading = 90°
                      diagonal)
 ```
 
-So a filter that fixes the ellipse orientation once (say at $t = 0$) is right only at that instant. After the robot turns, it models slip in the wrong direction. Our toy problem (a unicycle looping through every heading) exposes this by comparing three process-noise policies:
+So a filter that fixes the ellipse orientation once (say at $t = 0$) is right only at that instant. After the robot turns, it models slip in the wrong direction. Our toy problem (a **unicycle**, a robot steered by forward speed and turn rate, looping through every heading) exposes this by comparing three **process-noise** (random disturbance added to the motion model each step) policies:
 
 - `fixed_anisotropic`: right shape, orientation frozen at the start.
 - `heading_aware`: ellipse re-oriented every step to the current heading.
 - `isotropic`: no directional claim at all, the safe fallback.
 
-**Where the question comes from.** Hybrid-systems filtering usually models friction as discrete contact modes (stuck or sliding), each switch with its own saltation matrix. Kong et al. (2024, §V-F) derive that matrix for stick-slip under Coulomb friction, whose single coefficient $\mu$ has no preferred direction. For an anisotropic pad that is not enough: slip variance depends on heading relative to the pad's own friction axes, not only on the active mode. A filter that switches modes correctly but keeps an isotropic process-noise covariance $`Q`$ (defined in §1) treats slip along the low-friction axis like slip along the high-friction one.
+**Where the question comes from.** Hybrid-systems filtering usually models friction as discrete contact modes (stuck or sliding), each switch with its own saltation matrix ([glossary](../glossary.md#7-hybrid-discontinuous-systems)). Kong et al. (2024, §V-F) derive that matrix for stick-slip under **Coulomb friction** (the textbook law: friction can reach a fixed coefficient times the normal force, and equals that bound while sliding), whose single coefficient $\mu$ has no preferred direction. For an anisotropic pad that is not enough: slip variance depends on heading relative to the pad's own friction axes, not only on the active mode. A filter that switches modes correctly but keeps an isotropic process-noise covariance $`Q`$ (defined in §1) treats slip along the low-friction axis like slip along the high-friction one.
 
 We work through the simplest concrete version, using [`friction_anisotropic_ekf.py`](../../use_numpy/friction_anisotropic_ekf.py)'s crawling unicycle.
 
@@ -40,7 +40,7 @@ We work through the simplest concrete version, using [`friction_anisotropic_ekf.
 
 A unicycle robot drives at a *known* constant commanded forward speed $v_{\text{cmd}}$ and turn rate $\omega_{\text{cmd}}$, so its true path is an exact circular arc (`exact_arc_step`, closed-form, exact for any $dt$ - the same "exact propagation, not a linearization" convention as `saltation_matrix_ekf.flow`; §1.1 gives the formulas and the Jacobian). $\omega_{\text{cmd}}$ defaults to $\dfrac{2\pi}{T}$ (where $T$ is the run duration), i.e. exactly one full loop over the run - so the heading sweeps through every possible orientation relative to a fixed reference.
 
-On top of that exact commanded arc, true position picks up a random slip disturbance each tick, drawn in the **pad's own body frame** - low variance along the grip/forward axis, high variance along the slip/lateral axis - then rotated into world coordinates by the **true** heading at that instant.
+On top of that exact commanded arc, true position picks up a random slip disturbance each **tick** (one filter time step), drawn in the **pad's own body frame** - low variance along the grip/forward axis, high variance along the slip/lateral axis - then rotated into world coordinates by the **true** heading at that instant.
 
 We compare three ways of building the position block of the filter's process-noise covariance $Q$ (the policies above, selected by `q_policy`). All share the identical predict step and the same noisy position measurement each tick. The `isotropic` circle has the same total noise budget as the two ellipses (a fair comparison, not a rigged one; see §1.1).
 

@@ -6,10 +6,10 @@ A **factor graph** represents:
 
 > **"What unknowns do we have, and what pieces of evidence tell us about them?"**
 
-It is a bipartite graph with two kinds of nodes (§6 spells out the distinction):
+It is a **bipartite** graph (edges join only nodes of different kinds) with two kinds of nodes (§6 spells out the distinction):
 
 - **Variables** = things we don't know: robot poses, landmarks, sensor biases, etc.
-- **Factors** = measurements/constraints: odometry, camera observations, IMU, GPS, loop closures, etc.
+- **Factors** = measurements/constraints: odometry (incremental motion from onboard sensors), camera observations, IMU, GPS, loop closures, etc.
 
 ![A bipartite factor graph for a SLAM-style problem: robot poses x0..xn connected by odometry-measurement factors u1..un, with landmarks l1, l2 connected to poses via landmark-measurement factors m1..m4, plus a small "variable node/factor node" legend](../images/factor_graph_1.jpg)
 
@@ -37,7 +37,7 @@ Pose x0 ●─────────● x1 ──────● x2
 ```
 
 - The circles are **variables**.
-- In this sketch each labelled line stands for a **factor** joining the variables it touches (a binary factor). The images above draw factors as their own nodes (dots or squares), which is how a unary factor such as a prior or GPS fix fits in: it touches just one variable.
+- In this sketch each labelled line stands for a **factor** joining the variables it touches (a **binary factor**: it touches two variables). The images above draw factors as their own nodes (dots or squares), which is how a unary factor such as a prior or GPS fix fits in: it touches just one variable.
 
 ---
 
@@ -292,7 +292,7 @@ It can represent:
 - IMU biases
 - calibration parameters
 - time offsets
-- sensor extrinsics
+- sensor extrinsics (each sensor's mounting pose relative to the robot body)
 - etc.
 
 So:
@@ -380,7 +380,7 @@ IMU says:
 x1 should be somewhere else┘
 ```
 
-The optimizer doesn't choose one measurement. It finds the configuration with the **best overall compromise**, weighted by measurement uncertainty (a local optimum, so it relies on a good initial guess).
+The optimizer doesn't choose one measurement. It finds the configuration with the **best overall compromise**, weighted by measurement uncertainty (a **local optimum**: better than nearby solutions, not necessarily the best overall, so it relies on a good initial guess).
 
 And when a loop closure arrives:
 

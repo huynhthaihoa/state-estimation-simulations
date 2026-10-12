@@ -114,7 +114,7 @@ The **MSCKF** (Mourikis & Roumeliotis 2007), a classic VIO filter, is an ESKF wh
 
 They aren't competing alternatives: the IEKF *is* an error-state filter. In fact the ESKF rotation error above, $`\delta\theta = \log(\hat R^{-1}R)`$, already *is* the left-invariant error ($`\eta = \hat X^{-1}X`$; the right-invariant one is $`X\hat X^{-1}`$). What the IEKF adds is:
 
-- **Estimate-independent error dynamics.** For group-affine dynamics (and suitable invariant measurements), the error dynamics and their Jacobians don't depend on the current estimate. This can fail, for example with IMU biases in the state.
+- **Estimate-independent error dynamics.** For **group-affine** dynamics ([lie_algebra.md §11.1](../foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity); and suitable invariant measurements), the error dynamics and their Jacobians don't depend on the current estimate. This can fail, for example with IMU biases in the state.
 - **Left vs right choice.** We pick the invariant error that matches the measurement.
 
 ---
@@ -157,18 +157,18 @@ This one is less about the **estimation philosophy** and more about **numerical 
 
 The standard KF stores the covariance $P$. The square-root version stores a factor $L$ with $P = LL^\top$, often obtained through Cholesky decomposition.
 
-Why? A covariance matrix must be symmetric and positive semi-definite. In floating point, the standard update $`P \leftarrow (I - KH)P`$, where $`K`$ is the **Kalman gain** and $`H`$ the measurement Jacobian ([glossary](../glossary.md#6-kalman-filter-family)), subtracts nearly equal numbers, and rounding error can leave $P$ slightly asymmetric or with a negative eigenvalue. After that, the filter can diverge.
+Why? A covariance matrix must be symmetric and **positive semi-definite** (never negative variance in any direction). In floating point, the standard update $`P \leftarrow (I - KH)P`$, where $`K`$ is the **Kalman gain** and $`H`$ the measurement Jacobian ([glossary](../glossary.md#6-kalman-filter-family)), subtracts nearly equal numbers, and rounding error can leave $P$ slightly asymmetric or with a negative eigenvalue. After that, the filter can diverge.
 
 Carrying $L$ avoids this in two ways:
 
 - $LL^\top$ is positive semi-definite **by construction**, whatever rounding happens to $L$.
-- $L$'s condition number is the square root of $P$'s, so the same arithmetic keeps roughly twice as many significant digits.
+- $L$'s **condition number** (ratio of its largest to smallest singular value; large means numerically fragile) is the square root of $P$'s, so the same arithmetic keeps roughly twice as many significant digits.
 
 **Tiny example** (toy case: two independent states):
 - $P$ has variances 1 and $10^{-8}$, so the spread of its entries is $10^8$. That is too much for float32 (about 7 digits).
 - $L$ has 1 and $10^{-4}$, so the spread is only $10^4$.
 
-A cheaper, common partial fix is the **Joseph form** of the update, $`P \leftarrow (I-KH)P(I-KH)^\top + KRK^\top`$ ($`R`$ is the measurement noise covariance), which keeps $P$ symmetric positive semi-definite for any gain.
+A cheaper, common partial fix is the **Joseph form** of the update (an algebraically equivalent, rounding-robust rewrite), $`P \leftarrow (I-KH)P(I-KH)^\top + KRK^\top`$ ($`R`$ is the measurement noise covariance), which keeps $P$ symmetric positive semi-definite for any gain.
 
 The same idea appears on the optimization side: iSAM keeps and updates the square-root *information* matrix $R$ (with $R^\top R = H$; here $`R`$ is the square-root information factor and $`H`$ the information matrix, not the noise covariance $`R`$ and measurement Jacobian $`H`$ above) rather than $H$ itself ([isam_optimization.md](../optimization/isam_optimization.md)).
 
@@ -233,12 +233,12 @@ This lets a PF represent **multimodal** beliefs - "the robot is either in room A
 **Why care?**
 
 - No linearity or Gaussian-noise assumption at all - works for arbitrarily nonlinear, non-Gaussian problems.
-- Naturally represents multimodal beliefs (ambiguous data association, the kidnapped-robot problem, global localization).
+- Naturally represents multimodal beliefs (ambiguous **data association**, i.e. which landmark a measurement belongs to; the **kidnapped-robot problem**, being moved without being told; **global localization**, finding the pose with no initial guess).
 - Classic robotics use case: **Monte Carlo Localization (MCL)** - localizing a robot on a known map from range/bearing measurements.
 
 **The catch**: accuracy scales with particle count, and in high-dimensional state spaces (like a full SLAM state vector) you need an impractically large number of particles to cover the space adequately. That's why plain particle filters are common for low-dimensional localization but rare for full SLAM state estimation, where EKF/UKF/factor-graph approaches dominate instead.
 
-The notable exception is the **Rao-Blackwellized particle filter**. Given the robot's trajectory, the landmarks become independent of each other, so each particle carries only a trajectory hypothesis plus one small EKF per landmark (**FastSLAM**, Montemerlo et al. 2002), or an occupancy grid (**GMapping**, Grisetti et al. 2007). The particles then cover only the low-dimensional pose, which is what makes particle-filter SLAM practical.
+The notable exception is the **Rao-Blackwellized particle filter**. Given the robot's trajectory, the landmarks become independent of each other, so each particle carries only a trajectory hypothesis plus one small EKF per landmark (**FastSLAM**, Montemerlo et al. 2002), or an **occupancy grid** (a map of which cells are free or occupied; **GMapping**, Grisetti et al. 2007). The particles then cover only the low-dimensional pose, which is what makes particle-filter SLAM practical.
 
 ---
 
@@ -252,7 +252,7 @@ An adaptive KF estimates or adjusts $Q$ and/or $R$ online. One family does this 
 - Before each measurement, the filter predicts how big its surprise (the innovation) should be: the **innovation covariance** $`S`$ ([glossary](../glossary.md#6-kalman-filter-family)).
 - Then it compares with the surprise it actually gets.
 - Surprises much bigger than $`S`$ say that $Q$ or $R$ is too small. Much smaller says too big.
-- So the filter nudges $Q$/$R$ until predicted and actual surprise agree.
+- So the filter nudges $`Q`$ and $`R`$ until predicted and actual surprise agree.
 
 ---
 

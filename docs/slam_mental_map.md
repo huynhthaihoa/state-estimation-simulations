@@ -50,7 +50,7 @@ Several docs already draw a partial map of their own corner. We treat those as z
   Jacobian · Lie groups SO(3)/SE(3) · quaternion · linear vs. nonlinear
 ```
 
-In the diagram, $`Q`$ is the **process-noise covariance** of the filter's predict step ([glossary](glossary.md#6-kalman-filter-family)).
+In the diagram, $`Q`$ is the **process-noise covariance** of the filter's predict step ([glossary](glossary.md#6-kalman-filter-family)); **PGO** is pose-graph optimization; **contact/phase** signals (when a legged or crawling body touches the ground, and which gait phase it is in) are explained in the [appendix](#appendix-contact-and-phase-signals).
 
 Three questions organize the whole map:
 
@@ -112,7 +112,7 @@ Here $`\Delta R, \Delta v, \Delta p`$ are the preintegrated rotation, velocity a
 | PnP | A camera pose from known landmarks | [triangulation_pnp.md §3](frontend/triangulation_pnp.md#3-pnp-as-the-inverse-problem) | `pnp_estimation.py` |
 | Loop-closure detection | A constraint between non-consecutive poses | [frontend_backend.md §3](frontend_backend.md#3-example-loop-closure) | `pose_graph.py` (the constraint is given, not detected) |
 | IMU preintegration | One relative-motion bundle per keyframe pair (bundle + bias Jacobians + $O(1)$ correction) | [imu_preintegration.md §3](optimization/imu_preintegration.md#3-what-gets-compressed), [§6](optimization/imu_preintegration.md#6-where-this-fits-in-a-slam-back-end) | `imu_preintegration.py` |
-| VI initialization | Scale, gravity, velocities, gyro bias | [vi_initialization.md §2](frontend/vi_initialization.md#2-the-classic-linear-alignment-pipeline), [§4](frontend/vi_initialization.md#4-the-hand-off) | - (conceptual only) |
+| VI (visual-inertial) initialization | Scale, gravity, velocities, gyro bias | [vi_initialization.md §2](frontend/vi_initialization.md#2-the-classic-linear-alignment-pipeline), [§4](frontend/vi_initialization.md#4-the-hand-off) | - (conceptual only) |
 
 Two things sit on the boundary:
 
@@ -123,7 +123,7 @@ Two things sit on the boundary:
 
 ## 4. Back-end, branch A: filtering
 
-A filter carries only the current state and its covariance. Each new measurement is folded in, and the past is marginalized away ([filtering_smoothing.md §2](filtering_smoothing.md#2-filtering-one-step-at-a-time)).
+A filter carries only the current state and its covariance. Each new measurement is folded in, and the past is marginalized away ([filtering_smoothing.md §2](filtering_smoothing.md#2-filtering-one-step-at-a-time)). Every filter in the tree is a [Bayes filter](glossary.md#6-kalman-filter-family) (predict, then update); the branches differ in how they represent the belief.
 
 ```text
                          Bayes filter (predict → update)
@@ -143,6 +143,7 @@ A filter carries only the current state and its covariance. Each new measurement
 
    When the MODEL itself is unusual (this repo's robot-motion toys):
      discrete jumps          → saltation matrix       (hybrid_saltation_ekf)
+     jumps on a Lie group    → invariant saltation    (invariant_saltation_ekf)
      known stationary phases → phase-gated ZUPT       (inchworm_zupt_ekf)
      direction-dependent Q   → heading-aware Q        (friction_anisotropic_ekf)
 ```
@@ -153,7 +154,8 @@ A filter carries only the current state and its covariance. Each new measurement
 | Left- vs. right-invariant error | Which frame the error is defined in, and why it matters | [left_right_invariant.md §3](filtering/left_right_invariant.md#3-why-invariant---and-why-leftright) | `pointcloud_pose_tracking.py` (`run_iekf`) |
 | UKF, ESKF, MSCKF, PF, ... | Each relaxes one KF assumption | [extra_kf_variants.md §1](filtering/extra_kf_variants.md#1-unscented-kalman-filter-ukf), [§2](filtering/extra_kf_variants.md#2-error-state-kalman-filter-eskf), [§7](filtering/extra_kf_variants.md#7-particle-filter-pf), [kf_ekf_iekf.md §9](filtering/kf_ekf_iekf.md#9-other-prominent-variants-worth-keeping-in-mind) (MSCKF) | `pointcloud_pose_tracking.py` (`run_ukf`; UKF only) |
 | What differs in practice | EKF = IEKF (same update $K r$, the **Kalman gain** times the innovation, and covariance $`P`$ to round-off; [glossary](glossary.md#6-kalman-filter-family)); UKF ~1.4 mm at the first update, micrometers after; vanilla KF ~1-4 mm off from truncating the motion step to first order | [pointcloud_pose_tracking_empirical_note.md §2-§4](filtering/pointcloud_pose_tracking_empirical_note.md#2-ekf-vs-iekf-exact-by-construction) | `pointcloud_pose_tracking.py` |
-| Hybrid events | Propagating covariance through a reset | [hybrid_saltation_ekf.md §2](filtering/hybrid_saltation_ekf.md#2-why-the-reset-maps-own-jacobian-is-not-enough), [§6](filtering/hybrid_saltation_ekf.md#6-the-empirical-finding-a-modest-real-gap-not-a-dramatic-one) | `saltation_matrix_ekf.py` |
+| Hybrid events | Propagating covariance through a reset ([glossary](glossary.md#7-hybrid-discontinuous-systems)) | [hybrid_saltation_ekf.md §2](filtering/hybrid_saltation_ekf.md#2-why-the-reset-maps-own-jacobian-is-not-enough), [§6](filtering/hybrid_saltation_ekf.md#6-the-empirical-finding-a-modest-real-gap-not-a-dramatic-one) | `saltation_matrix_ekf.py` |
+| Hybrid events on a Lie group | A bounce is not a group automorphism, so even the invariant error's reset Jacobian depends on the state. Skipping that leaves the right-invariant EKF (RIEKF) overconfident after each bounce; a timing-noise term absorbs contact-detection jitter | [invariant_saltation_ekf.md §3](filtering/invariant_saltation_ekf.md#3-what-the-bounce-breaks), [§6](filtering/invariant_saltation_ekf.md#6-results-consistency-through-the-bounces), [§7](filtering/invariant_saltation_ekf.md#7-contact-detection-jitter) | `invariant_saltation_ekf.py` |
 | Phase-gated measurements | Free zero-velocity information, but wrong gating is catastrophic and a confident gated filter is hit harder by unmodeled acceleration | [inchworm_zupt_ekf.md §3](filtering/inchworm_zupt_ekf.md#3-the-finding-not-just-always-is-wrong-while-moving) | `inchworm_zupt_ekf.py` |
 | Shaped process noise | A wrongly oriented $Q$ is worse than an isotropic one | [friction_anisotropic_ekf.md §2](filtering/friction_anisotropic_ekf.md#2-the-dominant-finding-fixed_anisotropic-is-dramatically-worse-everywhere), [§3](filtering/friction_anisotropic_ekf.md#3-a-secondary-finding-the-worst-mismatch-is-90-not-180) | `friction_anisotropic_ekf.py` |
 
@@ -202,7 +204,7 @@ The bottom row is the solve strategy. GN/LM is the step rule, a separate axis: i
 | Pose-graph optimization | Poses + relative constraints; loop closures spread the drift conflict over the loop | [pose_graph_optimization.md §4-§5](optimization/pose_graph_optimization.md#4-the-really-important-event-loop-closure), [§15](optimization/pose_graph_optimization.md#15-mathematical-breakdown-of-the-error-formulation-and-lie-algebra-operations) | `pose_graph.py` |
 | Robust kernels | Down-weight outliers such as false loop closures | [pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures) | - |
 | Bundle adjustment | Poses + landmarks against reprojection error | [bundle_adjustment.md §4](optimization/bundle_adjustment.md#4-heres-the-important-part-both-cameras-and-points-are-adjusted), [§9](optimization/bundle_adjustment.md#9-ba-vs-pose-graph-optimization) | `bundle_adjustment.py` |
-| Local vs. global BA | A covisibility window every keyframe, a full re-solve occasionally | [bundle_adjustment.md §13](optimization/bundle_adjustment.md#13-local-vs-global-bundle-adjustment-real-systems) | `bundle_adjustment_advanced.py` |
+| Local vs. global BA | A **covisibility window** (keyframes sharing landmarks with the current one) every keyframe, a full re-solve occasionally | [bundle_adjustment.md §13](optimization/bundle_adjustment.md#13-local-vs-global-bundle-adjustment-real-systems) | `bundle_adjustment_advanced.py` |
 | IMU factors | Preintegrated edges between (pose, v, bias) nodes | [imu_preintegration.md §6](optimization/imu_preintegration.md#6-where-this-fits-in-a-slam-back-end) | - (the script stops before building the factor) |
 
 ### 5.2 The solver
@@ -249,6 +251,7 @@ The EKF linearizes once per predict/update step, at the current estimate. GN/LM 
 The same question appears on both branches: in which frame, and on which space, is the error measured?
 
 - Filtering: EKF vs. IEKF differ only in how they define the error ([kf_ekf_iekf.md §5](filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error), [left_right_invariant.md §4](filtering/left_right_invariant.md#4-why-it-actually-matters-not-just-bookkeeping)).
+- Filtering through a jump: the invariant error's propagation is [trajectory-independent](glossary.md#1-geometry-and-lie-groups), but a bounce's reset is not a group automorphism, so its Jacobian in invariant coordinates depends on the state again ([invariant_saltation_ekf.md §3](filtering/invariant_saltation_ekf.md#3-what-the-bounce-breaks)).
 - Smoothing: PGO's residual is the $\mathrm{Log}$ of a relative-pose mismatch ([pose_graph_optimization.md §7](optimization/pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive)).
 
 ### 6.3 Variable elimination: one operation, three uses
@@ -284,10 +287,11 @@ Loop closure is the event that separates SLAM from odometry, and every layer has
 
 ### 6.5 Consistency, not just accuracy
 
-Accuracy and covariance calibration are separate properties, and NEES measures the second ([linear_nonlinear.md §4.4](filtering/linear_nonlinear.md#44-after-the-fact-consistency-tests)). Three docs report a calibration problem:
+Accuracy and covariance calibration are separate properties, and NEES measures the second ([linear_nonlinear.md §4.4](filtering/linear_nonlinear.md#44-after-the-fact-consistency-tests)). Four docs report a calibration problem:
 
 - ZUPT: the one clean accuracy-vs-consistency trade. `phase_conditional` has better velocity but worse position and cruise NEES than `never` ([inchworm_zupt_ekf.md §3](filtering/inchworm_zupt_ekf.md#3-the-finding-not-just-always-is-wrong-while-moving)).
 - Hybrid: both filters are underconfident, and the saltation matrix is slightly closer to consistent ([hybrid_saltation_ekf.md §6](filtering/hybrid_saltation_ekf.md#6-the-empirical-finding-a-modest-real-gap-not-a-dramatic-one)).
+- Hybrid on a Lie group: an RIEKF that skips the state-dependent reset Jacobian is overconfident after bounces (NEES about 13.5 against a consistent 9), and under contact-detection jitter only the filter with the timing-noise term stays consistent ([invariant_saltation_ekf.md §6](filtering/invariant_saltation_ekf.md#6-results-consistency-through-the-bounces), [§7](filtering/invariant_saltation_ekf.md#7-contact-detection-jitter)).
 - Friction: `fixed_anisotropic` is overconfident ([friction_anisotropic_ekf.md §2](filtering/friction_anisotropic_ekf.md#2-the-dominant-finding-fixed_anisotropic-is-dramatically-worse-everywhere)).
 
 ---
@@ -302,11 +306,12 @@ Accuracy and covariance calibration are separate properties, and NEES measures t
 | `pnp_estimation.py` | Front-end | Pose from known 3D points | [triangulation_pnp.md §3](frontend/triangulation_pnp.md#3-pnp-as-the-inverse-problem) |
 | `pointcloud_pose_tracking.py` | Back-end, both branches | EKF/IEKF/UKF/vanilla KF vs. batch GN | [pointcloud_pose_tracking_empirical_note.md](filtering/pointcloud_pose_tracking_empirical_note.md) |
 | `saltation_matrix_ekf.py` | Back-end, filtering | Hybrid resets | [hybrid_saltation_ekf.md](filtering/hybrid_saltation_ekf.md) |
+| `invariant_saltation_ekf.py` | Back-end, filtering | Hybrid resets on $`SE_2(3)`$ (right-invariant EKF) | [invariant_saltation_ekf.md](filtering/invariant_saltation_ekf.md) |
 | `inchworm_zupt_ekf.py` | Back-end, filtering | Phase-gated ZUPT | [inchworm_zupt_ekf.md](filtering/inchworm_zupt_ekf.md) |
 | `friction_anisotropic_ekf.py` | Back-end, filtering | Heading-dependent $Q$ | [friction_anisotropic_ekf.md](filtering/friction_anisotropic_ekf.md) |
 | `pose_graph.py` | Back-end, smoothing (batch) | PGO with one loop closure, LM | [pose_graph_optimization.md](optimization/pose_graph_optimization.md) |
 | `bundle_adjustment.py` | Back-end, smoothing (batch) | Joint pose + landmark BA, GN | [bundle_adjustment.md](optimization/bundle_adjustment.md) |
-| `bundle_adjustment_advanced.py` | Front-end + back-end | Triangulation, local vs. global BA, LM (no Umeyama: raw error carries a similarity offset) | [bundle_adjustment.md §13](optimization/bundle_adjustment.md#13-local-vs-global-bundle-adjustment-real-systems) |
+| `bundle_adjustment_advanced.py` | Front-end + back-end | Triangulation, local vs. global BA, LM (no [Umeyama](foundations/umeyama_alignment.md) alignment, so the raw error includes a **similarity offset**: one rotation, translation and scale of the whole map) | [bundle_adjustment.md §13](optimization/bundle_adjustment.md#13-local-vs-global-bundle-adjustment-real-systems) |
 | `pose_graph_incremental.py` | Back-end, smoothing (incremental) | iSAM v1: Givens updates for odometry, full rebuild at loop closure, no reordering | [isam_optimization.md §14](optimization/isam_optimization.md#14-where-this-is-implemented-in-this-repo) |
 | `bayes_tree_construction.py` | Back-end, smoothing (incremental) | Elimination tree + affected path | [bayes_tree.md §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo) |
 | `sliding_window_marginalization.py` | Back-end, smoothing (bounded) | Schur-complement marginalization | [marginalization.md §8](optimization/marginalization.md#8-what-this-repo-implements) |
@@ -327,10 +332,19 @@ Each path follows one branch of the map from the root to its leaves. Start with 
 
 **Visual-inertial.** [quaternion.md](foundations/quaternion.md) → [lie_algebra.md](foundations/lie_algebra.md) → [imu_preintegration.md](optimization/imu_preintegration.md) → [triangulation_pnp.md](frontend/triangulation_pnp.md) → [vi_initialization.md](frontend/vi_initialization.md) → [marginalization.md](optimization/marginalization.md)
 
-**Unusual robot motion.** [kf_ekf_iekf.md](filtering/kf_ekf_iekf.md) → [hybrid_saltation_ekf.md](filtering/hybrid_saltation_ekf.md) → [inchworm_zupt_ekf.md](filtering/inchworm_zupt_ekf.md) → [friction_anisotropic_ekf.md](filtering/friction_anisotropic_ekf.md) → [filtering_smoothing.md §11](filtering_smoothing.md#11-and-this-matters-a-lot-for-slam--state-estimation-for-resource-constrained-robots-with-discontinuoushybrid-motion)
+**Unusual robot motion.** [kf_ekf_iekf.md](filtering/kf_ekf_iekf.md) → [hybrid_saltation_ekf.md](filtering/hybrid_saltation_ekf.md) → [invariant_saltation_ekf.md](filtering/invariant_saltation_ekf.md) (after [left_right_invariant.md](filtering/left_right_invariant.md)) → [inchworm_zupt_ekf.md](filtering/inchworm_zupt_ekf.md) → [friction_anisotropic_ekf.md](filtering/friction_anisotropic_ekf.md) → [filtering_smoothing.md §11](filtering_smoothing.md#11-and-this-matters-a-lot-for-slam--state-estimation-for-resource-constrained-robots-with-discontinuoushybrid-motion)
 
 ---
 
 ## 9. One-sentence summary
 
 > **A SLAM system turns sensor data into constraints (front-end), then finds the trajectory and map that best explain them (back-end), either by carrying only the current state forward (filtering) or by keeping the history as a factor graph and solving it as sparse nonlinear least squares, from scratch, incrementally or over a bounded window (smoothing), with Jacobians on Lie groups underneath every step.**
+
+---
+
+## Appendix: contact and phase signals
+
+Legged and crawling robots often have a third source of information besides cameras and IMUs. A **contact** signal says when the body touches the ground: a foot switch, a force threshold, or an accelerometer spike at impact. A **phase** signal says which part of the gait the body is in, e.g. **stance** (foot planted) or swing; it can come from such a sensor or from a known gait schedule. Neither measures the pose. They tell the filter *when* the dynamics or the measurements change:
+
+- **A contact triggers a hybrid reset**: the bounce's reset map and saltation matrix are applied at the detected impact ([hybrid_saltation_ekf.md](filtering/hybrid_saltation_ekf.md); [invariant_saltation_ekf.md §7](filtering/invariant_saltation_ekf.md#7-contact-detection-jitter) for detection delay and jitter).
+- **A stance phase licenses a zero-velocity update**: while a segment is planted, its velocity is known to be zero ([inchworm_zupt_ekf.md](filtering/inchworm_zupt_ekf.md)).

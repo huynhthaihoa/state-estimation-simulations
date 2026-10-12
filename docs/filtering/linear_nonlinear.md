@@ -10,7 +10,7 @@ The system is linear only if both $f$ and $h$ are linear in the state $x$, meani
 
 ## 1. Three ways to tell
 
-1. **Superposition.** $f(a x_1 + b x_2) = a f(x_1) + b f(x_2)$ must hold for every $x_1, x_2, a, b$. A constant offset (making $f$ affine) fails this test but is still fine for a KF, since it just adds to the mean.
+1. **Superposition.** $f(a x_1 + b x_2) = a f(x_1) + b f(x_2)$ must hold for every $x_1, x_2, a, b$. A constant offset (making $f$ **affine**: linear plus a constant) fails this test but is still fine for a KF, since it just adds to the mean.
 2. **The Jacobian doesn't depend on $x$.** Differentiate: if $\partial f / \partial x$ or $\partial h / \partial x$ still contains $x$, the system is nonlinear. This is the most practical test, and it is why the EKF has to recompute $F_k$ and $H_k$ at every step ([kf_ekf_iekf.md §2](kf_ekf_iekf.md#2-extended-kalman-filter-the-world-is-nonlinear-so-ill-approximate-it-locally)): they change as the estimate changes.
 3. **Look for these patterns.** Any of them makes a model nonlinear:
    - **Trig of a state**: $\cos\theta$, $\sin\theta$ where $\theta$ is estimated. This is the unicycle in [kf_ekf_iekf.md §2](kf_ekf_iekf.md#2-extended-kalman-filter-the-world-is-nonlinear-so-ill-approximate-it-locally).
@@ -30,7 +30,7 @@ The first two tests are exact. The third is a heuristic for spotting what will f
   - the state is a minimal parameterization (angles, tangent-space error) or must satisfy the $SO(3)$ constraint;
   - the angular velocity or a bias is itself a state, so it multiplies $R$.
 
-  With a known body twist, $R_{k+1} = R_k\,\mathrm{Exp}(\omega\,\Delta t)$ is linear in $\mathrm{vec}(R_k)$. The vanilla KF in [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) is inexact only because it truncates the exponential and needs an SVD re-projection onto $SO(3)$. For **group-affine** dynamics, a well-chosen invariant error evolves independently of the state estimate (Barrau & Bonnabel 2017, [kf_ekf_iekf.md §11](kf_ekf_iekf.md#11-references)).
+  With a known body twist, $R_{k+1} = R_k\,\mathrm{Exp}(\omega\,\Delta t)$ is linear in $\mathrm{vec}(R_k)$. The vanilla KF in [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) is inexact only because it truncates the exponential and needs an **SVD** (singular value decomposition) re-projection onto $SO(3)$ (snapping the matrix back to the nearest rotation). For **group-affine** dynamics ([lie_algebra.md §11.1](../foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity)), a well-chosen invariant error evolves independently of the state estimate (Barrau & Bonnabel 2017, [kf_ekf_iekf.md §11](kf_ekf_iekf.md#11-references)).
 
 ## 3. "How nonlinear" matters in practice
 
@@ -43,12 +43,12 @@ Almost every real robot model is nonlinear. The useful question is whether it's 
 Compare that to the process or measurement noise.
 
 - **Much smaller than the noise**: the EKF is fine.
-- **Comparable to the noise or larger**: the Jacobian changes a lot within our uncertainty (for example, a large heading uncertainty, or a landmark close to the camera). Consider the UKF, an iterated update, or an invariant or manifold formulation.
+- **Comparable to the noise or larger**: the Jacobian changes a lot within our uncertainty (for example, a large heading uncertainty, or a landmark close to the camera). Consider the UKF, an **iterated update** (re-linearizing several times within one measurement update), or an invariant or manifold formulation.
 
 $P$ (the state covariance) changes over time, so the answer does too. Check at the worst moments:
 
 - right after initialization, when $P$ is large;
-- after long dead-reckoning;
+- after long [dead-reckoning](../glossary.md#5-slam-system);
 - just before a loop closure;
 - when landmarks are close to the camera.
 
@@ -133,9 +133,9 @@ Evaluate $J$ at $\hat x \pm \sigma$ along the main axes of $P$ (the eigenvectors
 
 ### 4.4 After the fact: consistency tests
 
-Run the filter and check whether its reported uncertainty is believable:
+Run the filter and check whether its reported uncertainty is believable (**consistency**, [glossary](../glossary.md#2-uncertainty-and-probability)):
 
-- **NIS**, the normalized innovation squared, $\nu^\top S^{-1}\nu$ (innovation $`\nu`$ and **innovation covariance** $`S`$, [glossary](../glossary.md#6-kalman-filter-family)), needs no ground truth.
+- **NIS**, the normalized innovation squared, $\nu^\top S^{-1}\nu$ (**innovation** $`\nu`$, the measurement minus its prediction, and **innovation covariance** $`S`$, [glossary](../glossary.md#6-kalman-filter-family)), needs no ground truth.
 - **NEES**, the normalized estimation error squared, needs simulated ground truth. This repo reports a Monte Carlo NEES in three scripts, which test different things:
   - [`friction_anisotropic_ekf.py`](../../use_numpy/friction_anisotropic_ekf.py) ($n = 3$): a genuinely nonlinear motion model (heading enters through $\cos\theta$, $\sin\theta$);
   - [`inchworm_zupt_ekf.py`](../../use_numpy/inchworm_zupt_ekf.py) ($n = 2$): exactly linear;
@@ -144,12 +144,12 @@ Run the filter and check whether its reported uncertainty is believable:
 **Intuition for NEES:**
 - Divide each error by its predicted spread. A consistent filter gives values around $\pm 1$.
 - Square them and sum over the $n$ states: the total is about $n$.
-- Well above $n$ means the filter is overconfident.
+- Well above $n$ means the filter is **overconfident** (its reported covariance is smaller than its real errors).
 
 A consistent filter's NEES averages the state dimension $n$ (NIS: the measurement dimension). Which bound to compare against depends on what we look at:
 
-- **One run**: a single NEES value is chi-square with $n$ degrees of freedom, so its 95% upper bound is wide (7.81 for $n = 3$).
-- **An average over $N$ Monte Carlo runs**: $N$ times the average is chi-square with $nN$ degrees of freedom, so the interval is much tighter, about $`n \pm 1.96\sqrt{2n/N}`$. The scripts compute it with the Wilson-Hilferty approximation (`averaged_nees_bounds(n, N)`). For $N = 500$:
+- **One run**: a single NEES value is **chi-square** (a sum of squared standard-normal values) with $n$ degrees of freedom, so its 95% upper bound is wide (7.81 for $n = 3$).
+- **An average over $N$ Monte Carlo runs**: $N$ times the average is chi-square with $nN$ degrees of freedom, so the interval is much tighter, about $`n \pm 1.96\sqrt{2n/N}`$. The scripts compute it with the **Wilson-Hilferty approximation** (a closed-form estimate of chi-square quantiles) (`averaged_nees_bounds(n, N)`). For $N = 500$:
 
 | Script | $n$ | 95% band |
 | --- | --- | --- |

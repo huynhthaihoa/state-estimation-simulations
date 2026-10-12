@@ -47,7 +47,7 @@ So a quaternion reads as **"rotate around this axis by this amount."** The four 
 
 > **Watch the component order and the convention.**
 >
-> - **Component order.** This doc writes quaternions scalar-first, $(w, x, y, z)$. Many libraries store them scalar-last, $[x, y, z, w]$: scipy's `Rotation.as_quat()`, ROS messages, and this repo's own `utils.py`. Reading one ordering as the other silently gives a different rotation.
+> - **Component order.** This doc writes quaternions scalar-first, $(w, x, y, z)$. Many libraries store them scalar-last, $[x, y, z, w]$: scipy's `Rotation.as_quat()`, ROS (Robot Operating System) messages, and this repo's own `utils.py`. Reading one ordering as the other silently gives a different rotation.
 > - **Multiplication convention.** **Hamilton** (used here, and by most robotics libraries) and **JPL** (common in older aerospace and MSCKF-era VIO papers) compose in opposite orders. Solà (2017) compares them.
 > - Always check both before mixing code or equations from different sources.
 
@@ -140,7 +140,7 @@ r_{31} & r_{32} & r_{33} \end{bmatrix}
 has **9 elements**, even though a rotation has only 3 degrees of freedom, and they must satisfy several constraints: $R^\top R = I$ and $\det(R) = 1$. A quaternion has four numbers and one simple normalization constraint: $`\|q\| = 1`$. So quaternions are:
 
 - more compact
-- numerically convenient: rounding makes $\lVert q\rVert$ drift slowly from 1 over many multiplications, so implementations renormalize regularly, which is much cheaper than re-orthogonalizing a rotation matrix
+- numerically convenient: rounding makes $\lVert q\rVert$ drift slowly from 1 over many multiplications, so implementations renormalize regularly, which is much cheaper than re-orthogonalizing a rotation matrix (making its columns perpendicular unit vectors again)
 - efficient for composing rotations
 - easy to interpolate smoothly: slerp (spherical linear interpolation) $\text{slerp}(q_0, q_1, t)$ (from start orientation $`q_0`$ to end orientation $`q_1`$, with fraction $`t \in [0,1]`$) moves at constant angular speed along the shortest arc (choose the sign of $q_1$ so that $q_0 \cdot q_1 \ge 0$, see Section 10)
 - free of gimbal lock
@@ -175,10 +175,10 @@ R= \begin{bmatrix} 0 & -1 & 0\\
 
 Strangely, $q$ and $-q$ represent **the exact same physical orientation**. For example, $q = (0.707, 0, 0, 0.707)$ and $-q = (-0.707, 0, 0, -0.707)$ are the same rotation.
 
-This matters for **optimization, SLAM, EKF, and Lie-group state estimation**, because treating quaternion components as ordinary Euclidean coordinates causes two problems:
+This matters for **optimization, SLAM, [EKF](../glossary.md#6-kalman-filter-family), and Lie-group ([glossary](../glossary.md#1-geometry-and-lie-groups)) state estimation**, because treating quaternion components as ordinary Euclidean coordinates causes two problems:
 
-- **Additive updates break the unit-norm constraint.** Adding a small correction to $q$ leaves the unit sphere.
-- **The double cover makes averaging and differencing ambiguous.** Averaging $q$ and $-q$ (the same rotation) gives $(0,0,0,0)$, which is not a rotation. Their component-wise difference is as large as possible.
+- **Additive updates break the unit-norm constraint.** Adding a small correction to $q$ leaves the unit sphere (the set of quaternions with norm 1).
+- **The double cover (each rotation has two quaternions, $`q`$ and $`-q`$) makes averaging and differencing ambiguous.** Averaging $q$ and $-q$ (the same rotation) gives $(0,0,0,0)$, which is not a rotation. Their component-wise difference is as large as possible.
 
 ---
 
@@ -210,8 +210,8 @@ It lives on the **unit quaternion manifold**. That's why modern VIO/SLAM systems
 
 The small error can be attached on either side, and both are common:
 
-- $`q_{\text{true}} = \delta q\otimes \hat q`$: the error is expressed in the world frame. In the terminology of [left_right_invariant.md](../filtering/left_right_invariant.md) this is a *right*-invariant error.
-- $`q_{\text{true}} = \hat q\otimes \delta q`$: the error is expressed in the body frame. This is the *left*-invariant error, the convention of Solà's ESKF and of this repo's `run_iekf` (the $\hat X\,\mathrm{Exp}(\xi)$ form, where $`\hat X`$ is the estimated pose, $`\xi`$ the tangent-space error and $`\mathrm{Exp}`$ the exponential map, see the [glossary](../glossary.md#1-geometry-and-lie-groups)).
+- $`q_{\text{true}} = \delta q\otimes \hat q`$: the error is expressed in the world frame (fixed reference axes). In the terminology of [left_right_invariant.md](../filtering/left_right_invariant.md) this is a *right*-invariant error.
+- $`q_{\text{true}} = \hat q\otimes \delta q`$: the error is expressed in the body frame (axes attached to the robot). This is the *left*-invariant error, the convention of Solà's ESKF and of this repo's `run_iekf` (the $\hat X\,\mathrm{Exp}(\xi)$ form, where $`\hat X`$ is the estimated pose, $`\xi`$ the tangent-space error and $`\mathrm{Exp}`$ the exponential map, see the [glossary](../glossary.md#1-geometry-and-lie-groups)).
 
 This is the error-state idea of [extra_kf_variants.md §2](../filtering/extra_kf_variants.md#2-error-state-kalman-filter-eskf), and it leads directly into **SO(3), Lie groups, Lie algebra, and the Invariant EKF**.
 
@@ -308,7 +308,7 @@ $$
 \mathbf{v} = \mathbf{v}_{\parallel} + \mathbf{v}_{\perp}
 $$
 
-**Parallel part.** Two pure quaternions along the same direction commute (their cross product is zero). So $q$ commutes with $\mathbf{v}_{\parallel}$ and the sandwich collapses:
+**Parallel part.** Two pure quaternions along the same direction **commute** (their product is the same in either order; their cross product is zero). So $q$ commutes with $\mathbf{v}_{\parallel}$ and the sandwich collapses:
 
 $$
 q \otimes \mathbf{v}_{\parallel} \otimes q^{\ast} = \mathbf{v}_{\parallel} \otimes q \otimes q^{\ast} = \mathbf{v}_{\parallel}
@@ -350,7 +350,7 @@ Putting both parts together:
 \boxed{q \otimes \mathbf{v} \otimes q^{\ast} = \mathbf{v}_{\parallel} + \cos\theta\,\mathbf{v}_{\perp} + \sin\theta\,(\mathbf{u} \times \mathbf{v}_{\perp})}
 ```
 
-This is exactly **Rodrigues' rotation formula** - the same rotation a rotation matrix would produce.
+This is exactly **Rodrigues' rotation formula** (the closed-form rotation of a vector about an axis by an angle) - the same rotation a rotation matrix would produce.
 
 > **Each side of the sandwich turns the perpendicular part by $\theta/2$, so the quaternion stores $\theta/2$ in order to produce a rotation by $\theta$.**
 

@@ -104,7 +104,7 @@ iSAM2 improves on the original iSAM with three ideas:
 
 ### 6.1 iSAM vs. iSAM2, side by side
 
-iSAM2 solves the same problem as iSAM, on the same factorization: iSAM's square-root information matrix $R$ and iSAM2's Bayes tree hold the same numbers (for the same variable ordering and linearization point), just organized differently. What changes is how much each one can do *incrementally*:
+iSAM2 solves the same problem as iSAM, on the same factorization: iSAM's **square-root information matrix** $R$ (the triangular factor with $`H=R^\top R`$) and iSAM2's Bayes tree hold the same numbers (for the same variable ordering and linearization point), just organized differently. What changes is how much each one can do *incrementally*:
 
 | | iSAM (Kaess et al. 2008) | iSAM2 (Kaess et al. 2012) |
 | --- | --- | --- |
@@ -112,7 +112,7 @@ iSAM2 solves the same problem as iSAM, on the same factorization: iSAM's square-
 | New measurement | Folded into $R$ as a new row, with Givens rotations | The cliques it touches, and everything above them, are removed, re-eliminated and put back (§8-§9) |
 | Relinearization | Periodic batch step: every variable at once | Selective: only variables that moved past a threshold (§10) |
 | Variable reordering | Periodic batch step: COLAMD over every variable | Incremental: CCOLAMD over just the re-eliminated part (§12) |
-| Loop closure | The Givens sweep runs through most of $R$, and the fill-in it adds stays until the next batch step | A large affected region, but re-eliminated right away with a fresh ordering (§9, §12) |
+| [Loop closure](../glossary.md#5-slam-system) | The Givens sweep runs through most of $R$, and the fill-in it adds stays until the next batch step | A large affected region, but re-eliminated right away with a fresh ordering (§9, §12) |
 | Updating the estimate | Back-substitution through $R$ | Starts at the root and stops in branches where the changes are negligible (§13) |
 | Periodic batch steps | Required: the only way to relinearize and reorder | None |
 
@@ -138,7 +138,7 @@ Cholesky/QR
 Bayes tree
 ```
 
-The **Bayes tree** is a tree representation of that factorization - built by eliminating variables one at a time and recording which remaining variables each elimination step's result depends on - that makes incremental updates easier: given a new factor, iSAM2 can walk straight to the affected part of the tree instead of recomputing everything.
+The **Bayes tree** is a tree representation of that factorization - built by eliminating variables one at a time and recording which remaining variables each elimination step's result depends on - that makes incremental updates easier: given a new [factor](../glossary.md#4-graphs-sparsity-and-solvers), iSAM2 can walk straight to the affected part of the tree instead of recomputing everything.
 
 This doc only needs that one-sentence version. For the full mechanism - how elimination produces the tree, cliques, the probabilistic interpretation, and a worked loop-closure example on a correctly-drawn tree - see [`bayes_tree.md`](bayes_tree.md).
 
@@ -242,7 +242,7 @@ The amount of computation in sparse Cholesky depends heavily on **variable order
 - **Fill-in**: how dense the factorization gets ([sparse_cholesky_factorization.md](sparse_cholesky_factorization.md)).
 - **Where each variable sits in the Bayes tree.** The last variable eliminated becomes the root, and an update's affected region is the path from the touched cliques up to the root (§8-§9).
 
-A fixed order can be fine for one and terrible for the other. This repo's own example ([bayes_tree.md §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo)) eliminates a square loop of 16 poses oldest first. Fill-in stays small (no separator larger than 2), but the tree comes out as a single chain with the first pose at the bottom, so a loop closure touching the first pose invalidates all 16 variables.
+A fixed order can be fine for one and terrible for the other. This repo's own example ([bayes_tree.md §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo)) eliminates a square loop of 16 poses oldest first. Fill-in stays small (no **separator**, the variables a clique shares with its parent, larger than 2), but the tree comes out as a single chain with the first pose at the bottom, so a loop closure touching the first pose invalidates all 16 variables.
 
 iSAM2 therefore reorders as it goes. Each time it re-eliminates the affected part of the tree, it picks a new order for just those variables with **constrained COLAMD (CCOLAMD)**: a fill-reducing ordering, constrained so that the variables touched by the newest factors are eliminated last. They end up near the root, where the next measurement (which usually involves the same recent variables) disturbs only a few cliques.
 
@@ -300,7 +300,7 @@ Everything below the removed top of the tree keeps its factorization untouched (
 
 ## 14. iSAM2 vs EKF
 
-**EKF-SLAM** is fundamentally a **filtering** approach: "I maintain my current estimate and uncertainty, and update it when a measurement arrives." Old information is compressed into the current state.
+**EKF-SLAM** ([glossary](../glossary.md#6-kalman-filter-family)) is fundamentally a **filtering** approach: "I maintain my current estimate and uncertainty, and update it when a measurement arrives." Old information is compressed into the current state.
 
 ```text
 prediction → measurement → EKF update → new estimate

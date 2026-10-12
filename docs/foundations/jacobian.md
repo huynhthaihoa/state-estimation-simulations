@@ -121,7 +121,7 @@ Putting every partial derivative together gives the full Jacobian:
 0 & f/Z & -fY/Z^2 \end{bmatrix}}
 ```
 
-Notice the zeros: $\partial u/\partial Y = 0$ and $\partial v/\partial X = 0$, because horizontal image position ($u$) doesn't depend on vertical 3D position ($Y$) at all, and vice versa for $v$ and $X$. This is the projection Jacobian a visual-SLAM or bundle-adjustment system computes at every reprojected point, with $(X, Y, Z)$ the point in *camera* coordinates; it is then chained with the Jacobians of the world-to-camera transform to get derivatives with respect to the pose and the world-frame point.
+Notice the zeros: $\partial u/\partial Y = 0$ and $\partial v/\partial X = 0$, because horizontal image position ($u$) doesn't depend on vertical 3D position ($Y$) at all, and vice versa for $v$ and $X$. This is the projection Jacobian a visual-SLAM or bundle-adjustment system computes at every reprojected point (a 3D point projected into the image with current estimates), with $(X, Y, Z)$ the point in *camera* coordinates; it is then chained with the Jacobians of the world-to-camera transform to get derivatives with respect to the pose and the world-frame point.
 
 ---
 
@@ -176,7 +176,7 @@ The mountain idea of Section 6, written as an equation. Let $\delta x$ be a slig
 
 $$\boxed{\delta z \approx H\delta x}$$
 
-That is why Jacobians are everywhere in EKF, ESKF, IEKF, bundle adjustment, nonlinear least squares, factor graphs, visual odometry and SLAM.
+That is why Jacobians are everywhere in EKF, ESKF, IEKF, bundle adjustment, **nonlinear least squares** (minimizing summed squared residuals of nonlinear models), factor graphs, visual odometry and SLAM.
 
 ---
 
@@ -218,7 +218,7 @@ So instead of blindly asking "What is the derivative with respect to my state ve
 
 That's one reason Lie groups and Jacobians become so tightly connected in modern SLAM.
 
-A manifold perturbation on its own isn't yet what makes a filter **invariant**: error-state filters such as the ESKF and MEKF already perturb on the manifold. The IEKF goes one step further and picks the specific error that ignores a change of world or body frame (left- or right-invariant), which is what makes its linearization independent of the current estimate for group-affine dynamics. See [kf_ekf_iekf.md §5](../filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error) and [left_right_invariant.md](../filtering/left_right_invariant.md).
+A manifold perturbation on its own isn't yet what makes a filter **invariant**: error-state filters such as the ESKF and MEKF (multiplicative EKF, which perturbs attitude by composition) already perturb on the manifold. The IEKF goes one step further and picks the specific error that ignores a change of world or body frame (left- or right-invariant), which is what makes its linearization independent of the current estimate for **group-affine** dynamics (dynamics under which the invariant error evolves on its own, whatever the trajectory; see [lie_algebra.md §11.1](lie_algebra.md#111-extended-poses-pose-plus-velocity)). See [kf_ekf_iekf.md §5](../filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error) and [left_right_invariant.md](../filtering/left_right_invariant.md).
 
 ---
 
@@ -240,7 +240,7 @@ Section 9 mentioned that manifold-aware filters (error-state filters and the IEK
 
 Everywhere above, perturbing an input meant simple addition: $x \to x + \delta x$. That works because $x$ lives in a vector space.
 
-A rotation $R \in SO(3)$ does not. There is no such thing as $R + \delta R$ - the result generally isn't even a valid rotation. Instead, a small perturbation $\delta\varphi \in \mathbb{R}^3$ is turned into a rotation via the exponential map, $\text{Exp}(\delta\varphi)$, and then **composed** (matrix-multiplied) with $R$:
+A rotation $R \in SO(3)$ does not. There is no such thing as $R + \delta R$ - the result generally isn't even a valid rotation. Instead, a small perturbation $\delta\varphi \in \mathbb{R}^3$ is turned into a rotation via the **exponential map** (turning a rotation vector, axis times angle, into a rotation matrix), $\text{Exp}(\delta\varphi)$, and then **composed** (matrix-multiplied) with $R$:
 
 ```math
 R' = \text{Exp}(\delta\varphi)\,R \qquad \text{or} \qquad R' = R\,\text{Exp}(\delta\varphi)
@@ -271,7 +271,7 @@ Near the identity ($\varphi \to 0$) there's no rotation yet to disagree about "w
 
 ### 11.4 Closed form for $SO(3)$
 
-With $\theta = \lVert\varphi\rVert$ and $[\varphi]_\times$ the skew-symmetric matrix of $\varphi$:
+With $\theta = \lVert\varphi\rVert$ and $[\varphi]_\times$ the skew-symmetric matrix of $\varphi$ (so that $`[\varphi]_\times b = \varphi \times b`$ for any 3-vector $`b`$):
 
 $$J_l(\varphi) = I + \frac{1-\cos\theta}{\theta^2}[\varphi]_\times + \frac{\theta-\sin\theta}{\theta^3}[\varphi]_\times^2$$
 
@@ -301,9 +301,9 @@ Notice $J_r = J_l^\top$, as the identity predicts. Plugging $\theta \to 0$ into 
 
 ### 11.6 Where this actually matters
 
-- **IMU preintegration**: the effect of a small change in gyroscope bias is naturally expressed in the sensor's own (body) frame, so bias-correction Jacobians in preintegration use $J_r$ - worked out end-to-end in [imu_preintegration.md](../optimization/imu_preintegration.md).
+- **IMU preintegration** (preintegration summarizes the IMU samples between two keyframes into one relative-motion measurement): the effect of a small change in gyroscope bias is naturally expressed in the sensor's own (body) frame, so bias-correction Jacobians in preintegration use $J_r$ - worked out end-to-end in [imu_preintegration.md](../optimization/imu_preintegration.md).
 - **Covariance propagation on the manifold**: a rotation's uncertainty is a covariance on the tangent vector $\delta\varphi$, and what it numerically means depends on whether $\delta\varphi$ is defined via $`R\,\text{Exp}(\delta\varphi)`$ (right) or $`\text{Exp}(\delta\varphi)\, R`$ (left).
-  - Converting between them is a multiplication by $R$ (for rotations, the adjoint is $R$ itself): $`\text{Exp}(\delta\varphi_{\text{left}})\,R = R\,\text{Exp}(\delta\varphi_{\text{right}})`$ gives $`\delta\varphi_{\text{left}} = R\,\delta\varphi_{\text{right}}`$.
+  - Converting between them is a multiplication by $R$ (the **adjoint** re-expresses a tangent vector from one frame in another; for rotations it is $R$ itself): $`\text{Exp}(\delta\varphi_{\text{left}})\,R = R\,\text{Exp}(\delta\varphi_{\text{right}})`$ gives $`\delta\varphi_{\text{left}} = R\,\delta\varphi_{\text{right}}`$.
   - Hence $`\Sigma_{\text{left}} = R\,\Sigma_{\text{right}}R^\top`$: a change of frame, not a change of the underlying uncertainty.
   - The Section 11.4 identity $`J_l = R\,J_r`$ follows from the same fact.
 - **Factor graphs/bundle adjustment on $SE(3)$**: residual Jacobians w.r.t. a pose depend on which perturbation convention (left vs. right) the library uses, and the update must apply the step with the same convention. Mixing them computes wrong step directions: the optimization converges slowly, converges to the wrong place, or diverges, all while the code runs without error.

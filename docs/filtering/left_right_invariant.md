@@ -34,7 +34,7 @@ $$\eta_R = X \hat X^{-1} \qquad \text{(right-invariant error)}$$
 Each error is unaffected by one specific kind of frame change, and the name says which:
 
 - $\eta_L$ is unchanged if we left-multiply both $X$ and $\hat X$ by the same fixed transform $g$ (we redefine the *world/global* frame: rotate the map, shift the origin). That cancels out: $(g\hat X)^{-1}(gX) = \hat X^{-1}X$. So it's invariant to **global frame redefinition** - which makes sense, since a body-frame quantity shouldn't care how we labeled the world frame.
-- $\eta_R$ is unchanged if we right-multiply both by $g$ (we redefine the *body* frame convention: recalibrate where the robot frame origin sits, e.g. sensor extrinsics). That cancels out too: $(Xg)(\hat Xg)^{-1} = X\hat X^{-1}$. So it's invariant to **body-frame redefinition**.
+- $\eta_R$ is unchanged if we right-multiply both by $g$ (we redefine the *body* frame convention: recalibrate where the robot frame origin sits, e.g. **sensor extrinsics**, the fixed sensor-to-body pose). That cancels out too: $(Xg)(\hat Xg)^{-1} = X\hat X^{-1}$. So it's invariant to **body-frame redefinition**.
 
 **Picture (re-drawing the map):**
 - Redraw the world map: move the origin or rotate the axes. The true pose and our estimate both get new coordinates.
@@ -69,13 +69,13 @@ So $\hat\omega^b$ plays the same role as $\eta_L$ above (indifferent to how we l
 
 ## 4. Why it actually matters (not just bookkeeping)
 
-The whole point of IEKF is that with the *right* choice of error, the linearized error dynamics stop depending on the current state estimate. The Jacobians can still change over time with known inputs (for example the gyro and accelerometer readings), but not with the estimate, unlike an ordinary EKF's. That is what gives IEKF its convergence guarantees (Barrau & Bonnabel 2017, Theorem 1: estimate-independent, log-linear error propagation), and it also helps consistency.
+The whole point of IEKF is that with the *right* choice of error, the linearized error dynamics stop depending on the current state estimate. The Jacobians can still change over time with known inputs (for example the gyro and accelerometer readings), but not with the estimate, unlike an ordinary EKF's. That is what gives IEKF its convergence guarantees (Barrau & Bonnabel 2017, Theorem 1: estimate-independent, **log-linear** error propagation: the error's Log obeys a linear equation), and it also helps consistency.
 
 Rule of thumb for picking one:
 
 | Situation | Natural choice |
 |---|---|
-| Propagation driven by body-mounted sensors (IMU gyro/accel, wheel odometry) | either, for group-affine dynamics (see below) |
+| Propagation driven by body-mounted sensors (IMU gyro/accel, wheel odometry) | either, for **group-affine** dynamics (the invariant error evolves on its own, whatever the trajectory; see below) |
 | World-frame measurement of a point fixed on the body: $`h(X) = X b`$ for a known body-frame point $b$ (GPS antenna, or this repo's `pointcloud_pose_tracking.py`, where $b = p_i$) | **left**-invariant |
 | Body-mounted sensor measuring a landmark known in the world frame: $`h(X) = X^{-1} d`$ for a known world-frame point $d$ | **right**-invariant |
 

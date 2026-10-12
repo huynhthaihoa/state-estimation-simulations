@@ -20,7 +20,7 @@ ANCHOR                    EXTEND                     ANCHOR
 
 The idea: during anchor, "velocity = 0" is a known, free measurement (a ZUPT, Zero-Velocity Update) that we can feed into the filter. It is valid only while we're still. Fed in during extend, it tells the filter something false with high confidence, which is the failure mode the `always` variant demonstrates.
 
-The same idea is well established for foot-mounted pedestrian navigation (Foxlin 2005), where the shoe is still during each stance phase. For an inchworm robot, a sensor on the anchored segment gets up to three nearly free pieces of information while that segment is planted:
+The same idea is well established for foot-mounted pedestrian navigation (Foxlin 2005), where the shoe is still during each **stance phase** (the part of a step when the foot is planted). For an inchworm robot, a sensor on the anchored segment gets up to three nearly free pieces of information while that segment is planted:
 
 - **velocity ≈ 0**, a zero-velocity update (ZUPT);
 - **angular rate ≈ 0**, a zero-angular-rate update (ZARU);
@@ -40,21 +40,21 @@ We work through the simplest concrete version using [`inchworm_zupt_ekf.py`](../
 
 **Scope**: this is deliberately a small slice of the real idea.
 
-- It models translation only: ZUPT, not ZARU, which needs gyro-bias and orientation states this toy doesn't carry.
+- It models translation only: ZUPT, not ZARU, which needs gyro-bias ([glossary](../glossary.md#2-uncertainty-and-probability)) and orientation states this toy doesn't carry.
 - It assumes the gait schedule (when anchor/extend happen) is *known*, not detected. What happens once the schedule itself is uncertain is the subject of [`hybrid_saltation_ekf.md` §8](hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter), which we lean on rather than repeat.
 
 ---
 
 ## 1. Why this isn't a hybrid-reset problem
 
-Unlike the bouncing point mass in `hybrid_saltation_ekf.md`, nothing here needs a guard, a reset map, or a saltation matrix. Velocity is externally commanded per phase - an ordinary **switched-linear system**, not a discontinuous *state* jump the filter's covariance has to be linearized through. The interesting question sits on the **measurement** side: does the filter exploit (or misuse) the zero-velocity information the anchor phase provides?
+Unlike the bouncing point mass in `hybrid_saltation_ekf.md`, nothing here needs a guard, a reset map, or a saltation matrix ([glossary](../glossary.md#7-hybrid-discontinuous-systems)). Velocity is externally commanded per phase - an ordinary **switched-linear system** (a different linear model in each phase), not a discontinuous *state* jump the filter's covariance has to be linearized through. The interesting question sits on the **measurement** side: does the filter exploit (or misuse) the zero-velocity information the anchor phase provides?
 
 State is $x = [p, v]$ (1D). The gait cycle alternates:
 
 - **anchor** (duration $t_{\text{anchor}}$): the point mass is exactly stationary, $v = 0$.
 - **extend** (duration $t_{\text{extend}}$): the point mass ramps up to a commanded cruise speed $v_{\text{extend}}$, holds it, then ramps back down to exactly $0$ before the next anchor phase begins - continuous everywhere, no instantaneous jump (§2 explains why).
 
-We compare three ways of using the ZUPT pseudo-measurement, sharing an identical predict step and the same noisy position measurement every tick - they differ *only* in when an additional ZUPT update runs:
+We compare three ways of using the ZUPT **pseudo-measurement** (a value the filter knows from the motion itself rather than from a sensor, here velocity = 0), sharing an identical predict step and the same noisy position measurement every **tick** (one filter time step) - they differ *only* in when an additional ZUPT update runs:
 
 | Variant | ZUPT applied when |
 | --- | --- |
@@ -64,7 +64,7 @@ We compare three ways of using the ZUPT pseudo-measurement, sharing an identical
 
 ### 1.1 The filter math, concretely
 
-All three variants run the same Kalman filter over $x = [p, v]^\top$. The script calls it an EKF to match the rest of this repo, but every model here is exactly linear, so there is no linearization error and it is really a plain KF. Each tick runs up to three steps, in this order: **predict**, **position update**, then (depending on the variant) a **ZUPT update** (`run_ekf`).
+All three variants run the same Kalman filter over $x = [p, v]^\top$. The script calls it an EKF ([glossary](../glossary.md#6-kalman-filter-family)) to match the rest of this repo, but every model here is exactly linear, so there is no linearization error and it is really a plain KF. Each tick runs up to three steps, in this order: **predict**, **position update**, then (depending on the variant) a **ZUPT update** (`run_ekf`).
 
 **Predict** (`predict`): a constant-velocity model, identical for all variants and both gait phases. The filter doesn't know the commanded velocity, only that it's roughly constant between ticks:
 
@@ -151,7 +151,7 @@ A ramp only helps if it is gentle enough. The rule: compare the true ramp accele
 
 The defaults' $t_{\text{extend}}$ gives 12 cruise and 20 anchor ticks, enough to settle before being measured. The $40\times$ case is far worse, but $3.3\times$ is still a real mismatch, not a negligible one: §3 shows it sets every variant's NEES level and drives the `never`-vs-`phase_conditional` comparison.
 
-The lesson matches the Zeno-regime pitfall in [`hybrid_saltation_ekf.md` §7](hybrid_saltation_ekf.md#7-two-things-worth-knowing-before-reusing-this-pattern): pick simulation parameters with real margin under a hard failure mode, not by trial against the first numbers that come out.
+The lesson matches the **Zeno**-regime pitfall (infinitely many jumps in finite time) in [`hybrid_saltation_ekf.md` §7](hybrid_saltation_ekf.md#7-two-things-worth-knowing-before-reusing-this-pattern): pick simulation parameters with real margin under a hard failure mode, not by trial against the first numbers that come out.
 
 The headline NEES comparison below excludes the ramp ticks themselves (`is_cruise` excludes them, matching `is_anchor`'s own definition). They are a shared transition cost all three variants pay alike, not the phenomenon being measured, the same convention `hybrid_saltation_ekf.md` uses for its shared bounce-tick spike.
 
@@ -171,7 +171,7 @@ One might expect `always` to match `phase_conditional` during genuine anchor tic
 
 *Figure: `use_numpy/inchworm_zupt_ekf.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py inchworm_zupt_ekf`.*
 
-The same run, animated over five anchor/extend cycles. The top strip shows the point mass crawling along its track, gold while anchored and green while extending, with a gray footprint at each anchor point and each policy's position estimate below it; `always` falls several centimetres behind (position RMS 0.060 m vs 0.015-0.016 m). The middle panel shows each policy's velocity estimate with its ±2σ band: `always` collapses its band during motion, and `phase_conditional` tightens only on anchor ticks. The bottom panel shows the Monte Carlo NEES building up cycle by cycle; `always` climbs to about 900, and none of the three is consistent at these defaults (§3).
+The same run, animated over five anchor/extend cycles. The top strip shows the point mass crawling along its track, gold while anchored and green while extending, with a gray footprint at each anchor point and each policy's position estimate below it; `always` falls several centimetres behind (position **RMS** (root-mean-square) error 0.060 m vs 0.015-0.016 m). The middle panel shows each policy's velocity estimate with its ±2σ band: `always` collapses its band during motion, and `phase_conditional` tightens only on anchor ticks. The bottom panel shows the Monte Carlo NEES building up cycle by cycle; `always` climbs to about 900, and none of the three is consistent at these defaults (§3).
 
 ![Animation of the inchworm gait over five cycles: top, the point mass crawling along its track with its anchor footprints and the three position estimates; middle, true velocity and the never, always and phase_conditional estimates with their ±2-sigma bands, anchor phases shaded; bottom, each policy's Monte Carlo averaged NEES on a log scale against the expected value 2](../../assets/inchworm_zupt_ekf.gif)
 

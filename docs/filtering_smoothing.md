@@ -13,7 +13,7 @@ Suppose a robot moves through a room:
 At every time step, it gets:
 
 - IMU measurements
-- camera/LiDAR observations
+- camera/LiDAR (laser range scanner) observations
 - wheel odometry, etc.
 
 The robot wants to estimate:
@@ -54,7 +54,7 @@ z₀ → z₁ → z₂ → z₃
         current state x₃
 ```
 
-It summarizes the past into the **current belief**.
+It summarizes the past into the **current belief** (the probability distribution over the current state, given all measurements so far).
 
 For a Kalman filter, conceptually:
 
@@ -121,7 +121,7 @@ After:
      A ------------- E
 ```
 
-A pure filtering mindset is uncomfortable with this because it has already compressed the past: the old poses are no longer in its state, so it cannot move them. (An EKF-SLAM filter still benefits from the loop closure. Through the correlations in its covariance, it corrects the current pose and the whole landmark map; see [§9](#9-the-precise-distinction).)
+A pure filtering mindset is uncomfortable with this because it has already compressed the past: the old poses are no longer in its state, so it cannot move them. (An **EKF-SLAM** filter, an EKF whose state holds the current pose and every landmark, still benefits from the loop closure. Through the correlations in its covariance, it corrects the current pose and the whole landmark map; see [§9](#9-the-precise-distinction).)
 
 ---
 
@@ -165,7 +165,7 @@ where:
 - $r_i(\mathbf{x})$ = (whitened) measurement residual, i.e. weighted by the measurement covariance
 - the solver (Gauss-Newton or a damped variant such as Levenberg-Marquardt) finds a local minimum of the total error, so a good initial guess matters.
 
-This is the fundamental idea behind **bundle adjustment**, **pose-graph optimization**, and many modern SLAM systems.
+This is the fundamental idea behind **bundle adjustment (BA)**, **pose-graph optimization**, and many modern SLAM systems.
 
 ### Revising the past after a loop closure
 
@@ -378,7 +378,7 @@ A filter can incorporate loop closures and other global information. For example
 
 The more precise distinction is:
 
-> **Filtering recursively represents the current posterior and marginalizes old information, whereas smoothing maintains a posterior over multiple states and can jointly revise them.**
+> **Filtering recursively represents the current posterior (the belief of §2) and marginalizes old information, whereas smoothing maintains a posterior over multiple states and can jointly revise them.**
 
 **Tiny example (toy case, 1D):**
 - Prior: $`x_0\sim N(0,1)`$, and $`x_1 = x_0 + 1`$ with extra noise of variance 1. So $`x_1`$ has mean 1 and variance 2.
@@ -408,7 +408,7 @@ A rough map is:
                          Factor graphs/Optimization
 ```
 
-(KF and EKF stay in the dense, recursive filtering loop; fixed-lag and full smoothing are the methods usually solved via sparse factor-graph optimization.)
+(KF and EKF stay in the dense, recursive filtering loop; fixed-lag and full smoothing (which keeps the whole trajectory) are the methods usually solved via sparse factor-graph optimization.)
 
 Examples:
 
@@ -416,7 +416,7 @@ Examples:
 - **MSCKF** → an EKF-based filter for visual-inertial estimation, run over a sliding window of poses. Landmarks never enter the state; each is used once as a constraint between window poses, then dropped. Because of the window it fits the fixed-lag box only loosely.
 - **VINS-Mono/VINS-Fusion** → nonlinear optimization + sliding window
 - **ORB-SLAM** → heavily optimization-based
-- **GTSAM-based systems** → factor-graph optimization
+- **GTSAM-based systems** (GTSAM is a factor-graph optimization library) → factor-graph optimization
 - **iSAM/iSAM2** → incremental smoothing/optimization
 
 (See [optimization/marginalization.md](optimization/marginalization.md) for the actual mechanics of how a state gets marginalized out and why that's what makes a bounded sliding window possible.)

@@ -130,7 +130,7 @@ S = H P_{k|k-1} H^\top + R_z, \qquad K = P_{k|k-1} H^\top S^{-1}
 x_{k|k} = x_{k|k-1} + K\,(z - H x_{k|k-1}), \qquad P_{k|k} = (I - K H)\,P_{k|k-1}
 ```
 
-Here $`x_{k|k-1}, P_{k|k-1}`$ are the output of this tick's hybrid predict and $`x_{k|k}, P_{k|k}`$ the updated estimate. The other filtering docs write these as $x^{-}/x^{+}$, but in this doc $-$/$`+`$ is reserved for the bounce, and $R$ for the reset map ($R_z$ is `measurement_update`'s `R` argument). The covariance uses the plain $`(I - KH)P_{k|k-1}`$ form, not the Joseph form. The default is $\sigma_z = 0.03$ m (`--pos-noise-std`).
+Here $`x_{k|k-1}, P_{k|k-1}`$ are the output of this tick's hybrid predict and $`x_{k|k}, P_{k|k}`$ the updated estimate. The other filtering docs write these as $x^{-}/x^{+}$, but in this doc $-$/$`+`$ is reserved for the bounce, and $R$ for the reset map ($R_z$ is `measurement_update`'s `R` argument). The covariance uses the plain $`(I - KH)P_{k|k-1}`$ form, not the **Joseph form** $`(I - KH)P_{k|k-1}(I - KH)^\top + K R_z K^\top`$, which is algebraically the same but stays symmetric and positive definite under rounding. The default is $\sigma_z = 0.03$ m (`--pos-noise-std`).
 
 **Ground truth and Monte Carlo setup.**
 
@@ -163,9 +163,9 @@ The problem is timing, not the reset map: $DR$ is the Jacobian of "apply the res
 
 **Grazing, in numbers:** the same 5 cm offset costs $`0.05/10.1 \approx 4.9`$ ms at a 10.1 m/s impact, but $`0.05/1 = 50`$ ms at a 1 m/s (shallow) impact. Slower crossing, bigger timing shift.
 
-The correct sensitivity has to account for that time-shift, for comparison at a shared later time. That is the **saltation matrix**, $\Xi$: the reset Jacobian $DR$ plus a correction for the event-timing sensitivity. §4 builds it in **two stages**:
+The correct sensitivity has to account for that time-shift, for comparison at a shared later time. That is the **saltation matrix**, $\Xi$: the reset Jacobian $DR$ plus a **timing correction** for the event-timing sensitivity. §4 builds it in **two stages**:
 
-- **Stage 1:** a rank-one projector that removes the "along-the-flow" component of a perturbation - the part that only changes *when* the guard is crossed, not *where*. $DR$ times this projector is $`\Xi_{\text{own-time}}`$, the "wrong turn" §4 starts with: correct when each trajectory is compared at its own crossing moment, but not enough here.
+- **Stage 1:** a **rank-one projector**, a matrix that removes a single direction from a vector: here the "along-the-flow" component of a perturbation - the part that only changes *when* the guard is crossed, not *where*. $DR$ times this projector is $`\Xi_{\text{own-time}}`$, the "wrong turn" §4 starts with: correct when each trajectory is compared at its own crossing moment, but not enough here.
 - **Stage 2:** one further term, $`f^{+} \otimes Dg \,/\, (Dg \cdot f^{-})`$, needed once the two trajectories are compared at a shared later time.
 
 §3's worked example uses that shared-time comparison, since that's what this script's own filter needs.
@@ -240,7 +240,7 @@ Since $`x(T;p) = \Phi\big(x^{+}(p),\,T-t^{*}(p)\big)`$ (the flow map, run for wh
 Here $`\Phi_{\text{after}} = D_1\Phi(x^{+}, T-t^{*})`$ is the ordinary flow Jacobian over the remaining duration (`flow`'s own `Phi` output) and $f_T = f\big(x(T;0)\big)$ is the vector field at the nominal state at $T$. Then:
 
 1. Expand $`\frac{dx^{+}}{dp} = DR\big[f^{-}(x^{-})\frac{dt^{*}}{dp} + S(t^{*})\big]`$ (same reasoning as $\Xi_{\text{own-time}}$'s derivation).
-2. Use the flow identity $D_1\Phi(x,s)\cdot f(x) = f\big(\Phi(x,s)\big)$ (an autonomous flow's linearization carries its generating vector field forward), so $\Phi_{\text{after}}\cdot f^{+}(x^{+}) = f_T$.
+2. Use the flow identity $D_1\Phi(x,s)\cdot f(x) = f\big(\Phi(x,s)\big)$ (for an **autonomous** flow, one whose vector field does not depend on time, the linearization carries the vector field forward), so $\Phi_{\text{after}}\cdot f^{+}(x^{+}) = f_T$.
    - **Intuition:** nudging a state forward along its own path is the same as starting a tiny bit later or earlier.
    - **Tiny example (toy case: free fall, state $`(h, v)`$):** after time $`s`$ the flow gives $`h' = h + vs - gs^2/2`$ and $`v' = v - gs`$. Nudge the start along its path, by $`\epsilon f = \epsilon(v, -g)`$. The end state moves by $`\epsilon(v - gs,\, -g)`$, which is $`\epsilon f`$ evaluated at the end state. So $`D_1\Phi\cdot f(x) = f(\Phi(x,s))`$.
 3. Pull the term $`-f_T\,dt^{*}/dp`$ inside $\Phi_{\text{after}}$ using step 2.
@@ -278,7 +278,7 @@ Dg\,\Xi(x^{-}) = -e\,Dg
 
 In code: `Dg @ saltation_matrix(x_minus, e, g)` always equals `-e * Dg`. This is *reduced*, not zero:
 
-- $\Xi_{\text{own-time}}$ (§4) has an identically zero guard-normal row, since every trajectory in that comparison satisfies $g(x)=0$ at its own crossing by construction.
+- $\Xi_{\text{own-time}}$ (§4) has an identically zero **guard-normal** row (the row of $p_z$, the coordinate normal to the guard), since every trajectory in that comparison satisfies $g(x)=0$ at its own crossing by construction.
 - $\Xi$ compares trajectories at a fixed later time, by which point the guard-normal coordinate has evolved under real post-bounce flow and is no longer pinned. Its sensitivity is nonzero, just scaled down by the restitution coefficient.
 
 Practical consequence: $\Xi$ does not drive $P$'s guard-normal row/column to a near-singular state at every bounce, so we expect it to need no regularizing floor for numerical stability against a truth sampled at fixed ticks (§7 sweeps the floor). `step_hybrid`'s small isotropic "impact noise" floor stays in the code as a simplified stand-in for the explicit impact-timing/model-uncertainty term a real contact-aided filter would carry.
@@ -300,7 +300,7 @@ Mean NEES, 5 ticks after each of 3 bounces (seed 0):
 **Both filters are *under*confident after a bounce, and the saltation-corrected one slightly less so.**
 
 - **Reproducible**: across seeds 0-3, naive gives 2.35-2.38 and saltation 2.49-2.50.
-- **Clearly below 6**: for a 500-trial mean, the 95% band around a consistent $6$ is only $`6 \pm 1.96\sqrt{2\cdot 6/500} \approx 6 \pm 0.30`$ (the $12.59$ chi-squared bound applies to a *single* NEES sample, not a 500-trial mean). So both report a clearly larger $P$ than their actual errors.
+- **Clearly below 6**: for a 500-trial mean, the 95% band around a consistent $6$ is only $`6 \pm 1.96\sqrt{2\cdot 6/500} \approx 6 \pm 0.30`$ (the familiar $12.59$ bound is the 95% point of a chi-squared distribution with 6 degrees of freedom, which applies to a *single* NEES sample, not a 500-trial mean). So both report a clearly larger $P$ than their actual errors.
 - **Not bounce-specific**: the whole-run mean NEES is $\approx 3.3$ for both. Part of that is process noise the truth doesn't have (the true trajectory has none, yet both filters add $Q$ every sub-interval and the impact floor at every bounce). Only part, though: cutting `--process-noise-std` from $0.3$ to $0.01$ raises the whole-run mean only to about 4.0-4.4 (seed 0).
 - **So saltation's 5-6% higher NEES means slightly *closer* to consistent**, not worse. It is also nowhere near the order-of-magnitude effect an incorrect formula (one missing §4's $f^{+}$ term) would produce.
 
@@ -315,8 +315,8 @@ So with exact detection there is no case for the naive update:
 
 - The two filters are close, both right after a bounce and over the whole trajectory, and neither is overconfident.
 - The naive update has no principled derivation behind it at all.
-- The larger miscalibration here is the conservatism both filters share over the whole trajectory, not the difference between their bounce updates.
-- A real Hybrid-InEKF implementation would still benefit from an explicit model of detection uncertainty (e.g., an impact-timing noise term scaled by the velocity jump at the event, rather than this script's isotropic floor). §8 measures how much detection error costs each filter.
+- The larger miscalibration here is the conservatism (underconfidence) both filters share over the whole trajectory, not the difference between their bounce updates.
+- A real hybrid invariant EKF would still benefit from an explicit model of detection uncertainty (e.g., an impact-timing noise term scaled by the velocity jump at the event, rather than this script's isotropic floor). [invariant_saltation_ekf.md §7](invariant_saltation_ekf.md#7-contact-detection-jitter) implements such a term. §8 measures how much detection error costs each filter.
 
 ![Two panels from saltation_matrix_ekf.py: the height of the bouncing point mass with measurements, ground truth and both EKFs, and Monte Carlo NEES over time for the naive and saltation bounce updates against the consistent value of 6](../../assets/saltation_matrix_ekf.png)
 

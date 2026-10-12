@@ -1,6 +1,6 @@
 # Front-end & Back-end in SLAM
 
-In **SLAM**, the terms **front-end** and **back-end** describe two major parts of the system.
+In **SLAM** ([glossary](glossary.md#5-slam-system)), the terms **front-end** and **back-end** describe two major parts of the system.
 
 A simple way to think about them is:
 
@@ -42,10 +42,10 @@ Measurements/constraints
 
 Typical front-end tasks:
 
-- **Feature extraction** - ORB, FAST, SIFT, etc.
-- **Feature tracking/matching**
+- **Feature extraction** (finding distinctive image points, such as corners) - ORB, FAST, SIFT, etc.
+- **Feature tracking/matching** (finding the same feature again in later frames)
 - **Data association** - determining that a feature in frame $k$ is the same physical point seen in frame $k+1$
-- **Visual odometry**
+- **Visual odometry** (VO) - odometry computed from camera images
 - **Depth estimation/triangulation** - see [frontend/triangulation_pnp.md](frontend/triangulation_pnp.md) for the actual math, plus its inverse problem, Perspective-n-Point (PnP), which estimates the pose from known points
 - **Keyframe selection**
 - **Loop-closure detection**
@@ -159,7 +159,7 @@ The **back-end then optimizes the entire trajectory** so that all constraints ar
 - That 0.4 m is spread over the 4 odometry steps, 0.1 m per step.
 - So $x_1, x_2, x_3, x_4$ move back by 0.1, 0.2, 0.3, 0.4 m. Later poses carry more of the drift, so they move more.
 
-In practice, "loop closure" really spans both stages: the front-end/place-recognition module detects the candidate match, while the back-end verifies it and folds it into the global optimization - which is why the diagrams above disagree: the third and fourth diagrams put "loop closure" inside the back-end, the second sends a loop-closure constraint out of the front-end, and the first draws it as a feedback box between the two.
+In practice, "loop closure" really spans both stages: the front-end/place-recognition module (which matches the current view against stored ones) detects the candidate match, while the back-end verifies it and folds it into the global optimization - which is why the diagrams above disagree: the third and fourth diagrams put "loop closure" inside the back-end, the second sends a loop-closure constraint out of the front-end, and the first draws it as a feedback box between the two.
 
 ---
 
@@ -177,7 +177,7 @@ In practice, "loop closure" really spans both stages: the front-end/place-recogn
 
 ## 5. Front-end ≠ real-time, back-end ≠ offline
 
-The front-end **doesn't necessarily mean "real-time"**, and the back-end **doesn't necessarily mean "offline."**
+The front-end **doesn't necessarily mean "real-time"**, and the back-end **doesn't necessarily mean "offline."** (Offline means run after all the data is collected; online means run while data arrives.)
 
 (The fourth diagram above labels the front-end "online processing" and the back-end "offline processing" - a common simplification, but, as just stated, not a strict rule.)
 
@@ -195,7 +195,7 @@ Sensors ──→ Tracking ──→ Constraints
                   Updated SLAM state
 ```
 
-Separately, note that **front-end errors become constraints for the back-end**. If data association or motion estimation is wrong, a plain least-squares optimizer will fit the bad constraint and converge to the wrong solution. Back-ends therefore often use robust costs (Huber, Cauchy, DCS) that down-weight constraints that disagree strongly with the rest; see [optimization/pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
+Separately, note that **front-end errors become constraints for the back-end**. If data association or motion estimation is wrong, a plain least-squares optimizer will fit the bad constraint and converge to the wrong solution. Back-ends therefore often use robust costs ([glossary](glossary.md#3-least-squares-optimization); Huber, Cauchy, DCS) that down-weight constraints that disagree strongly with the rest; see [optimization/pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
 
 ---
 

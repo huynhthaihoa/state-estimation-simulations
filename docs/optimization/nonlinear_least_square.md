@@ -46,7 +46,7 @@ Take errors $`[1,-2,3]`$:
 Absolute values, $`\sum_i|e_i|`$, would also stop the cancelling, so why squares? Two reasons:
 
 - **Easy to solve.** Once we linearize $e$ (§7), each step is a linear least-squares problem with a closed-form solution (normal equations, §8). $`|e|`$ has a kink at zero and no such structure.
-- **Statistically right.** For Gaussian measurement noise, minimizing squared error gives the maximum-likelihood estimate, which is also why §12's weights are $`W_i=\Sigma_i^{-1}`$ (the weight $`W_i`$ and the measurement covariance $`\Sigma_i`$, both defined in §12).
+- **Statistically right.** For Gaussian measurement noise, minimizing squared error gives the **maximum-likelihood estimate** (the parameters under which the observed measurements are most probable), which is also why §12's weights are $`W_i=\Sigma_i^{-1}`$ (the weight $`W_i`$ and the measurement covariance $`\Sigma_i`$, both defined in §12).
 
 So $`\text{total error}=\sum_i e_i^2`$.
 
@@ -85,7 +85,7 @@ The standard NLS problem is:
 \boxed{\min_x \frac12\sum_i \|e_i(x)\|^2}
 ```
 
-or, stacking all residuals:
+or, stacking all **residuals** (the error terms $`e_i`$):
 
 ```math
 \boxed{\min_x \frac12\|e(x)\|^2}
@@ -170,7 +170,7 @@ There is generally no closed-form solution for $`\min_x\|e(x)\|^2`$, so we itera
 
 ## 7. The key trick: make the nonlinear problem locally linear
 
-This is where the **Jacobian** enters. At the current estimate $`x_k`$ we use a first-order Taylor expansion of the residual:
+This is where the **Jacobian** enters. At the current estimate $`x_k`$ we use a first-order **Taylor expansion** of the residual:
 
 $$e(x_k+\Delta x)\approx e(x_k)+J\Delta x,\qquad J=\frac{\partial e}{\partial x}$$
 
@@ -301,6 +301,8 @@ Suppose two position fixes for the same pose come from different receivers:
 consumer GPS fix → good to about ±5 m
 RTK-GPS fix      → good to about ±2 cm
 ```
+
+(**RTK-GPS**: real-time kinematic GPS, which corrects the fix using a nearby base station.)
 
 (Covariances let us compare sensors with different units: a camera measures pixels, an IMU measures rates, so each measurement carries its own $\Sigma_i$.)
 

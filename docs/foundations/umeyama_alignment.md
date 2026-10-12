@@ -4,11 +4,11 @@
 
 > Given two point sets that are supposed to describe the same shape but live in different, unaligned coordinate frames, what's the best rigid-plus-scale transform that overlays one onto the other?
 
-It isn't a SLAM algorithm by itself. We focus on its most common use: the evaluation tool we reach for *after* running one, whenever the output is only defined up to an ambiguity that must be removed before comparing against ground truth.
+It isn't a SLAM algorithm by itself. We focus on its most common use: the evaluation tool we reach for *after* running one, whenever the output is only defined up to an ambiguity that must be removed before comparing against **ground truth** (the true reference values).
 
 The same closed-form fit also runs *inside* SLAM pipelines:
 
-- point-to-point ICP uses it as the per-iteration alignment step (scale fixed to 1)
+- point-to-point **ICP** (iterative closest point: repeatedly match each point to its nearest neighbor, then re-align) uses it as the per-iteration alignment step (scale fixed to 1)
 - monocular systems use the similarity version to align two maps at a loop closure
 
 ---
@@ -48,7 +48,7 @@ Given $n$ corresponding point pairs $`\{(x_i, y_i)\}`$ - here, $x_i$ from the es
 \boxed{\min_{s,R,t} \sum_{i=1}^{n} \left\| s R x_i + t - y_i \right\|^2}
 ```
 
-i.e., the least-squares best-fit similarity transform mapping the estimated points onto the ground-truth points. Unlike a generic nonlinear least-squares problem, this one has a **closed-form solution** via SVD - no Gauss-Newton iteration needed.
+i.e., the least-squares best-fit similarity transform mapping the estimated points onto the ground-truth points. Unlike a generic nonlinear least-squares problem, this one has a **closed-form solution** via **SVD** (singular value decomposition: factoring a matrix into orthogonal, diagonal, orthogonal parts) - no Gauss-Newton iteration needed.
 
 ---
 
@@ -112,7 +112,7 @@ Without step 3's correction, the fit can return a **mirror image** instead of a 
 - **Uncorrected** ($R = UV^\top$): fits **perfectly** (residual $\approx 0$), but $\det(R) \approx -1$, which is not a valid rotation and not a valid camera/robot pose.
 - **Corrected** ($R = USV^\top$): $\det(R) = +1$, but it can only *approximate* the mirrored points. Here the best fit has a max per-point residual of about $0.77$ (at the origin point; the other three are off by about $0.31$), and scale drops from $1.0$ to $s = 7/9 \approx 0.78$ to partially compensate.
 
-So the guard trades a perfect fit on mirror-related point sets for a valid rotation. For the point sets this repo's scripts generate (cameras spread around a 3D landmark cluster), we don't expect the reflection case to trigger (not measured separately). It is more likely for noisy or nearly degenerate configurations; for exactly coplanar points the flip costs nothing.
+So the guard trades a perfect fit on mirror-related point sets for a valid rotation. For the point sets this repo's scripts generate (cameras spread around a 3D landmark cluster), we don't expect the reflection case to trigger (not measured separately). It is more likely for noisy or nearly degenerate configurations; for exactly coplanar points (all lying in one plane) the flip costs nothing.
 
 ---
 

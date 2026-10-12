@@ -1,10 +1,10 @@
 # Marginalization and sliding-window smoothing
 
-Marginalizing a variable means permanently removing it from the optimization while keeping everything it taught you about its neighbors, packaged as one new prior factor - so a real-time estimator can bound its problem size without lying to itself about what it used to know.
+Marginalizing a variable means permanently removing it from the optimization while keeping everything it taught you about its neighbors, packaged as one new **prior factor** (a factor encoding existing knowledge about variables, not a new measurement) - so a real-time estimator can bound its problem size without lying to itself about what it used to know.
 
 This doc builds on two earlier ones:
 - **Variable elimination** from [`bayes_tree.md`](bayes_tree.md) §3 ("eliminate $x_1$ → its info gets summarized into a new constraint on $x_2$"). We reuse that mechanic for a different purpose.
-- **Full vs. fixed-lag smoothing** from [filtering_smoothing.md §9](../filtering_smoothing.md#9-the-precise-distinction) (filtering marginalizes old information, smoothing keeps it). This doc is the mechanical middle ground the diagram there only names.
+- **Full vs. fixed-lag smoothing** (fixed-lag: optimize only the most recent states and marginalize older ones) from [filtering_smoothing.md §9](../filtering_smoothing.md#9-the-precise-distinction) (filtering marginalizes old information, smoothing keeps it). This doc is the mechanical middle ground the diagram there only names.
 
 ---
 
@@ -12,7 +12,7 @@ This doc builds on two earlier ones:
 
 Full batch optimization (plain [bundle_adjustment.md](bundle_adjustment.md)/[pose_graph_optimization.md](pose_graph_optimization.md)) keeps every pose ever seen in the optimization forever - the problem grows without bound as the robot keeps moving. [isam2_optimization.md](isam2_optimization.md) fixes the *recompute* cost (only touch the part of the Bayes tree a new factor actually affects) but not the *memory* cost - every variable is still in the graph, just efficiently re-solved.
 
-A real-time VIO/VI-SLAM front-end (MSCKF, VINS-Mono, OKVIS) can't afford either: fixed onboard memory, fixed per-frame compute, running forever. We must **forget** old states, but forget the *variable* while keeping the *information* it contributed. That is marginalization.
+A real-time VIO/VI-SLAM ([glossary](../glossary.md#5-slam-system)) front-end (MSCKF, VINS-Mono, OKVIS) can't afford either: fixed onboard memory, fixed per-frame compute, running forever. We must **forget** old states, but forget the *variable* while keeping the *information* it contributed. That is marginalization.
 
 ---
 
@@ -50,7 +50,7 @@ Two naive shortcuts both go wrong, in opposite directions:
 |---|---|---|---|
 | What's eliminated | 3D landmarks | any variable, in a chosen order | the oldest pose/state in the window |
 | Is it recoverable? | **Yes** - back-substitution recovers it | **Yes** - it stays in the graph, and is re-eliminated whenever a later update affects it | **No** - gone for good |
-| Why eliminate it | Landmarks outnumber cameras; cheap to invert | Reuse most of the last solve; minimize fill-in | Bound memory/compute to a fixed window size |
+| Why eliminate it | Landmarks outnumber cameras; cheap to invert | Reuse most of the last solve; minimize fill-in ([glossary](../glossary.md#4-graphs-sparsity-and-solvers)) | Bound memory/compute to a fixed window size |
 | Where it's covered | [bundle_adjustment.md §12](bundle_adjustment.md#12-block-sparsity-and-the-schur-complement) | [bayes_tree.md](bayes_tree.md), [isam2_optimization.md](isam2_optimization.md) | §4-§7 below |
 
 The math (§4) is the same Schur-complement elimination in all three rows. Only the fate of the eliminated variable differs.
@@ -153,7 +153,7 @@ The window never grows past a fixed size, so cost and memory stay **bounded by t
 - iSAM2 is bounded by how much of the Bayes tree a new factor *changes*, not by a fixed window. A loop closure can still touch a large chunk of history (`isam2_optimization.md §9`).
 
 This is what `filtering_smoothing.md §10`'s "fixed-lag smoothing" box and its MSCKF/VINS-Mono bullets refer to:
-- MSCKF keeps a sliding window of camera poses and marginalizes a landmark's constraint into them once triangulated (see [kf_ekf_iekf.md](../filtering/kf_ekf_iekf.md)'s MSCKF paragraph).
+- MSCKF keeps a sliding window of camera poses and marginalizes a landmark's constraint into them once triangulated (its 3D position computed from several views) (see [kf_ekf_iekf.md](../filtering/kf_ekf_iekf.md)'s MSCKF paragraph).
 - VINS-Mono keeps a sliding window of keyframes and marginalizes the oldest one with the Schur-complement step in §4, without FEJ (§6).
 
 ![Three panels from sliding_window_marginalization.py on a 16-pose square with a 10-pose window: window membership after each new pose, the window's block-tridiagonal information matrix with the oldest pose's block about to be eliminated, and the next window's matrix where that information lands as one prior block on the new oldest pose](../../assets/sliding_window_marginalization_concept.png)
@@ -169,12 +169,12 @@ This is what `filtering_smoothing.md §10`'s "fixed-lag smoothing" box and its M
 - **It keeps §4's $\Lambda_b'$ as the prior's information matrix, but does not store $\eta_b'$.** Instead, the prior is anchored at a frozen reference pose, so its linear term is zero at the moment it is created. That is exact only when $\eta_b' = 0$, and it is here: see §8.1.
 
 Two deliberate scope choices, both flagged in the script:
-- **Pure odometry chain, no loop closures.** The oldest pose in a chain window is connected to exactly one surviving neighbor, so marginalizing it produces a *provably unary* prior - verified directly by a test that checks the Schur-complement correction term is zero (to 1e-8) everywhere outside that one block. §5's fill-in appears once a marginalized node has *multiple* neighbors (a landmark, an IMU-bias variable, a loop closure). That is a different problem, covered by [`bayes_tree.md`](bayes_tree.md)/[`isam2_optimization.md`](isam2_optimization.md) and by `pose_graph_incremental.py`'s loop-closure handling. This script isolates the memory-*bounding* property alone.
+- **Pure odometry chain, no loop closures.** The oldest pose in a chain window is connected to exactly one surviving neighbor, so marginalizing it produces a *provably unary* prior (touching a single pose) - verified directly by a test that checks the Schur-complement correction term is zero (to 1e-8) everywhere outside that one block. §5's fill-in appears once a marginalized node has *multiple* neighbors (a landmark, an IMU-bias variable, a loop closure). That is a different problem, covered by [`bayes_tree.md`](bayes_tree.md)/[`isam2_optimization.md`](isam2_optimization.md) and by `pose_graph_incremental.py`'s loop-closure handling. This script isolates the memory-*bounding* property alone.
 - **No First-Estimate Jacobians (§6).** Every pose's Jacobian, including the prior factor's own, is re-evaluated at its newest estimate on every solve, the textbook source of the mild overconfidence FEJ fixes. Like `pose_graph_incremental.py` with iSAM2, the script flags what it omits.
 
 ### 8.1 The math, concretely
 
-Poses $X_k$ are $4 \times 4$ SE(3) matrices, and tangent vectors follow the repo's `[vx, vy, vz, wx, wy, wz]` order. We solve every window by plain Gauss-Newton over two factor types, both linearized at the current estimate on every iteration (no First-Estimate Jacobians).
+Poses $X_k$ are $4 \times 4$ SE(3) matrices, and tangent vectors follow the repo's `[vx, vy, vz, wx, wy, wz]` order. We solve every window by plain Gauss-Newton ([gauss_newton.md](gauss_newton.md)) over two factor types, both linearized at the current estimate on every iteration (no First-Estimate Jacobians).
 
 **Odometry edge** (`linearize_edge`, reused from `pose_graph_incremental.py`). Here $\mathcal{J}_r^{-1}$ is the inverse right Jacobian of SE(3) (`compute_se3_inv_right_jacobian`), $\mathrm{Ad}$ is the adjoint, $`Z_{ij}`$ is the measured relative pose from $`X_i`$ to $`X_j`$, and $\mathrm{Log}$ maps an SE(3) element to its 6-vector tangent ([glossary](../glossary.md#1-geometry-and-lie-groups)):
 
@@ -190,7 +190,7 @@ $$
 e_p = \mathrm{Log}(X_{\text{ref}}^{-1} X_0), \qquad J_p = \mathcal{J}_r^{-1}(e_p)
 $$
 
-The first prior is the gauge anchor, with $X_{\text{ref}}$ equal to the ground-truth first pose and $\Omega_p = 10^6 I$ (`--anchor-weight`). Every later prior comes from marginalization (below).
+The first prior is the gauge anchor, with $X_{\text{ref}}$ equal to the ground-truth (simulator's true) first pose and $\Omega_p = 10^6 I$ (`--anchor-weight`). Every later prior comes from marginalization (below).
 
 **Gauss-Newton step** (`assemble_window_system`, `solve_to_convergence`). Each edge uses the information matrix $\Omega = I_6$. The script accumulates
 
@@ -218,7 +218,7 @@ Taking $\Lambda_{bb}$ from the full $H$ instead would also include the b–c edg
 
 The solve therefore never exceeds `window_size` poses, so `max_dof` is capped at 6 × `window_size`. A marginalized pose keeps the estimate it had when it was dropped.
 
-**Baseline** (`run_full_batch_growing`). For $k = 1 \dots n$, the baseline re-solves the whole graph of the first $k$ poses from scratch. It uses `pose_graph.run_pose_graph_optimization` (adaptive Levenberg-Marquardt starting at λ = 0, via `damping=0.0`), starting from dead reckoning from the first ground-truth pose, with node 0 anchored by $10^6 I$ inside that function. Its `max_dof` is $6n$.
+**Baseline** (`run_full_batch_growing`). For $k = 1 \dots n$, the baseline re-solves the whole graph of the first $k$ poses from scratch. It uses `pose_graph.run_pose_graph_optimization` (adaptive Levenberg-Marquardt ([levenberg_marquardt.md](levenberg_marquardt.md)) starting at λ = 0, via `damping=0.0`), starting from dead reckoning from the first ground-truth pose, with node 0 anchored by $10^6 I$ inside that function. Its `max_dof` is $6n$.
 
 **Defaults:** `--window-size 10`; `--nodes-per-side-sweep 2 4 8 16 32 64` (8 to 256 poses); `--side-length 2.0` m; `--pos-noise-std 0.05` m; `--rot-noise-std 0.01` rad; `--anchor-weight 1e6`; `--gn-tol 1e-6`; `--gn-max-iters 10`; `--seed 0`.
 

@@ -2,7 +2,7 @@
 
 ![State Estimation Simulations: sensors feed a front-end, whose constraints go to Kalman filtering or factor-graph optimization, producing a trajectory and map estimate, all built on Lie-group and Jacobian foundations](assets/banner.svg)
 
-> New here? [GETTING_STARTED.md](GETTING_STARTED.md) is a suggested reading-and-running order through every doc and script in this repo, phase by phase.
+> New here? [GETTING_STARTED.md](GETTING_STARTED.md) is a suggested reading-and-running order through every doc and script in this repo, phase by phase. Terms such as SLAM, IMU and pose are defined in [docs/glossary.md](docs/glossary.md).
 
 ## A. Introduction
 
@@ -266,7 +266,7 @@ uv run python use_numpy/pointcloud_pose_tracking.py --duration 5.0 --dt 0.1 --n-
 A robot drives a closed 4-node square loop, accumulating drift from noisy relative-pose ("odometry") edges between consecutive nodes, then detects it has returned to the start and adds one loop-closure edge back to node 0.
 - **Solver**: all node poses are jointly refined by Levenberg-Marquardt against every edge's residual $e_{ij} = \log(Z_{ij}^{-1} X_i^{-1} X_j)$.
 - **Jacobians**: analytical `compose`/`rminus` Jacobians chained together (hand-rolled $SE(3)$ $Exp$/$`Log`$/adjoint math via `lie_utils.py` in `use_numpy`; `manifpy`'s out-parameters in `use_manif`). This is the same motion-factor Jacobian-chaining pattern as `run_batch_gn` in `pointcloud_pose_tracking.py`, generalized from a twist-based motion model to a directly-measured relative pose.
-- **Output**: per-iteration chi-squared error plus final/RMS rotation+position error (uncorrected odometry vs. optimized), and an XY trajectory plot against ground truth.
+- **Output**: per-iteration [chi-squared](docs/glossary.md#2-uncertainty-and-probability) error plus final/RMS rotation+position error (uncorrected odometry vs. optimized), and an XY trajectory plot against ground truth.
 
 ![Two panels from pose_graph.py: the four-pose square loop with ground truth, drifting odometry, the optimized estimate and the loop-closure edge, and each pose's position error before and after optimization](assets/pose_graph.png)
 
@@ -299,7 +299,7 @@ uv run python use_numpy/pose_graph.py --side-length 2.0 --pos-noise-std 0.05 --r
 `n_cameras` cameras are placed on a horizontal arc around a cluster of `n_landmarks` 3D landmarks, each looking inward via a look-at rotation. A landmark counts as observed only if it lies in front of a camera and projects inside its image, so not every camera observes every landmark (landmarks seen by fewer than `--min-observations` cameras are dropped as not triangulable) - this is `docs/optimization/bundle_adjustment.md`'s observed set ${\mathcal{O}}$, a real strict subset of all camera-landmark pairs, not "every camera sees everything." Every camera pose and every landmark is perturbed from ground truth to build a noisy initial guess, then three solvers are compared:
 
 - **Landmarks-only refinement**: poses held fixed at their noisy initial guess, only landmarks refined (the "cameras are correct" strawman) - decouples into independent $3\times3$ Gauss-Newton solves per landmark (classic triangulation from known poses).
-- **Poses-only refinement**: landmarks held fixed, only poses refined (the "points are correct" strawman) - decouples into independent $6\times6$ Gauss-Newton solves per camera (classic PnP-style resection).
+- **Poses-only refinement**: landmarks held fixed, only poses refined (the "points are correct" strawman) - decouples into independent $6\times6$ Gauss-Newton solves per camera (classic PnP-style **resection**: solving for a camera's pose from known 3D points).
 - **Full joint bundle adjustment**: both refined together in one coupled dense Gauss-Newton solve over every pose and landmark - the actual thing bundle adjustment is.
   - **Gauge freedom**: joint BA reintroduces the monocular gauge freedom (6-DoF rigid + 1-DoF scale). It is fixed with a prior factor on the first two camera poses (mean = their own noisy initial guess), the same prior-factor pattern as `run_batch_gn`'s initial-pose prior in `pointcloud_pose_tracking.py`.
   - **Alignment**: the result is aligned to ground truth via Umeyama's least-squares similarity fit (standard for evaluating monocular BA/SfM output) before computing absolute pose/landmark error. Reprojection error is unaffected by this alignment.

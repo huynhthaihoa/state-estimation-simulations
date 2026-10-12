@@ -1,6 +1,6 @@
 # IMU preintegration
 
-An IMU (Inertial Measurement Unit: a gyroscope for angular rate plus an accelerometer for linear acceleration, sampled at 100-1000 Hz) produces **hundreds of raw samples between two keyframes**. IMU preintegration compresses them into **one relative-motion factor**, and lets that factor be recomputed instantly when the bias estimate changes, without re-touching a single raw sample.
+An IMU (Inertial Measurement Unit: a gyroscope for angular rate plus an accelerometer for linear acceleration, sampled at 100-1000 Hz) produces **hundreds of raw samples between two keyframes** ([glossary](../glossary.md#5-slam-system)). IMU preintegration compresses them into **one relative-motion factor**, and lets that factor be recomputed instantly when the bias estimate changes, without re-touching a single raw sample.
 
 It builds on two earlier ideas:
 
@@ -105,12 +105,12 @@ J_{R,b_g} \leftarrow dR^\top J_{R,b_g} - J_r\,dt
 **Why $J_{R,b_g}$ is the one to study.** It is a direct instance of [jacobian.md §11.4](../foundations/jacobian.md#114-closed-form-for-so3)'s identities, and every other $J_{\cdot,b_g}$ inherits from it:
 
 - $-J_r\,dt$: $J_r$ is the right Jacobian of the micro-step's rotation. The $dt$ is the chain-rule factor from $`\partial\big((\tilde\omega-b_g)dt\big)/\partial b_g = -dt\,I`$, which also supplies the minus sign.
-- $dR^\top J_{R,b_g}$: the sensitivity accumulated so far is a right perturbation on the old $\Delta R$, and the new step composes $dR$ after it. Moving that perturbation past $dR$ uses the adjoint identity $\text{Exp}(x)\,dR = dR\,\text{Exp}(dR^\top x)$, which is where the $dR^\top$ comes from.
+- $dR^\top J_{R,b_g}$: the sensitivity accumulated so far is a right perturbation on the old $\Delta R$, and the new step composes $dR$ after it. Moving that perturbation past $dR$ uses the **adjoint** identity ([glossary](../glossary.md#1-geometry-and-lie-groups)) $\text{Exp}(x)\,dR = dR\,\text{Exp}(dR^\top x)$, which is where the $dR^\top$ comes from.
 
 **Implementation notes.**
 
 - Both `lie_utils.py` helpers switch to first-order forms when $\theta = \lVert(\tilde\omega-b_g)dt\rVert < 10^{-6}$: `so3_exp` returns $`I + [\phi]_\times`$ and `so3_right_jacobian` returns $`I - \tfrac{1}{2}[\phi]_\times`$. Otherwise they use the closed forms (Rodrigues and the $J_r$ formula from [jacobian.md §11.4](../foundations/jacobian.md#114-closed-form-for-so3)).
-- The demo omits two things a real preintegrated factor needs. There is **no gravity term** (a real accelerometer's specific force must have gravity removed, usually in the residual). There is **no preintegrated noise covariance**: the script propagates the bias Jacobians but not Forster et al.'s $\Sigma$ recursion, so the bundle carries no uncertainty.
+- The demo omits two things a real preintegrated factor needs. There is **no gravity term** (a real accelerometer's **specific force**, the acceleration minus gravity that it measures, must have gravity removed, usually in the residual, [glossary](../glossary.md#3-least-squares-optimization)). There is **no preintegrated noise covariance**: the script propagates the bias Jacobians but not Forster et al.'s $\Sigma$ recursion, so the bundle carries no uncertainty.
 - The demo builds its raw readings as the commanded twist plus the *estimated* bias, so $`\tilde v - b_a`$ and $`\tilde\omega - b_g`$ equal the commanded values exactly.
 
 ---
@@ -146,7 +146,7 @@ A full VIO (Visual-Inertial Odometry)/VI-SLAM back-end (GTSAM's `CombinedImuFact
 ## 7. What the accompanying scripts actually do (and don't)
 
 - **`imu_preintegration.py`** (both [`use_numpy/`](../../use_numpy/imu_preintegration.py) and [`use_manif/`](../../use_manif/imu_preintegration.py)) implements §3-§5: compress raw samples into a bundle, track the bias Jacobians, apply the $O(1)$ correction. The two versions are line-for-line equivalent (`use_manif`'s docstring spells out the correspondence: its `rplus()` returns the same `dR`/right-Jacobian pair the numpy version computes by hand). **Neither builds the graph residual of §6**; both stop at compression plus correction.
-- **`robot_imu_simulation.py`** is related but different: it [dead-reckons](factor_graph.md#2-why-do-we-need-it) noisy body-twist readings directly on $SE(3)$ every micro-step (chaining `se3_exp`, no bundle, no bias Jacobians). Its "IMU" reports a 6-D velocity twist, so there is no accelerometer, no bias and no gravity. It periodically runs a small damped Gauss-Newton correction against a separate GPS-like position fix. It is about *twist dead-reckoning + periodic on-manifold correction*, not preintegration.
+- **`robot_imu_simulation.py`** is related but different: it [dead-reckons](factor_graph.md#2-why-do-we-need-it) noisy body-twist readings directly on $SE(3)$ every micro-step (chaining `se3_exp`, no bundle, no bias Jacobians). Its "IMU" reports a 6-D velocity twist, so there is no accelerometer, no bias and no gravity. It periodically runs a small damped [Gauss-Newton](gauss_newton.md) correction against a separate GPS-like position fix. It is about *twist dead-reckoning + periodic on-manifold correction*, not preintegration.
 - **`imu_integration_comparison.py`** is also related but different. Like [pointcloud_pose_tracking_empirical_note.md](../filtering/pointcloud_pose_tracking_empirical_note.md), it is an empirical comparison note, not a concept explainer: it plots naive Euler-angle (vector-space) integration against proper $SO(3)$ Exp-map integration. The Exp-map estimate still drifts from gyro noise, just far less: with the defaults, it ends at about 0.47° rotation error vs. about 70.8° for naive. Each method is scored against its own noise-free ground truth (§7.1). No bias correction is involved.
 
 ![Two panels from imu_preintegration.py: the preintegrated position change built up sample by sample from keyframe i to keyframe j, and a log-scale bar chart comparing how much a bias update changes each preintegrated quantity with the error of the first-order Jacobian correction against a full re-integration](../../assets/imu_preintegration.png)
@@ -177,7 +177,7 @@ $$\tilde\omega = \omega + n_\omega,\quad n_\omega \sim \mathcal N(0, \sigma_g^2 
 
 Defaults: $\sigma_g = 0.02$ rad/s, $\sigma_v = 0.05$ m/s, $dt = 0.005$ s, 20 s, seed 0.
 
-**Naive update.** Attitude is kept as a ZYX Euler vector $\theta_{rpy}$ and rebuilt with `euler_to_R`, which returns $`R_z(\text{yaw}) R_y(\text{pitch}) R_x(\text{roll})`$:
+**Naive update.** Attitude (orientation) is kept as a ZYX Euler vector $\theta_{rpy}$ and rebuilt with `euler_to_R`, which returns $`R_z(\text{yaw}) R_y(\text{pitch}) R_x(\text{roll})`$:
 
 ```math
 \theta_{rpy} \leftarrow \theta_{rpy} + \tilde\omega\,dt, \qquad R \leftarrow \texttt{euler\_to\_R}(\theta_{rpy}), \qquad p \leftarrow p + R\,\tilde v\,dt
@@ -191,7 +191,7 @@ R \leftarrow R\,\text{Exp}(\tilde\omega\,dt), \qquad p \leftarrow p + R\,\tilde 
 
 In both, the position step uses the rotation *after* this step's update. That is the opposite of the preintegration order in §3, which uses the old $\Delta R$.
 
-**Ground truths.** One per estimator, each built from the noise-free rates with that estimator's own composition rule: $`R^{gt}_{\text{naive}} \leftarrow R^{gt}_{\text{naive}}\,\texttt{euler\_to\_R}(\omega\,dt)`$ and $`R^{gt}_{\text{exp}} \leftarrow R^{gt}_{\text{exp}}\,\text{Exp}(\omega\,dt)`$, with positions integrated as above. Rotation error is the geodesic angle (`rotation_geodesic_error`, computed equivalently with `atan2` for precision), plotted in degrees; position error is the Euclidean norm:
+**Ground truths.** One per estimator, each built from the noise-free rates with that estimator's own composition rule: $`R^{gt}_{\text{naive}} \leftarrow R^{gt}_{\text{naive}}\,\texttt{euler\_to\_R}(\omega\,dt)`$ and $`R^{gt}_{\text{exp}} \leftarrow R^{gt}_{\text{exp}}\,\text{Exp}(\omega\,dt)`$, with positions integrated as above. Rotation error is the **geodesic angle** (the smallest single rotation angle taking one orientation to the other; `rotation_geodesic_error`, computed equivalently with `atan2` for precision), plotted in degrees; position error is the Euclidean norm:
 
 ```math
 e_R = \arccos\!\left(\frac{\mathrm{tr}(R_{gt}^\top R_{est}) - 1}{2}\right),\qquad e_p = \lVert p_{gt} - p_{est}\rVert

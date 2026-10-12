@@ -36,7 +36,7 @@ The 3D point $P$ gets projected onto the camera image:
 If we know:
 
 - camera pose
-- camera intrinsics
+- camera intrinsics (the camera's fixed calibration: focal lengths and image center)
 - 3D point position
 
 we can predict where $P$ should appear in the image.
@@ -136,7 +136,7 @@ BA doesn't say "the cameras are correct, I'll fix the points" or "the points are
 
 > **"I'll adjust everything together until the entire reconstruction explains the image measurements as well as possible."**
 
-To see why both must move, look at the RMS-error panel of the figure in [Section 6.1](#61-the-ba-math-concretely): it compares landmarks-only, poses-only and joint bundle adjustment.
+To see why both must move, look at the RMS-error (root mean square: the square root of the average squared error) panel of the figure in [Section 6.1](#61-the-ba-math-concretely): it compares **landmarks**-only (the 3D points being estimated), poses-only and joint bundle adjustment.
 
 ---
 
@@ -165,7 +165,7 @@ With noise and imperfect estimates, they don't intersect perfectly:
 
 We can think of BA as adjusting the **bundle of rays** and the camera poses together until everything fits.
 
-(Recovering a single point from rays with already-known poses, rather than adjusting everything jointly, is triangulation on its own. See [frontend/triangulation_pnp.md](../frontend/triangulation_pnp.md) for the closed-form math this repo implements, plus its inverse problem, PnP.)
+(Recovering a single point from rays with already-known poses, rather than adjusting everything jointly, is triangulation on its own. See [frontend/triangulation_pnp.md](../frontend/triangulation_pnp.md) for the closed-form math this repo implements, plus its inverse problem, **PnP**: Perspective-n-Point, recovering a camera pose from known 3D points.)
 
 ![Two top-view panels from bundle_adjustment.py's defaults: rays back-projected through one landmark's measured pixels from all eight cameras, scattered at the noisy initial guess and meeting at one point after joint bundle adjustment](../../assets/bundle_adjustment_concept.png)
 
@@ -205,11 +205,11 @@ where:
 
 In plain English: **find the camera poses and 3D points that make the predicted image points match the actual image points as closely as possible.**
 
-Real implementations usually wrap the squared reprojection error in a **robust loss** (e.g. Huber) instead of squaring it directly, so a handful of bad feature matches can't drag the whole reconstruction toward them - see [pose_graph_optimization.md](pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures)'s "Robust loss functions" section for the exact same idea applied to pose graphs. `bundle_adjustment.py` keeps the plain, un-robustified squared error above, matching the objective as written here.
+Real implementations usually wrap the squared reprojection error in a **robust loss** (e.g. Huber) instead of squaring it directly, so a handful of bad **feature matches** (wrong pairings of the same image point across images) can't drag the whole reconstruction toward them - see [pose_graph_optimization.md](pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures)'s "Robust loss functions" section for the exact same idea applied to pose graphs. `bundle_adjustment.py` keeps the plain, un-robustified squared error above, matching the objective as written here.
 
 ### 6.1 The BA math, concretely
 
-`bundle_adjustment.py` minimizes the objective above with plain Gauss-Newton. Each pose $T_i$ is a $4\times4$ camera-to-world matrix with rotation $R_i$ and translation $t_i$. Each landmark $P_j$ is a world point. Pose corrections are 6-vectors $\delta = [\delta v, \delta\omega]$, translation first.
+`bundle_adjustment.py` minimizes the objective above with plain Gauss-Newton ([glossary](../glossary.md#3-least-squares-optimization)). Each pose $T_i$ is a $4\times4$ camera-to-world matrix with rotation $R_i$ and translation $t_i$. Each landmark $P_j$ is a world point. Pose corrections are 6-vectors $\delta = [\delta v, \delta\omega]$, translation first.
 
 ![Two panels from bundle_adjustment.py: a top-down view of cameras on an arc around a landmark cluster (ground truth, noisy initial guess, joint BA), and log-scale RMS errors for the noisy initial guess, landmarks-only, poses-only and joint bundle adjustment](../../assets/bundle_adjustment.png)
 
@@ -219,9 +219,9 @@ The same run, animated over its Gauss-Newton iterations. Optimizing poses and la
 
 ![Animation of bundle_adjustment.py: left, a top-down view of cameras and landmarks moving from the noisy initial guess onto ground truth over the Gauss-Newton iterations; right, the reprojection RMS falling to about 1.2 px on a log scale, below the landmarks-only (100 px) and poses-only (54 px) levels](../../assets/bundle_adjustment.gif)
 
-*Animation: `use_numpy/animate_bundle_adjustment.py` at its defaults (seed 0), rendered by `uv run python use_numpy/animate_bundle_adjustment.py --out assets/bundle_adjustment.gif`. Each iterate is aligned to ground truth for display (gauge freedom), and the motion between the 7 iterates is interpolated.*
+*Animation: `use_numpy/animate_bundle_adjustment.py` at its defaults (seed 0), rendered by `uv run python use_numpy/animate_bundle_adjustment.py --out assets/bundle_adjustment.gif`. Each iterate is aligned to ground truth for display (**gauge freedom**: the whole scene can shift, rotate or rescale without changing any reprojection error), and the motion between the 7 iterates is interpolated.*
 
-**Projection** (`camera_project`): move the point into the camera frame, then apply the pinhole model with intrinsics $(f_x, f_y, c_x, c_y)$:
+**Projection** (`camera_project`): move the point into the camera frame, then apply the **pinhole model** (an ideal camera whose rays all pass through one point) with intrinsics $(f_x, f_y, c_x, c_y)$:
 
 ```math
 p_c = R_i^\top (P_j - t_i) = \begin{bmatrix} x \\ y \\ z \end{bmatrix}, \qquad
@@ -230,7 +230,7 @@ p_c = R_i^\top (P_j - t_i) = \begin{bmatrix} x \\ y \\ z \end{bmatrix}, \qquad
 
 Here $`z`$ is the point's depth in the camera frame, not the pixel observation $`z_{ij}`$. The code clamps $|z|$ to at least $10^{-9}$, keeping its sign, so a point at the camera center can't divide by zero.
 
-**Intuition (projection Jacobian):** it says how many pixels the image point moves per metre the 3D point moves, and far points move less.
+**Intuition (projection Jacobian,** [glossary](../glossary.md#3-least-squares-optimization)**):** it says how many pixels the image point moves per metre the 3D point moves, and far points move less.
 
 - Tiny example: shift a point $`1`$ cm sideways, with $`f_x = 800`$. The pixel moves by $`f_x \cdot 0.01 / z`$.
 - At $`z = 5`$ m that is $`1.6`$ px. At $`z = 10`$ m it is $`0.8`$ px. This is the $`f_x/z`$ entry of $`J_{\text{proj}}`$ below (the projection Jacobian $`\partial\pi/\partial p_c`$).
@@ -293,7 +293,7 @@ Script defaults:
 - Camera: $f_x = f_y = 800$ px on a 640×480 image (about 44°×33° field of view).
 - Noise: $\sigma_{\text{pose}} = 0.1$, $\sigma_{\text{lm}} = 0.3$ m, $\sigma_{\text{px}} = 1$ px.
 - Solver: `gn_tol` = $10^{-6}$, at most 30 iterations.
-- `reprojection_rms` reports the RMS of $`\|z_{ij} - \pi(T_i^{-1}P_j)\|`$. It is unaffected by the Umeyama alignment of Section 14, because reprojection error is invariant to a similarity transform.
+- `reprojection_rms` reports the RMS of $`\|z_{ij} - \pi(T_i^{-1}P_j)\|`$. It is unaffected by the Umeyama alignment of Section 14, because reprojection error is invariant to a **similarity transform** (rotation, translation and uniform scale).
 
 
 ---
@@ -452,11 +452,11 @@ Local BA and Global BA minimize the same reprojection objective from Section 6. 
 
 | Metric | **Local BA** (e.g. ORB-SLAM) | **Global BA** (e.g. COLMAP) |
 | --- | --- | --- |
-| System paradigm | Visual SLAM (real-time, online) | Structure-from-Motion (offline, batch) |
-| Optimization scope | A local window of recent keyframes + covisible neighbors | Every registered camera pose and every 3D point |
+| System paradigm | Visual SLAM (real-time, online) | **Structure-from-Motion** (SfM: reconstructing 3D structure and camera poses from many photos; offline, batch) |
+| Optimization scope | A local window of recent **keyframes** (selected frames kept in the optimization) + **covisible** neighbors (keyframes sharing landmarks) | Every registered camera pose and every 3D point |
 | Input | Sequential video with continuous tracking | Unordered photo collections (or long video) |
 | Frequency | Continuous, runs on every new keyframe | Periodic (e.g. every ~10-20% map growth) or a final pass |
-| Outlier handling | Fast local robust cost (Huber) + chi-square gating | Heavy re-triangulation, track merging/filtering |
+| Outlier handling | Fast local robust cost (Huber) + **chi-square gating** (rejecting observations whose weighted squared error exceeds a chi-square threshold) | Heavy re-triangulation, track merging/filtering |
 | Scaling | Roughly constant per window | Grows up to cubically with the number of camera poses (dense reduced system) |
 
 
@@ -517,9 +517,9 @@ But fixing a pose treats it as exactly known, which throws its uncertainty away.
 Drift has two parts, and they need different cures.
 
 - **Inconsistency between windows.** Each window was solved against a slightly different frozen border, so neighboring windows disagree a little about the landmarks they share. The measurements *can* see this: solved jointly, the disagreement shows up as reprojection error. A Global BA pass removes it.
-- **Error the measurements can't see.** On a path that never revisits a place, nothing ties the end of the map to its start. The measurements only fix each part of the map relative to its neighbors, so the uncertainty in where the far end is grows with distance from the anchor. Even a perfect joint solve has this drift. A monocular camera adds **scale drift** on top, since images only determine the scene up to a scale factor (Strasdat et al. 2010).
+- **Error the measurements can't see.** On a path that never revisits a place, nothing ties the end of the map to its start. The measurements only fix each part of the map relative to its neighbors, so the uncertainty in where the far end is grows with distance from the anchor. Even a perfect joint solve has this drift. A monocular setup adds **scale drift** on top, since images only determine the scene up to a scale factor (Strasdat et al. 2010).
 
-Only new information cures the second part: a **loop closure** (seeing a place again, which ties the far end back to the start) or another sensor, such as GPS, or an IMU, which makes roll, pitch and metric scale observable. So real systems split the work. ORB-SLAM runs Local BA on every keyframe. When it detects a loop, it estimates a similarity transform between the two ends (7 DoF, so scale drift is corrected too) and spreads the correction along the trajectory with pose-graph optimization ([pose_graph_optimization.md](pose_graph_optimization.md)). ORB-SLAM2 then runs a full BA in a separate thread to refine the result.
+Only new information cures the second part: a loop closure or another sensor, such as GPS, or an IMU, which makes roll, pitch and metric scale observable. So real systems split the work. ORB-SLAM runs Local BA on every keyframe. When it detects a loop, it estimates a similarity transform between the two ends (7 DoF, so scale drift is corrected too) and spreads the correction along the trajectory with pose-graph optimization ([pose_graph_optimization.md](pose_graph_optimization.md)). ORB-SLAM2 then runs a full BA in a separate thread to refine the result.
 
 
 ### 13.4 Global BA in practice (COLMAP)
@@ -534,7 +534,7 @@ The cost is that even after the Schur complement from Section 12, the reduced ca
 
 ### 13.5 Choosing between them
 
-Use **Local BA** for real-time robotics/AR/VR where sub-30ms latency matters more than perfect global consistency (loop closure repairs that later).
+Use **Local BA** for real-time robotics/AR/VR (augmented/virtual reality) where sub-30ms latency matters more than perfect global consistency (loop closure repairs that later).
 
 Use **Global BA** for offline reconstruction - meshes, NeRF/Gaussian-Splatting input scenes, photogrammetric surveys - where total geometric fidelity matters more than runtime.
 
@@ -562,7 +562,7 @@ Use **Global BA** for offline reconstruction - meshes, NeRF/Gaussian-Splatting i
 - **Loop closure** (`--arc-span-deg 350 --n-keyframes 190`): the path swings back within view of its start, and the script reports `Loop closure detected at keyframe K ...`.
   - No code changes are needed, because the covisibility bookkeeping, window builder and Global BA solve don't assume temporal locality. The extra keyframes only keep the default run's ~0.5 m spacing (at 50 keyframes it grows to ~1.9 m, and too few landmarks get triangulated for the closure to register).
   - Over seeds 0-4 the closure is detected on all 5 paths (keyframes 183-186). The Local-only final error on the default seed is 13.46 m.
-  - The Local+Global result on this long run is unstable. In our re-runs it varied widely across seeds (better than Local-only on only 1 of 5 seeds in one single-thread run, often much worse) and even changed with the BLAS thread count.
+  - The Local+Global result on this long run is unstable. In our re-runs it varied widely across seeds (better than Local-only on only 1 of 5 seeds in one single-thread run, often much worse) and even changed with the **BLAS** (the linear-algebra library NumPy calls) thread count.
   - So this scenario doesn't show that a Global pass reliably helps after a loop closure.
 
 So judge Global BA's benefit here from the aggregate statistics, not from any single run's printed numbers.
@@ -596,7 +596,7 @@ It uses the residual and Jacobians from [Section 6.1](#61-the-ba-math-concretely
 
 Diagonal entries of $H$ below $10^{-12}$ are floored to $10^{-12}$ before scaling. $\lambda$ starts at $10^{-3}$ in every call. A trial step is accepted only if it lowers the cost, and then $\lambda \leftarrow \max(\lambda/2, 10^{-7})$. Otherwise $\lambda \leftarrow 2\lambda$ and the solve is retried, up to 10 times. The loop stops when no step is accepted after 10 retries, when the step norm drops below `gn_tol`, or after `gn_max_iters` iterations.
 
-**Why cheirality matters (tiny example):** the pinhole $`u = f_x\,x/z + c_x`$ flips sign with $`z`$. Take $`f_x = 800`$, $`c_x = 320`$.
+**Why cheirality matters (tiny example):** **cheirality** is the requirement that a point lie in front of the camera (positive depth). The pinhole $`u = f_x\,x/z + c_x`$ flips sign with $`z`$. Take $`f_x = 800`$, $`c_x = 320`$.
 - A point in front, $`P_c = (-1, 0, 5)`$, gives $`u = 160`$.
 - The point $`(1, 0, -5)`$ behind the camera gives the same $`u = 160`$.
 - So a point behind the camera can look like a valid mirrored pixel. The solver must reject it explicitly.

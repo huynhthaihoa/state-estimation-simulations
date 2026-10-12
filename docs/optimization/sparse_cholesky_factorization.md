@@ -10,7 +10,7 @@ where $L$ is lower triangular. Column by column, its entries are:
 
 $$L_{jj} = \sqrt{A_{jj} - \sum_{k=1}^{j-1} L_{jk}^2}, \qquad L_{ij} = \frac{1}{L_{jj}}\left(A_{ij} - \sum_{k=1}^{j-1} L_{ik}L_{jk}\right)\ \ (i>j)$$
 
-That sum over earlier columns $k$ is the whole story behind fill-in (Section 3): even when $A_{ij}=0$, $L_{ij}$ can come out nonzero if $i$ and $j$ share an already-eliminated neighbor $k$ with $L_{ik}, L_{jk} \neq 0$.
+That sum over earlier columns $k$ is the whole story behind fill-in (Section 3): even when $A_{ij}=0$, $L_{ij}$ can come out nonzero if $i$ and $j$ share an already-eliminated neighbor $k$ (a variable whose column of $`L`$ is already computed) with $L_{ik}, L_{jk} \neq 0$.
 
 For example:
 
@@ -34,7 +34,7 @@ The key problem is that **large optimization problems often contain mostly zeros
 
 ## 1. Why does sparsity matter?
 
-Consider a SLAM problem with 1,000 robot poses and 5,000 landmarks.
+Consider a SLAM problem ([glossary](../glossary.md#5-slam-system)) with 1,000 robot poses and 5,000 landmarks.
 
 Each measurement connects only a few variables:
 
@@ -92,7 +92,7 @@ $$H\Delta x = -b$$
 - Weighted, these become $H = J^\top\Omega J$ and $b = J^\top\Omega r$.
 - $\Omega$ is the information matrix from [factor_graph.md §4](factor_graph.md#4-optimization-means-minimizing-all-those-errors), the same quantity as $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty).
 
-We need $H$ to be symmetric positive definite, and that isn't automatic. If every factor is relative (odometry, loop closures, reprojections with no prior), some motion of the whole solution leaves the cost unchanged (a **gauge freedom**). $H$ is then only positive *semi*-definite, and Cholesky breaks down on a zero pivot.
+We need $H$ to be symmetric positive definite, and that isn't automatic. If every factor is relative (odometry, loop closures, reprojections with no prior), some motion of the whole solution leaves the cost unchanged (a **gauge freedom**). $H$ is then only positive *semi*-definite, and Cholesky breaks down on a zero **pivot** (the quantity under the square root in $`L_{jj}`$).
 
 **Tiny example (toy case):** two poses joined by one odometry factor give $`H=\begin{bmatrix}1&-1\\-1&1\end{bmatrix}`$.
 - Moving both poses together changes nothing, so $`H`$ has rank 1.
@@ -137,7 +137,7 @@ L = \begin{bmatrix} * & 0 & 0 \\
 
 where $[*]$ marks the entry that was zero in $H$. That newly created nonzero is called **fill-in**. It comes straight from the formula at the top: $`L_{32} = (H_{32} - L_{31}L_{21}) / L_{22}`$, and $H_{32} = 0$ doesn't help when $L_{31}$ and $L_{21}$ are both nonzero.
 
-Eliminate the hub last instead (order 2, 3, 1, so variable 1 becomes the last row and column), and $L$ has no fill at all. §5 turns this into a general rule.
+Eliminate the **hub** (variable 1, connected to both others) last instead (order 2, 3, 1, so variable 1 becomes the last row and column), and $L$ has no fill at all. §5 turns this into a general rule.
 
 **Tiny example:** take $`H=\begin{bmatrix}4&2&2\\2&5&0\\2&0&5\end{bmatrix}`$ (variable 1 is the hub, $`H_{32}=0`$).
 - Order 1, 2, 3 gives $`L_{21}=1`$, $`L_{31}=1`$, so $`L_{32}=(0-1\cdot1)/2=-0.5`$. That is fill-in: a nonzero where $`H`$ had a zero.
@@ -179,12 +179,12 @@ Take §4's chain `1 ─ 2 ─ 3` again:
 
 So the **order in which variables are eliminated** dramatically affects the amount of computation and memory required.
 
-Both examples follow the same rule: eliminating a variable connects all of its remaining neighbors, so eliminate variables with few neighbors first and hubs last. Finding the truly optimal order is NP-hard, so solvers use heuristics built on that rule:
+Both examples follow the same rule: eliminating a variable connects all of its remaining neighbors, so eliminate variables with few neighbors first and hubs last. Finding the truly optimal order is NP-hard (no known polynomial-time algorithm), so solvers use heuristics built on that rule:
 
 - **AMD** (Approximate Minimum Degree): repeatedly eliminate the variable with the fewest remaining neighbors.
 - **COLAMD**: the same idea, computed from the columns of $J$ without forming $H$. It is a common choice for batch solvers.
 - **CCOLAMD**: constrained COLAMD, which can force chosen variables (for example the newest poses) to the end. iSAM2 uses it ([isam2_optimization.md §12](isam2_optimization.md#12-variable-ordering-is-also-crucial)).
-- **Nested dissection**: split the graph with a small separator, order each half recursively, and put the separator last.
+- **Nested dissection**: split the graph with a small **separator** (a set of variables whose removal disconnects it), order each half recursively, and put the separator last.
 
 [elimination_tree.md §9](elimination_tree.md#9-why-ordering-matters-so-much) works through the effect of ordering on a SLAM example.
 
@@ -209,7 +209,7 @@ with robot poses $x_1, \dots, x_N$ followed by landmarks $l_1, l_2, \dots$. Line
 
 Because each measurement only involves a small number of variables, $J$ and $H$ are sparse.
 
-The pattern also stays fixed for a fixed graph. Every Gauss-Newton or LM iteration relinearizes at a new estimate, which changes the *values* in $H$, but the same factors connect the same variables, so the **nonzero pattern** doesn't change. Solvers exploit this by splitting the factorization in two: a **symbolic** step (choose the ordering, predict where $L$'s nonzeros go, allocate memory) done once for a fixed graph, and a **numeric** step (compute the values) repeated every iteration. CHOLMOD's `analyze`/`factorize` calls are this split. That's why an expensive ordering heuristic is affordable: its cost is paid once, not per iteration. (Incremental solvers add factors, so their pattern changes and they redo part of this step.)
+The pattern also stays fixed for a fixed graph. Every Gauss-Newton or LM iteration relinearizes at a new estimate, which changes the *values* in $H$, but the same factors connect the same variables, so the **nonzero pattern** doesn't change. Solvers exploit this by splitting the factorization in two: a **symbolic** step (choose the ordering, predict where $L$'s nonzeros go, allocate memory) done once for a fixed graph, and a **numeric** step (compute the values) repeated every iteration. CHOLMOD's `analyze`/`factorize` calls (CHOLMOD is a sparse Cholesky library) are this split. That's why an expensive ordering heuristic is affordable: its cost is paid once, not per iteration. (Incremental solvers add factors, so their pattern changes and they redo part of this step.)
 
 ---
 
@@ -286,7 +286,7 @@ L1     X     X
 L2     X  X     X
 ```
 
-The rule is exact: $H_{ij}$ is structurally nonzero exactly when variables $i$ and $j$ appear together in at least one factor. So $H$'s graph is the **factor graph** with each factor replaced by edges between all of its variables.
+The rule is exact: $H_{ij}$ is **structurally nonzero** (nonzero by the sparsity pattern, even if values happen to cancel) exactly when variables $i$ and $j$ appear together in at least one factor. So $H$'s graph is the **factor graph** with each factor replaced by edges between all of its variables.
 
 ---
 
@@ -296,13 +296,13 @@ In one sentence:
 
 > **Sparse Cholesky is a way of solving a large linear system exactly, doing arithmetic only on the entries that can be nonzero, while choosing the elimination order to keep fill-in small.**
 
-It is still exact: nothing small is dropped. Dropping small entries on purpose is a different method, **incomplete Cholesky**, used as a preconditioner for iterative solvers.
+It is still exact: nothing small is dropped. Dropping small entries on purpose is a different method, **incomplete Cholesky**, used as a **preconditioner** (an approximate factor that speeds up an iterative solver's convergence) for iterative solvers.
 
 And in SLAM:
 
 > **The factor graph tells us which variables interact; elimination turns those interactions into a sparse factor $L$.**
 
-This is why **variable ordering, fill-in, elimination trees, and sparse matrix structures** become so important in systems such as iSAM, GTSAM, g2o, and Ceres.
+This is why **variable ordering, fill-in, elimination trees, and sparse matrix structures** become so important in systems such as iSAM (an incremental-smoothing algorithm) and the optimization libraries GTSAM, g2o, and Ceres.
 
 ---
 

@@ -99,7 +99,7 @@ A rotation matrix is a point in this space. Optimizing directly on it is inconve
 
 ## 6. Lie algebra: zoom in locally
 
-Now suppose we are at some rotation $R$. Instead of thinking about all possible rotations, we zoom in around $R$, where small rotations behave approximately like ordinary vectors. Every nearby rotation can be written as $R\exp(\delta\theta^\wedge)$ for a small 3-vector (where $`\delta\theta^\wedge`$ is the **hat operator**'s skew-symmetric matrix, Section 7, and $`\exp`$ the **matrix exponential**, Section 8; see the [glossary](../glossary.md#1-geometry-and-lie-groups)):
+Now suppose we are at some rotation $R$. Instead of thinking about all possible rotations, we zoom in around $R$, where small rotations behave approximately like ordinary vectors. Every nearby rotation can be written as $R\exp(\delta\theta^\wedge)$ for a small 3-vector (where $`\delta\theta^\wedge`$ is the **hat operator**'s **skew-symmetric** matrix (equal to minus its transpose), Section 7, and $`\exp`$ the **matrix exponential**, Section 8; see the [glossary](../glossary.md#1-geometry-and-lie-groups)):
 
 ```math
 \delta\theta =\begin{bmatrix}\delta\theta_x\\ 
@@ -194,10 +194,10 @@ $$\delta\theta^\wedge = \log(R_1^{-1}R_2)$$
 and $\log$ undoes the exponential map: $\log(\exp(\delta\theta^\wedge)) = \delta\theta^\wedge$.
 
 - This holds as long as $`\|\delta\theta\| < \pi`$ (at exactly $\pi$, $\log$ is ambiguous).
-- Beyond that range, multiple $\delta\theta$'s map to the same $R$ (the exponential is periodic per rotation axis), and $\log$ recovers only the one on its principal branch.
+- Beyond that range, multiple $\delta\theta$'s map to the same $R$ (the exponential is periodic per rotation axis), and $\log$ recovers only the one on its **principal branch** (the one with norm at most $`\pi`$).
 - To pull the plain vector out of the skew-symmetric matrix we apply the inverse of the hat operator, the **vee operator** $(\cdot)^\vee$, so $\delta\theta = (\log(R))^\vee$.
 
-**Worked number: a 90° yaw.** Take $\delta\theta = (0,0,\pi/2)$. Then
+**Worked number: a 90° yaw.** Take $\delta\theta = (0,0,\pi/2)$, a turn about the vertical $`z`$ axis. Then
 
 ```math
 R = \exp(\delta\theta^\wedge) = \begin{bmatrix} 0 & -1 & 0\\
@@ -293,7 +293,7 @@ A filter driven by an IMU needs velocity as well as pose: the accelerometer chan
 X = \begin{bmatrix} R & v & p \\ 0 & 1 & 0 \\ 0 & 0 & 1 \end{bmatrix} \in SE_2(3)
 ```
 
-- It has 9 degrees of freedom: 3 for rotation, 3 for velocity, 3 for position.
+- It has 9 **degrees of freedom (DoF)**, the independent numbers needed to describe it: 3 for rotation, 3 for velocity, 3 for position.
 - The "2" counts the vector columns. Adding $`K`$ more (for example, foot-contact points) gives $`SE_{K+2}(3)`$.
 
 **Composition and inverse** work column by column, as for $`SE(3)`$:
@@ -321,7 +321,7 @@ So a velocity changes frame exactly like a position. **Tiny example:** a drone f
 **Why not store $`R`$ in $`SO(3)`$ and $`v`$, $`p`$ as plain vectors?** Both hold the same numbers; the difference is what the group product buys the filter.
 - With this product, one IMU step over $`h`$ is $`X^+ = \Gamma\, f(X)\, \Upsilon`$. Here $`\Gamma`$ is a fixed matrix holding gravity, $`f(R, v, p) = (R, v, p + v h)`$ respects the group product (a **group automorphism**: $`f(X_1 X_2) = f(X_1)\,f(X_2)`$), and $`\Upsilon`$ holds the IMU increments. Systems of this form are called **group-affine**.
 - For a group-affine system, the **invariant error** $`\eta = \hat X X^{-1}`$ between estimate and truth evolves in the same way whatever the trajectory, and its logarithm evolves through a constant matrix, even for large errors. This is the basis of the **invariant EKF** (Barrau & Bonnabel, 2017).
-- With separate pieces, the error dynamics depend on the current estimate. In [invariant_saltation_ekf.md §6](../filtering/invariant_saltation_ekf.md#6-results-consistency-through-the-bounces), an EKF built that way is overconfident before any bounce (NEES 14-19 against a consistent 9), while the invariant EKF on $`SE_2(3)`$ is close to consistent.
+- With separate pieces, the error dynamics depend on the current estimate. In [invariant_saltation_ekf.md §6](../filtering/invariant_saltation_ekf.md#6-results-consistency-through-the-bounces), an EKF built that way is overconfident before the body's first bounce on the ground (NEES 14-19 against a consistent 9), while the invariant EKF on $`SE_2(3)`$ is close to consistent.
 
 In code: `se23_make`, `se23_parts`, `se23_inv`, `se23_exp`, `se23_log` and `se23_adjoint` in [use_numpy/lie_utils.py](../../use_numpy/lie_utils.py), and `manif.SE_2_3`, whose tangent order is (position, rotation, velocity).
 
@@ -393,7 +393,7 @@ except that the "+" is replaced by a group operation. This update is called a **
 
 ## 13. Why not just use Euler angles?
 
-We could optimize $x,y,z,\text{roll},\text{pitch},\text{yaw}$ directly, but Euler angles bring singularities (gimbal lock), awkward composition, coordinate-dependent behavior, and problematic derivatives. The Lie algebra gives a **local minimal representation** of the perturbation while the state stays on the correct manifold.
+We could optimize $x,y,z,\text{roll},\text{pitch},\text{yaw}$ directly, but Euler angles bring singularities (**gimbal lock**: at pitch 90° two rotation axes line up and one rotation direction is lost), awkward composition, coordinate-dependent behavior, and problematic derivatives. The Lie algebra gives a **local minimal representation** of the perturbation (as many numbers as degrees of freedom, none redundant) while the state stays on the correct **manifold** (a curved space that is locally flat).
 
 ---
 

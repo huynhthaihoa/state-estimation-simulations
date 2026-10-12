@@ -91,11 +91,11 @@ After linearization, the nonlinear optimization becomes approximately a linear l
 \min_{\Delta x} \lVert A\Delta x - b \rVert^2
 ```
 
-Here $`A`$ is the stacked, noise-whitened Jacobian of all factors, $`b`$ is the stacked (negated) residual vector, and $`\Delta x`$ is the update step to the variables. (§14.1 writes the same step as $`\boldsymbol\delta`$.)
+Here $`A`$ is the stacked, **noise-whitened** (each row scaled so its residual has unit noise covariance) Jacobian of all factors, $`b`$ is the stacked (negated) residual vector, and $`\Delta x`$ is the update step to the variables. (§14.1 writes the same step as $`\boldsymbol\delta`$.)
 
 Instead of solving this from scratch every time, we can factorize $A = QR$ (or work with a related factorization of the information/Hessian system).
 
-> **Note**: QR decomposition factors a matrix as $A=QR$, with $Q$ orthogonal and $R$ upper-triangular. Because $Q$ is orthogonal it doesn't change the least-squares solution, so minimizing $`\lVert A\Delta x - b \rVert^2`$ reduces to the cheap triangular solve $R\Delta x = Q^\top b$ - and, critically for iSAM, $R$ can be updated incrementally via Givens rotations when a new row (factor) arrives, instead of refactorizing $A$ from scratch. That incremental-update property is what the next point relies on.
+> **Note**: QR decomposition factors a matrix as $A=QR$, with $Q$ orthogonal and $R$ upper-triangular. Because $Q$ is orthogonal it doesn't change the least-squares solution, so minimizing $`\lVert A\Delta x - b \rVert^2`$ reduces to the cheap triangular solve $R\Delta x = Q^\top b$ - and, critically for iSAM, $R$ can be updated incrementally via **Givens rotations** (plane rotations that zero one entry by mixing two rows) when a new row (factor) arrives, instead of refactorizing $A$ from scratch. That incremental-update property is what the next point relies on.
 
 **Intuition: $R$ is a square root of the information.**
 - Like $25 = 5 \cdot 5$: $R^\top R = H$ (the information matrix, $H = A^\top A$), so $R$ holds the same information in a "half-size" form.
@@ -152,8 +152,8 @@ x0 ── x1 ── x2 ── x3 ── x4
 The loop closure can affect **many previous poses**, so incremental optimization cannot simply update $x_4$.
 
 - Original iSAM still absorbs the loop-closure factor like any other: one more row folded into the factorization with Givens rotations (§3).
-- But this row links $x_4$ back to $x_0$, so the rotations sweep through most of the factorization and leave it denser (fill-in).
-- Original iSAM cleans this up periodically, by relinearizing everything and choosing a new variable ordering in one batch step (Kaess et al. 2008). This repo's script goes straight to that batch step when the loop closes (§14.1).
+- But this row links $x_4$ back to $x_0$, so the rotations sweep through most of the factorization and leave it denser (fill-in; [glossary](../glossary.md#4-graphs-sparsity-and-solvers)).
+- Original iSAM cleans this up periodically, by relinearizing everything and choosing a new variable ordering (the order variables are eliminated in) in one batch step (Kaess et al. 2008). This repo's script goes straight to that batch step when the loop closes (§14.1).
 
 **Why it sweeps:** Givens rotations start at the first nonzero column of the new row. An odometry row starts near the end; a loop-closure row touches $`x_0`$ (column 0), so it sweeps every column (worked in §14.1).
 
@@ -176,7 +176,7 @@ Original iSAM stops at §3's mechanism: Givens-rotation updates to the factoriza
 | Full cost on every update       | Cheaper per update, except around loop closures |
 | Good for offline SLAM           | Good for online SLAM            |
 | Simple conceptual model         | More complicated implementation |
-| Example: standard Gauss-Newton  | Example: iSAM/iSAM2             |
+| Example: standard Gauss-Newton ([glossary](../glossary.md#3-least-squares-optimization))  | Example: iSAM/iSAM2             |
 
 ```text
 BATCH
@@ -299,7 +299,7 @@ The earlier topics connect like this:
              Levenberg-Marquardt
 ```
 
-And underneath the pose optimization:
+And underneath the pose optimization (see the [glossary](../glossary.md#1-geometry-and-lie-groups) for SE(3), Lie algebra and perturbation):
 
 ```text
 SE(3)

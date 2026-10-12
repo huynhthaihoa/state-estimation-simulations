@@ -22,12 +22,12 @@ And suppose it observes a landmark:
      x1    x3
 ```
 
-The factor graph represents **constraints**:
+The [factor graph](../glossary.md#4-graphs-sparsity-and-solvers) represents **constraints**:
 
 - $x_1$ → $x_2$: odometry
 - $x_2$ → $x_3$: odometry
 - $x_3$ → $x_4$: odometry
-- $x_1$ → $l_1$: observation
+- $x_1$ → $l_1$: observation (a measurement of the landmark)
 - $x_3$ → $l_1$: observation
 
 The goal is still:
@@ -95,7 +95,7 @@ Eliminate x1:
 
 This is the fundamental idea behind elimination. See [`elimination_tree.md`](elimination_tree.md) for the dependency structure it produces.
 
-Here $x_1$ is eliminated only to build a solve order. It is still part of the problem, and a later update re-eliminates it if that update affects it. [marginalization.md](marginalization.md) reuses this exact step for a different purpose: permanently discarding an old state to bound a sliding-window estimator's size.
+Here $x_1$ is eliminated only to build a solve order. It is still part of the problem, and a later update re-eliminates it if that update affects it. [marginalization.md](marginalization.md) reuses this exact step for a different purpose: permanently discarding an old state to bound the size of a **sliding-window** estimator (one that keeps only the most recent states).
 
 ---
 
@@ -145,7 +145,7 @@ That is essentially what the **Bayes tree** captures.
 2. **Fill-in.** Every pair of variables in $S(v)$ gets connected, then $v$ is removed from the graph. This is the "summarized information" arrow of §3: the new constraint links all of $v$'s remaining neighbors.
 3. **Parent.** $\text{parent}(v)$ is the member of $S(v)$ that comes earliest in `order`, i.e. the next of them to be eliminated. If $S(v)$ is empty, $v$ is the root.
 
-The node $`\{v\} \cup S(v)`$ is what the docstring calls a clique. The script keeps one node per variable and does not apply §13's merge rule (a node joins its parent's clique when its separator equals the parent clique's variables), so strictly it builds the elimination tree.
+The node $`\{v\} \cup S(v)`$ is what the docstring calls a **clique** (a group of variables stored together in one tree node). The script keeps one node per variable and does not apply §13's merge rule (a node joins its parent's clique when its separator equals the parent clique's variables), so strictly it builds the elimination tree.
 
 **Worked example: a 5-node ring.** Take odometry edges 0–1, 1–2, 2–3, 3–4 plus a loop-closure edge 4–0, eliminated oldest-first (`order = [0, 1, 2, 3, 4]`, as the script does):
 
@@ -199,7 +199,7 @@ Each variable ends up conditioned only on its separator, and the separator's nex
 - Chain example: $`x_1 = (d_1 - r_{12}\, x_2) / r_{11}`$ (here $`r_{11}`$, $`r_{12}`$, $`d_1`$ are row 1's diagonal, off-diagonal and right-hand-side entries). This one line is "$`x_1`$ given $`x_2`$".
 - To solve, read the tree from the root down. The root has no parents, so it is solved first. Its value is then substituted into the children.
 
-For iSAM2, the useful translation is:
+For [iSAM2](isam2_optimization.md) (incremental smoothing and mapping: updates a SLAM solution as measurements arrive, rather than re-solving from scratch), the useful translation is:
 
 > **Bayes tree = conditional dependency tree created by variable elimination.**
 
@@ -290,7 +290,7 @@ Re-eliminate
 Updated Bayes Tree
 ```
 
-This is the core mechanism behind **[iSAM2](isam2_optimization.md)'s incremental efficiency** - the older [iSAM](isam_optimization.md) algorithm gets its incremental updates from Givens row insertion plus periodic batch steps, without a Bayes tree at all.
+This is the core mechanism behind **[iSAM2](isam2_optimization.md)'s incremental efficiency** - the older [iSAM](isam_optimization.md) algorithm gets its incremental updates from Givens row insertion (a rotation-based update of a QR factorization when a row is added) plus periodic batch steps, without a Bayes tree at all.
 
 ---
 
@@ -336,7 +336,7 @@ The factor graph is good at representing **constraints** ("what measurements con
 | Factor Graph                        | Bayes Tree                                       |
 | ----------------------------------- | ------------------------------------------------ |
 | Represents measurements/constraints | Represents elimination/conditional structure     |
-| Bipartite graph                     | Tree structure                                   |
+| Bipartite graph (edges only join variables to factors) | Tree structure                                   |
 | Variables + factors                 | Conditional relationships                        |
 | Describes the SLAM problem          | Describes its factorized solution                |
 | Natural representation of SLAM      | Efficient representation for incremental solving |
@@ -393,7 +393,7 @@ So:
 
 ## 15. Where this is implemented in this repo
 
-Partially. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds the **elimination tree** of this repo's pose-graph topology: one node per variable, no clique merging (§13). It is the structure a Bayes tree is built from, not a full Bayes tree.
+Partially. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds the **elimination tree** of this repo's [pose-graph](../glossary.md#4-graphs-sparsity-and-solvers) topology: one node per variable, no clique merging (§13). It is the structure a Bayes tree is built from, not a full Bayes tree.
 
 **What it does:**
 - `symbolic_eliminate`/`bayes_tree_affected_path` in `utils.py` run the elimination-game construction from §3-§4 (spelled out in §4.1) and the root-ward affected-path query from §7-§9. Every "N/16 affected" count is a count of variables, not cliques.
@@ -402,8 +402,8 @@ Partially. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_constructio
 - The script plots the "small vs. large affected region" contrast this doc argues for in prose (§7 vs. §8) using a real, computed example instead of an ASCII sketch.
 
 **What it doesn't:**
-- It fixes the elimination order (oldest node first) rather than choosing one dynamically, so **iSAM2's variable reordering (CCOLAMD) is still not implemented**. Under that fixed order, this repo's loop-closure edge invalidates the *entire* tree, not just a subtree. That is the case where a fixed ordering hurts most; iSAM2 additionally reorders the affected part to limit fill-in.
-- There is still no numeric fluid-relinearization solve integrated with this tree. [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`) separately implements the older [iSAM v1](isam_optimization.md) algorithm (incremental QR row insertion, no Bayes tree at all); see [`isam_optimization.md` §14](isam_optimization.md#14-where-this-is-implemented-in-this-repo) and [`isam2_optimization.md` §19](isam2_optimization.md#19-where-this-is-implemented-in-this-repo) for exactly where that numeric-solve line is drawn.
+- It fixes the elimination order (oldest node first) rather than choosing one dynamically, so **iSAM2's variable reordering (CCOLAMD, a fill-reducing ordering heuristic) is still not implemented**. Under that fixed order, this repo's loop-closure edge invalidates the *entire* tree, not just a subtree. That is the case where a fixed ordering hurts most; iSAM2 additionally reorders the affected part to limit fill-in.
+- There is still no numeric **fluid-relinearization** (relinearizing only variables whose estimate has moved enough) solve integrated with this tree. [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`) separately implements the older [iSAM v1](isam_optimization.md) algorithm (incremental QR row insertion, no Bayes tree at all); see [`isam_optimization.md` §14](isam_optimization.md#14-where-this-is-implemented-in-this-repo) and [`isam2_optimization.md` §19](isam2_optimization.md#19-where-this-is-implemented-in-this-repo) for exactly where that numeric-solve line is drawn.
 
 ![Two rows from bayes_tree_construction.py: the 16-variable elimination chain, where a new odometry edge affects 2 variables and the loop-closure edge affects all 16](../../assets/bayes_tree_construction.png)
 

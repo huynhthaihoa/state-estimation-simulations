@@ -118,7 +118,7 @@ Then Pose 1 is eliminated, and its resulting information affects Pose 2. So info
 
 The two structures answer different questions.
 
-**Factor graph**: which variables are connected by measurements?
+**Factor graph** ([glossary](../glossary.md#4-graphs-sparsity-and-solvers)): which variables are connected by measurements?
 
 ```text
 x1 ─ factor ─ l1
@@ -188,7 +188,7 @@ The two subtrees under 8, {6, 4, 5, 2, 3} and {7, 1}, share nothing until 8, so 
 
 ## 7. This becomes very important for iSAM2
 
-iSAM2 uses a [**Bayes tree**](bayes_tree.md), which is built directly from the elimination tree (the pipeline is drawn once, in §11).
+**iSAM2** ([details](isam2_optimization.md); an incremental solver that updates the previous solution as new measurements arrive) uses a [**Bayes tree**](bayes_tree.md), which is built directly from the elimination tree (the pipeline is drawn once, in §11).
 
 Concretely, a Bayes tree is the elimination tree with some of its nodes merged into **cliques**, where each clique stores the conditional density produced when its variables were eliminated ([bayes_tree.md §13](bayes_tree.md#13-one-more-important-concept-cliques)).
 
