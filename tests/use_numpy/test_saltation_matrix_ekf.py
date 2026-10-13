@@ -268,13 +268,6 @@ def test_run_ekf_variants_beat_dead_reckoning(saltation_matrix_ekf):
     assert np.sqrt(np.mean(pos_err_salt ** 2)) < rms_dr
 
 
-def test_nees_zero_for_exact_match(saltation_matrix_ekf):
-    m = saltation_matrix_ekf
-    x = np.array([1.0, 2.0, 0.0, 3.0, 4.0, -5.0])
-    P = np.eye(6) * 0.1
-    assert m.nees(x, x.copy(), P) == 0.0
-
-
 def test_detect_bounce_ticks_known_case(saltation_matrix_ekf):
     m = saltation_matrix_ekf
     # a hand-built height sequence with an obvious single local minimum at index 2

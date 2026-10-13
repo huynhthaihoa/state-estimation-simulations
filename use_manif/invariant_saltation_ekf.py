@@ -40,7 +40,7 @@ import matplotlib.pyplot as plt
 import manifpy as manif
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import measure_performance
+from utils import measure_performance, averaged_nees_bounds, nees
 
 # Blocks of a 9-vector in manif's SE_2_3 tangent order.
 POS, ROT, VEL = slice(0, 3), slice(3, 6), slice(6, 9)
@@ -696,17 +696,6 @@ def error_vector(name, X_true, X_est):
     return X_est.lminus(X_true).coeffs_copy()
 
 
-def nees(err, P):
-    """Normalized Estimation Error Squared, err^T P^-1 err (expected 9 for a
-    consistent 9-DoF filter, averaged over many trials).
-    Arguments:
-        err: (9,), P: (9,9)
-    Returns:
-        scalar
-    """
-    return float(err @ np.linalg.solve(P, err))
-
-
 def state_errors(X_true_list, X_est_list):
     """Rotation (deg), velocity (m/s) and position (m) error norms per tick.
     Arguments:
@@ -811,19 +800,6 @@ def child_detect_rngs(rng):
         dict name -> Generator
     """
     return dict(zip(FILTERS, rng.spawn(len(FILTERS))))
-
-
-def averaged_nees_bounds(dof, n_trials, z=1.959964):
-    """Two-sided 95% interval for NEES averaged over n_trials runs
-    (Wilson-Hilferty approximation of the chi-squared quantiles).
-    Arguments:
-        dof: state dimension, n_trials: trials averaged, z: normal quantile
-    Returns:
-        (lower, upper)
-    """
-    k = dof * n_trials
-    c = 2.0 / (9.0 * k)
-    return tuple(k * (1.0 - c + s * z * np.sqrt(c)) ** 3 / n_trials for s in (-1.0, 1.0))
 
 
 def default_landmarks():

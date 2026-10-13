@@ -114,10 +114,3 @@ def test_fixed_anisotropic_degrades_with_rotation_but_heading_aware_does_not(fri
     # at its worst, fixed_anisotropic (pointing the wrong way) should be at least as
     # inconsistent as isotropic (which never claimed a direction to begin with).
     assert np.mean(nees_fixed[near_90_mismatch]) >= np.mean(nees_iso[near_90_mismatch])
-
-
-def test_nees_zero_for_exact_match(friction_anisotropic_ekf):
-    m = friction_anisotropic_ekf
-    x = np.array([1.0, 2.0, 0.5])
-    P = np.eye(3) * 0.1
-    assert m.nees(x, x.copy(), P) == 0.0

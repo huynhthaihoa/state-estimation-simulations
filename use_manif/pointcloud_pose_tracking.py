@@ -66,6 +66,7 @@ import manifpy as manif
 from scipy.spatial.transform import Rotation
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from manif_utils import pose_errors
 from utils import measure_performance, true_body_rates, unscented_weights, unscented_sigma_offsets
 
 def make_body_point_cloud(n_points, rng, half_extent=0.5):
@@ -605,25 +606,6 @@ def run_batch_gn(T_init_list, T_prior0, P_init, u_meas, z, body_points, dt, Q_ta
         print(f"    Batch GN reached max iterations ({gn_max_iters}) without full convergence")
 
     return T_est
-
-
-def pose_errors(T_true_list, T_est_list):
-    """Rotation geodesic error (deg) and position error (m), per step.
-    Arguments:
-        T_true_list: list of true poses (manif.SE3)
-        T_est_list: list of estimated poses (manif.SE3)
-    Returns:
-        rot_err: (N+1,) array of rotation errors (deg), one per pose
-        pos_err: (N+1,) array of position errors (m), one per pose
-    """
-    n = len(T_true_list)
-    rot_err, pos_err = np.zeros(n), np.zeros(n)
-    for k in range(n):
-        R_true = manif.SO3(T_true_list[k].coeffs()[3:7])
-        R_est = manif.SO3(T_est_list[k].coeffs()[3:7])
-        rot_err[k] = np.degrees(np.linalg.norm(R_est.rminus(R_true).coeffs()))
-        pos_err[k] = np.linalg.norm(T_true_list[k].translation() - T_est_list[k].translation())
-    return rot_err, pos_err
 
 
 def main():

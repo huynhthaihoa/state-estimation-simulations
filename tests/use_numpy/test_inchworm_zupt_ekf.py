@@ -184,10 +184,3 @@ def test_run_ekf_rejects_unknown_zupt_mode(inchworm_zupt_ekf):
     is_anchor = np.array([True, True, False])
     with pytest.raises(ValueError):
         m.run_ekf(x_init, P_init, z, 0.1, 2, 0.05, 0.01, 0.01, is_anchor, zupt_mode="bogus")
-
-
-def test_nees_zero_for_exact_match(inchworm_zupt_ekf):
-    m = inchworm_zupt_ekf
-    x = np.array([1.0, 2.0])
-    P = np.eye(2) * 0.1
-    assert m.nees(x, x.copy(), P) == 0.0

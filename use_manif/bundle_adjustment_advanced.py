@@ -35,6 +35,7 @@ import matplotlib.pyplot as plt
 import manifpy as manif
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from manif_utils import camera_project
 from utils import pair_key, forward_facing_rotation, rotation_matrix_to_quaternion_xyzw
 
 
@@ -105,48 +106,6 @@ def generate_landmark_corridor(T_true, n_landmarks_per_keyframe, lateral_spread,
                       rng.uniform(-spacing, spacing) * forward)
             landmarks.append(cam_pos + offset)
     return np.array(landmarks)
-
-
-def camera_project(T, P, K, with_jacobians=False):
-    """Pinhole reprojection of a world point through a camera pose:
-    p_c = T^-1 @ P (world point into the camera frame), then
-    u = fx*x/z + cx, v = fy*y/z + cy. Pose Jacobian obtained by chaining
-    manifpy's own `inverse`/`act` Jacobian out-parameters. Identical to
-    bundle_adjustment.py's camera_project (duplicated rather than imported
-    -- this codebase never imports across sibling scripts).
-    Arguments:
-        T: camera pose, camera-to-world (manif.SE3)
-        P: world point (3,)
-        K: (fx, fy, cx, cy) camera intrinsics
-        with_jacobians: if True, also return (J_pose, J_point)
-    Returns:
-        pixel: predicted (2,) pixel coordinates
-        J_pose: (2,6) Jacobian of pixel wrt a right-perturbation of T, or None
-        J_point: (2,3) Jacobian of pixel wrt P, or None
-    """
-    fx, fy, cx, cy = K
-
-    J_pose = J_point = None
-    if with_jacobians:
-        J_inv = np.zeros((6, 6))
-        T_inv = T.inverse(J_inv)
-        J_act_self, J_act_point = np.zeros((3, 6)), np.zeros((3, 3))
-        p_c = T_inv.act(P, J_act_self, J_act_point)
-    else:
-        p_c = T.inverse().act(P)
-
-    x, y, z = p_c
-    z_safe = z if abs(z) > 1e-9 else (1e-9 if z >= 0 else -1e-9)
-    pixel = np.array([fx * x / z_safe + cx, fy * y / z_safe + cy])
-
-    if with_jacobians:
-        J_proj = np.array([
-            [fx / z_safe, 0.0, -fx * x / z_safe ** 2],
-            [0.0, fy / z_safe, -fy * y / z_safe ** 2],
-        ])
-        J_pose = J_proj @ J_act_self @ J_inv
-        J_point = J_proj @ J_act_point
-    return pixel, J_pose, J_point
 
 
 def compute_visibility(T_true, P_true, K, max_view_range):

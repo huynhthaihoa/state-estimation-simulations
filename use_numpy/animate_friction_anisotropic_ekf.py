@@ -39,7 +39,9 @@ from matplotlib.patches import Ellipse
 from friction_anisotropic_ekf import (
     generate_ground_truth_and_data, run_ekf_isotropic, run_ekf_fixed_anisotropic,
     run_ekf_heading_aware, run_monte_carlo_consistency, isotropic_Q_pos, anisotropic_Q_pos,
-    averaged_nees_bounds, state_errors)
+    state_errors)
+from utils import averaged_nees_bounds
+
 
 COLORS = {"isotropic": "tab:gray", "fixed_anisotropic": "tab:red", "heading_aware": "tab:blue"}
 

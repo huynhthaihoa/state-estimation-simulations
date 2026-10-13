@@ -29,7 +29,8 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-from lie_utils import se3_exp, se3_log, se3_inv, se3_adjoint, compute_se3_inv_right_jacobian, rotation_geodesic_error
+from lie_utils import se3_exp, se3_log, se3_inv, se3_adjoint, compute_se3_inv_right_jacobian
+from numpy_utils import pose_errors
 
 def generate_ground_truth_trajectory(side_length, nodes_per_side=1):
     """A closed square loop in the XY plane (start -> +X -> +Y -> -X), with an
@@ -211,23 +212,6 @@ def run_pose_graph_optimization(T_init_list, constraints, info_matrix, damping, 
         print(f"    Reached max iterations ({gn_max_iters}) without full convergence")
 
     return T_est
-
-
-def pose_errors(T_true_list, T_est_list):
-    """Rotation geodesic error (deg) and position error (m), per node.
-    Arguments:
-        T_true_list: list of true poses (4,4)
-        T_est_list: list of estimated poses (4,4)
-    Returns:
-        rot_err: (N,) array of rotation errors (deg)
-        pos_err: (N,) array of position errors (m)
-    """
-    n = len(T_true_list)
-    rot_err, pos_err = np.zeros(n), np.zeros(n)
-    for k in range(n):
-        rot_err[k] = np.degrees(rotation_geodesic_error(T_true_list[k][0:3, 0:3], T_est_list[k][0:3, 0:3]))
-        pos_err[k] = np.linalg.norm(T_true_list[k][0:3, 3] - T_est_list[k][0:3, 3])
-    return rot_err, pos_err
 
 
 def main():

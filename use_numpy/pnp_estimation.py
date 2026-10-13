@@ -38,43 +38,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from lie_utils import skew, so3_exp, se3_exp, rotation_geodesic_error
-
-
-def camera_project(T, P, K, with_jacobians=False):
-    """Pinhole reprojection of a world point through a camera pose:
-    p_c = T^-1 @ P (world point into the camera frame), then
-    u = fx*x/z + cx, v = fy*y/z + cy. Identical to
-    bundle_adjustment_advanced.py's camera_project (duplicated rather than
-    imported -- this codebase never imports across sibling scripts, only
-    through the shared lie_utils.py).
-    Arguments:
-        T: camera pose, camera-to-world (4,4)
-        P: world point (3,)
-        K: (fx, fy, cx, cy) camera intrinsics
-        with_jacobians: if True, also return (J_pose, J_point)
-    Returns:
-        pixel: predicted (2,) pixel coordinates
-        J_pose: (2,6) Jacobian of pixel wrt a right-perturbation of T ([dv,dw] order), or None
-        J_point: (2,3) Jacobian of pixel wrt P, or None
-    """
-    fx, fy, cx, cy = K
-    R, t = T[0:3, 0:3], T[0:3, 3]
-    p_c = R.T @ (P - t)
-    x, y, z = p_c
-    z_safe = z if abs(z) > 1e-9 else (1e-9 if z >= 0 else -1e-9)
-
-    pixel = np.array([fx * x / z_safe + cx, fy * y / z_safe + cy])
-
-    J_pose = J_point = None
-    if with_jacobians:
-        J_proj = np.array([
-            [fx / z_safe, 0.0, -fx * x / z_safe ** 2],
-            [0.0, fy / z_safe, -fy * y / z_safe ** 2],
-        ])
-        J_pc_wrt_pose = np.hstack([-np.eye(3), skew(p_c)])
-        J_pose = J_proj @ J_pc_wrt_pose
-        J_point = J_proj @ R.T
-    return pixel, J_pose, J_point
+from numpy_utils import camera_project
 
 
 def generate_scene(n_points, K, rng):

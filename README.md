@@ -43,12 +43,15 @@ simulate against), `rotation_matrix_to_quaternion_xyzw`, `umeyama_alignment`/`la
 (Givens-rotation incremental QR update, `pose_graph_incremental.py`), `symbolic_eliminate`/
 `bayes_tree_affected_path` (elimination-tree construction and affected-region query,
 `bayes_tree_construction.py`), `look_at_rotation`/`forward_facing_rotation`/`pair_key` (camera-pose
-and pairing helpers for the bundle-adjustment scripts), and `measure_performance` (the shared
-timing/peak-memory measurement helper every script's benchmark printout uses).
+and pairing helpers for the bundle-adjustment scripts), `nees`/`averaged_nees_bounds` (NEES and its
+95% band for an average over Monte Carlo trials, used by the filter-consistency scripts), and
+`measure_performance` (the shared timing/peak-memory measurement helper every script's benchmark
+printout uses).
 
 ### [use_numpy/](use_numpy/) - Plain numpy, hand-rolled Lie-group math
 
 - [lie_utils.py](use_numpy/lie_utils.py): shared module of the hand-rolled Lie-group helpers (`skew`, `rotation_geodesic_error`, `so3_exp`, `so3_right_jacobian`, `se3_exp`, `se3_log`, `se3_inv`, `se3_adjoint`, `se3_ad`, `compute_so3_inv_right_jacobian`, `compute_se3_inv_right_jacobian`, `se3_right_jacobian`; plus `so3_log`, `so3_left_jacobian` and the $`SE_2(3)`$ helpers `se23_make`, `se23_parts`, `se23_inv`, `se23_exp`, `se23_log`, `se23_adjoint`; also grouped under short names as static methods of `SO3`/`SE3`/`SE23`, e.g. `SE3.exp`, `SE3.log`, `SO3.inv_right_jacobian`, `SE23.exp`; these are plain functions on arrays, not an object API like manif's). Imported by 11 of the other 15 scripts in this directory (`imu_integration_comparison.py`, `robot_imu_simulation.py`, `imu_preintegration.py`, `pointcloud_pose_tracking.py`, `pose_graph.py`, `pose_graph_incremental.py`, `bundle_adjustment.py`, `bundle_adjustment_advanced.py`, `pnp_estimation.py`, `sliding_window_marginalization.py`, and `invariant_saltation_ekf.py`); none keeps its own inline copy of the skew/Jacobian helpers. The remaining 4 (`bayes_tree_construction.py`, `friction_anisotropic_ekf.py`, `inchworm_zupt_ekf.py`, `saltation_matrix_ekf.py`) don't need Lie-group math for what they do. (These counts exclude the `*_v2.py` and `animate_*.py` scripts below; `pointcloud_pose_tracking_v2.py` and `animate_bundle_adjustment.py` import `lie_utils.py` too.)
+- [numpy_utils.py](use_numpy/numpy_utils.py): shared `camera_project` (pinhole reprojection with pose/point Jacobians) and `pose_errors` (per-pose rotation and position errors), built on `lie_utils.py`. Imported by `bundle_adjustment.py`, `bundle_adjustment_advanced.py`, `pnp_estimation.py`, `pointcloud_pose_tracking.py` (+ `_v2`) and `pose_graph.py`.
 - [imu_integration_comparison.py](use_numpy/imu_integration_comparison.py): naive Euler-angle vs. $SO(3)$ exp-map orientation integration.
 - [robot_imu_simulation.py](use_numpy/robot_imu_simulation.py): high-rate IMU propagation + a low-rate Gauss-Newton position-only correction against a noisy GPS-style fix (the correction's Jacobian has a structurally zero angular block, so the correction never changes orientation; only the IMU [dead-reckons](docs/optimization/factor_graph.md#2-why-do-we-need-it) it), reusing `lie_utils.py`'s $SE(3)$ $Exp$ math.
 - [imu_preintegration.py](use_numpy/imu_preintegration.py): IMU preintegration: compresses a burst of high-frequency IMU samples into one relative measurement plus first-order bias Jacobians. When the bias estimate changes, a Taylor-expansion correction updates it instantly, without re-integrating.
@@ -88,6 +91,7 @@ The other 6 scripts are NumPy-only:
 - `saltation_matrix_ekf.py`, `inchworm_zupt_ekf.py`, `friction_anisotropic_ekf.py`: plain Euclidean states (no manifold question).
 - `pnp_estimation.py`, `sliding_window_marginalization.py`: single implementation; the PnP recipe and the bounded-vs-unbounded scaling result are backend-agnostic.
 
+- [manif_utils.py](use_manif/manif_utils.py): manif versions of `camera_project` and `pose_errors`, shared by `bundle_adjustment.py`, `bundle_adjustment_advanced.py`, `pointcloud_pose_tracking.py` and `pose_graph.py`.
 - [imu_integration_comparison.py](use_manif/imu_integration_comparison.py)
 - [robot_imu_simulation.py](use_manif/robot_imu_simulation.py)
 - [imu_preintegration.py](use_manif/imu_preintegration.py): same bias-Jacobian preintegration bundle, with the $SO(3)$ $Exp$ map/right Jacobian/skew(hat) math delegated to manif's `rplus` Jacobian out-parameters and `SO3Tangent.hat()` instead of hand-rolled formulas.

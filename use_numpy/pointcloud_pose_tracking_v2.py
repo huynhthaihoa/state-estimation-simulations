@@ -69,7 +69,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lie_utils import skew, se3_exp, se3_log, se3_inv, se3_adjoint, compute_se3_inv_right_jacobian, se3_right_jacobian, rotation_geodesic_error
+from lie_utils import skew, se3_exp, se3_log, se3_inv, se3_adjoint, compute_se3_inv_right_jacobian, se3_right_jacobian
+from numpy_utils import pose_errors
 from utils import measure_performance, true_body_rates, unscented_weights, unscented_sigma_offsets
 
 def make_body_point_cloud(n_points, rng, half_extent=0.5):
@@ -804,23 +805,6 @@ def run_batch_gn(T_init_list, T_prior0, P_init, u_meas, z, body_points, dt, Q_ta
     smoother = BatchGNSmoother(T_prior0, P_init, u_meas, z, body_points, dt, Q_tangent,
                                point_noise_std)
     return smoother.solve(T_init_list, gn_tol, gn_max_iters)
-
-
-def pose_errors(T_true_list, T_est_list):
-    """Rotation geodesic error (deg) and position error (m), per step.
-    Arguments:
-        T_true_list: list of true poses (4,4)
-        T_est_list: list of estimated poses (4,4)
-    Returns:
-        rot_err: (N+1,) array of rotation errors (deg), one per pose
-        pos_err: (N+1,) array of position errors (m), one per pose
-    """
-    n = len(T_true_list)
-    rot_err, pos_err = np.zeros(n), np.zeros(n)
-    for k in range(n):
-        rot_err[k] = np.degrees(rotation_geodesic_error(T_true_list[k][0:3, 0:3], T_est_list[k][0:3, 0:3]))
-        pos_err[k] = np.linalg.norm(T_true_list[k][0:3, 3] - T_est_list[k][0:3, 3])
-    return rot_err, pos_err
 
 
 def main():

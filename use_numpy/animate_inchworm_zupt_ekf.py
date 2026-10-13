@@ -39,7 +39,8 @@ from matplotlib.patches import Rectangle
 
 from inchworm_zupt_ekf import (generate_ground_truth_and_data, run_ekf_never_zupt,
                                run_ekf_always_zupt, run_ekf_phase_conditional_zupt,
-                               run_monte_carlo_consistency, averaged_nees_bounds, state_errors)
+                               run_monte_carlo_consistency, state_errors)
+from utils import averaged_nees_bounds
 
 
 def main():

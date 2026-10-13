@@ -68,25 +68,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import measure_performance
-
-def averaged_nees_bounds(dof, n_trials, z=1.959964):
-    """Two-sided 95% acceptance interval for NEES averaged over n_trials
-    independent runs. n_trials * (average NEES) is chi-squared with
-    dof * n_trials degrees of freedom; its quantiles come from the
-    Wilson-Hilferty approximation (accurate to well under 1% at the
-    hundreds of degrees of freedom used here), avoiding a scipy dependency.
-    The single-run bound (7.81 for 3 DoF) does not apply to an average.
-    Arguments:
-        dof: state dimension
-        n_trials: number of Monte Carlo trials averaged
-        z: standard-normal quantile (1.96 for a two-sided 95% interval)
-    Returns:
-        (lower, upper): bounds on the averaged NEES
-    """
-    k = dof * n_trials
-    c = 2.0 / (9.0 * k)
-    return tuple(k * (1.0 - c + s * z * np.sqrt(c)) ** 3 / n_trials for s in (-1.0, 1.0))
+from utils import measure_performance, averaged_nees_bounds, nees
 
 
 def rotation_2d(theta):
@@ -362,23 +344,6 @@ def state_errors(x_true, x_est):
     return pos_err, theta_err
 
 
-def nees(x_true, x_est, P):
-    """Normalized Estimation Error Squared: (x_true-x_est)^T @ P^-1 @ (x_true-x_est).
-    A consistent filter's NEES should average to the state dimension (3 here)
-    across many independent trials; a value that's persistently much larger
-    means the filter's reported covariance P is too small (overconfident)
-    for the errors it is actually making.
-    Arguments:
-        x_true: true state (3,)
-        x_est: estimated state (3,)
-        P: estimated covariance (3,3)
-    Returns:
-        nees: scalar NEES value
-    """
-    err = x_true - x_est
-    return float(err @ np.linalg.inv(P) @ err)
-
-
 def run_monte_carlo_consistency(x_true, dt, v_cmd, omega_cmd, sigma_grip, sigma_slip, sigma_theta,
                                  R_pos, theta_ref, init_pos_noise_std, init_theta_noise_std,
                                  n_trials, rng):
@@ -431,9 +396,9 @@ def run_monte_carlo_consistency(x_true, dt, v_cmd, omega_cmd, sigma_grip, sigma_
                                                   R_pos)
 
         for k in range(n_pts):
-            sum_iso[k] += nees(x_true_trial[k], x_iso[k], P_iso[k])
-            sum_fixed[k] += nees(x_true_trial[k], x_fixed[k], P_fixed[k])
-            sum_aware[k] += nees(x_true_trial[k], x_aware[k], P_aware[k])
+            sum_iso[k] += nees(x_true_trial[k] - x_iso[k], P_iso[k])
+            sum_fixed[k] += nees(x_true_trial[k] - x_fixed[k], P_fixed[k])
+            sum_aware[k] += nees(x_true_trial[k] - x_aware[k], P_aware[k])
 
     return sum_iso / n_trials, sum_fixed / n_trials, sum_aware / n_trials
 

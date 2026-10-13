@@ -15,6 +15,7 @@ from utils import (
     symbolic_eliminate,
     bayes_tree_affected_path,
     measure_performance,
+    nees,
 )
 
 
@@ -198,3 +199,10 @@ def test_measure_performance_matches_direct_call_and_reports_positive_metrics():
     assert result == 42
     assert avg_time > 0
     assert avg_mem >= 0
+
+
+def test_nees_zero_for_exact_match_and_matches_quadratic_form():
+    err = np.array([1.0, -2.0, 0.5])
+    P = np.diag([0.1, 0.4, 0.2])
+    assert nees(np.zeros(3), P) == 0.0
+    assert nees(err, P) == pytest.approx(err @ np.linalg.inv(P) @ err)

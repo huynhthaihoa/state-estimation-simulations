@@ -302,3 +302,37 @@ def measure_performance(fn, *args, n_steps, **kwargs):
     tracemalloc.stop()
 
     return result, elapsed / n_steps, peak_mem
+
+
+def averaged_nees_bounds(dof, n_trials, z=1.959964):
+    """Two-sided 95% acceptance interval for NEES averaged over n_trials
+    independent runs. n_trials * (average NEES) is chi-squared with
+    dof * n_trials degrees of freedom; its quantiles come from the
+    Wilson-Hilferty approximation (accurate to well under 1% at the
+    hundreds of degrees of freedom used here), avoiding a scipy dependency.
+    The single-run bound (chi-squared with dof degrees of freedom) does not
+    apply to an average.
+    Arguments:
+        dof: state dimension
+        n_trials: number of Monte Carlo trials averaged
+        z: standard-normal quantile (1.96 for a two-sided 95% interval)
+    Returns:
+        (lower, upper): bounds on the averaged NEES
+    """
+    k = dof * n_trials
+    c = 2.0 / (9.0 * k)
+    return tuple(k * (1.0 - c + s * z * np.sqrt(c)) ** 3 / n_trials for s in (-1.0, 1.0))
+
+
+def nees(err, P):
+    """Normalized Estimation Error Squared, err^T P^-1 err. A consistent
+    filter's NEES averages to the state dimension over many independent
+    trials; a persistently larger value means the reported covariance P is
+    too small (overconfident) for the errors the filter actually makes.
+    Arguments:
+        err: estimation error (n,), e.g. x_true - x_est
+        P: estimated covariance (n,n)
+    Returns:
+        scalar NEES value
+    """
+    return float(err @ np.linalg.solve(P, err))

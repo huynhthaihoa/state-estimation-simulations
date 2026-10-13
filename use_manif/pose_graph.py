@@ -24,6 +24,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import manifpy as manif
+from manif_utils import pose_errors
 
 
 def generate_ground_truth_trajectory(side_length, nodes_per_side=1):
@@ -204,25 +205,6 @@ def run_pose_graph_optimization(T_init_list, constraints, info_matrix, damping, 
         print(f"    Reached max iterations ({gn_max_iters}) without full convergence")
 
     return T_est
-
-
-def pose_errors(T_true_list, T_est_list):
-    """Rotation geodesic error (deg) and position error (m), per node.
-    Arguments:
-        T_true_list: list of true poses (manif.SE3)
-        T_est_list: list of estimated poses (manif.SE3)
-    Returns:
-        rot_err: (N,) array of rotation errors (deg)
-        pos_err: (N,) array of position errors (m)
-    """
-    n = len(T_true_list)
-    rot_err, pos_err = np.zeros(n), np.zeros(n)
-    for k in range(n):
-        R_true = manif.SO3(T_true_list[k].coeffs()[3:7])
-        R_est = manif.SO3(T_est_list[k].coeffs()[3:7])
-        rot_err[k] = np.degrees(np.linalg.norm(R_est.rminus(R_true).coeffs()))
-        pos_err[k] = np.linalg.norm(T_true_list[k].translation() - T_est_list[k].translation())
-    return rot_err, pos_err
 
 
 def main():
