@@ -128,7 +128,11 @@ uv run pytest tests/ -v
 
 #### Purpose
 
-Integrates the same noisy gyro + body-velocity stream two ways: attitude kept as a **flat Euler-angle vector** (`euler += omega*dt`) vs. attitude kept on **$SO(3)$ and updated via the exponential map** to isolate the error that the flat vector-space approximation introduces on its own. In the `use_numpy` version each method is scored against its own noise-free ground truth (the noise-free rates integrated with that method's own update rule), not a shared exp-map one; the `use_manif` version scores both against one shared SE(3) truth (a ~0.36° difference in the naive error, which is ~70°). Plots rotation and position error (log scale) over time.
+Integrates the same noisy gyro + body-velocity stream two ways: 
+ 1. Attitude kept as a **flat Euler-angle vector** (`euler += omega*dt`) 
+ 2. Attitude kept on **$SO(3)$ and updated via the exponential map** to isolate the error that the flat vector-space approximation introduces on its own. 
+
+In the `use_numpy` version each method is scored against its own noise-free ground truth (the noise-free rates integrated with that method's own update rule), not a shared exp-map one; the `use_manif` version scores both against one shared SE(3) truth (a ~0.36° difference in the naive error, which is ~70°). Plots rotation and position error (log scale) over time.
 
 ![Two log-scale panels from imu_integration_comparison.py: rotation error and position error over 20 s for naive Euler-angle integration versus the SO(3) exponential-map update, both fed the same noisy IMU samples](assets/imu_integration_comparison.png)
 
@@ -681,11 +685,11 @@ uv run python use_numpy/sliding_window_marginalization.py --nodes-per-side-sweep
 `docs/filtering/invariant_saltation_ekf.md` lifts §11's bouncing point mass to a **tumbling rigid body carrying an IMU**, with state $`X = (R, v, p) \in SE_2(3)`$, tracked by a **right-invariant EKF (RIEKF)**. Between bounces the RIEKF's error dynamics are exactly linear and trajectory-independent ($`\Phi = e^{A h}`$ with constant $`A`$), and body-frame landmark measurements give a constant $`H`$. The bounce $`(R, v, p) \mapsto (R, M v, p)`$ is not a group automorphism, so its Jacobian in invariant coordinates is state-dependent.
 
 Five filters, identical apart from the bounce treatment or the error coordinates:
-- **RIEKF, invariant-naive**: $`\mathrm{blockdiag}(I, M, I)`$ - applies the reset to the velocity error as if it were an automorphism.
-- **RIEKF, reset-Jacobian**: $`T(X^+)^{-1} DR\, T(X^-)`$ - correct state dependence, no impact-timing correction.
-- **RIEKF, saltation**: $`\Xi_{RI} = T(X^+)^{-1} \Xi_{\text{world}} T(X^-)`$ - both; matches a finite-difference ground truth of the exact hybrid map on $`SE_2(3)`$ to about $`10^{-9}`$ (the other two are off by order one).
-- **RIEKF, saltation + timing noise**: saltation plus $`s^2 w w^\top`$ at each bounce, where $`w = T(X^+)^{-1}(f^+ - DR\, f^-)`$ is how far the post-impact state moves per second of contact-detection timing error and $`s`$ is that error's RMS. Identical to saltation with exact detection (the default).
-- **World-frame EKF, saltation**: the non-invariant baseline.
+ 1. **RIEKF, invariant-naive**: $`\mathrm{blockdiag}(I, M, I)`$ - applies the reset to the velocity error as if it were an automorphism.
+ 2. **RIEKF, reset-Jacobian**: $`T(X^+)^{-1} DR\, T(X^-)`$ - correct state dependence, no impact-timing correction.
+ 3. **RIEKF, saltation**: $`\Xi_{RI} = T(X^+)^{-1} \Xi_{\text{world}} T(X^-)`$ - both; matches a finite-difference ground truth of the exact hybrid map on $`SE_2(3)`$ to about $`10^{-9}`$ (the other two are off by order one).
+ 4. **RIEKF, saltation + timing noise**: saltation plus $`s^2 w w^\top`$ at each bounce, where $`w = T(X^+)^{-1}(f^+ - DR\, f^-)`$ is how far the post-impact state moves per second of contact-detection timing error and $`s`$ is that error's RMS. Identical to saltation with exact detection (the default).
+ 5. **World-frame EKF, saltation**: the non-invariant baseline.
 
 Results (Monte Carlo NEES over mode-matched ticks, 200 trials; consistent value 9, 95% interval [8.42, 9.60]): after bounces the invariant-naive filter is overconfident (13.45 at the defaults, 16.44 with `--meas-every 25`), reset-Jacobian and saltation are close to consistent (9.33/8.89 and 10.36/9.37), and the world-frame EKF is already inconsistent before the first bounce (14.01/18.92). RMS errors are nearly identical across the RIEKFs - the effect is in the reported uncertainty.
 
