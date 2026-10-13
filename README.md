@@ -674,7 +674,7 @@ uv run python use_numpy/sliding_window_marginalization.py --nodes-per-side-sweep
 - `--seed`: RNG seed
 - `--out`: save the figure to this path instead of showing it (default: show)
 
-### 15. Invariant EKF on SE_2(3) through a bounce
+### 15. Invariant EKF on $SE_2(3)$ through a bounce
 
 #### Purpose
 
