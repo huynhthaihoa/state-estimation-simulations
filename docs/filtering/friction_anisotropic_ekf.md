@@ -19,7 +19,7 @@ So a filter that fixes the ellipse orientation once (say at $t = 0$) is right on
 - `heading_aware`: ellipse re-oriented every step to the current heading.
 - `isotropic`: no directional claim at all, the safe fallback.
 
-**Where the question comes from.** Hybrid-systems filtering usually models friction as discrete contact modes (stuck or sliding), each switch with its own saltation matrix ([glossary](../glossary.md#7-hybrid-discontinuous-systems)). Kong et al. (2024, §V-F) derive that matrix for stick-slip under **Coulomb friction** (the textbook law: friction can reach a fixed coefficient times the normal force, and equals that bound while sliding), whose single coefficient $\mu$ has no preferred direction. For an anisotropic pad that is not enough: slip variance depends on the heading relative to the pad's own friction axes, not only on the active mode. A filter that switches modes correctly but keeps an isotropic process-noise covariance $`Q`$ (defined in §1) treats slip along the low-friction axis like slip along the high-friction one.
+**Where the question comes from.** Hybrid-systems filtering usually models friction as discrete contact modes (stuck or sliding), each switch with its own saltation matrix ([glossary](../glossary.md#saltation-matrix)). Kong et al. (2024, §V-F) derive that matrix for stick-slip under **Coulomb friction** (the textbook law: friction can reach a fixed coefficient times the normal force, and equals that bound while sliding), whose single coefficient $\mu$ has no preferred direction. For an anisotropic pad that is not enough: slip variance depends on the heading relative to the pad's own friction axes, not only on the active mode. A filter that switches modes correctly but keeps an isotropic process-noise covariance $`Q`$ (defined in §1) treats slip along the low-friction axis like slip along the high-friction one.
 
 We work through the simplest concrete version, using [`friction_anisotropic_ekf.py`](../../use_numpy/friction_anisotropic_ekf.py)'s crawling unicycle.
 
@@ -28,7 +28,7 @@ We work through the simplest concrete version, using [`friction_anisotropic_ekf.
 *Figure: the setup at `use_numpy/friction_anisotropic_ekf.py`'s defaults, plotted by `uv run python assets/make_figures.py friction_anisotropic_ekf_concept`. Ellipses are enlarged to be visible; their 5:1 axis ratio is exact.*
 
 **Relation to the point-cloud note.** This applies an argument the repo already made, on the other side of the filter:
-- [`pointcloud_pose_tracking_empirical_note.md`](pointcloud_pose_tracking_empirical_note.md) §2/§5 (terms in the [glossary](../glossary.md#1-geometry-and-lie-groups)) showed that a noise ellipsoid fixed in an object's own frame looks anisotropic-and-rotating in the world frame, and that what matters is whether the filter's noise model tracks that rotation, not "rigid vs. non-rigid." That note was about *measurement* noise in a point-cloud registration EKF/IEKF.
+- [`pointcloud_pose_tracking_empirical_note.md`](pointcloud_pose_tracking_empirical_note.md) §2/§5 (terms in the [glossary](../glossary.md#isotropic-and-anisotropic)) showed that a noise ellipsoid fixed in an object's own frame looks anisotropic-and-rotating in the world frame, and that what matters is whether the filter's noise model tracks that rotation, not "rigid vs. non-rigid." That note was about *measurement* noise in a point-cloud registration EKF/IEKF.
 - Here we apply the same argument to *process* noise, for a robot that is actually moving and turning.
 - We stay with an ordinary EKF throughout: no new IEKF/Lie-group derivation, since the question is purely "does $Q$'s shape track heading," not a linearization-frame question.
 
@@ -144,7 +144,7 @@ r = z - H x^{-}, \qquad S = H P^{-} H^\top + R, \qquad K = P^{-} H^\top S^{-1}, 
 x^{+} = x^{-} + K r, \qquad P^{+} = (I - K H)\,P^{-}
 ```
 
-Here $`z`$ is the measured position, $`R`$ is the measurement-noise covariance with $`\sigma_{\text{pos}}`$ its standard deviation (this $`R`$ is not the rotation $`R(\theta_Q)`$ above), $`r`$ is the **innovation** (not the arc radius $r$ of the predict step), $`S`$ is its covariance and $`K`$ the **Kalman gain** ([glossary](../glossary.md#6-kalman-filter-family)).
+Here $`z`$ is the measured position, $`R`$ is the measurement-noise covariance with $`\sigma_{\text{pos}}`$ its standard deviation (this $`R`$ is not the rotation $`R(\theta_Q)`$ above), $`r`$ is the **innovation** (not the arc radius $r$ of the predict step), $`S`$ is its covariance and $`K`$ the **Kalman gain** ([glossary](../glossary.md#innovation-and-kalman-gain)).
 
 Heading is never measured directly. It gets corrected only through the position-heading cross-covariance that $F$'s third column builds up in $P^{-}$. So `heading_aware`'s $\hat\theta_{k-1}$ is only as good as that indirect correction.
 
@@ -159,7 +159,7 @@ Two consequences follow directly from these formulas:
 
 ## 2. The dominant finding: `fixed_anisotropic` is dramatically worse, everywhere
 
-Monte Carlo **NEES** ([glossary](../glossary.md#2-uncertainty-and-probability)) over 500 trials (seed 0, $`dt = 0.05\,\text{s}`$, one full loop over $`20\,\text{s}`$, all script defaults), binned by how far the true heading has rotated away from `fixed_anisotropic`'s fixed reference heading. Each trial draws a fresh slip realization, initial error and measurement noise. Redrawing the slip matters because slip is the process noise whose model $Q$ is being tested.
+Monte Carlo **NEES** ([glossary](../glossary.md#consistency-and-nees)) over 500 trials (seed 0, $`dt = 0.05\,\text{s}`$, one full loop over $`20\,\text{s}`$, all script defaults), binned by how far the true heading has rotated away from `fixed_anisotropic`'s fixed reference heading. Each trial draws a fresh slip realization, initial error and measurement noise. Redrawing the slip matters because slip is the process noise whose model $Q$ is being tested.
 
 ![Two panels from friction_anisotropic_ekf.py: the circular path with the per-step slip covariance ellipse turning with the heading, and Monte Carlo NEES over one full turn for isotropic, frozen anisotropic and heading-aware process noise](../../assets/friction_anisotropic_ekf.png)
 

@@ -1,6 +1,6 @@
 # Front-end & Back-end in SLAM
 
-In **SLAM** ([glossary](glossary.md#5-slam-system)), the terms **front-end** and **back-end** describe two major parts of the system.
+In **SLAM** ([glossary](glossary.md#slam-simultaneous-localization-and-mapping)), the terms **front-end** and **back-end** describe two major parts of the system.
 
 Think of them as:
 
@@ -97,7 +97,7 @@ For example:
 \min_{\mathbf{x}} \frac12\sum_i \|r_i(\mathbf{x})\|^2
 ```
 
-where $r_i$ is the [residual](glossary.md#3-least-squares-optimization) of measurement $i$.
+where $r_i$ is the [residual](glossary.md#residual-error) of measurement $i$.
 
 **Intuition:** the residual is the gap between prediction and measurement. Toy case: the model predicts a landmark at pixel 100, the camera sees it at 103, so the residual has size 3. The sign convention varies, but the squared cost does not care.
 
@@ -202,7 +202,7 @@ Sensors ──→ Tracking ──→ Constraints
                   Updated SLAM state
 ```
 
-**Front-end errors become constraints for the back-end.** If data association or motion estimation is wrong, a plain least-squares optimizer tries to satisfy the bad constraint and can converge to a wrong solution. Back-ends therefore often use robust costs ([glossary](glossary.md#3-least-squares-optimization); Huber, Cauchy, DCS) that down-weight constraints that disagree strongly with the rest; see [optimization/pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
+**Front-end errors become constraints for the back-end.** If data association or motion estimation is wrong, a plain least-squares optimizer tries to satisfy the bad constraint and can converge to a wrong solution. Back-ends therefore often use robust costs ([glossary](glossary.md#outlier-and-robust-kernel); Huber, Cauchy, DCS) that down-weight constraints that disagree strongly with the rest; see [optimization/pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
 
 ---
 

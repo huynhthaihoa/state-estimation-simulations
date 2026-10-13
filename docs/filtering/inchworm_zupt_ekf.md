@@ -40,14 +40,14 @@ We work through the simplest concrete version using [`inchworm_zupt_ekf.py`](../
 
 **Scope**: this is deliberately a small slice of the real idea.
 
-- It models translation only: ZUPT, not ZARU, which needs gyro-bias ([glossary](../glossary.md#2-uncertainty-and-probability)) and orientation states this toy doesn't carry.
+- It models translation only: ZUPT, not ZARU, which needs gyro-bias ([glossary](../glossary.md#bias)) and orientation states this toy doesn't carry.
 - It assumes the gait schedule (when anchor/extend happen) is *known*, not detected. What happens once the schedule itself is uncertain is the subject of [`hybrid_saltation_ekf.md` §8](hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter), which we lean on rather than repeat.
 
 ---
 
 ## 1. Why this isn't a hybrid-reset problem
 
-Unlike the bouncing point mass in `hybrid_saltation_ekf.md`, nothing here needs a guard, a reset map, or a saltation matrix ([glossary](../glossary.md#7-hybrid-discontinuous-systems)). Velocity is externally commanded per phase - an ordinary **switched-linear system** (a different linear model in each phase), not a discontinuous *state* jump the filter's covariance has to be linearized through. The interesting question sits on the **measurement** side: does the filter exploit (or misuse) the zero-velocity information the anchor phase provides?
+Unlike the bouncing point mass in `hybrid_saltation_ekf.md`, nothing here needs a guard, a reset map, or a saltation matrix ([glossary](../glossary.md#hybrid-system-guard-and-reset-map)). Velocity is externally commanded per phase - an ordinary **switched-linear system** (a different linear model in each phase), not a discontinuous *state* jump the filter's covariance has to be linearized through. The interesting question sits on the **measurement** side: does the filter exploit (or misuse) the zero-velocity information the anchor phase provides?
 
 State is $x = [p, v]$ (1D). The gait cycle alternates:
 
@@ -64,7 +64,7 @@ We compare three ways of using the ZUPT **pseudo-measurement** (a value the filt
 
 ### 1.1 The filter math, concretely
 
-All three variants run the same Kalman filter over $x = [p, v]^\top$. The script calls it an EKF ([glossary](../glossary.md#6-kalman-filter-family)) to match the rest of this repo, but every model here is exactly linear, so there is no linearization error and it is really a plain KF. Each tick runs up to three steps, in this order: **predict**, **position update**, then (depending on the variant) a **ZUPT update** (`run_ekf`).
+All three variants run the same Kalman filter over $x = [p, v]^\top$. The script calls it an EKF ([glossary](../glossary.md#ekf-extended-kalman-filter)) to match the rest of this repo, but every model here is exactly linear, so there is no linearization error and it is really a plain KF. Each tick runs up to three steps, in this order: **predict**, **position update**, then (depending on the variant) a **ZUPT update** (`run_ekf`).
 
 **Predict** (`predict`): a constant-velocity model, identical for all variants and both gait phases. The filter doesn't know the commanded velocity, only that it's roughly constant between ticks:
 
@@ -77,17 +77,17 @@ Q = \begin{bmatrix} \left(\tfrac{1}{2}\sigma_{\text{process}}\Delta t^2\right)^2
 x^{-} = \Phi\,x, \qquad P^{-} = \Phi\,P\,\Phi^\top + Q
 ```
 
-Superscripts mark the step: $x^-$, $P^-$ are predicted (before the update) and $x^+$, $P^+$ are updated, where $`P`$ is the state **covariance** ([glossary](../glossary.md#2-uncertainty-and-probability)) ([kf_ekf_iekf.md §1](kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear)).
+Superscripts mark the step: $x^-$, $P^-$ are predicted (before the update) and $x^+$, $P^+$ are updated, where $`P`$ is the state **covariance** ([glossary](../glossary.md#covariance)) ([kf_ekf_iekf.md §1](kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear)).
 
-$`\sigma_{\text{process}}`$ is the assumed acceleration-disturbance standard deviation (§2), and $Q$ (the **process-noise covariance**, [glossary](../glossary.md#6-kalman-filter-family)) is a simple diagonal heuristic (the same formula as in `saltation_matrix_ekf.py`), not the textbook continuous white-noise-acceleration $Q$, which also has off-diagonal terms.
+$`\sigma_{\text{process}}`$ is the assumed acceleration-disturbance standard deviation (§2), and $Q$ (the **process-noise covariance**, [glossary](../glossary.md#predict-and-update-steps)) is a simple diagonal heuristic (the same formula as in `saltation_matrix_ekf.py`), not the textbook continuous white-noise-acceleration $Q$, which also has off-diagonal terms.
 
-**Measurement updates** (`_kf_update`): both updates go through the same standard linear-Gaussian update and differ only in $z$, $H$ and $R$ (the measurement, the **measurement Jacobian** and the **measurement-noise covariance**, [glossary](../glossary.md#6-kalman-filter-family)):
+**Measurement updates** (`_kf_update`): both updates go through the same standard linear-Gaussian update and differ only in $z$, $H$ and $R$ (the measurement, the **measurement Jacobian** and the **measurement-noise covariance**, [glossary](../glossary.md#ekf-extended-kalman-filter)):
 
 ```math
 r = z - H x^{-}, \qquad S = H P^{-} H^\top + R, \qquad K = P^{-} H^\top S^{-1}
 ```
 
-Here $`r`$ is the **innovation**, $`S`$ its covariance and $`K`$ the **Kalman gain** ([glossary](../glossary.md#6-kalman-filter-family)).
+Here $`r`$ is the **innovation**, $`S`$ its covariance and $`K`$ the **Kalman gain** ([glossary](../glossary.md#innovation-and-kalman-gain)).
 
 ```math
 x^{+} = x^{-} + K r, \qquad P^{+} = (I - K H)\,P^{-}
@@ -128,7 +128,7 @@ Three things follow directly from these formulas:
 
 - **It corrects position too, through the cross-covariance.** $P_{pv}$ is how the filter has learned that position and velocity errors move together. If the velocity estimate turns out too high, the position estimate has probably drifted ahead too, so $p$ gets pulled back as well (for positive $P_{pv}$). This is how a velocity-only pseudo-measurement also affects position.
 
-- **It always makes the filter more confident, whether or not the claim is true.** $P_{vv}^{+}$ is always smaller than both $P_{vv}$ and $R_{\text{zupt}}$. Nothing in the update checks whether the robot is stationary. So when `always` applies it during extend, the filter reports a velocity standard deviation of at most 0.01 m/s while the true velocity is up to $v_{\text{extend}} = 0.1$ m/s away from the zero it was just told. That built-in overconfidence drives the large `always` NEES values in §3 (**NEES**, 2 on average for a consistent 2-state filter, [glossary](../glossary.md#2-uncertainty-and-probability)).
+- **It always makes the filter more confident, whether or not the claim is true.** $P_{vv}^{+}$ is always smaller than both $P_{vv}$ and $R_{\text{zupt}}$. Nothing in the update checks whether the robot is stationary. So when `always` applies it during extend, the filter reports a velocity standard deviation of at most 0.01 m/s while the true velocity is up to $v_{\text{extend}} = 0.1$ m/s away from the zero it was just told. That built-in overconfidence drives the large `always` NEES values in §3 (**NEES**, 2 on average for a consistent 2-state filter, [glossary](../glossary.md#consistency-and-nees)).
 
 ---
 
@@ -151,7 +151,7 @@ A ramp only helps if it is gentle enough. The rule: compare the true ramp accele
 
 The defaults' $t_{\text{extend}}$ gives 12 cruise and 20 anchor ticks, enough to settle before being measured. The $40\times$ case is far worse, but $3.3\times$ is still a real mismatch, not a negligible one: §3 shows it sets every variant's NEES level and drives the `never`-vs-`phase_conditional` comparison.
 
-The lesson matches the **Zeno**-regime pitfall ([glossary](../glossary.md#7-hybrid-discontinuous-systems)) in [`hybrid_saltation_ekf.md` §7](hybrid_saltation_ekf.md#7-two-things-worth-knowing-before-reusing-this-pattern): pick simulation parameters with real margin under a hard failure mode, not by trial against the first numbers that come out.
+The lesson matches the **Zeno**-regime pitfall ([glossary](../glossary.md#zeno-behavior)) in [`hybrid_saltation_ekf.md` §7](hybrid_saltation_ekf.md#7-two-things-worth-knowing-before-reusing-this-pattern): pick simulation parameters with real margin under a hard failure mode, not by trial against the first numbers that come out.
 
 The headline NEES comparison below excludes the ramp ticks themselves (`is_cruise` excludes them, matching `is_anchor`'s own definition). They are a shared transition cost all three variants pay alike, not the phenomenon being measured, the same convention `hybrid_saltation_ekf.md` uses for its shared bounce-tick spike.
 

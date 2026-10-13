@@ -87,7 +87,7 @@ The standard NLS problem is:
 \boxed{\min_x \frac12\sum_i \|e_i(x)\|^2}
 ```
 
-or, stacking all [residuals](../glossary.md#3-least-squares-optimization) $`e_i`$:
+or, stacking all [residuals](../glossary.md#residual-error) $`e_i`$:
 
 ```math
 \boxed{\min_x \frac12\|e(x)\|^2}
@@ -365,7 +365,7 @@ Here:
 - $`X_i`$ is now the $i$-th **pose** (not the landmark $`X_i`$ of §3)
 - $`L_j`$ is the $j$-th landmark
 - $`v_i`$ is the velocity at pose $i$
-- $`b_i`$ is the IMU bias at pose $i$ (not the intercept $`b`$ of §1; [glossary](../glossary.md#5-slam-system))
+- $`b_i`$ is the IMU bias at pose $i$ (not the intercept $`b`$ of §1; [glossary](../glossary.md#bias))
 
 Putting everything together (each term weighted by its $W_i$ as in §12, left out here for readability):
 

@@ -129,7 +129,7 @@ We will meet this matrix:
 -\delta\theta_y & \delta\theta_x & 0 \end{bmatrix}
 ```
 
-The map $(\cdot)^\wedge : \mathbb{R}^3 \rightarrow \mathfrak{so}(3)$ is the hat operator ([glossary](../glossary.md#1-geometry-and-lie-groups)). The odd shape comes from its key property:
+The map $(\cdot)^\wedge : \mathbb{R}^3 \rightarrow \mathfrak{so}(3)$ is the hat operator ([glossary](../glossary.md#hat-operator)). The odd shape comes from its key property:
 
 $$\delta\theta^\wedge v = \delta\theta \times v$$
 
@@ -211,7 +211,7 @@ so Exp builds the matrix and Log recovers the original 3-vector (checked numeric
 
 This is how we turn "the difference between two poses" into a plain vector we can measure, weight, and feed into a least-squares solver, which is what pose-graph optimization does with every edge residual.
 
-The same idea applies to $SE(3)$: $\xi^\wedge = \log(T_1^{-1}T_2)$ (where $`\xi = [\rho, \phi]`$ is the 6-vector defined in §11; the [glossary](../glossary.md#1-geometry-and-lie-groups) writes it $[v, \omega]$) gives the 6D motion that separates two poses $T_1$ and $T_2$.
+The same idea applies to $SE(3)$: $\xi^\wedge = \log(T_1^{-1}T_2)$ (where $`\xi = [\rho, \phi]`$ is the 6-vector defined in §11; the [glossary](../glossary.md#twist) writes it $[v, \omega]$) gives the 6D motion that separates two poses $T_1$ and $T_2$.
 
 ---
 
@@ -320,7 +320,7 @@ So a velocity changes frame exactly like a position. **Tiny example:** a drone f
 
 **Why not store $`R`$ in $`SO(3)`$ and $`v`$, $`p`$ as plain vectors?** Both hold the same numbers; the difference is what the group product buys the filter.
 
-- With this product, one IMU step over $`h`$ is $`X^+ = \Gamma\, f(X)\, \Upsilon`$. Here $`\Gamma`$ is a fixed matrix holding gravity, $`f(R, v, p) = (R, v, p + v h)`$ respects the group product (a **group automorphism**: $`f(X_1 X_2) = f(X_1)\,f(X_2)`$), and $`\Upsilon`$ holds the IMU increments. Systems of this form are [group-affine](../glossary.md#1-geometry-and-lie-groups).
+- With this product, one IMU step over $`h`$ is $`X^+ = \Gamma\, f(X)\, \Upsilon`$. Here $`\Gamma`$ is a fixed matrix holding gravity, $`f(R, v, p) = (R, v, p + v h)`$ respects the group product (a **group automorphism**: $`f(X_1 X_2) = f(X_1)\,f(X_2)`$), and $`\Upsilon`$ holds the IMU increments. Systems of this form are [group-affine](../glossary.md#group-affine-dynamics-trajectory-independence).
 - For a group-affine system, the **invariant error** $`\eta = \hat X X^{-1}`$ between estimate and truth evolves in the same way whatever the trajectory, and its logarithm evolves through a constant matrix, even for large errors. This is the basis of the **invariant EKF** (Barrau & Bonnabel, 2017).
 - With separate pieces, the error dynamics depend on the current estimate. In [invariant_saltation_ekf.md §6](../filtering/invariant_saltation_ekf.md#6-results-consistency-through-the-bounces), the world-frame EKF is overconfident before the body's first bounce on the ground (NEES 14-19 against a consistent 9), while the invariant EKF on $`SE_2(3)`$ is close to consistent. That document attributes the gap most likely to Jacobians evaluated at a poor initial estimate, and does not isolate it further.
 
@@ -388,7 +388,7 @@ We then apply that motion to the drone's current pose:
 
 $$\boxed{ \text{current pose} + \text{small motion} \rightarrow \text{new pose}}$$
 
-except that the "+" is replaced by a group operation. This update is a [retraction](../glossary.md#1-geometry-and-lie-groups), often written $`T \oplus \xi = T\,\mathrm{Exp}(\xi)`$ (some docs write $`\boxplus`$).
+except that the "+" is replaced by a group operation. This update is a [retraction](../glossary.md#retraction), often written $`T \oplus \xi = T\,\mathrm{Exp}(\xi)`$ (some docs write $`\boxplus`$).
 
 ---
 

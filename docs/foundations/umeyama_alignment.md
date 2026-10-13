@@ -22,7 +22,7 @@ A monocular camera looking at a static scene can recover the *shape* of the scen
 
 **Tiny example (toy case: pinhole camera, ignoring the principal point):** a point at $`(X, Z) = (1, 5)`$ and another at $`(2, 10)`$ both land at $`u = f X / Z = f/5`$ (where $`f`$ is the focal length, $`u`$ the horizontal pixel coordinate, and $`X, Z`$ the point's lateral and depth coordinates). Doubling the whole scene changes no pixel.
 
-Together, that is a **7-parameter similarity ambiguity**: 3 translation + 3 rotation + 1 scale. It is a **gauge freedom** ([glossary](../glossary.md#3-least-squares-optimization)); see the "one subtlety this formula hides" note in [pose_graph_optimization.md](../optimization/pose_graph_optimization.md).
+Together, that is a **7-parameter similarity ambiguity**: 3 translation + 3 rotation + 1 scale. It is a **gauge freedom** ([glossary](../glossary.md#gauge-freedom)); see the "one subtlety this formula hides" note in [pose_graph_optimization.md](../optimization/pose_graph_optimization.md).
 
 The difference from pose graphs is scale:
 

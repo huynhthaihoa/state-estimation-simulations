@@ -54,7 +54,7 @@ The pattern above is easiest to see on the rotation part alone, without the esti
 
 $$\hat\omega^b = R^\top\dot R \qquad \hat\omega^s = \dot RR^\top$$
 
-(with the [hat operator](../glossary.md#1-geometry-and-lie-groups) turning a vector into its skew-symmetric matrix). Redefining the world frame by a fixed rotation is left-multiplication $R\mapsto R_0R$; redefining the body frame is right-multiplication $R\mapsto RR_0$. Each redefinition cancels out of exactly one of the two velocities:
+(with the [hat operator](../glossary.md#hat-operator) turning a vector into its skew-symmetric matrix). Redefining the world frame by a fixed rotation is left-multiplication $R\mapsto R_0R$; redefining the body frame is right-multiplication $R\mapsto RR_0$. Each redefinition cancels out of exactly one of the two velocities:
 
 | | Left-mult. ($R\mapsto R_0R$) | Right-mult. ($R\mapsto RR_0$) |
 |---|---|---|
@@ -76,7 +76,7 @@ So $\hat\omega^b$ plays the same role as $\eta_L$ above (indifferent to how we l
 
 The whole point of IEKF is that with the *right* choice of error, the linearized error dynamics stop depending on the current state estimate. The Jacobians can still change over time with known inputs (for example the gyro and accelerometer readings), but not with the estimate, unlike an ordinary EKF's. Barrau & Bonnabel (2017) build its convergence guarantee in three steps:
 
-- **Theorem 1**: for [group-affine](../glossary.md#1-geometry-and-lie-groups) dynamics, the error evolves independently of the trajectory.
+- **Theorem 1**: for [group-affine](../glossary.md#group-affine-dynamics-trajectory-independence) dynamics, the error evolves independently of the trajectory.
 - **Theorem 2**, the **log-linear** property: the error's Log then obeys an exact linear equation, even for large errors.
 - **Theorem 4**: so the IEKF is a locally asymptotically stable observer around any trajectory, under the same conditions that make a linear Kalman filter stable.
 
@@ -90,7 +90,7 @@ Rule of thumb for picking one:
 | World-frame measurement of a point fixed on the body: $`h(X) = X b`$ for a known body-frame point $b$ (GPS antenna, or this repo's `pointcloud_pose_tracking.py`, where $b = p_i$) | **left**-invariant |
 | Body-mounted sensor measuring a landmark known in the world frame: $`h(X) = X^{-1} d`$ for a known world-frame point $d$ | **right**-invariant |
 
-- **Propagation (row 1).** The two errors differ in how body-frame noise enters. With the **left** error it enters unchanged. With the **right** error it is multiplied by $`\mathrm{Ad}_{\hat X}`$ (the **adjoint** of $`\hat X`$, [glossary](../glossary.md#1-geometry-and-lie-groups)), which depends on the estimate. Right-invariant filters such as Hartley et al.'s legged-robot IEKF accept that because their measurements are right-invariant.
+- **Propagation (row 1).** The two errors differ in how body-frame noise enters. With the **left** error it enters unchanged. With the **right** error it is multiplied by $`\mathrm{Ad}_{\hat X}`$ (the **adjoint** of $`\hat X`$, [glossary](../glossary.md#adjoint)), which depends on the estimate. Right-invariant filters such as Hartley et al.'s legged-robot IEKF accept that because their measurements are right-invariant.
 - **$X b$ with the left error (row 2).** Substitute $`X = \hat X \eta_L`$ and form the residual in the body frame: $`\hat X^{-1} z - b = \eta_L b - b`$ plus rotated noise, where $`z`$ is the measured world-frame point. With $`\eta_L = \exp(\xi)`$ the Jacobian is $`[\,I \;\; -b^\wedge\,]`$, which is constant. This is equivalent to `run_iekf`'s residual, `((z[k+1] - t_pred) @ R_pred - body_points)` in `pointcloud_pose_tracking.py`, which computes $`R_{\text{pred}}^\top(z - t_{\text{pred}}) - p_i`$ for all points at once, where $`R_{\text{pred}}`$ and $`t_{\text{pred}}`$ are the rotation and translation of the predicted pose.
 - **$X^{-1}d$ with the right error (row 3).** Substitute $`X = \eta_R \hat X`$ and form the residual in the world frame: $`\hat X z - d = \eta_R^{-1} d - d`$ plus rotated noise. The Jacobian $`-[\,I \;\; -d^\wedge\,]`$ is constant too. This is the dual of row 2.
 - **Why the pairing matters.** Rows 2 and 3 both involve a point and a world frame, but the measurement shapes differ ($X b$ vs. $X^{-1}d$) and pair with opposite errors (Barrau & Bonnabel call them left- and right-invariant observations). The wrong pairing does not give a constant Jacobian: $X b$ with $`X = \eta_R \hat X`$ gives $`h(X) = \eta_R \hat X b`$, whose Jacobian $`[\,I \;\; -(\hat X b)^\wedge\,]`$ contains the predicted point, hence the current estimate.

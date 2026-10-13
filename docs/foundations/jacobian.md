@@ -176,7 +176,7 @@ The mountain idea of §6, written as an equation. Let $\delta x$ be a slight cha
 
 $$\boxed{\delta z \approx H\delta x}$$
 
-That is why Jacobians appear throughout EKF, ESKF, IEKF, bundle adjustment, [nonlinear least squares](../glossary.md#3-least-squares-optimization), factor graphs, visual odometry and SLAM.
+That is why Jacobians appear throughout EKF, ESKF, IEKF, bundle adjustment, [nonlinear least squares](../glossary.md#nonlinear-least-squares), factor graphs, visual odometry and SLAM.
 
 ---
 
@@ -218,7 +218,7 @@ So instead of blindly asking "What is the derivative with respect to my state ve
 
 That's one reason Lie groups and Jacobians become so tightly connected in modern SLAM.
 
-A manifold perturbation on its own isn't yet what makes a filter **invariant**: error-state filters such as the ESKF and MEKF (multiplicative EKF, which perturbs attitude by composition) already perturb on the manifold. The IEKF goes one step further and picks a left- or right-[invariant](../glossary.md#1-geometry-and-lie-groups) error. For **group-affine** dynamics ([glossary](../glossary.md#1-geometry-and-lie-groups)) this makes its linearization independent of the current estimate; see [lie_algebra.md §11.1](lie_algebra.md#111-extended-poses-pose-plus-velocity)). See [kf_ekf_iekf.md §5](../filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error) and [left_right_invariant.md](../filtering/left_right_invariant.md).
+A manifold perturbation on its own isn't yet what makes a filter **invariant**: error-state filters such as the ESKF and MEKF (multiplicative EKF, which perturbs attitude by composition) already perturb on the manifold. The IEKF goes one step further and picks a left- or right-[invariant](../glossary.md#invariant-and-equivariant) error. For **group-affine** dynamics ([glossary](../glossary.md#group-affine-dynamics-trajectory-independence)) this makes its linearization independent of the current estimate; see [lie_algebra.md §11.1](lie_algebra.md#111-extended-poses-pose-plus-velocity)). See [kf_ekf_iekf.md §5](../filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error) and [left_right_invariant.md](../filtering/left_right_invariant.md).
 
 ---
 
@@ -240,7 +240,7 @@ In the EKF specifically:
 
 Everywhere above, perturbing an input meant simple addition: $x \to x + \delta x$. That works because $x$ lives in a vector space.
 
-A rotation $R \in SO(3)$ does not. There is no such thing as $R + \delta R$ - the result generally isn't even a valid rotation. Instead, a small perturbation $\delta\varphi \in \mathbb{R}^3$ is turned into a rotation via the exponential map $\text{Exp}(\delta\varphi)$ (rotation vector to rotation matrix; see the [glossary](../glossary.md#1-geometry-and-lie-groups)), and then **composed** (matrix-multiplied) with $R$:
+A rotation $R \in SO(3)$ does not. There is no such thing as $R + \delta R$ - the result generally isn't even a valid rotation. Instead, a small perturbation $\delta\varphi \in \mathbb{R}^3$ is turned into a rotation via the exponential map $\text{Exp}(\delta\varphi)$ (rotation vector to rotation matrix; see the [glossary](../glossary.md#exp-and-log-maps)), and then **composed** (matrix-multiplied) with $R$:
 
 ```math
 R' = \text{Exp}(\delta\varphi)\,R \qquad \text{or} \qquad R' = R\,\text{Exp}(\delta\varphi)
@@ -301,7 +301,7 @@ Notice $J_r = J_l^\top$, as the identity predicts. Plugging $\theta \to 0$ into 
 
 ### 11.6 Where this actually matters
 
-- **[IMU preintegration](../glossary.md#5-slam-system)**: the effect of a small change in gyroscope bias is naturally expressed in the sensor's own (body) frame, so bias-correction Jacobians in preintegration use $J_r$ - worked out end-to-end in [imu_preintegration.md](../optimization/imu_preintegration.md).
+- **[IMU preintegration](../glossary.md#imu-preintegration)**: the effect of a small change in gyroscope bias is naturally expressed in the sensor's own (body) frame, so bias-correction Jacobians in preintegration use $J_r$ - worked out end-to-end in [imu_preintegration.md](../optimization/imu_preintegration.md).
 - **Covariance propagation on the manifold**: a rotation's uncertainty is a covariance on the tangent vector $\delta\varphi$, and what it numerically means depends on whether $\delta\varphi$ is defined via $`R\,\text{Exp}(\delta\varphi)`$ (right) or $`\text{Exp}(\delta\varphi)\, R`$ (left).
   - Converting between them is a multiplication by $R$ (the [adjoint](lie_algebra.md#112-the-adjoint-moving-a-small-motion-between-frames), which for rotations is $R$ itself): $`\text{Exp}(\delta\varphi_{\text{left}})\,R = R\,\text{Exp}(\delta\varphi_{\text{right}})`$ gives $`\delta\varphi_{\text{left}} = R\,\delta\varphi_{\text{right}}`$.
   - Hence $`\Sigma_{\text{left}} = R\,\Sigma_{\text{right}}R^\top`$: a change of frame, not a change of the underlying uncertainty.

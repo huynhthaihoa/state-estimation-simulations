@@ -52,7 +52,7 @@ A **hybrid dynamical system** alternates **continuous flow** with **instantaneou
   - The letter $g$ does double duty, following the saltation-matrix literature: $g(x)$ and $Dg$ are the guard, while a bare $g$ in the dynamics, as in $\tfrac12 g t^2$, is gravity, $9.81\ \text{m/s}^2$.
 - **Reset map**: $R(x)$, applied at the guard - here, $`v_z \mapsto -e\,v_z`$ (an inelastic bounce with restitution $e$), position and horizontal velocity untouched. A superscript $-$/$`+`$ on a state, vector field or covariance (e.g. $x^{-}$, $f^{+}$, $P^{-}$, $P^{+}$) means "evaluated just before/after the reset" (see the notation table below).
 
-This is the canonical example (the word "saltation" is Latin for "leaping"). It is the simplest analog of a foot-strike impact, a discrete velocity reset at a discrete contact event, without the rotational complexity of $SE(3)$. The glossary defines [hybrid system, guard, reset map and saltation matrix](../glossary.md#7-hybrid-discontinuous-systems).
+This is the canonical example (the word "saltation" is Latin for "leaping"). It is the simplest analog of a foot-strike impact, a discrete velocity reset at a discrete contact event, without the rotational complexity of $SE(3)$. The glossary defines [hybrid system, guard, reset map and saltation matrix](../glossary.md#hybrid-system-guard-and-reset-map).
 
 **Notation used throughout this doc.** Several letters mean something different here than in the rest of the repo, or mean two things within this doc; the table settles each one.
 
@@ -290,7 +290,7 @@ Practical consequence: $\Xi$ does not drive $P$'s guard-normal row/column to a n
 
 ## 6. The empirical finding: a modest, real gap, not a dramatic one
 
-The intuitive story going in was that the naive $`P^{+} = DR\,P^{-}\,DR^\top`$ update would be measurably overconfident (too-small reported uncertainty) right after each bounce compared to the saltation-corrected one, and a Monte Carlo NEES consistency check would show it (see [NEES](../glossary.md#2-uncertainty-and-probability): a consistent 6-DoF filter averages $\approx 6$, higher means overconfident, lower underconfident). The data does not bear that out.
+The intuitive story going in was that the naive $`P^{+} = DR\,P^{-}\,DR^\top`$ update would be measurably overconfident (too-small reported uncertainty) right after each bounce compared to the saltation-corrected one, and a Monte Carlo NEES consistency check would show it (see [NEES](../glossary.md#consistency-and-nees): a consistent 6-DoF filter averages $\approx 6$, higher means overconfident, lower underconfident). The data does not bear that out.
 
 Running `saltation_matrix_ekf.py` at its defaults (500 Monte Carlo trials, 3 well-separated bounces from a 5m drop at $e = 0.85$) and looking at NEES in the few ticks immediately following each bounce (excluding the shared spike at the bounce tick itself, which both filters exhibit for the mundane reason that the true trajectory is also close to its own crossing at that tick):
 

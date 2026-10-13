@@ -1,10 +1,10 @@
 # Marginalization and sliding-window smoothing
 
-Marginalizing a variable permanently removes it from the optimization and keeps everything it taught us about its neighbors, packaged as one new **prior factor** (see [Prior](../glossary.md#2-uncertainty-and-probability)). A real-time estimator can then bound its problem size without discarding what it used to know.
+Marginalizing a variable permanently removes it from the optimization and keeps everything it taught us about its neighbors, packaged as one new **prior factor** (see [Prior](../glossary.md#prior-unary-factor)). A real-time estimator can then bound its problem size without discarding what it used to know.
 
 This doc builds on two earlier ones:
 - **Variable elimination** from [`bayes_tree.md`](bayes_tree.md) §3 ("eliminate $x_1$ → its info gets summarized into a new constraint on $x_2$"). We reuse that mechanic for a different purpose.
-- **Full vs. [fixed-lag smoothing](../glossary.md#4-graphs-sparsity-and-solvers)** from [filtering_smoothing.md §9](../filtering_smoothing.md#9-the-precise-distinction) (filtering marginalizes old information, smoothing keeps it). This doc is the mechanical middle ground that the diagram in [§10](../filtering_smoothing.md#10-where-the-modern-systems-fit) only names.
+- **Full vs. [fixed-lag smoothing](../glossary.md#sliding-window-and-fixed-lag-smoothing)** from [filtering_smoothing.md §9](../filtering_smoothing.md#9-the-precise-distinction) (filtering marginalizes old information, smoothing keeps it). This doc is the mechanical middle ground that the diagram in [§10](../filtering_smoothing.md#10-where-the-modern-systems-fit) only names.
 
 ---
 
@@ -12,7 +12,7 @@ This doc builds on two earlier ones:
 
 Full batch optimization (plain [bundle_adjustment.md](bundle_adjustment.md)/[pose_graph_optimization.md](pose_graph_optimization.md)) keeps every pose ever seen in the optimization, so the problem grows without bound as the robot keeps moving. [isam2_optimization.md](isam2_optimization.md) fixes the *recompute* cost (only touch the part of the Bayes tree a new factor actually affects) but not the *memory* cost - every variable is still in the graph, just efficiently re-solved.
 
-A real-time VIO/VI-SLAM ([glossary](../glossary.md#5-slam-system)) estimator (MSCKF, VINS-Mono, OKVIS) can afford neither. It has fixed onboard memory and fixed per-frame compute, and it runs forever. It must **forget** old states: drop the *variable* but keep the *information* it contributed. That is marginalization.
+A real-time VIO/VI-SLAM ([glossary](../glossary.md#imu-inertial-measurement-unit)) estimator (MSCKF, VINS-Mono, OKVIS) can afford neither. It has fixed onboard memory and fixed per-frame compute, and it runs forever. It must **forget** old states: drop the *variable* but keep the *information* it contributed. That is marginalization.
 
 ---
 
@@ -39,7 +39,7 @@ That is marginalization. `bayes_tree.md` uses it to build a **solve order**, whe
 **Why not just delete $x_1$?**
 Two naive shortcuts go wrong, in opposite directions. Marginalization is the third option:
 - **Delete $x_1$ and its factors:** everything those factors told us about $x_2$ is lost, so we become less sure than we should be.
-- **Cut $x_1$'s row and column out of $\Lambda$ (ignore the Schur term):** $\Lambda$ is the [information matrix](../glossary.md#2-uncertainty-and-probability) of the §4 example. Here $x_2$ keeps information $2$, as if $x_1$ were known exactly. The true value is $`\Lambda' = 1.5`$ ($`\Lambda'`$ = information after marginalizing, §4), so the variance is $0.5$ instead of $0.667$: overconfident.
+- **Cut $x_1$'s row and column out of $\Lambda$ (ignore the Schur term):** $\Lambda$ is the [information matrix](../glossary.md#information-matrix) of the §4 example. Here $x_2$ keeps information $2$, as if $x_1$ were known exactly. The true value is $`\Lambda' = 1.5`$ ($`\Lambda'`$ = information after marginalizing, §4), so the variance is $0.5$ instead of $0.667$: overconfident.
 - **Marginalize:** keeps exactly what $x_1$ taught us about $x_2$, as a prior on $x_2$.
 
 ---
@@ -50,7 +50,7 @@ Two naive shortcuts go wrong, in opposite directions. Marginalization is the thi
 |---|---|---|---|
 | What's eliminated | 3D landmarks | any variable, in a chosen order | the oldest pose/state in the window |
 | Is it recoverable? | **Yes** - back-substitution recovers it | **Yes** - it stays in the graph, and is re-eliminated whenever a later update affects it | **No** - gone for good |
-| Why eliminate it | Landmarks outnumber cameras; cheap to invert | Reuse most of the last solve; minimize fill-in ([glossary](../glossary.md#4-graphs-sparsity-and-solvers)) | Bound memory/compute to a fixed window size |
+| Why eliminate it | Landmarks outnumber cameras; cheap to invert | Reuse most of the last solve; minimize fill-in ([glossary](../glossary.md#fill-in)) | Bound memory/compute to a fixed window size |
 | Where it's covered | [bundle_adjustment.md §12](bundle_adjustment.md#12-block-sparsity-and-the-schur-complement) | [bayes_tree.md](bayes_tree.md), [isam2_optimization.md](isam2_optimization.md) | §4-§7 below |
 
 The math (§4) is the same Schur-complement elimination in all three rows. Only the fate of the eliminated variable differs.
@@ -153,7 +153,7 @@ The window never grows past a fixed size, so cost and memory stay **bounded by t
 - iSAM2 is bounded by how much of the Bayes tree a new factor *changes*, not by a fixed window. A loop closure can still touch a large chunk of history (`isam2_optimization.md §9`).
 
 This is what `filtering_smoothing.md §10`'s "fixed-lag smoothing" box and its MSCKF/VINS-Mono bullets refer to:
-- MSCKF keeps a sliding window of camera poses. When a landmark's track ends, it [triangulates](../glossary.md#5-slam-system) the landmark, uses its observations to update the window poses, then discards it: the landmark never enters the state (see [kf_ekf_iekf.md](../filtering/kf_ekf_iekf.md)'s MSCKF paragraph).
+- MSCKF keeps a sliding window of camera poses. When a landmark's track ends, it [triangulates](../glossary.md#triangulation-and-pnp) the landmark, uses its observations to update the window poses, then discards it: the landmark never enters the state (see [kf_ekf_iekf.md](../filtering/kf_ekf_iekf.md)'s MSCKF paragraph).
 - VINS-Mono keeps a sliding window of keyframes and marginalizes the oldest one with the Schur-complement step in §4, without FEJ (§6).
 
 ![Three panels from sliding_window_marginalization.py on a 16-pose square with a 10-pose window: window membership after each new pose, the window's block-tridiagonal information matrix with the oldest pose's block about to be eliminated, and the next window's matrix where that information lands as one prior block on the new oldest pose](../../assets/sliding_window_marginalization_concept.png)
@@ -176,7 +176,7 @@ Two deliberate scope choices, both flagged in the script:
 
 Poses $X_k$ are $4 \times 4$ SE(3) matrices, and tangent vectors follow the repo's `[vx, vy, vz, wx, wy, wz]` order. We solve every window by plain Gauss-Newton ([gauss_newton.md](gauss_newton.md)) over two factor types, both linearized at the current estimate on every iteration (no First-Estimate Jacobians).
 
-**Odometry edge** (`linearize_edge`, reused from `pose_graph_incremental.py`). Here $\mathcal{J}_r^{-1}$ is the SE(3) inverse [right Jacobian](../glossary.md#1-geometry-and-lie-groups) (`compute_se3_inv_right_jacobian`), $\mathrm{Ad}$ is the [adjoint](../glossary.md#1-geometry-and-lie-groups), $\mathrm{Log}$ is the [Log map](../glossary.md#1-geometry-and-lie-groups), and $`Z_{ij}`$ is the measured relative pose from $`X_i`$ to $`X_j`$:
+**Odometry edge** (`linearize_edge`, reused from `pose_graph_incremental.py`). Here $\mathcal{J}_r^{-1}$ is the SE(3) inverse [right Jacobian](../glossary.md#right-and-left-jacobians) (`compute_se3_inv_right_jacobian`), $\mathrm{Ad}$ is the [adjoint](../glossary.md#adjoint), $\mathrm{Log}$ is the [Log map](../glossary.md#exp-and-log-maps), and $`Z_{ij}`$ is the measured relative pose from $`X_i`$ to $`X_j`$:
 
 ```math
 e_{ij} = \mathrm{Log}\big((X_i Z_{ij})^{-1} X_j\big), \qquad

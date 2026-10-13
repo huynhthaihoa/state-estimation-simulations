@@ -1,6 +1,6 @@
 # IMU preintegration
 
-An [IMU](../glossary.md#5-slam-system) sampled at 100-1000 Hz produces **hundreds of raw samples between two keyframes**. IMU preintegration compresses them into **one relative-motion factor**. When the bias estimate changes, the factor is corrected instantly, without re-touching a single raw sample.
+An [IMU](../glossary.md#imu-inertial-measurement-unit) sampled at 100-1000 Hz produces **hundreds of raw samples between two keyframes**. IMU preintegration compresses them into **one relative-motion factor**. When the bias estimate changes, the factor is corrected instantly, without re-touching a single raw sample.
 
 It builds on two earlier ideas:
 
@@ -86,7 +86,7 @@ These are the "sensitivity map" from [jacobian.md §3](../foundations/jacobian.m
   - The tilt grows as $`0.01\,t`$ rad, so about 0.01 rad at the end.
   - Sideways velocity error: $`\int a\,\theta\,dt = 0.005`$ m/s.
   - Sideways position error: about $`0.01/6 \approx 0.0017`$ m.
-- This is the effect that $`J_{v,b_g}`$ and $`J_{p,b_g}`$ (the $`[\tilde v-b_a]_\times J_{R,b_g}`$ terms below, with $`[\cdot]_\times`$ the [hat operator](../glossary.md#1-geometry-and-lie-groups)) capture.
+- This is the effect that $`J_{v,b_g}`$ and $`J_{p,b_g}`$ (the $`[\tilde v-b_a]_\times J_{R,b_g}`$ terms below, with $`[\cdot]_\times`$ the [hat operator](../glossary.md#hat-operator)) capture.
 
 ```math
 J_{p,b_g} \leftarrow J_{p,b_g} + J_{v,b_g}\,dt - \tfrac{1}{2}\Delta R\,[\tilde v-b_a]_\times J_{R,b_g}\,dt^2 \qquad J_{p,b_a} \leftarrow J_{p,b_a} + J_{v,b_a}\,dt - \tfrac{1}{2}\Delta R\,dt^2
@@ -109,12 +109,12 @@ J_{R,b_g} \leftarrow dR^\top J_{R,b_g} - J_r\,dt
 **Why $J_{R,b_g}$ is the one to study.** It is a direct instance of [jacobian.md §11.4](../foundations/jacobian.md#114-closed-form-for-so3)'s identities, and every other $J_{\cdot,b_g}$ inherits from it:
 
 - $-J_r\,dt$: $J_r$ is the right Jacobian of the micro-step's rotation. The $dt$ is the chain-rule factor from $`\partial\big((\tilde\omega-b_g)dt\big)/\partial b_g = -dt\,I`$, which also supplies the minus sign.
-- $dR^\top J_{R,b_g}$: the sensitivity accumulated so far is a right perturbation on the old $\Delta R$, and the new step composes $dR$ after it. Moving that perturbation past $dR$ uses the **adjoint** identity ([glossary](../glossary.md#1-geometry-and-lie-groups)) $\text{Exp}(x)\,dR = dR\,\text{Exp}(dR^\top x)$, which is where the $dR^\top$ comes from.
+- $dR^\top J_{R,b_g}$: the sensitivity accumulated so far is a right perturbation on the old $\Delta R$, and the new step composes $dR$ after it. Moving that perturbation past $dR$ uses the **adjoint** identity ([glossary](../glossary.md#adjoint)) $\text{Exp}(x)\,dR = dR\,\text{Exp}(dR^\top x)$, which is where the $dR^\top$ comes from.
 
 **Implementation notes.**
 
 - Both `lie_utils.py` helpers switch to first-order forms when $\theta = \lVert(\tilde\omega-b_g)dt\rVert < 10^{-6}$: `so3_exp` returns $`I + [\phi]_\times`$ and `so3_right_jacobian` returns $`I - \tfrac{1}{2}[\phi]_\times`$. Otherwise they use the closed forms (Rodrigues and the $J_r$ formula from [jacobian.md §11.4](../foundations/jacobian.md#114-closed-form-for-so3)).
-- The demo omits two things a real preintegrated factor needs. There is **no gravity term**: a real accelerometer measures specific force ([glossary](../glossary.md#5-slam-system)), so gravity must be removed, usually in the residual. There is **no preintegrated noise covariance**: the script propagates the bias Jacobians but not Forster et al.'s $\Sigma$ recursion, so the bundle carries no uncertainty.
+- The demo omits two things a real preintegrated factor needs. There is **no gravity term**: a real accelerometer measures specific force ([glossary](../glossary.md#imu-inertial-measurement-unit)), so gravity must be removed, usually in the residual. There is **no preintegrated noise covariance**: the script propagates the bias Jacobians but not Forster et al.'s $\Sigma$ recursion, so the bundle carries no uncertainty.
 - The demo builds its raw readings as the commanded twist plus the *estimated* bias, so $`\tilde v - b_a`$ and $`\tilde\omega - b_g`$ equal the commanded values exactly.
 
 ---
@@ -143,7 +143,7 @@ A preintegrated bundle becomes one **edge** in the sense of [pose_graph_optimiza
                       IMU factor
 ```
 
-A full VIO/VI-SLAM back-end ([glossary](../glossary.md#5-slam-system)) (GTSAM's `CombinedImuFactor`, ORB-SLAM3, VINS-Mono, etc.) builds a residual comparing this corrected bundle with what the two nodes' current estimates imply: the same "measured vs. predicted, then `Log`" pattern as [pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive). Because the bias correction is $O(1)$, the residual and its Jacobian can be re-evaluated at every optimizer iteration without revisiting the raw 100+ Hz stream.
+A full VIO/VI-SLAM back-end ([glossary](../glossary.md#imu-inertial-measurement-unit)) (GTSAM's `CombinedImuFactor`, ORB-SLAM3, VINS-Mono, etc.) builds a residual comparing this corrected bundle with what the two nodes' current estimates imply: the same "measured vs. predicted, then `Log`" pattern as [pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive). Because the bias correction is $O(1)$, the residual and its Jacobian can be re-evaluated at every optimizer iteration without revisiting the raw 100+ Hz stream.
 
 ---
 

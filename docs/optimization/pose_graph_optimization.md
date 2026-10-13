@@ -10,7 +10,7 @@ Think of it as **"fixing the robot's entire trajectory using a network of geomet
 
 ## 1. First: what is a "pose"?
 
-A robot's [**pose**](../glossary.md#1-geometry-and-lie-groups) is its position + orientation.
+A robot's [**pose**](../glossary.md#pose) is its position + orientation.
 
 - 2D robot: $x_i = [x, y, \theta]$
 - 3D robot: $T_i \in SE(3)$, which holds a 3D position and a 3D orientation
@@ -74,7 +74,7 @@ Odometry has small errors, so chaining slightly wrong steps leaves the estimated
  x₄    x₀ ──── x₁
 ```
 
-Small errors accumulate with motion. This is [**drift**](../glossary.md#5-slam-system).
+Small errors accumulate with motion. This is [**drift**](../glossary.md#drift).
 
 ---
 
@@ -132,7 +132,7 @@ For every edge we have the **measured relative transformation** $z_{ij}$ between
 
 $${\text{error}_{ij} = z_{ij}^{-1}(T_i^{-1}T_j)}$$
 
-That comparison is still a **group element** ($SE(2)$/$`SE(3)`$, not a plain vector), so to measure "how big" it is - and to compute the Jacobians the optimizer needs - we take its **Log map**, which turns it into a tangent-space vector ([glossary](../glossary.md#1-geometry-and-lie-groups)):
+That comparison is still a **group element** ($SE(2)$/$`SE(3)`$, not a plain vector), so to measure "how big" it is - and to compute the Jacobians the optimizer needs - we take its **Log map**, which turns it into a tangent-space vector ([glossary](../glossary.md#exp-and-log-maps)):
 
 $${e_{ij} = \text{Log}(\text{error}_{ij}) = \text{Log}\big(z_{ij}^{-1}(T_i^{-1}T_j)\big)}$$
 
@@ -170,7 +170,7 @@ In plain English:
 
 > **Find the poses that make all the measured relative transformations agree as much as possible.**
 
-One subtlety this formula hides: since every constraint is *relative*, rigidly translating and rotating the entire graph together leaves every $e_{ij}$ unchanged. The cost therefore has flat directions with zero curvature: [**gauge freedom**](../glossary.md#3-least-squares-optimization). In practice we anchor one pose (usually $T_0$), e.g. by giving it an enormous information weight. The linear system solved at each step then has a unique solution instead of infinitely many equally good ones.
+One subtlety this formula hides: since every constraint is *relative*, rigidly translating and rotating the entire graph together leaves every $e_{ij}$ unchanged. The cost therefore has flat directions with zero curvature: [**gauge freedom**](../glossary.md#gauge-freedom). In practice we anchor one pose (usually $T_0$), e.g. by giving it an enormous information weight. The linear system solved at each step then has a unique solution instead of infinitely many equally good ones.
 
 **Intuition:** picture a square of poses drawn on the floor.
 - Slide or turn the whole square: every relative edge is unchanged, so the cost does not change.
@@ -297,7 +297,7 @@ For example, if one measurement is highly reliable (weight $w_1 = 100$) and anot
 
 $${\min_X \sum_{(i,j) \in \mathcal{E}} e_{ij}^\top \Omega_{ij} e_{ij}}$$
 
-where $`X`$ is the set of all node poses (defined in §15.1) and $\Omega_{ij}$ is related to the **information/covariance** of the measurement ([glossary](../glossary.md#2-uncertainty-and-probability)). This is why sensor uncertainty matters.
+where $`X`$ is the set of all node poses (defined in §15.1) and $\Omega_{ij}$ is related to the **information/covariance** of the measurement ([glossary](../glossary.md#information-matrix)). This is why sensor uncertainty matters.
 
 Caveat about the accompanying scripts:
 
@@ -342,7 +342,7 @@ This doc covers only PGO (with BA in §8 as the contrast); filtering is shown he
 
 > **Pose-graph optimization is like taking a trajectory made of slightly inaccurate pieces, connecting those pieces with constraints - including loop closures - and then moving the poses around until the entire graph becomes as geometrically consistent as possible.**
 
-Precisely, **PGO is a sparse nonlinear least-squares problem over poses on $SE(2)$ or $SE(3)$**. The natural next step is to see **why we need Lie groups/Lie algebra ([glossary](../glossary.md#1-geometry-and-lie-groups)) and how Gauss-Newton or Levenberg-Marquardt (both explained in §15.5) moves the poses during optimization**.
+Precisely, **PGO is a sparse nonlinear least-squares problem over poses on $SE(2)$ or $SE(3)$**. The natural next step is to see **why we need Lie groups/Lie algebra ([glossary](../glossary.md#lie-group)) and how Gauss-Newton or Levenberg-Marquardt (both explained in §15.5) moves the poses during optimization**.
 
 ---
 
@@ -388,7 +388,7 @@ The residual vector stacks a translational and a rotational part:
 r_{ij} = \left[ \mathbf{v}_{ij}^\top \;\; \boldsymbol{\omega}_{ij}^\top \right]^\top
 ```
 
-- $`\mathbf{v}_{ij}`$ is the translational part of the twist, $`\mathbf{v} = V(\boldsymbol{\omega})^{-1} t_E`$ (here $`V(\boldsymbol{\omega})`$ is the **left Jacobian** of $`\mathrm{SO}(3)`$, [glossary](../glossary.md#1-geometry-and-lie-groups), and $`t_E`$ is the translation of $`E_{ij}`$; as in `use_numpy/lie_utils.py`). It equals $`E_{ij}`$'s translation only when $`\boldsymbol{\omega} = \mathbf{0}`$, or to first order.
+- $`\mathbf{v}_{ij}`$ is the translational part of the twist, $`\mathbf{v} = V(\boldsymbol{\omega})^{-1} t_E`$ (here $`V(\boldsymbol{\omega})`$ is the **left Jacobian** of $`\mathrm{SO}(3)`$, [glossary](../glossary.md#right-and-left-jacobians), and $`t_E`$ is the translation of $`E_{ij}`$; as in `use_numpy/lie_utils.py`). It equals $`E_{ij}`$'s translation only when $`\boldsymbol{\omega} = \mathbf{0}`$, or to first order.
 - $`\boldsymbol{\omega}_{ij}`$ is the rotational error.
 
 ### 15.3 Objective Function
@@ -399,7 +399,7 @@ The global optimization minimizes the sum of squared Mahalanobis distances over 
 {F(X) = \sum_{(i,j) \in \mathcal{E}} r_{ij}(X)^\top \Omega_{ij} \, r_{ij}(X)}
 ```
 
-> **Note**: [Mahalanobis distance](../glossary.md#2-uncertainty-and-probability) measures how far a point is from the center of a distribution, in units of its spread. Here the "point" is the residual ${r_{ij}(X)}$, the "distribution" is the measurement noise model (mean $\mathbf{0}$, covariance ${\Sigma_{ij} = \Omega_{ij}^{-1}}$), and ${\Omega_{ij}}$ is exactly the inverse-covariance weighting that turns a plain squared-error sum into a squared Mahalanobis-distance sum. See the tilestats.com video and amit's Medium explainer cited in [§17](#17-references), and [the isotropic special case](../glossary.md#2-uncertainty-and-probability), where this weighting collapses to a uniform scale factor.
+> **Note**: [Mahalanobis distance](../glossary.md#mahalanobis-distance) measures how far a point is from the center of a distribution, in units of its spread. Here the "point" is the residual ${r_{ij}(X)}$, the "distribution" is the measurement noise model (mean $\mathbf{0}$, covariance ${\Sigma_{ij} = \Omega_{ij}^{-1}}$), and ${\Omega_{ij}}$ is exactly the inverse-covariance weighting that turns a plain squared-error sum into a squared Mahalanobis-distance sum. See the tilestats.com video and amit's Medium explainer cited in [§17](#17-references), and [the isotropic special case](../glossary.md#isotropic-and-anisotropic), where this weighting collapses to a uniform scale factor.
 
 ### 15.4 Manifold Optimization and Linearization
 
@@ -428,7 +428,7 @@ Linearizing the residual $r_{ij}$ with respect to local perturbations ${\boldsym
 r_{ij}(X \oplus \boldsymbol{\delta}) \approx r_{ij}(X) + J_i \, \boldsymbol{\xi}_i + J_j \, \boldsymbol{\xi}_j
 ```
 
-Here the Jacobians are $`J_i = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_i}`$ and $`J_j = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_j}`$. They are exact (no small-residual approximation), with $`J_j = J_r^{-1}(r_{ij})`$ (the inverse **right Jacobian**, [glossary](../glossary.md#1-geometry-and-lie-groups)) and $`J_i`$ carrying an extra adjoint factor:
+Here the Jacobians are $`J_i = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_i}`$ and $`J_j = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_j}`$. They are exact (no small-residual approximation), with $`J_j = J_r^{-1}(r_{ij})`$ (the inverse **right Jacobian**, [glossary](../glossary.md#right-and-left-jacobians)) and $`J_i`$ carrying an extra adjoint factor:
 
 - `use_numpy/` evaluates $J_r^{-1}$ from an 18-term series (see [§15.7](#157-the-solver-concretely)); its truncation error is $\lesssim 10^{-12}$ at about 1.6 rad.
 - `use_manif/` uses manif's closed-form Jacobians. For small residuals the two agree to machine precision.
@@ -442,7 +442,7 @@ Here the Jacobians are $`J_i = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_
 - Toy case: frames $i$ and $j$ are $90^\circ$ apart. A 1 m push "forward" in one frame is a 1 m push "sideways" in the other.
 - The $R$ blocks of $\mathrm{Ad}$ do this relabeling. The $p^\wedge R$ block adds the effect of the offset $p$ between the frames.
 
-Here, ${\mathrm{Ad}(T) \in \mathbb{R}^{6 \times 6}}$ is the **Adjoint transformation matrix** of ${\mathrm{SE}(3)}$ ([glossary](../glossary.md#1-geometry-and-lie-groups)), which transforms velocity/tangent vectors between frame coordinate systems:
+Here, ${\mathrm{Ad}(T) \in \mathbb{R}^{6 \times 6}}$ is the **Adjoint transformation matrix** of ${\mathrm{SE}(3)}$ ([glossary](../glossary.md#adjoint)), which transforms velocity/tangent vectors between frame coordinate systems:
 
 ```math
 {\mathrm{Ad}\left(\begin{bmatrix} R & p \\ 
@@ -483,7 +483,7 @@ Each pass is just row-by-row substitution - no matrix inversion needed.
 **Why "sparse" matters:**
 
 - Most pose pairs never share a constraint, so most of $H$'s off-diagonal blocks are exactly zero. Sparse Cholesky exploits that known zero pattern instead of doing dense arithmetic on zeros.
-- Eliminating a variable can turn some zeros into nonzeros, called [**fill-in**](../glossary.md#4-graphs-sparsity-and-solvers). Example: eliminating $x_2$ out of a chain $x_1 - x_2 - x_3$ creates a new dependency between $x_1$ and $x_3$ even though they were never directly measured.
+- Eliminating a variable can turn some zeros into nonzeros, called [**fill-in**](../glossary.md#fill-in). Example: eliminating $x_2$ out of a chain $x_1 - x_2 - x_3$ creates a new dependency between $x_1$ and $x_3$ even though they were never directly measured.
 - The elimination order controls how much fill-in accumulates. See [`elimination_tree.md`](elimination_tree.md) for a worked elimination example, and [`isam2_optimization.md` §12](isam2_optimization.md#12-variable-ordering-is-also-crucial) for why iSAM2 cares about this.
 
 In practice a pure Gauss-Newton step can overshoot or diverge far from the solution, so a **Levenberg-Marquardt** damping term $\lambda$ is added to the Hessian's diagonal before solving. Both `pose_graph.py` implementations (`use_numpy/` and `use_manif/`) use the Marquardt-scaled form, which scales $\lambda$ by $H$'s own diagonal instead of adding $\lambda I$:
@@ -502,7 +502,7 @@ Larger $\lambda$ shrinks the step toward (diagonally scaled) gradient descent: s
 
 ### 15.6 Retraction/State Update
 
-Once the increment vector ${\boldsymbol{\delta}^*}$ is computed, the system updates the trajectory states on the ${\mathrm{SE}(3)}$ manifold. This kind of step, taken through Exp instead of addition, is a [**retraction**](../glossary.md#1-geometry-and-lie-groups):
+Once the increment vector ${\boldsymbol{\delta}^*}$ is computed, the system updates the trajectory states on the ${\mathrm{SE}(3)}$ manifold. This kind of step, taken through Exp instead of addition, is a [**retraction**](../glossary.md#retraction):
 
 ```math
 {T_i^{(k+1)} = T_i^{(k)} \cdot \mathrm{Exp}\left(\boldsymbol{\xi}_i^*\right), \quad \forall i \in \{1, \dots, N\}}
@@ -546,7 +546,7 @@ These are `Jc_self` ($`\partial \hat{X}_j / \partial X_i`$), `Ja` ($`\partial e_
 -J_r^{-1}(-e_{ij}) \, \mathrm{Ad}\big(Z_{ij}^{-1}\big) = -J_r^{-1}(e_{ij}) \, \mathrm{Ad}\big(X_j^{-1} X_i\big)
 ```
 
-This holds because $`J_r(-e) = J_l(e) = \mathrm{Ad}(\mathrm{Exp}(e)) \, J_r(e)`$ ($`J_l`$ is the **left Jacobian**, [glossary](../glossary.md#1-geometry-and-lie-groups)) and ${\mathrm{Exp}(e_{ij})^{-1} = X_j^{-1} X_i Z_{ij}}$.
+This holds because $`J_r(-e) = J_l(e) = \mathrm{Ad}(\mathrm{Exp}(e)) \, J_r(e)`$ ($`J_l`$ is the **left Jacobian**, [glossary](../glossary.md#right-and-left-jacobians)) and ${\mathrm{Exp}(e_{ij})^{-1} = X_j^{-1} X_i Z_{ij}}$.
 
 **Right Jacobian** (`se3_right_jacobian`, `compute_se3_inv_right_jacobian` in `use_numpy/lie_utils.py`): an 18-term series in the little adjoint (`se3_ad`), then a plain matrix inverse:
 
@@ -582,7 +582,7 @@ So $g = -b$ in §15.5's notation, and the code solves $`(H + \lambda \, \mathrm{
 
 ## 16. Robust loss functions used to handle false loop closures
 
-In PGO, standard nonlinear least squares relies on an $L_2$ squared-error norm ${F(x) = \sum r_{ij}^\top \Omega_{ij} r_{ij}}$. Under an $L_2$ loss, a single false loop closure (a severe [**outlier**](../glossary.md#3-least-squares-optimization)) produces a massive residual $r_{ij}$ whose squared weight pulls the entire trajectory out of shape to satisfy the invalid edge.
+In PGO, standard nonlinear least squares relies on an $L_2$ squared-error norm ${F(x) = \sum r_{ij}^\top \Omega_{ij} r_{ij}}$. Under an $L_2$ loss, a single false loop closure (a severe [**outlier**](../glossary.md#outlier-and-robust-kernel)) produces a massive residual $r_{ij}$ whose squared weight pulls the entire trajectory out of shape to satisfy the invalid edge.
 
 Robust cost functions replace or reweight the standard $L_2$ norm to cap or reduce the influence of large residuals.
 

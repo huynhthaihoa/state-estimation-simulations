@@ -62,7 +62,7 @@ The tree is **not necessarily the original graph**:
 
 ## 3. Connecting it to sparse Cholesky
 
-We want $`H=LL^\top`$, where $`H`$ is the [Hessian](../glossary.md#3-least-squares-optimization) (information matrix) of the linearized problem and $`L`$ is its lower-triangular Cholesky factor, computed by eliminating variables one by one. Take this graph:
+We want $`H=LL^\top`$, where $`H`$ is the [Hessian](../glossary.md#normal-equations-and-hessian) (information matrix) of the linearized problem and $`L`$ is its lower-triangular Cholesky factor, computed by eliminating variables one by one. Take this graph:
 
 ```text
 1 ─ 2 ─ 3
@@ -71,7 +71,7 @@ We want $`H=LL^\top`$, where $`H`$ is the [Hessian](../glossary.md#3-least-squar
 ```
 
 - **Eliminate 1.** It has one neighbor, so 2 takes over its information and no fill-in appears: $\text{parent}(1)=2$.
-- **Eliminate 2.** It still has **two** neighbors, 3 and 4, which were never directly connected. Removing 2 forces them to pick up each other's dependency, so a new edge $3 \leftrightarrow 4$ appears ([fill-in](../glossary.md#4-graphs-sparsity-and-solvers)), and $\text{parent}(2)=3$.
+- **Eliminate 2.** It still has **two** neighbors, 3 and 4, which were never directly connected. Removing 2 forces them to pick up each other's dependency, so a new edge $3 \leftrightarrow 4$ appears ([fill-in](../glossary.md#fill-in)), and $\text{parent}(2)=3$.
 - **Eliminate 3.** Its only remaining neighbor is 4, via that fill-in edge: $\text{parent}(3)=4$.
 
 The result is the same chain as §1's tree, but for a different reason. §1's chain came from a graph that was already a chain; here the 3–4 link exists only because eliminating 2 created it. That is §2's point: the tree is not the original graph.
@@ -118,7 +118,7 @@ Then Pose 1 is eliminated, and its resulting information affects Pose 2. So info
 
 The two structures answer different questions.
 
-**Factor graph** ([glossary](../glossary.md#4-graphs-sparsity-and-solvers)): which variables are connected by measurements?
+**Factor graph** ([glossary](../glossary.md#factor-graph)): which variables are connected by measurements?
 
 ```text
 x1 ─ factor ─ l1
@@ -188,7 +188,7 @@ The two subtrees under 8, {6, 4, 5, 2, 3} and {7, 1}, share nothing until 8, so 
 
 ## 7. This becomes very important for iSAM2
 
-**iSAM2** ([details](isam2_optimization.md); an [incremental solver](../glossary.md#4-graphs-sparsity-and-solvers)) uses a [**Bayes tree**](bayes_tree.md), which is built directly from the elimination tree (the pipeline is drawn once, in §11).
+**iSAM2** ([details](isam2_optimization.md); an [incremental solver](../glossary.md#batch-vs-incremental)) uses a [**Bayes tree**](bayes_tree.md), which is built directly from the elimination tree (the pipeline is drawn once, in §11).
 
 Concretely, a Bayes tree is the elimination tree with some of its nodes merged into **cliques**, where each clique stores the conditional density produced when its variables were eliminated ([bayes_tree.md §13](bayes_tree.md#13-one-more-important-concept-cliques)).
 
@@ -336,7 +336,7 @@ The concepts above connect into one pipeline:
               Solve Δx
 ```
 
-The elimination structure then feeds the Bayes tree (§7) and iSAM2. Here $`J`$ is the Jacobian of the residuals, and $`\Omega`$ in $`H = J^\top \Omega J`$ is the measurement [information matrix](../glossary.md#2-uncertainty-and-probability).
+The elimination structure then feeds the Bayes tree (§7) and iSAM2. Here $`J`$ is the Jacobian of the residuals, and $`\Omega`$ in $`H = J^\top \Omega J`$ is the measurement [information matrix](../glossary.md#information-matrix).
 
 ### The simplest mental model
 

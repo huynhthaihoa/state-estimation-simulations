@@ -154,8 +154,8 @@ x0 ── x1 ── x2 ── x3 ── x4
 The loop closure can affect **many previous poses**, so incremental optimization cannot simply update $x_4$.
 
 - Original iSAM still absorbs the loop-closure factor like any other: one more row folded into the factorization with Givens rotations (§3).
-- But this row links $x_4$ back to $x_0$, so the rotations sweep through most of the factorization and leave it denser (fill-in; [glossary](../glossary.md#4-graphs-sparsity-and-solvers)).
-- Original iSAM cleans this up periodically, in one batch step that relinearizes everything and chooses a new [variable ordering](../glossary.md#4-graphs-sparsity-and-solvers) (Kaess et al. 2008).
+- But this row links $x_4$ back to $x_0$, so the rotations sweep through most of the factorization and leave it denser (fill-in; [glossary](../glossary.md#fill-in)).
+- Original iSAM cleans this up periodically, in one batch step that relinearizes everything and chooses a new [variable ordering](../glossary.md#variable-ordering) (Kaess et al. 2008).
 - This repo's script goes straight to that batch step when the loop closes (§14.1).
 
 **Why it sweeps:** Givens rotations start at the first nonzero column of the new row. An odometry row starts near the end; a loop-closure row touches $`x_0`$ (column 0), so it sweeps every column (worked in §14.1).
@@ -181,7 +181,7 @@ Original iSAM stops at §3's mechanism: Givens-rotation updates to the factoriza
 | Full cost on every update       | Cheaper per update, except around loop closures |
 | Good for offline SLAM           | Good for online SLAM            |
 | Simple conceptual model         | More complicated implementation |
-| Example: standard Gauss-Newton ([glossary](../glossary.md#3-least-squares-optimization))  | Example: iSAM/iSAM2             |
+| Example: standard Gauss-Newton ([glossary](../glossary.md#gauss-newton))  | Example: iSAM/iSAM2             |
 
 ```text
 BATCH

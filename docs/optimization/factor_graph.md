@@ -9,7 +9,7 @@ A **factor graph** represents:
 It is a **bipartite** graph (edges join only nodes of different kinds) with two kinds of nodes (§6 spells out the distinction):
 
 - **Variables** = things we don't know: robot poses, landmarks, sensor biases, etc.
-- **Factors** = measurements/constraints: [odometry](../glossary.md#5-slam-system), camera observations, IMU, GPS, loop closures, etc.
+- **Factors** = measurements/constraints: [odometry](../glossary.md#odometry), camera observations, IMU, GPS, loop closures, etc.
 
 ![A bipartite factor graph for a SLAM-style problem: robot poses x0..xn connected by odometry-measurement factors u1..un, with landmarks l1, l2 connected to poses via landmark-measurement factors m1..m4, plus a small "variable node/factor node" legend](../images/factor_graph_1.jpg)
 
@@ -163,9 +163,9 @@ e_k^\top\Omega_k e_k
 }
 $$
 
-where $\Omega_k=\Sigma_k^{-1}$ is the [**information matrix**](../glossary.md#2-uncertainty-and-probability) (called $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty); downstream docs such as [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md) use $\Omega$).
+where $\Omega_k=\Sigma_k^{-1}$ is the [**information matrix**](../glossary.md#information-matrix) (called $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty); downstream docs such as [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md) use $\Omega$).
 
-> **Note**: a precise sensor (small $\Sigma_k$) gives a *large* $\Omega_k$, so its error counts more in the sum; a noisy sensor (large $\Sigma_k$) gives a *small* $\Omega_k$ and is down-weighted. The term $e_k^\top\Omega_k e_k$ is a **squared Mahalanobis distance** - see the [glossary](../glossary.md#2-uncertainty-and-probability) for the definition and the isotropic special case where it collapses to plain squared error divided by a constant.
+> **Note**: a precise sensor (small $\Sigma_k$) gives a *large* $\Omega_k$, so its error counts more in the sum; a noisy sensor (large $\Sigma_k$) gives a *small* $\Omega_k$ and is down-weighted. The term $e_k^\top\Omega_k e_k$ is a **squared Mahalanobis distance** - see the [glossary](../glossary.md#mahalanobis-distance) for the definition and the isotropic special case where it collapses to plain squared error divided by a constant.
 
 So:
 
@@ -316,8 +316,8 @@ But the errors are nonlinear because poses involve rotations and transformations
 
 So we linearize:
 
-- $`\oplus`$ is the **retraction** that applies a small update $`\Delta X`$ to a state ([glossary](../glossary.md#1-geometry-and-lie-groups)).
-- $`J`$ is the **Jacobian** of $`e`$ with respect to $`\Delta X`$ ([glossary](../glossary.md#3-least-squares-optimization)).
+- $`\oplus`$ is the **retraction** that applies a small update $`\Delta X`$ to a state ([glossary](../glossary.md#retraction)).
+- $`J`$ is the **Jacobian** of $`e`$ with respect to $`\Delta X`$ ([glossary](../glossary.md#jacobian)).
 
 $$e(X\oplus\Delta X)\approx e(X)+J\Delta X$$
 

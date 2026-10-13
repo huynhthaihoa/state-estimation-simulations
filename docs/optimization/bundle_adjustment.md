@@ -209,7 +209,7 @@ Real implementations usually wrap the squared reprojection error in a **robust l
 
 ### 6.1 The BA math, concretely
 
-`bundle_adjustment.py` minimizes the objective above with plain Gauss-Newton ([glossary](../glossary.md#3-least-squares-optimization)). Each pose $T_i$ is a $4\times4$ camera-to-world matrix with rotation $R_i$ and translation $t_i$. Each landmark $P_j$ is a world point. Pose corrections are 6-vectors $\delta = [\delta v, \delta\omega]$, translation first.
+`bundle_adjustment.py` minimizes the objective above with plain Gauss-Newton ([glossary](../glossary.md#gauss-newton)). Each pose $T_i$ is a $4\times4$ camera-to-world matrix with rotation $R_i$ and translation $t_i$. Each landmark $P_j$ is a world point. Pose corrections are 6-vectors $\delta = [\delta v, \delta\omega]$, translation first.
 
 ![Two panels from bundle_adjustment.py: a top-down view of cameras on an arc around a landmark cluster (ground truth, noisy initial guess, joint BA), and log-scale RMS errors for the noisy initial guess, landmarks-only, poses-only and joint bundle adjustment](../../assets/bundle_adjustment.png)
 
@@ -230,7 +230,7 @@ p_c = R_i^\top (P_j - t_i) = \begin{bmatrix} x \\ y \\ z \end{bmatrix}, \qquad
 
 Here $`z`$ is the point's depth in the camera frame, not the pixel observation $`z_{ij}`$. The code clamps $|z|$ to at least $10^{-9}$, keeping its sign, so a point at the camera center can't divide by zero.
 
-**Intuition (projection Jacobian,** [glossary](../glossary.md#3-least-squares-optimization)**):** it says how many pixels the image point moves per metre the 3D point moves, and far points move less.
+**Intuition (projection Jacobian,** [glossary](../glossary.md#jacobian)**):** it says how many pixels the image point moves per metre the 3D point moves, and far points move less.
 
 - Tiny example: shift a point $`1`$ cm sideways, with $`f_x = 800`$. The pixel moves by $`f_x \cdot 0.01 / z`$.
 - At $`z = 5`$ m that is $`1.6`$ px. At $`z = 10`$ m it is $`0.8`$ px. This is the $`f_x/z`$ entry of $`J_{\text{proj}}`$ below (the projection Jacobian $`\partial\pi/\partial p_c`$).
@@ -247,7 +247,7 @@ J_{\text{pose}} = J_{\text{proj}} \begin{bmatrix} -I_3 & [p_c]_\times \end{bmatr
 J_{\text{point}} = J_{\text{proj}}\, R_i^\top
 ```
 
-Here $`[p_c]_\times`$ is the skew-symmetric **hat** matrix of $`p_c`$ and $`\mathrm{Exp}`$ is the **exponential map** ([glossary](../glossary.md#1-geometry-and-lie-groups)). $J_{\text{pose}}$ is for a right perturbation $`T_i \leftarrow T_i\,\mathrm{Exp}(\delta)`$. The block $`[-I_3 \;\; [p_c]_\times]`$ comes from inverting the perturbed pose, which puts the perturbation on the left with a minus sign:
+Here $`[p_c]_\times`$ is the skew-symmetric **hat** matrix of $`p_c`$ and $`\mathrm{Exp}`$ is the **exponential map** ([glossary](../glossary.md#exp-and-log-maps)). $J_{\text{pose}}$ is for a right perturbation $`T_i \leftarrow T_i\,\mathrm{Exp}(\delta)`$. The block $`[-I_3 \;\; [p_c]_\times]`$ comes from inverting the perturbed pose, which puts the perturbation on the left with a minus sign:
 
 ```math
 \left(T_i\,\mathrm{Exp}(\delta)\right)^{-1} P_j = \mathrm{Exp}(-\delta)\, p_c \approx p_c - \delta v - \delta\omega \times p_c = p_c - \delta v + [p_c]_\times \delta\omega
@@ -279,7 +279,7 @@ J_k = J_r^{-1}(e_k), \qquad
 H_{kk} \mathrel{+}= J_k^\top \Omega_{\text{prior}} J_k, \qquad g_k \mathrel{+}= -J_k^\top \Omega_{\text{prior}}\, e_k
 ```
 
-$J_r^{-1}$ is the inverse **right Jacobian** ([glossary](../glossary.md#1-geometry-and-lie-groups)), computed by `compute_se3_inv_right_jacobian`; $`\mathrm{Log}`$ is the **logarithm map** (inverse of $`\mathrm{Exp}`$, same glossary section) and $`\sigma_{\text{pose}}`$ is the standard deviation of the prior on camera pose.
+$J_r^{-1}$ is the inverse **right Jacobian** ([glossary](../glossary.md#right-and-left-jacobians)), computed by `compute_se3_inv_right_jacobian`; $`\mathrm{Log}`$ is the **logarithm map** (inverse of $`\mathrm{Exp}`$, same glossary section) and $`\sigma_{\text{pose}}`$ is the standard deviation of the prior on camera pose.
 
 - One prior pose would remove only the 6 rigid DoF. The second also pins the distance between the two cameras, which fixes scale.
 - The prior is finite ($\sigma_{\text{pose}}$ is the same 0.1 used to perturb the initial guess), so camera 1's actual error can still be corrected by its observations.
@@ -447,7 +447,7 @@ It is the same style of sparsity exploitation that makes [`sparse_cholesky_facto
 $H = J^\top J$ above is the plain textbook form. The scripts' actual $H$ has extra terms:
 
 - `run_bundle_adjustment` weights every reprojection block by $\omega_{\text{px}} = 1/\sigma_{\text{px}}^2$, adds the gauge-prior blocks on cameras 0 and 1, and adds $10^{-6} I$ (see [§6.1](#61-the-ba-math-concretely)).
-- `run_windowed_gn_lm` in `bundle_adjustment_advanced.py` uses no weighting but solves $`(H + \lambda\,\mathrm{diag}(H))\,\delta = g`$ (see §13), where $`\lambda`$ is the **LM damping** factor ([glossary](../glossary.md#3-least-squares-optimization)).
+- `run_windowed_gn_lm` in `bundle_adjustment_advanced.py` uses no weighting but solves $`(H + \lambda\,\mathrm{diag}(H))\,\delta = g`$ (see §13), where $`\lambda`$ is the **LM damping** factor ([glossary](../glossary.md#levenberg-marquardt-lm-and-damping)).
 - None of these changes the sparsity pattern: the prior and damping touch only diagonal blocks, and the weights rescale blocks that already exist.
 
 ---

@@ -258,7 +258,7 @@ x₀ x₁ x₂ x₃
 
 Optimization is often the computational mechanism for obtaining this joint estimate. Strictly, least-squares optimization returns the single most likely trajectory (the MAP estimate, i.e. the peak of $`p(x_{0:t} \mid z_{0:t})`$), not the whole distribution.
 
-The uncertainty around it is usually approximated as a Gaussian. Its information matrix is the Gauss-Newton Hessian $`J^\top \Sigma^{-1} J`$ at the solution, where $`J`$ is the stacked **Jacobian** of the residuals and $`\Sigma`$ is the measurement covariance ([glossary](glossary.md#3-least-squares-optimization)). With whitened Jacobians, this is simply $`J^\top J`$.
+The uncertainty around it is usually approximated as a Gaussian. Its information matrix is the Gauss-Newton Hessian $`J^\top \Sigma^{-1} J`$ at the solution, where $`J`$ is the stacked **Jacobian** of the residuals and $`\Sigma`$ is the measurement covariance ([glossary](glossary.md#jacobian)). With whitened Jacobians, this is simply $`J^\top J`$.
 
 **Tiny example** (toy case: one scalar $x$, measurement $r = x - z$ with $\sigma = 0.5$):
 - Information $= 1/\sigma^2 = 4$, so the variance is $1/4 = 0.25$.
@@ -317,7 +317,7 @@ x₀ ● ──■── ● landmark ──■── ● x₂
 x₀ ● ──■── ● x₁ ──■── ● x₂ ──■── ● x₃
 ```
 
-- A **unary (prior) factor** constrains a single variable directly. It removes [gauge freedom](glossary.md#3-least-squares-optimization) or injects an absolute measurement like GPS:
+- A **unary (prior) factor** constrains a single variable directly. It removes [gauge freedom](glossary.md#gauge-freedom) or injects an absolute measurement like GPS:
 
 ```text
 ■ ── ● x₀ ──■── ● x₁ ──■── ● x₂

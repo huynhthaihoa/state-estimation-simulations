@@ -90,7 +90,7 @@ At zero rotation ($\theta = 0$), $w = \cos 0 = 1$ and $x = y = z = 0$, giving $q
 
 ## 6. Why are quaternions so useful in robotics?
 
-Suppose the [IMU](../glossary.md#5-slam-system) says "the robot rotated slightly during this 10 ms interval." We update the orientation $R_{k+1}=R_k\Delta R$. A rotation matrix ($`R \in SO(3)`$) needs **9 numbers**, while a quaternion needs only $q = (w,x,y,z)$ with the unit constraint. More importantly, composing rotations becomes quaternion multiplication, $q_{\text{new}}=q_{\text{old}}\otimes\Delta q$ (where $`\otimes`$ is the **quaternion product**, defined in §13, and $`\Delta q`$ is the quaternion of the small rotation $`\Delta R`$ measured over the interval):
+Suppose the [IMU](../glossary.md#imu-inertial-measurement-unit) says "the robot rotated slightly during this 10 ms interval." We update the orientation $R_{k+1}=R_k\Delta R$. A rotation matrix ($`R \in SO(3)`$) needs **9 numbers**, while a quaternion needs only $q = (w,x,y,z)$ with the unit constraint. More importantly, composing rotations becomes quaternion multiplication, $q_{\text{new}}=q_{\text{old}}\otimes\Delta q$ (where $`\otimes`$ is the **quaternion product**, defined in §13, and $`\Delta q`$ is the quaternion of the small rotation $`\Delta R`$ measured over the interval):
 
 > **Quaternion multiplication = "apply one rotation after another."**
 
@@ -177,7 +177,7 @@ R= \begin{bmatrix} 0 & -1 & 0\\
 
 $q$ and $-q$ represent **the exact same physical orientation**. For example, $q = (0.707, 0, 0, 0.707)$ and $-q = (-0.707, 0, 0, -0.707)$ are the same rotation.
 
-This matters for **optimization, SLAM, [EKF](../glossary.md#6-kalman-filter-family), and Lie-group ([glossary](../glossary.md#1-geometry-and-lie-groups)) state estimation**, because treating quaternion components as ordinary Euclidean coordinates causes two problems:
+This matters for **optimization, SLAM, [EKF](../glossary.md#ekf-extended-kalman-filter), and Lie-group ([glossary](../glossary.md#lie-group)) state estimation**, because treating quaternion components as ordinary Euclidean coordinates causes two problems:
 
 - **Additive updates break the unit-norm constraint.** Adding a small correction to $q$ leaves the unit sphere (the set of quaternions with norm 1).
 - **The double cover makes averaging and differencing ambiguous.** The **double cover** means each rotation has two quaternions, $`q`$ and $`-q`$. Averaging $q$ and $-q$ (the same rotation) gives $(0,0,0,0)$, which is not a rotation. Their component-wise difference is as large as possible.
@@ -214,7 +214,7 @@ The small error can be attached on either side, and both are common:
 
 - $`q_{\text{true}} = \delta q\otimes \hat q`$: the error is expressed in the world frame (fixed reference axes). In the terminology of [left_right_invariant.md](../filtering/left_right_invariant.md) this is a **right-invariant** error.
 - $`q_{\text{true}} = \hat q\otimes \delta q`$: the error is expressed in the body frame (axes attached to the robot). This is the **left-invariant** error, the convention of Solà's ESKF and of this repo's `run_iekf`.
-  `run_iekf` uses the $\hat X\,\mathrm{Exp}(\xi)$ form, with $`\hat X`$ the estimated pose and $`\xi`$ the tangent-space error (see the [glossary](../glossary.md#1-geometry-and-lie-groups)).
+  `run_iekf` uses the $\hat X\,\mathrm{Exp}(\xi)$ form, with $`\hat X`$ the estimated pose and $`\xi`$ the tangent-space error (see the [glossary](../glossary.md#lie-algebra-and-tangent-space)).
 
 This is the error-state idea of [extra_kf_variants.md §2](../filtering/extra_kf_variants.md#2-error-state-kalman-filter-eskf), and it leads directly into **SO(3), Lie groups, Lie algebra, and the Invariant EKF**.
 

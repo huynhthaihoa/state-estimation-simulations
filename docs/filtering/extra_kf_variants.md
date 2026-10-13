@@ -44,7 +44,7 @@ The UKF says:
 
 > "I don't want to calculate Jacobians. I'll pick a few carefully chosen points around my estimate and see how the nonlinear function transforms them."
 
-These points are called **sigma points**. They aren't random samples: for an $n$-dimensional state there are $2n+1$ of them, placed deterministically at the mean and at $\pm$ the columns of a matrix square root of $`(n+\lambda)P`$ (this repo uses the Cholesky factor). Here $`P`$ is the state covariance ([glossary](../glossary.md#2-uncertainty-and-probability)). $`\lambda`$ is the UKF scaling parameter, not the LM damping $\lambda$ of the [glossary](../glossary.md#3-least-squares-optimization).
+These points are called **sigma points**. They aren't random samples: for an $n$-dimensional state there are $2n+1$ of them, placed deterministically at the mean and at $\pm$ the columns of a matrix square root of $`(n+\lambda)P`$ (this repo uses the Cholesky factor). Here $`P`$ is the state covariance ([glossary](../glossary.md#covariance)). $`\lambda`$ is the UKF scaling parameter, not the LM damping $\lambda$ of the [glossary](../glossary.md#levenberg-marquardt-lm-and-damping).
 
 Picture the uncertainty as an ellipse:
 
@@ -86,11 +86,11 @@ See `run_ukf` in [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/point
 
 Widely used in SLAM and VIO.
 
-An ESKF doesn't estimate the entire state directly. It separates a **nominal state** from a **small error state**. For example, the true rotation is the nominal one times a small correction ($`\delta\theta`$ is a small rotation vector, and $`^\wedge`$ turns a 3-vector into its skew-symmetric matrix, see [glossary](../glossary.md#1-geometry-and-lie-groups)):
+An ESKF doesn't estimate the entire state directly. It separates a **nominal state** from a **small error state**. For example, the true rotation is the nominal one times a small correction ($`\delta\theta`$ is a small rotation vector, and $`^\wedge`$ turns a 3-vector into its skew-symmetric matrix, see [glossary](../glossary.md#hat-operator)):
 
 $$R = \hat R \exp(\delta\theta^\wedge)$$
 
-- Nominal state: $`\hat X = (\hat R,\hat p,\hat v,\hat b_g,\hat b_a)`$ (rotation, position, velocity, gyro bias, accelerometer bias; [glossary](../glossary.md#5-slam-system))
+- Nominal state: $`\hat X = (\hat R,\hat p,\hat v,\hat b_g,\hat b_a)`$ (rotation, position, velocity, gyro bias, accelerometer bias; [glossary](../glossary.md#bias))
 - Error state, on which the EKF mainly operates: $`\delta x = (\delta\theta,\delta p,\delta v,\delta b_g,\delta b_a)`$
 
 Each cycle has three steps:
@@ -160,7 +160,7 @@ This one is less about the **estimation philosophy** and more about **numerical 
 
 The standard KF stores the covariance $P$. The square-root version stores a factor $L$ with $P = LL^\top$, often obtained through Cholesky decomposition.
 
-Why? A covariance matrix must be symmetric and **positive semi-definite** (never negative variance in any direction). In floating point, the standard update $`P \leftarrow (I - KH)P`$, where $`K`$ is the Kalman gain and $`H`$ the measurement Jacobian ([glossary](../glossary.md#6-kalman-filter-family)), subtracts nearly equal numbers, and rounding error can leave $P$ slightly asymmetric or with a negative eigenvalue. After that, the filter can diverge.
+Why? A covariance matrix must be symmetric and **positive semi-definite** (never negative variance in any direction). In floating point, the standard update $`P \leftarrow (I - KH)P`$, where $`K`$ is the Kalman gain and $`H`$ the measurement Jacobian ([glossary](../glossary.md#innovation-and-kalman-gain)), subtracts nearly equal numbers, and rounding error can leave $P$ slightly asymmetric or with a negative eigenvalue. After that, the filter can diverge.
 
 Carrying $L$ avoids this in two ways:
 
@@ -252,7 +252,7 @@ Normally we assume the process noise covariance $Q$ and measurement noise covari
 An adaptive KF estimates or adjusts $Q$ and/or $R$ online. One family does this from the filter's own innovation sequence, the approach of Mehra (1970, reference 7). It is useful when the environment or sensor quality changes over time.
 
 **Intuition:**
-- Before each measurement, the filter predicts how big its surprise (the [innovation](../glossary.md#6-kalman-filter-family)) should be: the **innovation covariance** $`S`$ ([glossary](../glossary.md#6-kalman-filter-family)).
+- Before each measurement, the filter predicts how big its surprise (the [innovation](../glossary.md#innovation-and-kalman-gain)) should be: the **innovation covariance** $`S`$ ([glossary](../glossary.md#innovation-and-kalman-gain)).
 - Then it compares with the surprise it actually gets.
 - Surprises much bigger than $`S`$ say that $Q$ or $R$ is too small. Much smaller says too big.
 - So the filter nudges $`Q`$ and $`R`$ until predicted and actual surprise agree.

@@ -50,7 +50,7 @@ Several docs already draw a partial map of their own corner. We treat those as z
   Jacobian · Lie groups SO(3)/SE(3) · quaternion · linear vs. nonlinear
 ```
 
-In the diagram, $`Q`$ is the **process-noise covariance** of the filter's predict step ([glossary](glossary.md#6-kalman-filter-family)); **PGO** is pose-graph optimization; **contact/phase** signals (when a legged or crawling body touches the ground, and which gait phase it is in) are explained in the [appendix](#appendix-contact-and-phase-signals).
+In the diagram, $`Q`$ is the **process-noise covariance** of the filter's predict step ([glossary](glossary.md#predict-and-update-steps)); **PGO** is pose-graph optimization; **contact/phase** signals (when a legged or crawling body touches the ground, and which gait phase it is in) are explained in the [appendix](#appendix-contact-and-phase-signals).
 
 Three questions organize the whole map:
 
@@ -103,7 +103,7 @@ Three questions organize the whole map:
                               (seeds the first linearization point)
 ```
 
-Here $`\Delta R, \Delta v, \Delta p`$ are the preintegrated rotation, velocity and position changes, $`v`$ is the velocity, and $`b_g`$ is the gyro bias ([glossary](glossary.md#5-slam-system)).
+Here $`\Delta R, \Delta v, \Delta p`$ are the preintegrated rotation, velocity and position changes, $`v`$ is the velocity, and $`b_g`$ is the gyro bias ([glossary](glossary.md#bias)).
 
 | Step | What it produces | Doc | Script |
 |---|---|---|---|
@@ -123,7 +123,7 @@ Two things sit on the boundary:
 
 ## 4. Back-end, branch A: filtering
 
-A filter carries only the current state and its covariance. Each new measurement is folded in, and the past is marginalized away ([filtering_smoothing.md §2](filtering_smoothing.md#2-filtering-one-step-at-a-time)). Every filter in the tree is a [Bayes filter](glossary.md#6-kalman-filter-family) (predict, then update); the branches differ in how they represent the belief.
+A filter carries only the current state and its covariance. Each new measurement is folded in, and the past is marginalized away ([filtering_smoothing.md §2](filtering_smoothing.md#2-filtering-one-step-at-a-time)). Every filter in the tree is a [Bayes filter](glossary.md#bayes-filter) (predict, then update); the branches differ in how they represent the belief.
 
 ```text
                          Bayes filter (predict → update)
@@ -153,8 +153,8 @@ A filter carries only the current state and its covariance. Each new measurement
 | KF → EKF → IEKF | Linear, then linearized, then geometry-aware error | [kf_ekf_iekf.md §1-§3](filtering/kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear), [§5](filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error) | `pointcloud_pose_tracking.py` |
 | Left- vs. right-invariant error | Which frame the error is defined in, and why it matters | [left_right_invariant.md §3](filtering/left_right_invariant.md#3-why-invariant---and-why-leftright) | `pointcloud_pose_tracking.py` (`run_iekf`) |
 | UKF, ESKF, MSCKF, PF, ... | Each relaxes one KF assumption | [extra_kf_variants.md §1](filtering/extra_kf_variants.md#1-unscented-kalman-filter-ukf), [§2](filtering/extra_kf_variants.md#2-error-state-kalman-filter-eskf), [§7](filtering/extra_kf_variants.md#7-particle-filter-pf), [kf_ekf_iekf.md §9](filtering/kf_ekf_iekf.md#9-other-prominent-variants-worth-keeping-in-mind) (MSCKF) | `pointcloud_pose_tracking.py` (`run_ukf`; UKF only) |
-| What differs in practice | EKF = IEKF (same update $K r$, the **Kalman gain** times the innovation, and covariance $`P`$ to round-off; [glossary](glossary.md#6-kalman-filter-family)); UKF ~1.4 mm at the first update, micrometers after; vanilla KF ~1-4 mm off from truncating the motion step to first order | [pointcloud_pose_tracking_empirical_note.md §2-§4](filtering/pointcloud_pose_tracking_empirical_note.md#2-ekf-vs-iekf-exact-by-construction) | `pointcloud_pose_tracking.py` |
-| Hybrid events | Propagating covariance through a reset ([glossary](glossary.md#7-hybrid-discontinuous-systems)) | [hybrid_saltation_ekf.md §2](filtering/hybrid_saltation_ekf.md#2-why-the-reset-maps-own-jacobian-is-not-enough), [§6](filtering/hybrid_saltation_ekf.md#6-the-empirical-finding-a-modest-real-gap-not-a-dramatic-one) | `saltation_matrix_ekf.py` |
+| What differs in practice | EKF = IEKF (same update $K r$, the **Kalman gain** times the innovation, and covariance $`P`$ to round-off; [glossary](glossary.md#innovation-and-kalman-gain)); UKF ~1.4 mm at the first update, micrometers after; vanilla KF ~1-4 mm off from truncating the motion step to first order | [pointcloud_pose_tracking_empirical_note.md §2-§4](filtering/pointcloud_pose_tracking_empirical_note.md#2-ekf-vs-iekf-exact-by-construction) | `pointcloud_pose_tracking.py` |
+| Hybrid events | Propagating covariance through a reset ([glossary](glossary.md#hybrid-system-guard-and-reset-map)) | [hybrid_saltation_ekf.md §2](filtering/hybrid_saltation_ekf.md#2-why-the-reset-maps-own-jacobian-is-not-enough), [§6](filtering/hybrid_saltation_ekf.md#6-the-empirical-finding-a-modest-real-gap-not-a-dramatic-one) | `saltation_matrix_ekf.py` |
 | Hybrid events on a Lie group | A bounce is not a group automorphism, so even the invariant error's reset Jacobian depends on the state. Skipping that leaves the right-invariant EKF (RIEKF) overconfident after each bounce; a timing-noise term absorbs contact-detection jitter | [invariant_saltation_ekf.md §3](filtering/invariant_saltation_ekf.md#3-what-the-bounce-breaks), [§6](filtering/invariant_saltation_ekf.md#6-results-consistency-through-the-bounces), [§7](filtering/invariant_saltation_ekf.md#7-contact-detection-jitter) | `invariant_saltation_ekf.py` |
 | Phase-gated measurements | Free zero-velocity information, but wrong gating is catastrophic and a confident gated filter is hit harder by unmodeled acceleration | [inchworm_zupt_ekf.md §3](filtering/inchworm_zupt_ekf.md#3-the-finding-not-just-always-is-wrong-while-moving) | `inchworm_zupt_ekf.py` |
 | Shaped process noise | A wrongly oriented $Q$ is worse than an isotropic one | [friction_anisotropic_ekf.md §2](filtering/friction_anisotropic_ekf.md#2-the-dominant-finding-fixed_anisotropic-is-dramatically-worse-everywhere), [§3](filtering/friction_anisotropic_ekf.md#3-a-secondary-finding-the-worst-mismatch-is-90-not-180) | `friction_anisotropic_ekf.py` |
@@ -191,7 +191,7 @@ Smoothing keeps past states as variables and re-solves them jointly. The chain f
      (GN/LM)    (iSAM → iSAM2)            (sliding window/fixed lag)
 ```
 
-In the chain, $`r_i`$ is the residual of factor $`i`$ and $`\Omega`$ its **information matrix** ([glossary](glossary.md#2-uncertainty-and-probability)); $`H`$ is the **Gauss-Newton Hessian** (approximate), $`b`$ the gradient, and $`\Delta x`$ the step ([glossary](glossary.md#3-least-squares-optimization)); $`\boxplus`$ is the **retraction**, the manifold-aware "add" ([glossary](glossary.md#1-geometry-and-lie-groups)).
+In the chain, $`r_i`$ is the residual of factor $`i`$ and $`\Omega`$ its **information matrix** ([glossary](glossary.md#information-matrix)); $`H`$ is the **Gauss-Newton Hessian** (approximate), $`b`$ the gradient, and $`\Delta x`$ the step ([glossary](glossary.md#normal-equations-and-hessian)); $`\boxplus`$ is the **retraction**, the manifold-aware "add" ([glossary](glossary.md#retraction)).
 
 The bottom row is the solve strategy. GN/LM is the step rule, a separate axis: iSAM is another way to run the linear solves, not an alternative to GN/LM ([levenberg_marquardt.md §11](optimization/levenberg_marquardt.md#11-where-lm-fits)).
 
@@ -251,7 +251,7 @@ The EKF linearizes once per predict/update step, at the current estimate. GN/LM 
 The same question appears on both branches: in which frame, and on which space, is the error measured?
 
 - Filtering: EKF vs. IEKF differ only in how they define the error ([kf_ekf_iekf.md §5](filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error), [left_right_invariant.md §4](filtering/left_right_invariant.md#4-why-it-actually-matters-not-just-bookkeeping)).
-- Filtering through a jump: the invariant error's propagation is [trajectory-independent](glossary.md#1-geometry-and-lie-groups), but a bounce's reset is not a group automorphism, so its Jacobian in invariant coordinates depends on the state again ([invariant_saltation_ekf.md §3](filtering/invariant_saltation_ekf.md#3-what-the-bounce-breaks)).
+- Filtering through a jump: the invariant error's propagation is [trajectory-independent](glossary.md#group-affine-dynamics-trajectory-independence), but a bounce's reset is not a group automorphism, so its Jacobian in invariant coordinates depends on the state again ([invariant_saltation_ekf.md §3](filtering/invariant_saltation_ekf.md#3-what-the-bounce-breaks)).
 - Smoothing: PGO's residual is the $\mathrm{Log}$ of a relative-pose mismatch ([pose_graph_optimization.md §7](optimization/pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive)).
 
 ### 6.3 Variable elimination: one operation, three uses

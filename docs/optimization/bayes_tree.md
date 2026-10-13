@@ -22,7 +22,7 @@ And suppose it observes a landmark:
      x1    x3
 ```
 
-The [factor graph](../glossary.md#4-graphs-sparsity-and-solvers) represents **constraints**:
+The [factor graph](../glossary.md#factor-graph) represents **constraints**:
 
 - $x_1$ → $x_2$: odometry
 - $x_2$ → $x_3$: odometry
@@ -95,7 +95,7 @@ Eliminate x1:
 
 This is the fundamental idea behind elimination. See [`elimination_tree.md`](elimination_tree.md) for the dependency structure it produces.
 
-Here $x_1$ is eliminated only to build a solve order. It is still part of the problem, and a later update re-eliminates it if that update affects it. [marginalization.md](marginalization.md) reuses this exact step for a different purpose: permanently discarding an old state to bound the size of a [sliding-window](../glossary.md#4-graphs-sparsity-and-solvers) estimator.
+Here $x_1$ is eliminated only to build a solve order. It is still part of the problem, and a later update re-eliminates it if that update affects it. [marginalization.md](marginalization.md) reuses this exact step for a different purpose: permanently discarding an old state to bound the size of a [sliding-window](../glossary.md#sliding-window-and-fixed-lag-smoothing) estimator.
 
 ---
 
@@ -199,7 +199,7 @@ Each variable ends up conditioned only on its separator, and the separator's nex
 - Chain example: $`x_1 = (d_1 - r_{12}\, x_2) / r_{11}`$ (here $`r_{11}`$, $`r_{12}`$, $`d_1`$ are row 1's diagonal, off-diagonal and right-hand-side entries). This one line is "$`x_1`$ given $`x_2`$".
 - To solve, read the tree from the root down. The root has no parents, so it is solved first. Its value is then substituted into the children.
 
-For [iSAM2](isam2_optimization.md) ([incremental](../glossary.md#4-graphs-sparsity-and-solvers) smoothing and mapping), the useful translation is:
+For [iSAM2](isam2_optimization.md) ([incremental](../glossary.md#batch-vs-incremental) smoothing and mapping), the useful translation is:
 
 > **Bayes tree = conditional dependency tree created by variable elimination.**
 
@@ -395,7 +395,7 @@ So:
 
 ## 15. Where this is implemented in this repo
 
-Partially. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds the **elimination tree** of this repo's [pose-graph](../glossary.md#4-graphs-sparsity-and-solvers) topology: one node per variable, no clique merging (§13). It is the structure a Bayes tree is built from, not a full Bayes tree.
+Partially. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds the **elimination tree** of this repo's [pose-graph](../glossary.md#pose-graph) topology: one node per variable, no clique merging (§13). It is the structure a Bayes tree is built from, not a full Bayes tree.
 
 **What it does:**
 - `symbolic_eliminate`/`bayes_tree_affected_path` in `utils.py` run the elimination-game construction from §3-§4 (spelled out in §4.1) and the root-ward affected-path query from §7-§9. Every "N/16 affected" count is a count of variables, not cliques.

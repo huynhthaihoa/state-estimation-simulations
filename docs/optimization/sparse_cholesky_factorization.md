@@ -34,7 +34,7 @@ The key observation is that **large optimization problems often contain mostly z
 
 ## 1. Why does sparsity matter?
 
-Consider a SLAM problem ([glossary](../glossary.md#5-slam-system)) with 1,000 robot poses and 5,000 landmarks.
+Consider a SLAM problem ([glossary](../glossary.md#slam-simultaneous-localization-and-mapping)) with 1,000 robot poses and 5,000 landmarks.
 
 Each measurement connects only a few variables:
 
@@ -55,7 +55,7 @@ Pose 3 ─ Landmark 3
 ...
 ```
 
-Most variables don't directly interact, so the Hessian $H = J^\top \Omega J$ is **sparse** (with Jacobian $`J`$ and measurement **information matrix** $`\Omega`$, [glossary](../glossary.md#3-least-squares-optimization); §2 derives this).
+Most variables don't directly interact, so the Hessian $H = J^\top \Omega J$ is **sparse** (with Jacobian $`J`$ and measurement **information matrix** $`\Omega`$, [glossary](../glossary.md#information-matrix); §2 derives this).
 
 Instead of storing something like:
 
@@ -92,7 +92,7 @@ $$H\Delta x = -b$$
 - Weighted, these become $H = J^\top\Omega J$ and $b = J^\top\Omega r$.
 - $\Omega$ is the information matrix from [factor_graph.md §4](factor_graph.md#4-optimization-means-minimizing-all-those-errors), the same quantity as $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty).
 
-We need $H$ to be symmetric positive definite, and that isn't automatic. If every factor is relative (odometry, loop closures, reprojections with no prior), some motion of the whole solution leaves the cost unchanged (a [gauge freedom](../glossary.md#3-least-squares-optimization)). $H$ is then only positive *semi*-definite, and Cholesky breaks down on a zero **pivot** (the quantity under the square root in $`L_{jj}`$).
+We need $H$ to be symmetric positive definite, and that isn't automatic. If every factor is relative (odometry, loop closures, reprojections with no prior), some motion of the whole solution leaves the cost unchanged (a [gauge freedom](../glossary.md#gauge-freedom)). $H$ is then only positive *semi*-definite, and Cholesky breaks down on a zero **pivot** (the quantity under the square root in $`L_{jj}`$).
 
 **Tiny example (toy case):** two poses joined by one odometry factor give $`H=\begin{bmatrix}1&-1\\-1&1\end{bmatrix}`$.
 - Moving both poses together changes nothing, so $`H`$ has rank 1.
@@ -137,7 +137,7 @@ L = \begin{bmatrix} * & 0 & 0 \\
 * & [*] & * \end{bmatrix}
 ```
 
-where $[*]$ marks the entry that was zero in $H$. That newly created nonzero is [fill-in](../glossary.md#4-graphs-sparsity-and-solvers). It comes straight from the formula at the top: $`L_{32} = (H_{32} - L_{31}L_{21}) / L_{22}`$, and $H_{32} = 0$ doesn't help when $L_{31}$ and $L_{21}$ are both nonzero.
+where $[*]$ marks the entry that was zero in $H$. That newly created nonzero is [fill-in](../glossary.md#fill-in). It comes straight from the formula at the top: $`L_{32} = (H_{32} - L_{31}L_{21}) / L_{22}`$, and $H_{32} = 0$ doesn't help when $L_{31}$ and $L_{21}$ are both nonzero.
 
 Eliminate the **hub** (variable 1, connected to both others) last instead (order 2, 3, 1, so variable 1 becomes the last row and column), and $L$ has no fill at all. §5 turns this into a general rule.
 
@@ -154,7 +154,7 @@ So:
 
 ## 4. Why does fill-in happen?
 
-The intuitive way to see it is through [variable elimination](../glossary.md#4-graphs-sparsity-and-solvers). Take this graph:
+The intuitive way to see it is through [variable elimination](../glossary.md#variable-elimination). Take this graph:
 
 ```text
 1 ─ 2 ─ 3

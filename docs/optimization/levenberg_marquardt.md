@@ -35,7 +35,7 @@ We want to adjust $x_1$ and $l_1$ so that the error becomes smaller.
 
 ## 2. Why not just use [Gauss-Newton](gauss_newton.md)?
 
-Gauss-Newton linearizes the error, $e(x+\Delta x)\approx e(x)+J\Delta x$ (with $`J`$ the [Jacobian](../glossary.md#3-least-squares-optimization) of $`e`$), then solves
+Gauss-Newton linearizes the error, $e(x+\Delta x)\approx e(x)+J\Delta x$ (with $`J`$ the [Jacobian](../glossary.md#jacobian) of $`e`$), then solves
 
 $$\boxed{J^\top J\Delta x=-J^\top e}$$
 
@@ -298,7 +298,7 @@ Per script:
 
 - [`pose_graph.py`](../../use_numpy/pose_graph.py)'s `run_pose_graph_optimization` (both `use_numpy/` and `use_manif/`):
   - starts from `--damping` (default $0.01$); after an accepted step $\lambda \leftarrow \max(\lambda/2,\ 10^{-7})$, after a rejected one $\lambda \leftarrow \max(2\lambda,\ 10^{-6})$;
-  - adds a large constant, $10^6 I$, to the first pose's block of $H$. Pinning that pose removes the [gauge freedom](../glossary.md#3-least-squares-optimization), so $H$ isn't singular to begin with;
+  - adds a large constant, $10^6 I$, to the first pose's block of $H$. Pinning that pose removes the [gauge freedom](../glossary.md#gauge-freedom), so $H$ isn't singular to begin with;
   - reused by [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) for its batch baseline (its incremental solver runs plain Gauss-Newton);
   - reused by [`sliding_window_marginalization.py`](../../use_numpy/sliding_window_marginalization.py) with an initial damping of $0$, so its first step is a pure Gauss-Newton step. After that, the floors above keep $\lambda \ge 10^{-7}$.
 - [`bundle_adjustment_advanced.py`](../../use_numpy/bundle_adjustment_advanced.py) (both versions):

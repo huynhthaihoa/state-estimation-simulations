@@ -112,7 +112,7 @@ iSAM2 solves the same problem as iSAM, on the same factorization. iSAM's **squar
 | New measurement | Folded into $R$ as a new row, with Givens rotations | The cliques it touches, and everything above them, are removed, re-eliminated and put back (§8-§9) |
 | Relinearization | Periodic batch step: every variable at once | Selective: only variables that moved past a threshold (§10) |
 | Variable reordering | Periodic batch step: COLAMD over every variable | Incremental: CCOLAMD over just the re-eliminated part (§12) |
-| [Loop closure](../glossary.md#5-slam-system) | The Givens sweep runs through most of $R$, and the fill-in it adds stays until the next batch step | A large affected region, but re-eliminated right away with a fresh ordering (§9, §12) |
+| [Loop closure](../glossary.md#loop-closure) | The Givens sweep runs through most of $R$, and the fill-in it adds stays until the next batch step | A large affected region, but re-eliminated right away with a fresh ordering (§9, §12) |
 | Updating the estimate | Back-substitution through $R$ | Starts at the root and stops in branches where the changes are negligible (§13) |
 | Periodic batch steps | Required: the only way to relinearize and reorder | None |
 
@@ -124,10 +124,10 @@ This repo implements the iSAM column minus COLAMD reordering, with loop closures
 
 ## 7. Bayes tree - the most important intuition
 
-Quick recap: [Cholesky](../glossary.md#4-graphs-sparsity-and-solvers) factorization splits $H$ into $H = LL^\top$ ($L$ lower-triangular). Solving $H\Delta x=-g$ then takes two cheap triangular solves instead of one matrix inversion.
+Quick recap: [Cholesky](../glossary.md#cholesky-factorization) factorization splits $H$ into $H = LL^\top$ ($L$ lower-triangular). Solving $H\Delta x=-g$ then takes two cheap triangular solves instead of one matrix inversion.
 
 - $H$ is sparse: two poses only interact if a factor directly connects them, so the factorization skips arithmetic on known zeros.
-- Eliminating a variable can turn some of those zeros into nonzeros ([fill-in](../glossary.md#4-graphs-sparsity-and-solvers)), which is why the [variable ordering](../glossary.md#4-graphs-sparsity-and-solvers) matters (§12).
+- Eliminating a variable can turn some of those zeros into nonzeros ([fill-in](../glossary.md#fill-in)), which is why the [variable ordering](../glossary.md#variable-ordering) matters (§12).
 - Full derivation: [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md). Worked elimination example: [`elimination_tree.md`](elimination_tree.md).
 
 After linearization, SLAM gives exactly the $H\Delta x=-g$ system above, and this sparse elimination is run on it. Conceptually:
@@ -142,7 +142,7 @@ Cholesky/QR
 Bayes tree
 ```
 
-The **Bayes tree** ([glossary](../glossary.md#4-graphs-sparsity-and-solvers)) is a tree representation of that factorization. Given a new [factor](../glossary.md#4-graphs-sparsity-and-solvers), iSAM2 can walk straight to the affected part of the tree instead of recomputing everything.
+The **Bayes tree** ([glossary](../glossary.md#bayes-tree)) is a tree representation of that factorization. Given a new [factor](../glossary.md#factor), iSAM2 can walk straight to the affected part of the tree instead of recomputing everything.
 
 This doc needs only that. For how elimination produces the tree, the cliques, the probabilistic interpretation and a worked loop-closure example, see [`bayes_tree.md`](bayes_tree.md).
 
@@ -241,7 +241,7 @@ The exact behavior depends on the graph and ordering, but that is the intuition.
 
 ## 12. Variable ordering is also crucial
 
-The amount of computation in sparse Cholesky depends heavily on the [variable ordering](../glossary.md#4-graphs-sparsity-and-solvers), which decides two things at once:
+The amount of computation in sparse Cholesky depends heavily on the [variable ordering](../glossary.md#variable-ordering), which decides two things at once:
 
 - **Fill-in**: how dense the factorization gets ([sparse_cholesky_factorization.md](sparse_cholesky_factorization.md)).
 - **Where each variable sits in the Bayes tree.** The last variable eliminated becomes the root, and an update's affected region is the path from the touched cliques up to the root (§8-§9).
@@ -308,7 +308,7 @@ Everything below the removed top of the tree keeps its factorization untouched (
 
 ## 14. iSAM2 vs EKF
 
-**EKF-SLAM** ([glossary](../glossary.md#6-kalman-filter-family)) is fundamentally a **filtering** approach: "I maintain my current estimate and uncertainty, and update it when a measurement arrives." Old information is compressed into the current state.
+**EKF-SLAM** ([glossary](../glossary.md#ekf-extended-kalman-filter)) is fundamentally a **filtering** approach: "I maintain my current estimate and uncertainty, and update it when a measurement arrives." Old information is compressed into the current state.
 
 ```text
 prediction → measurement → EKF update → new estimate
