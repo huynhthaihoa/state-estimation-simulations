@@ -32,7 +32,7 @@ After all nine phases, [`docs/README.md`](docs/README.md) is the fuller index fo
 
 **Read:** [`docs/optimization/imu_preintegration.md`](docs/optimization/imu_preintegration.md) (leans on `jacobian.md` §11's right Jacobian). Optionally [`docs/frontend/vi_initialization.md`](docs/frontend/vi_initialization.md) as a conceptual-only follow-on (no script): what has to happen before any of this can start.
 
-**Run:** [README.md §3](README.md#3-imu-pre-integration-with-bias-jacobians) - [`use_numpy/imu_preintegration.py`](use_numpy/imu_preintegration.py) - bias-Jacobian bundle plus instant Taylor correction.
+**Run:** [README.md §3](README.md#3-imu-preintegration-with-bias-jacobians) - [`use_numpy/imu_preintegration.py`](use_numpy/imu_preintegration.py) - bias-Jacobian bundle plus instant Taylor correction.
 
 ## Phase 4 - The Kalman-filter lineage
 

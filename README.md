@@ -128,17 +128,17 @@ uv run pytest tests/ -v
 
 #### Purpose
 
-Integrates the same noisy gyro + body-velocity stream two ways: 
- 1. Attitude kept as a **flat Euler-angle vector** (`euler += omega*dt`) 
- 2. Attitude kept on **$SO(3)$ and updated via the exponential map** to isolate the error that the flat vector-space approximation introduces on its own. 
+Integrates the same noisy gyro + body-velocity stream two ways, to isolate the error that the flat vector-space approximation introduces on its own:
+ 1. Attitude kept as a **flat Euler-angle vector** (`euler += omega*dt`)
+ 2. Attitude kept on **$SO(3)$ and updated via the exponential map**
 
-In the `use_numpy` version each method is scored against its own noise-free ground truth (the noise-free rates integrated with that method's own update rule), not a shared exp-map one; the `use_manif` version scores both against one shared SE(3) truth (a ~0.36° difference in the naive error, which is ~70°). Plots rotation and position error (log scale) over time.
+In the `use_numpy` version each method is scored against its own noise-free ground truth (the noise-free rates integrated with that method's own update rule), not a shared exp-map one; the `use_manif` version scores both against one shared $`SE(3)`$ truth. The two scoring choices change the naive error (~70°) by only ~0.36°. Plots rotation and position error (log scale) over time.
 
 ![Two log-scale panels from imu_integration_comparison.py: rotation error and position error over 20 s for naive Euler-angle integration versus the SO(3) exponential-map update, both fed the same noisy IMU samples](assets/imu_integration_comparison.png)
 
 #### Scripts
 
-- [use_numpy/imu_integration_comparison.py](use_numpy/imu_integration_comparison.py) 
+- [use_numpy/imu_integration_comparison.py](use_numpy/imu_integration_comparison.py)
 
 - [use_manif/imu_integration_comparison.py](use_manif/imu_integration_comparison.py)
 
@@ -169,16 +169,18 @@ Prints pre/post correction error each second (no plot).
 
 ![Two panels from robot_imu_simulation.py run for 10 s: position error just before and just after each 1 Hz position fix, and orientation error growing throughout because a position-only fix cannot correct rotation](assets/robot_imu_tracking.png)
 
+Figure made by `assets/make_figures.py` (a 10 s run; the default is 3 s); the script itself only prints.
+
 #### Scripts
 
-- [use_numpy/robot_imu_simulation.py](use_numpy/robot_imu_simulation.py) 
+- [use_numpy/robot_imu_simulation.py](use_numpy/robot_imu_simulation.py)
 
 - [use_manif/robot_imu_simulation.py](use_manif/robot_imu_simulation.py)
 
 #### Usage
 
 ```
-uv run python use_numpy/robot_imu_simulation.py --dt-imu 0.01 --total-seconds 3 --snapshots-per-second 4 --gn-tol 1e-6 --gn-max-iters 10 --max-linear-vel 1.0 --max-angular-vel 0.5 --pos-noise-std 0.05
+uv run python use_numpy/robot_imu_simulation.py --dt-imu 0.01 --total-seconds 3 --snapshots-per-second 4 --gn-tol 1e-6 --gn-max-iters 10 --max-linear-vel 1.0 --max-angular-vel 0.5 --pos-noise-std 0.05 --seed 0
 ```
 
 - `--dt-imu`: IMU update interval in seconds (default `0.01`, i.e. 100 Hz)
@@ -189,18 +191,23 @@ uv run python use_numpy/robot_imu_simulation.py --dt-imu 0.01 --total-seconds 3 
 - `--max-linear-vel`: max linear velocity magnitude for the random true twist, m/s (default `1.0`)
 - `--max-angular-vel`: max angular velocity magnitude for the random true twist, rad/s (default `0.5`)
 - `--pos-noise-std`: per-axis std-dev (m) of the Global Position Measurement's Gaussian noise (default `0.05`)
+- `--seed`: RNG seed (default `0`)
 
-### 3. IMU pre-integration with bias Jacobians
+### 3. IMU preintegration with bias Jacobians
 
 #### Purpose
 
 Streams 1 second of high-frequency IMU samples into a single `PreintegratedIMUBundle` (compressed relative rotation/velocity/position, plus their Jacobians wrt gyro/accel bias). Then simulates a graph-SLAM-style bias update and applies it to the bundle via a first-order Taylor correction - instant, versus re-running the whole integration loop.
 
+Prints the preintegrated position change before and after the bias correction (no plot).
+
 ![Two panels from imu_preintegration.py: the preintegrated position change built up sample by sample from keyframe i to keyframe j, and a log-scale bar chart comparing how much a bias update changes each preintegrated quantity with the error of the first-order Jacobian correction against a full re-integration](assets/imu_preintegration.png)
+
+Figure made by `assets/make_figures.py` at the script defaults; the script itself only prints.
 
 #### Scripts
 
-- [use_numpy/imu_preintegration.py](use_numpy/imu_preintegration.py) 
+- [use_numpy/imu_preintegration.py](use_numpy/imu_preintegration.py)
 
 - [use_manif/imu_preintegration.py](use_manif/imu_preintegration.py)
 
@@ -219,7 +226,7 @@ uv run python use_numpy/imu_preintegration.py --frequency-hz 100 --gyro-bias 0.0
 
 #### Purpose
 
-Tracks a rigid object's $SE(3)$ pose from a combination of a motion-model prior (noisy control-input twist) and noisy point-cloud measurements of the object's known body-frame geometry ($z_i = T\cdot p_i + \text{noise}$). Two shared, documented functions - `motion_model` and `observation_model`, both with analytical Jacobians (hand-rolled $SE(3)$ $Exp$/$`Log`$/adjoint math via `lie_utils.py` in the `use_numpy` version; `manifpy`'s `rplus`/`rminus`/`act` out-parameters in the `use_manif` version) - feed six solvers: 
+Tracks a rigid object's $SE(3)$ pose from a combination of a motion-model prior (noisy control-input twist) and noisy point-cloud measurements of the object's known body-frame geometry ($z_i = T\cdot p_i + \text{noise}$). Two shared, documented functions - `motion_model` and `observation_model`, both with analytical Jacobians (hand-rolled $SE(3)$ $Exp$/$`Log`$/adjoint math via `lie_utils.py` in the `use_numpy` version; `manifpy`'s `rplus`/`rminus`/`act` out-parameters in the `use_manif` version) - feed six solvers:
  1. A **prior-only dead-reckoning baseline**
  2. A recursive **EKF** (constant-size state, online)
  3. A recursive **invariant EKF** (same predict step, but the update expresses the residual in the estimate's body frame, making the measurement Jacobian state-independent instead of relinearized around the current rotation every step; for this problem's [isotropic](docs/glossary.md#1-geometry-and-lie-groups) point-noise model this is provably equivalent to the plain EKF's corrections at every step, so the practical win here is a fixed, precomputed Jacobian rather than different accuracy)
@@ -371,7 +378,7 @@ The incremental loop (`run_incremental_local_ba`) runs keyframe-by-keyframe:
 
 #### Scripts
 
-- [use_numpy/bundle_adjustment_advanced.py](use_numpy/bundle_adjustment_advanced.py) 
+- [use_numpy/bundle_adjustment_advanced.py](use_numpy/bundle_adjustment_advanced.py)
 
 - [use_manif/bundle_adjustment_advanced.py](use_manif/bundle_adjustment_advanced.py)
 
@@ -399,6 +406,7 @@ uv run python use_numpy/bundle_adjustment_advanced.py --n-keyframes 50 --path-ra
 - `--gn-tol`: Levenberg-Marquardt convergence tolerance (default `1e-6`)
 - `--gn-max-iters`: maximum accepted GN/LM steps per solve (default `15`)
 - `--seed`: RNG seed (default `0`)
+- `--out`: save the figure to this path instead of showing it (default: show)
 
 #### Loop closure example
 
@@ -509,7 +517,7 @@ uv run python use_numpy/pnp_estimation.py --n-points 20 --pixel-noise-std 1.0 --
 - `--image-width`/`--image-height`/`--focal-length`: pinhole intrinsics (defaults `640`/`480`/`800.0`)
 - `--pixel-noise-std`: std-dev of Gaussian pixel noise added to each observation (px, default `1.0`)
 - `--gn-tol`/`--gn-max-iters`: Gauss-Newton convergence tolerance and iteration cap (defaults `1e-8`/`20`)
-- `--seed`: RNG seed
+- `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
 
 ### 11. Saltation-matrix EKF: tracking a point mass through discrete ground-contact events
@@ -518,7 +526,7 @@ uv run python use_numpy/pnp_estimation.py --n-points 20 --pixel-noise-std 1.0 --
 
 The earlier filtering scripts assume smooth, continuous motion between measurements. `docs/filtering/hybrid_saltation_ekf.md` introduces the exception: a **hybrid dynamical system**, where a point mass in free-fall bounces (inelastically, restitution `e`) off the ground $p_z = 0$. Between bounces the dynamics is exactly linear (mean/covariance propagate exactly, no linearization at all), so any disagreement between the two EKF variants below is attributable entirely to how each one handles the bounce itself.
 
-Three methods are compared: 
+Three methods are compared:
 - A **dead-reckoning baseline**: propagates the exact dynamics from an uncertain initial guess, never looking at measurements - an initial-condition error still causes growing error, since bounce *timing* is sensitive to the state even though the dynamics model itself is exact
 - An **EKF with naive bounce handling**: $`P^+ = DR\,P^-\,DR^\top`$, the reset map's own Jacobian alone - the common mistake, since it is not the correct linearization of "post-impact state as a function of pre-impact state" once a perturbed trajectory reaches the guard at a different time
 - An **EKF with saltation-corrected bounce handling**: $`P^+ = \Xi\,P^-\,\Xi^\top`$, the true `saltation_matrix` composed with the ordinary flow Jacobians before/after the bounce, so the covariance is mapped over the whole filter tick that contains it, derived from first principles and verified against a finite-difference ground truth to ~7e-6
@@ -526,10 +534,10 @@ Three methods are compared:
 A Monte Carlo consistency check (`run_monte_carlo_consistency`, [NEES](docs/glossary.md#2-uncertainty-and-probability)) repeats both EKFs over many independent noise realizations of the same nominal trajectory. The expected "naive is overconfident, saltation fixes it" does not hold at exact detection:
 - **Exact contact detection**: both filters are *under*confident after a bounce - post-bounce NEES is about 2.35 (naive) and 2.49 (saltation) at seed 0 against a consistent value of 6. So saltation is slightly *closer* to consistent, and which filter comes out ahead depends on the tuning (doc §6).
 - **Mechanism**: the saltation matrix shrinks, but does not zero out, the guard-normal (height) variance at every bounce ($`Dg\,\Xi = -e\,Dg`$ identically, verified). That is only right if the detected bounce time is right.
-- **Jittered detection** (`--detect-time-noise-std`, doc §8): both filters become overconfident and the saltation-corrected one more so, by about 1.4-1.6× the naive filter's NEES - a modest gap, not a blow-up: saltation matrices assume a known transition time.
+- **Jittered detection** (`--detect-time-noise-std`, doc §8): from 2 ms of jitter on (10% of `--dt`), both filters become overconfident and the saltation-corrected one more so, by about 1.4-1.6× the naive filter's NEES - a modest gap, not a blow-up: saltation matrices assume a known transition time.
 - Both EKFs' mean trajectories look nearly identical throughout - this entire effect is invisible in the point estimate.
 
-Plain $\mathbb{R}^6$ state (position/velocity, no rotation) - no `use_manif/` counterpart, for the same reason as `bayes_tree_construction.py`.
+Plain $\mathbb{R}^6$ state (position/velocity, no rotation) - no `use_manif/` counterpart: a plain Euclidean state raises no manifold question.
 
 ![Two panels from saltation_matrix_ekf.py: the height of the bouncing point mass with measurements, ground truth and both EKFs, and Monte Carlo NEES over time for the naive and saltation bounce updates against the consistent value of 6](assets/saltation_matrix_ekf.png)
 
@@ -558,7 +566,7 @@ uv run python use_numpy/saltation_matrix_ekf.py --duration 5.0 --dt 0.02 --resti
 - `--detect-time-bias`: systematic contact-detection timing offset, s, positive = late detection (default `0.0`, exact detection) - models a real contact sensor's own detection latency, on top of whatever the filter's state estimate already gets wrong about the geometric crossing time
 - `--detect-time-noise-std`: std-dev, s, of Gaussian contact-detection timing jitter added on top of `--detect-time-bias` each time a bounce is detected (default `0.0`) - see doc §8 for the measured saltation-vs-naive NEES gap this opens up as jitter grows
 - `--n-mc-trials`: number of Monte Carlo consistency trials (default `500`)
-- `--seed`: RNG seed
+- `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
 
 ### 12. Inchworm ZUPT: exploiting a known anchor/dwell schedule
@@ -577,7 +585,7 @@ Findings:
 - **`never` beats `phase_conditional`** in calibration and position accuracy at the defaults, because ZUPT has just made `phase_conditional` confident when the ramp arrives. With the process noise sized to cover the ramps, `phase_conditional` wins on both.
 - See the doc for the full numbers and mechanism.
 
-![Two panels from inchworm_zupt_ekf.py: velocity over the anchor/extend gait with the estimates of the three ZUPT policies, and Monte Carlo NEES for never, every-tick and anchor-only ZUPT against the consistent value of 2](assets/inchworm_zupt_ekf.png)
+![Two panels from inchworm_zupt_ekf.py: velocity over the anchor/extend gait with the estimates of the three ZUPT policies, and Monte Carlo NEES for the never, always and phase_conditional ZUPT policies against the consistent value of 2](assets/inchworm_zupt_ekf.png)
 
 #### Scripts
 
@@ -602,7 +610,7 @@ uv run python use_numpy/inchworm_zupt_ekf.py --duration 10.0 --dt 0.05 --t-ancho
 - `--zupt-noise-std`: ZUPT pseudo-measurement noise std-dev, m/s (default `0.01`)
 - `--init-pos-noise-std`/`--init-vel-noise-std`: std-dev used to perturb the initial position/velocity guess (defaults `0.05`/`0.05`)
 - `--n-mc-trials`: number of Monte Carlo consistency trials (default `500`)
-- `--seed`: RNG seed
+- `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
 
 ### 13. Friction-anisotropic process noise: fixed vs. heading-aware Q
@@ -640,7 +648,7 @@ uv run python use_numpy/friction_anisotropic_ekf.py --duration 20.0 --dt 0.05 --
 - `--pos-noise-std`: position measurement noise std-dev, m (default `0.02`)
 - `--init-pos-noise-std`/`--init-theta-noise-std`: std-dev used to perturb the initial position/heading guess (defaults `0.05`/`0.05`)
 - `--n-mc-trials`: number of Monte Carlo consistency trials (default `500`)
-- `--seed`: RNG seed
+- `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
 
 ### 14. Sliding-window marginalization: bounded-memory pose-graph smoothing
@@ -675,7 +683,7 @@ uv run python use_numpy/sliding_window_marginalization.py --nodes-per-side-sweep
 - `--anchor-weight`: information weight of the node-0 gauge-fixing prior (default `1e6`)
 - `--gn-tol`: Gauss-Newton convergence tolerance (default `1e-6`)
 - `--gn-max-iters`: maximum Gauss-Newton iterations per solve (default `10`)
-- `--seed`: RNG seed
+- `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
 
 ### 15. Invariant EKF on $SE_2(3)$ through a bounce
@@ -723,5 +731,5 @@ uv run python use_numpy/invariant_saltation_ekf.py --duration 5.0 --dt 0.01 --me
 - `--init-rot-std-deg`/`--init-vel-std`/`--init-pos-std`: initial right-invariant error std-devs (defaults `5.0` deg/`0.2` m/s/`0.1` m)
 - `--detect-time-bias`/`--detect-time-noise-std`: contact-detection timing offset (positive = late) and jitter std-dev, s (defaults `0.0`/`0.0`, exact detection); the bounce is applied at the detected time, clipped into the current tick
 - `--n-mc-trials`: number of Monte Carlo consistency trials (default `200`)
-- `--seed`: RNG seed
+- `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
