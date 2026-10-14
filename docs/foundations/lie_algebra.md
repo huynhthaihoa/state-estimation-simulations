@@ -294,7 +294,7 @@ X = \begin{bmatrix} R & v & p \\ 0 & 1 & 0 \\ 0 & 0 & 1 \end{bmatrix} \in SE_2(3
 ```
 
 - It has 9 **degrees of freedom (DoF)**, the independent numbers needed to describe it: 3 for rotation, 3 for velocity, 3 for position.
-- The "2" counts the vector columns. Adding $`K`$ more (for example, foot-contact points) gives $`SE_{K+2}(3)`$.
+- The "2" counts the vector columns. Adding $`k`$ more (for example, foot-contact points) gives $`SE_{k+2}(3)`$.
 
 **Composition and inverse** work column by column, as for $`SE(3)`$:
 
