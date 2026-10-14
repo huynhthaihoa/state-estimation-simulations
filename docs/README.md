@@ -32,6 +32,7 @@ Conceptual notes on the state-estimation and SLAM ideas behind the code in [`use
 - [invariant_saltation_ekf.md](filtering/invariant_saltation_ekf.md): the same bounce on a Lie group: a right-invariant EKF on $`SE_2(3)`$ for a tumbling IMU body. Covers the saltation matrix in invariant-error coordinates, why the reset breaks the filter's [trajectory independence](glossary.md#group-affine-dynamics-trajectory-independence), and a timing-noise term that keeps it consistent under contact-detection jitter. Implemented in `invariant_saltation_ekf.py`.
 - [inchworm_zupt_ekf.md](filtering/inchworm_zupt_ekf.md): a known-schedule anchor/dwell gait as a switched-linear system, and when to apply zero-velocity updates (ZUPT: correctly, always, or never); implemented in `inchworm_zupt_ekf.py`.
 - [friction_anisotropic_ekf.md](filtering/friction_anisotropic_ekf.md): a crawling unicycle on a friction-anisotropic pad, where process-noise variance depends on heading relative to the pad's axis; implemented in `friction_anisotropic_ekf.py`.
+- [hexapod_gait_ekf.md](filtering/hexapod_gait_ekf.md): planar hexapod leg odometry, where each stance foot measures the body's velocity and turn rate; how much the gait (tripod, ripple, wave) changes the estimate, and catching a slipping leg with a per-foot $`\chi^2`$ test; implemented in `hexapod_gait_ekf.py`.
 
 ## [`optimization/`](optimization/) - The factor-graph/smoothing lineage
 

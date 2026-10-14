@@ -1,6 +1,6 @@
 """Generates one illustrative figure per simulation, from the simulations' own
-output, into assets/<name>.png, plus a setup figure (<name>_concept) for each
-of the three hybrid-filtering docs.
+output, into assets/<name>.png, plus a setup figure (<name>_concept) for the docs
+that have one.
 
 Nothing here re-implements an estimator: every trajectory, error and NEES
 curve comes from calling the functions in use_numpy/ exactly the way each
@@ -69,10 +69,11 @@ def rms(a):
     return float(np.sqrt(np.mean(np.asarray(a) ** 2)))
 
 
-def finish(fig, name, title, subtitle, bottom=0.0):
+def finish(fig, name, title, subtitle, bottom=0.0, tight=True):
     fig.suptitle(title, fontsize=15, fontweight="bold", x=0.01, ha="left", y=0.995)
     fig.text(0.01, 0.925, subtitle, fontsize=10.5, color="#555555", ha="left")
-    fig.tight_layout(rect=(0, bottom, 1, 0.93))
+    if tight:
+        fig.tight_layout(rect=(0, bottom, 1, 0.93))
     path = os.path.join(OUT_DIR, f"{name}.png")
     fig.savefig(path)
     plt.close(fig)
@@ -1496,6 +1497,161 @@ def fig_pnp_estimation_concept():
            "(b) pnp_estimation.py, true camera's x-z plane; seed 0", bottom=0.04)
 
 
+HEX_GAIT_COLORS = {"tripod": C["red"], "ripple": C["orange"], "wave": C["blue"]}
+
+
+def hexapod_body(ax, center=(0.0, 0.0), down=None, scale=1.0, label_legs=True):
+    """Draws the hexapod body (heading +x) and its six feet at NOMINAL_FOOT_OFFSETS.
+    Feet in `down` are filled (stance), the others hollow (swing). Returns foot positions."""
+    import hexapod_gait_ekf as m
+    c = np.asarray(center)
+    feet = c + scale * m.NOMINAL_FOOT_OFFSETS
+    ax.add_patch(Ellipse(c, scale * 0.42, scale * 0.24, fc="#e8eef6", ec="#5b6b7f", lw=1.4, zorder=2))
+    arrow(ax, c, c + scale * np.array([0.17, 0.0]), "#5b6b7f", lw=1.2, ms=8, zorder=3)
+    for i, (name, f) in enumerate(zip(m.LEG_NAMES, feet)):
+        hip = c + scale * np.array([m.NOMINAL_FOOT_OFFSETS[i, 0] * 0.6, np.sign(m.NOMINAL_FOOT_OFFSETS[i, 1]) * 0.1])
+        on = down is None or i in down
+        ax.plot([hip[0], f[0]], [hip[1], f[1]], color="#5b6b7f", lw=1.6, alpha=1.0 if on else 0.35, zorder=2)
+        ax.plot(*f, "o", ms=8, mfc=TRUTH if on else "white", mec=TRUTH, mew=1.3, zorder=4)
+        if label_legs:
+            ax.text(*(f + np.array([0.025, 0.0]) * scale), name, ha="left", va="center", fontsize=8.5,
+                    color="#444444")
+    return feet
+
+
+def fig_hexapod_gait_ekf_concept():
+    """hexapod_gait_ekf.py: the three gait schedules, what each stance foot measures, and stance geometry."""
+    import hexapod_gait_ekf as m
+
+    dt, period = 0.02, 1.2
+    tpc = int(round(period / dt))
+    sigma = 0.02
+    fig = plt.figure(figsize=(15, 6.2))
+    gs = fig.add_gridspec(3, 3, width_ratios=[1.25, 1.0, 1.0], hspace=0.55, wspace=0.18,
+                          left=0.04, right=0.99, top=0.80, bottom=0.08)
+
+    # (a) gait diagram: stance (dark) / swing (blank) bars per leg over two cycles
+    for row, gait in enumerate(m.GAITS):
+        ax = fig.add_subplot(gs[row, 0])
+        stance = m.stance_mask(2 * tpc, tpc, gait)
+        t = np.arange(2 * tpc) * dt
+        for i in range(6):
+            y = 5 - i
+            on = stance[:, i]
+            edges = np.diff(np.concatenate([[False], on, [False]]).astype(int))
+            for s, e in zip(np.where(edges == 1)[0], np.where(edges == -1)[0]):
+                ax.add_patch(Rectangle((t[s], y - 0.35), (e - s) * dt, 0.7, fc=HEX_GAIT_COLORS[gait], ec="none"))
+        duty, _ = m.GAITS[gait]
+        ax.set(xlim=(0, 2 * period), ylim=(-0.6, 5.6), yticks=range(6), yticklabels=m.LEG_NAMES[::-1])
+        ax.tick_params(axis="y", labelsize=7.5)
+        ax.grid(False)
+        ax.text(0.0, 1.04, f"{gait}: duty {duty:.2f}, {int(stance.sum(axis=1)[0])} feet down at every tick",
+                transform=ax.transAxes, fontsize=10, fontweight="bold", color=HEX_GAIT_COLORS[gait])
+        if row == 0:
+            ax.set_title("(a) Gait diagrams: bar = foot down (stance), gap = swing", loc="left", pad=22)
+        if row == 2:
+            ax.set_xlabel(f"time (s), two {period} s cycles")
+        else:
+            ax.set_xticklabels([])
+
+    # (b) every stance foot measures -(b + omega x r_i): different feet, different readings
+    ax_b = fig.add_subplot(gs[:, 1])
+    ax_b.set_aspect("equal")
+    b, omega = np.array([0.1, 0.0]), 0.2
+    feet = hexapod_body(ax_b)
+    for i, f in enumerate(feet):
+        rel = -(b + omega * m.J @ m.NOMINAL_FOOT_OFFSETS[i])  # drawn to scale: 1 m/s = 1 m
+        arrow(ax_b, f, f + rel, C["green"], lw=1.8, ms=10, zorder=5)
+        side = np.sign(m.NOMINAL_FOOT_OFFSETS[i, 1])
+        ax_b.text(*(f + 0.5 * rel + np.array([0.0, 0.04 * side])), f"{np.linalg.norm(rel):.3f}",
+                  ha="center", va="center", fontsize=8.5, color=C["green"], fontweight="bold")
+    arrow(ax_b, (-0.25, -0.33), (-0.12, -0.33), TRUTH, lw=1.8)
+    ax_b.text(-0.10, -0.33, f"body: u = {b[0]} m/s,\nturning left at ω = {omega} rad/s", va="center", fontsize=9)
+    ax_b.set(xlim=(-0.34, 0.34), ylim=(-0.52, 0.3))
+    ax_b.axis("off")
+    ax_b.set_title("(b) What each stance foot measures", loc="left")
+    ax_b.text(0.0, 0.0, "green: foot velocity relative to the body, −(b + ω × r_i),\n"
+              "to scale, speed in m/s. Same body motion, six different\n"
+              "readings: that is what separates forward speed from turn rate.",
+              transform=ax_b.transAxes, fontsize=8.5, color="#555555", va="bottom")
+
+    # (c) same count, different places
+    ax_c = fig.add_subplot(gs[:, 2])
+    ax_c.set_aspect("equal")
+    layouts = [("tripod triangle", [0, 4, 2], (0.0, 0.0)), ("one side", [0, 1, 2], (0.0, -0.58))]
+    for label, legs, center in layouts:
+        hexapod_body(ax_c, center=center, down=legs, label_legs=False)
+        g = m.twist_geometry_std(m.NOMINAL_FOOT_OFFSETS[legs][None], np.ones((1, 3), dtype=bool), sigma)[0]
+        ax_c.text(center[0] + 0.3, center[1] + 0.06, label, fontsize=10, fontweight="bold", va="center")
+        ax_c.text(center[0] + 0.3, center[1] - 0.04, f"σ_u = {g[0]:.4f} m/s\nσ_ω = {g[2]:.4f} rad/s",
+                  fontsize=9, va="center")
+    ax_c.set(xlim=(-0.3, 0.72), ylim=(-1.1, 0.3))
+    ax_c.axis("off")
+    ax_c.set_title("(c) Three feet down, two layouts", loc="left")
+    ax_c.text(0.0, 0.02, f"filled = stance. From one tick's readings alone\n(σ = {sigma} m/s per axis), "
+              "three feet in a line along one\nside pin down u and ω about 40% worse than\nthe tripod's triangle.",
+              transform=ax_c.transAxes, fontsize=8.5, color="#555555")
+
+    finish(fig, "hexapod_gait_ekf_concept", "Hexapod leg odometry: every stance foot is a velocity sensor",
+           "hexapod_gait_ekf.py: stance_mask (dt = 0.02 s, cycle 1.2 s), NOMINAL_FOOT_OFFSETS and twist_geometry_std. "
+           "Arrows in (b) drawn to scale (1 m/s = 1 m).", tight=False)
+
+
+def fig_hexapod_gait_ekf():
+    """hexapod_gait_ekf.py: gait effect on twist RMSE (vs. the (q r)^(1/4) estimate) and one slipping leg."""
+    import hexapod_gait_ekf as m
+
+    dt, period, n_steps, n_mc = 0.02, 1.2, 600, 100
+    tpc = int(round(period / dt))
+    twist0 = np.array([0.1, 0.0, 0.2])
+    lin_std, ang_std, meas_std = 0.05, 0.1, 0.02
+    init_std = np.array([0.01, 0.01, 0.01, 0.05, 0.05, 0.05])
+    gaits = list(m.GAITS)
+    sim_args = (n_steps, dt, tpc, gaits, twist0, lin_std, ang_std, meas_std, init_std, 0.1)
+    slip = (1, 4.0, 8.0, np.array([0.0, 0.1]))
+
+    # same rng streams as hexapod_gait_ekf.main at seed 0
+    _, _, feet = m.simulate_trial(*sim_args, np.random.default_rng(SEED))
+    mc = m.run_monte_carlo(n_mc, *sim_args, np.random.default_rng(SEED + 1))
+    mc_slip = m.run_monte_carlo(n_mc, *sim_args, np.random.default_rng(SEED + 2), slip=slip,
+                                gating_modes=(False, True))
+
+    fig, (ax_u, ax_w, ax_s) = plt.subplots(1, 3, figsize=(15, 5.4), gridspec_kw={"width_ratios": [1, 1, 1.6]})
+    q = {3: (lin_std * dt) ** 2, 5: (ang_std * dt) ** 2}
+    for ax, col, unit, name in ((ax_u, 3, "m/s", "forward speed u"), (ax_w, 5, "rad/s", "turn rate ω")):
+        for j, gait in enumerate(gaits):
+            stance, r, _ = feet[gait]
+            geo = np.nanmean(m.twist_geometry_std(r[1:], stance[1:], meas_std), axis=0)[col - 3]
+            rmse = np.sqrt(mc[(gait, False)]["mse"][1:, col].mean())
+            pred = (q[col] * geo ** 2) ** 0.25
+            ax.bar(j, rmse, color=HEX_GAIT_COLORS[gait], width=0.6)
+            ax.text(j, rmse * 0.5, f"{rmse:.4f}", ha="center", color="white", fontweight="bold", fontsize=9)
+            ax.plot([j - 0.35, j + 0.35], [pred, pred], color=TRUTH, lw=2,
+                    label="(q·r)^¼ estimate" if j == 0 else None)
+            print(f"    {gait:<7s} {name}: RMSE {rmse:.4f}, estimate {pred:.4f}")
+        ax.set(xticks=range(3), xticklabels=[f"{g}\n({3 + i} feet)" for i, g in enumerate(gaits)],
+               ylabel=f"RMSE ({unit})", title=f"{name}: RMSE over {n_mc} runs")
+        ax.legend(loc="lower right", fontsize=8.5)
+        ax.grid(axis="x", visible=False)
+
+    t = np.arange(n_steps + 1) * dt
+    ax_s.axvspan(slip[1], slip[2], color=C["gold"], alpha=0.25, lw=0, label="L2 slipping sideways (0.1 m/s)")
+    for gait in ("tripod", "wave"):
+        for gating, ls in ((False, "-"), (True, "--")):
+            ax_s.plot(t, np.sqrt(mc_slip[(gait, gating)]["mse"][:, 4]), color=HEX_GAIT_COLORS[gait], ls=ls, lw=1.4,
+                      label=f"{gait}, {'per-foot χ² gate' if gating else 'trust every foot'}")
+    ax_s.set(xlabel="time (s)", ylabel="sideways velocity v RMSE (m/s)", ylim=(0, 0.036), xlim=(0, t[-1]),
+             title=f"One slipping leg: RMSE over {n_mc} runs")
+    ax_s.text(8.3, 0.0335, "trusting every foot:\ntripod: L2 is 1/3 of the update,\n  down half the time\n"
+              "wave: 1/5 of the update,\n  down 5/6 of the time", fontsize=8.5, color="#444444", va="top")
+    legend_below(ax_s, ncol=3)
+
+    finish(fig, "hexapod_gait_ekf", "Hexapod leg odometry: the gait barely matters, a slipping foot does",
+           f"hexapod_gait_ekf.py defaults, seed 0: run_monte_carlo ({n_mc} trials, 12 s). "
+           "Bars: filter RMSE; black line: steady-state estimate (q·r)^¼ with r = one tick's variance for that gait.",
+           bottom=0.03)
+
+
 FIGURES = {
     "pose_tracking": fig_pose_tracking,
     "robot_imu_tracking": fig_robot_imu_tracking,
@@ -1522,6 +1678,8 @@ FIGURES = {
     "pose_graph_incremental_concept": fig_pose_graph_incremental_concept,
     "sliding_window_marginalization_concept": fig_sliding_window_marginalization_concept,
     "pnp_estimation_concept": fig_pnp_estimation_concept,
+    "hexapod_gait_ekf": fig_hexapod_gait_ekf,
+    "hexapod_gait_ekf_concept": fig_hexapod_gait_ekf_concept,
 }
 
 
