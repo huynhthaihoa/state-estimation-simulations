@@ -29,7 +29,7 @@ Two questions, answered with [`hexapod_gait_ekf.py`](../../use_numpy/hexapod_gai
 
 ## 1. Model
 
-**Why planar, not 1D.** In 1D every stance foot measures the same scalar velocity, so six legs only average noise: variance $`\sigma^2/n`$. In the plane, a foot at body-frame offset $`r_i`$ sees the body's velocity *plus* the turn: when the body turns in place at $`\omega = 0.2`$ rad/s, a foot 0.15 m to the left moves at 0.03 m/s and its mirror foot at −0.03 m/s. Feet in different places therefore separate forward speed from turn rate.
+**Why planar, not 1D.** In 1D every stance foot measures the same scalar velocity, so six legs only average noise: variance $`\sigma^2/n`$, with $\sigma$ the noise std of one reading. In the plane, a foot at body-frame offset $`r_i`$ sees the body's velocity *plus* the turn: when the body turns in place at $`\omega = 0.2`$ rad/s, a foot 0.15 m to the left moves at 0.03 m/s and its mirror foot at −0.03 m/s. Feet in different places therefore separate forward speed from turn rate.
 
 **State.** $`x = [p_x, p_y, \theta, u, v, \omega]`$: world position, heading, body-frame velocity $`b = [u, v]`$ (forward, left) and turn rate. Velocity and turn rate together are the body's **twist** ([glossary](../glossary.md#twist)).
 
@@ -39,12 +39,12 @@ Two questions, answered with [`hexapod_gait_ekf.py`](../../use_numpy/hexapod_gai
 p_{k+1} = p_k + R(\theta_k)\, b_k\, \Delta t, \qquad \theta_{k+1} = \theta_k + \omega_k \Delta t, \qquad [b, \omega]_{k+1} = [b, \omega]_k + w_k
 ```
 
-$`w_k`$ is the random-walk noise on the twist, std $`\sigma_a \Delta t`$ for $`u, v`$ ($`\sigma_a = 0.05\ \text{m/s}^2`$) and $`\sigma_\alpha \Delta t`$ for $`\omega`$ ($`\sigma_\alpha = 0.1\ \text{rad/s}^2`$). The truth twist is drawn from exactly this random walk, so $Q$ is matched and NEES is a fair test.
+$`w_k`$ is the random-walk noise on the twist, std $`\sigma_a \Delta t`$ for $`u, v`$ ($`\sigma_a = 0.05\ \text{m/s}^2`$) and $`\sigma_\alpha \Delta t`$ for $`\omega`$ ($`\sigma_\alpha = 0.1\ \text{rad/s}^2`$). The truth twist is drawn from exactly this random walk, so $Q$ is matched and NEES is a fair test ([glossary](../glossary.md#consistency-and-nees)).
 
 **Measure** (`measurement_update_feet`): each stance foot $i$ reports its velocity relative to the body, in the body frame:
 
 ```math
-z_i = -\left(b + \omega\, J r_i\right) + n_i, \qquad J = \begin{bmatrix} 0 & -1 \\ 1 & 0 \end{bmatrix}, \qquad n_i \sim \mathcal{N}(0,\ 0.02^2 I)
+z_i = -\left(b + \omega\, J r_i\right) + n_i, \qquad J = \begin{bmatrix} 0 & -1 \\ 1 & 0 \end{bmatrix}, \qquad n_i \sim \mathcal{N}(0,\ \sigma^2 I), \qquad \sigma = 0.02\ \text{m/s}
 ```
 
 $`\omega J r_i`$ is the planar $`\omega \times r_i`$. The model is linear in the state, and it only involves the twist columns:
@@ -63,7 +63,7 @@ All stance feet enter one joint update per tick.
 
 ## 2. No slip: the gait matters, but less than you'd think
 
-**Intuition first.** One tick's readings pin down the twist to about $`\sigma/\sqrt{n}`$. The filter, though, averages over many ticks against a twist that slowly wanders, and that averaging shrinks the gait's effect to about $`n^{-1/4}`$.
+**Intuition first.** One tick's readings pin down the body velocity to about $`\sigma/\sqrt{n}`$; turn rate shrinks at the same rate. The filter, though, averages over many ticks against a twist that slowly wanders, and that averaging shrinks the gait's effect to about $`n^{-1/4}`$.
 
 **One tick, no filter** (`twist_geometry_std`: std from one tick's readings alone, mean over ticks; deterministic):
 
@@ -91,12 +91,12 @@ All stance feet enter one joint update per tick.
 | ripple | 0.0031-0.0032 | 0.0093-0.0095 | 0.020-0.025 | 0.021-0.024 | 5.56-6.25 / 2.96-3.01 |
 | wave | 0.0030 | 0.0088-0.0090 | 0.020-0.023 | 0.020-0.021 | 5.61-6.28 / 2.99-3.00 |
 
-- **Consistent.** A consistent filter averages NEES 6 (full state) and 3 (twist) ([glossary](../glossary.md#consistency-and-nees)); the 95% intervals for a 100-trial average are $`[5.34, 6.70]`$ and $`[2.54, 3.50]`$. Every gait is inside both.
+- **Consistent.** A consistent filter averages NEES 6 (full state) and 3 (twist); the 95% intervals for a 100-trial average are $`[5.34, 6.70]`$ and $`[2.54, 3.50]`$. Every gait is inside both.
 - **Wave beats tripod by 12%, not 22%.** One tick: 22% lower std. Filter: 12% lower RMSE.
-- **Why $`n^{-1/4}`$.** For a random walk with per-tick variance $q$, measured each tick with variance $r$ and $`q \ll r`$, the steady-state variance is about $`\sqrt{q\, r}`$, so the std scales as $`r^{1/4}`$ and $r \propto 1/n$. Worked for tripod $`u`$: $`q = (0.05 \times 0.02)^2 = 10^{-6}`$, $`r = 0.0117^2`$, so $`\sqrt[4]{q\,r} = 0.0034`$ m/s, the RMSE in the table. The same formula gives 0.0100 rad/s for tripod $`\omega`$ and 0.0030 / 0.0088 for wave, all within 0.0003 of the Monte Carlo values. $`(3/5)^{1/4} = 0.88`$ is the 12%.
+- **Why $`n^{-1/4}`$.** For a random walk with per-tick variance $q$, measured each tick with variance $`s^2`$ and $`q \ll s^2`$, the steady-state variance is about $`\sqrt{q\, s^2}`$, so the std scales as $`s^{1/2}`$, and $`s \propto 1/\sqrt{n}`$. Here $s$ is the one-tick std from the first table. Worked for tripod $`u`$: $`q = (0.05 \times 0.02)^2 = 10^{-6}`$, $`s = 0.0117`$, so $`\sqrt[4]{q\, s^2} = 0.0034`$ m/s, the RMSE in the table. The same formula gives 0.0100 rad/s for tripod $`\omega`$ and 0.0030 / 0.0088 for wave, all within 0.0003 of the Monte Carlo values. $`(3/5)^{1/4} = 0.88`$ is the 12%.
 - **Drift is the same story.** Position and heading are integrals of the twist error, so wave drifts slightly less (heading 0.020-0.021 vs 0.026-0.029 rad after 12 s), but no gait stops the drift.
 
-![Three panels from hexapod_gait_ekf.py: bar charts of forward-speed and turn-rate RMSE for the tripod, ripple and wave gaits, each with its (q r)^(1/4) steady-state estimate drawn as a line; and the sideways-velocity RMSE over time with leg L2 slipping between 4 and 8 s, for the tripod and wave gaits, trusting every foot versus the per-foot chi-squared gate](../../assets/hexapod_gait_ekf.png)
+![Three panels from hexapod_gait_ekf.py: bar charts of forward-speed and turn-rate RMSE for the tripod, ripple and wave gaits, each with its (q s^2)^(1/4) steady-state estimate drawn as a line; and the sideways-velocity RMSE over time with leg L2 slipping between 4 and 8 s, for the tripod and wave gaits, trusting every foot versus the per-foot chi-squared gate](../../assets/hexapod_gait_ekf.png)
 
 *Figure: `use_numpy/hexapod_gait_ekf.py` at its defaults (seed 0, 100 trials), plotted by `uv run python assets/make_figures.py hexapod_gait_ekf`. The right panel is §3's slip experiment.*
 
@@ -111,7 +111,7 @@ L2 slips outward at 0.1 m/s for $`t \in [4, 8)`$ s whenever it is down. Its read
 **Per-foot gating** (`gating=True`): before the joint update, test each stance foot's **innovation** $`\nu_i = z_i - H_i \hat{x}^-`$ against the predicted state ([glossary](../glossary.md#innovation-and-kalman-gain)):
 
 ```math
-\nu_i^\top \left(H_i P^- H_i^\top + R\right)^{-1} \nu_i \le 9.21
+\nu_i^\top \left(H_i P^- H_i^\top + \sigma^2 I\right)^{-1} \nu_i \le 9.21
 ```
 
 9.21 is the 99% point of a $`\chi^2`$ with 2 DoF ([glossary](../glossary.md#chi-square-distribution)), so a good foot is wrongly dropped 1% of the time. Feet that fail are left out ([glossary](../glossary.md#outlier-and-robust-kernel)). Testing each foot against the prediction, not after other feet's updates, makes the result independent of foot order.
@@ -129,7 +129,7 @@ Results (100 trials, seeds 0-2; "in window" = $`t \in [4, 8)`$ s):
 
 - **Naive: wrong and overconfident.** About 5× the no-slip velocity error and twist NEES near 34-37 instead of 3. Position error after 12 s triples (≈0.08 m vs ≈0.025 m). The gait changes little: wave is 9% better on velocity, and its NEES is slightly *worse*, since its extra feet make it more confident.
 - **Gated: back to the no-slip numbers.** RMSE and NEES return to the §2 values for every gait. The gate drops about 98% of the slipping readings and 1.0% of the good ones, the false-alarm rate it was set for.
-- **Why 2% get through.** A 0.1 m/s bias against a per-axis std of 0.02 m/s gives an expected test value near 25; the reading's own noise sometimes pulls it under 9.21.
+- **Why 2% get through.** A 0.1 m/s bias against a per-axis std of 0.02 m/s contributes about $`(0.1/0.02)^2 = 25`$ to the test value; noise adds about 2 on average, and sometimes pulls the total under 9.21.
 - **What this needs.** Gating works because the *other* feet agree with the prediction. With a tripod, two good feet still carry 4 readings for 3 twist unknowns.
 The same experiment, one run (seed 0, tripod gait), animated. The top-down view shows each stance foot at its simulated foothold, red while L2 slides; trusting every foot drags the sideways velocity off whenever L2 is down, and its estimated path drifts away (final position error 0.083 m vs 0.020 m with the gate). Swing legs are drawn at their nominal offset as an illustration, since the script does not simulate swing.
 
@@ -143,7 +143,7 @@ The same experiment, one run (seed 0, tripod gait), animated. The top-down view 
 
 ## 4. Takeaway
 
-- **More feet down is a weak lever for the estimate.** With the filter averaging over time, the gait changes twist RMSE by $`n^{-1/4}`$ (12% from tripod to wave), not $`n^{-1/2}`$. On a real robot, the gait choice is driven by stability and speed; estimation follows.
+- **More feet down is a weak lever for the estimate.** With the filter averaging over time, the gait changes twist RMSE by $`n^{-1/4}`$ (12% from tripod to wave), not $`n^{-1/2}`$. On a real robot, the gait choice is driven by stability and speed.
 - **Keep stance feet spread out.** Three feet on one side are about 40% worse than a tripod triangle. Standard gaits already avoid this; a damaged-leg or custom gait might not.
 - **A slipping foot matters much more than the gait**, and a per-foot $`\chi^2`$ test against the prediction is a cheap, effective guard against large slips; small ones pass it. Real filters do the same: Bloesch et al. 2013 (ref. 3) add outlier rejection to the update step for a quadruped on slippery terrain.
 - **Position and heading always drift** with leg odometry alone. A real system adds an IMU, which fixes roll and pitch through gravity but not yaw, and an exteroceptive sensor for the rest.
@@ -157,4 +157,4 @@ The next step up is a 3D filter that keeps each stance foot's position in the st
 1. Bloesch, M., Hutter, M., Hoepflinger, M., Leutenegger, S., Gehring, C., Remy, C. D., & Siegwart, R. (2012). *State Estimation for Legged Robots - Consistent Fusion of Leg Kinematics and IMU*. Robotics: Science and Systems VIII. https://doi.org/10.15607/RSS.2012.VIII.003 - an EKF that fuses leg kinematics with an IMU and keeps the footholds' absolute positions in the state; the 3D, IMU-driven version of this toy's stance-foot measurement.
 2. Hartley, R., Ghaffari, M., Eustice, R. M., & Grizzle, J. W. (2020). *Contact-Aided Invariant Extended Kalman Filtering for Robot State Estimation*. The International Journal of Robotics Research, 39(4), 402-430. https://doi.org/10.1177/0278364919894385 - an invariant EKF ([glossary](../glossary.md#iekf-invariant-ekf)) with the current contact points in the state, including how to add and remove contacts as feet land and lift.
 3. Bloesch, M., Gehring, C., Fankhauser, P., Hutter, M., Hoepflinger, M. A., & Siegwart, R. (2013). *State Estimation for Legged Robots on Unstable and Slippery Terrain*. 2013 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 6058-6064. https://doi.org/10.1109/IROS.2013.6697236 - an unscented Kalman filter with outlier rejection in the update step, tested on a quadruped trotting over slippery terrain; also shows that everything except global position and yaw is generally observable, even with one foot down. The real-robot counterpart of §3.
-4. Khalili, H. H., Cheah, W., Garcia-Nathan, T. B., Carrasco, J., Watson, S., & Lennox, B. (2020). *Tuning and Sensitivity Analysis of a Hexapod State Estimator*. Robotics and Autonomous Systems, 129, 103509. https://doi.org/10.1016/j.robot.2020.103509 - an IMU + leg-kinematics EKF on a real hexapod (Corin) and how its accuracy depends on its noise parameters. This toy sidesteps that question by matching $Q$ and $R$ to the truth.
+4. Khalili, H. H., Cheah, W., Garcia-Nathan, T. B., Carrasco, J., Watson, S., & Lennox, B. (2020). *Tuning and Sensitivity Analysis of a Hexapod State Estimator*. Robotics and Autonomous Systems, 129, 103509. https://doi.org/10.1016/j.robot.2020.103509 - an IMU + leg-kinematics EKF on a real hexapod (Corin) and how its accuracy depends on its noise parameters. This toy sidesteps that question by matching $Q$ and the reading noise to the truth.

@@ -1627,7 +1627,7 @@ def fig_hexapod_gait_ekf():
             ax.bar(j, rmse, color=HEX_GAIT_COLORS[gait], width=0.6)
             ax.text(j, rmse * 0.5, f"{rmse:.4f}", ha="center", color="white", fontweight="bold", fontsize=9)
             ax.plot([j - 0.35, j + 0.35], [pred, pred], color=TRUTH, lw=2,
-                    label="(q·r)^¼ estimate" if j == 0 else None)
+                    label="(q·s²)^¼ estimate" if j == 0 else None)
             print(f"    {gait:<7s} {name}: RMSE {rmse:.4f}, estimate {pred:.4f}")
         ax.set(xticks=range(3), xticklabels=[f"{g}\n({3 + i} feet)" for i, g in enumerate(gaits)],
                ylabel=f"RMSE ({unit})", title=f"{name}: RMSE over {n_mc} runs")
@@ -1648,7 +1648,7 @@ def fig_hexapod_gait_ekf():
 
     finish(fig, "hexapod_gait_ekf", "Hexapod leg odometry: the gait barely matters, a slipping foot does",
            f"hexapod_gait_ekf.py defaults, seed 0: run_monte_carlo ({n_mc} trials, 12 s). "
-           "Bars: filter RMSE; black line: steady-state estimate (q·r)^¼ with r = one tick's variance for that gait.",
+           "Bars: filter RMSE; black line: steady-state estimate (q·s²)^¼ with s = one tick's std for that gait.",
            bottom=0.03)
 
 

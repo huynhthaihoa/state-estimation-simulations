@@ -748,7 +748,7 @@ uv run python use_numpy/invariant_saltation_ekf.py --duration 5.0 --dt 0.01 --me
 - **No slip:** every gait is consistent (100 trials, seeds 0-2: twist NEES 2.96-3.02 against 3). Wave beats tripod on twist RMSE by only 12%, not the 22% of a single tick, because the filter's steady-state std scales as $`n^{-1/4}`$. Three feet on one side would be about 40% worse than the tripod's triangle. Position and heading are never measured and drift for every gait.
 - **One slipping leg** (L2, 0.1 m/s sideways for 4 s): trusting every foot gives about 5× the velocity error and twist NEES 34-37; a per-foot $`\chi^2`$ gate (99%) drops about 98% of the slipping readings and restores the no-slip numbers for every gait. A 0.03 m/s slip mostly passes the gate.
 
-![Three panels from hexapod_gait_ekf.py: forward-speed and turn-rate RMSE per gait with the (q r)^(1/4) steady-state estimate, and sideways-velocity RMSE over time with leg L2 slipping, trusting every foot versus the per-foot chi-squared gate](assets/hexapod_gait_ekf.png)
+![Three panels from hexapod_gait_ekf.py: forward-speed and turn-rate RMSE per gait with the (q s^2)^(1/4) steady-state estimate, and sideways-velocity RMSE over time with leg L2 slipping, trusting every foot versus the per-foot chi-squared gate](assets/hexapod_gait_ekf.png)
 
 #### Scripts
 
