@@ -18,9 +18,9 @@ trusting every foot drags the velocity estimate off whenever L2 is down and
 the position estimate drifts away; the gated filter drops L2's readings and
 stays on the truth.
 
-Swing legs are not simulated (hexapod_gait_ekf.py only models where a foot
-lands); they are drawn faded at their nominal offset, as an illustration.
-The truth, footholds, readings and estimates are the simulation's own
+Swing feet are drawn faded, at their simulated positions (simulate_feet
+moves each one along a straight line between footholds with a smooth speed
+profile). The truth, footholds, readings and estimates are the simulation's own
 simulate_trial / run_ekf outputs. This is the single run from main()'s
 seed (same rng streams), with the slip switched on.
 
@@ -116,7 +116,7 @@ def main():
     legs = [ax_m.plot([], [], color="#5b6b7f", lw=1.6, zorder=2)[0] for _ in range(6)]
     foot_marks = [ax_m.plot([], [], "o", ms=7, mec="black", zorder=5)[0] for _ in range(6)]
     ax_m.plot([], [], "o", ms=7, mfc="black", mec="black", label="stance foot (simulated foothold)")
-    ax_m.plot([], [], "o", ms=7, mfc="white", mec="black", alpha=0.4, label="swing foot (illustrative)")
+    ax_m.plot([], [], "o", ms=7, mfc="white", mec="black", alpha=0.4, label="swing foot (simulated)")
     ax_m.plot([], [], "o", ms=7, mfc="red", mec="black", label=f"{args.slip_leg} slipping")
     ax_m.legend(loc="upper center", bbox_to_anchor=(0.5, -0.13), fontsize=8, ncol=2, frameon=False)
     status = ax_m.text(0.02, 0.98, "", transform=ax_m.transAxes, va="top", fontsize=9, fontweight="bold")
@@ -150,7 +150,7 @@ def main():
                 fc = "red" if slipping[k] and i == slip_leg else "black"
                 alpha = 1.0
             else:
-                f = p + R @ NOMINAL_FOOT_OFFSETS[i]
+                f = p + R @ r[k, i]
                 fc, alpha = "white", 0.4
             legs[i].set_data([hip[0], f[0]], [hip[1], f[1]])
             legs[i].set_alpha(alpha)

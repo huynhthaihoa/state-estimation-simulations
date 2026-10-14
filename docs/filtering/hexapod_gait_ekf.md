@@ -18,12 +18,14 @@ The **duty factor** is the fraction of a cycle each foot spends on the ground. M
 
 *Figure: the gait schedules and stance geometry of `use_numpy/hexapod_gait_ekf.py`, plotted by `uv run python assets/make_figures.py hexapod_gait_ekf_concept`.*
 
-Two questions, answered with [`hexapod_gait_ekf.py`](../../use_numpy/hexapod_gait_ekf.py):
+Four questions, answered with [`hexapod_gait_ekf.py`](../../use_numpy/hexapod_gait_ekf.py):
 
 1. **No slip:** how much does the gait change the estimate? (§2)
 2. **One leg slips:** a slipping foot breaks "a planted foot doesn't move". What does that do, and can the filter catch it? (§3)
+3. **Every foot drifts a little:** what if planted feet are never perfectly still? (§4)
+4. **Contact timing is uncertain:** what if the filter's touchdown and liftoff times are off? (§5)
 
-**Scope.** Planar body, perfect kinematics (the filter knows where each stance foot is; only its velocity reading is noisy), a known stance schedule, no IMU. Contact detection is a separate problem ([`hybrid_saltation_ekf.md` §8](hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter)).
+**Scope.** Planar body, perfect kinematics (the filter knows where each stance foot is; only its velocity reading is noisy), a known stance schedule except in §5, no IMU. §5 adds timing errors to touchdown and liftoff; how a detector finds them is out of scope (see [`hybrid_saltation_ekf.md` §8](hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter)).
 
 ---
 
@@ -58,6 +60,20 @@ All stance feet enter one joint update per tick.
 **What is never measured.** No reading involves $`p_x, p_y, \theta`$, so they are unobservable ([glossary](../glossary.md#observability)): leg odometry integrates the twist, and position and heading drift. This matches the real-robot result that, with leg kinematics and an IMU, everything except global position and yaw is observable (Bloesch et al. 2013, ref. 3).
 
 **Controlled comparison** (`simulate_trial`): each Monte Carlo trial draws one true trajectory, one initial-guess error and one noise stream per foot, and every gait uses the same draws. Only which feet are down, and where, changes between gaits.
+
+**No saltation matrix here.** In [`hybrid_saltation_ekf.md` §4](hybrid_saltation_ekf.md#4-deriving-xi---including-a-wrong-turn-caught-by-verification), an impact is an event that *jumps the state*, and the saltation matrix carries the covariance across it:
+
+```math
+\Xi = DR + \frac{\big[f^{+} - DR\,f^{-}\big] \otimes Dg}{Dg \cdot f^{-}}
+```
+
+A touchdown here only changes *which feet are measured*. The legs have no mass and the schedule is set by the clock, so:
+
+- the body state does not jump: $`DR = I`$;
+- the body moves the same way before and after: $`f^{+} = f^{-}`$;
+- the timing term exists because a perturbed state reaches the guard at a different moment; here the clock sets the touchdown time, so a perturbed body lands at the same moment (and the term's numerator, $`f^{+} - DR\, f^{-}`$, is 0 anyway).
+
+So $`\Xi = DR = I`$ exactly, and the timing-noise term of [`invariant_saltation_ekf.md` §7](invariant_saltation_ekf.md#7-contact-detection-jitter), $`\sigma_{\text{detect}}^2\, w w^\top`$ with $`w = f^{+} - DR\, f^{-}`$ and $`\sigma_{\text{detect}}`$ the timing-error std, is exactly 0. A wrong touchdown time shows up in the *readings* instead (§5). A saltation matrix would matter only if touchdown changed the body state, e.g. an impact with height and pitch in the state, as in the bouncing-body docs.
 
 ---
 
@@ -131,7 +147,7 @@ Results (100 trials, seeds 0-2; "in window" = $`t \in [4, 8)`$ s):
 - **Gated: back to the no-slip numbers.** RMSE and NEES return to the §2 values for every gait. The gate drops about 98% of the slipping readings and 1.0% of the good ones, the false-alarm rate it was set for.
 - **Why 2% get through.** A 0.1 m/s bias against a per-axis std of 0.02 m/s contributes about $`(0.1/0.02)^2 = 25`$ to the test value; noise adds about 2 on average, and sometimes pulls the total under 9.21.
 - **What this needs.** Gating works because the *other* feet agree with the prediction. With a tripod, two good feet still carry 4 readings for 3 twist unknowns.
-The same experiment, one run (seed 0, tripod gait), animated. The top-down view shows each stance foot at its simulated foothold, red while L2 slides; trusting every foot drags the sideways velocity off whenever L2 is down, and its estimated path drifts away (final position error 0.083 m vs 0.020 m with the gate). Swing legs are drawn at their nominal offset as an illustration, since the script does not simulate swing.
+The same experiment, one run (seed 0, tripod gait), animated. The top-down view shows each stance foot at its simulated foothold, red while L2 slides; trusting every foot drags the sideways velocity off whenever L2 is down, and its estimated path drifts away (final position error 0.083 m vs 0.020 m with the gate). Swing feet are drawn faded at their simulated positions (§5 describes the swing model).
 
 ![Animation of one tripod-gait run: left, a top-down view of the hexapod walking its curved path with stance feet at their footholds, leg L2 turning red while it slides, and the estimated paths of the filter that trusts every foot and the gated filter; right, the true sideways body velocity and both estimates over time, with the slip window shaded](../../assets/hexapod_gait_ekf.gif)
 
@@ -141,18 +157,73 @@ The same experiment, one run (seed 0, tripod gait), animated. The top-down view 
 
 ---
 
-## 4. Takeaway
+## 4. Every foot drifts a little: model it as reading noise
+
+So far a planted foot is perfectly still. Real feet creep: soil gives, rubber rolls. `--foot-drift-std` makes every stance foot slide at a small random velocity, white and independent per foot and per axis (std $`\sigma_{\text{drift}} = 0.02`$ m/s, as large as the reading noise).
+
+**Intuition.** The filter only sees the foot's velocity relative to the body, so a random slide looks exactly like extra reading noise. The matched filter just uses a larger reading variance, $`\sigma^2 + \sigma_{\text{drift}}^2`$. (With foot positions in the state, as in refs. 1-2, the same drift would be process noise on each foot.)
+
+Results (tripod and wave, 100 trials, seeds 0-2; both filters see the same draws):
+
+| Gait | Filter | NEES full | NEES twist | RMSE $`u`$ (m/s) | RMSE $`\omega`$ (rad/s) | final position RMSE (m) |
+| --- | --- | --- | --- | --- | --- | --- |
+| tripod | ignores drift ($`\sigma^2`$) | 8.46-8.49 | 4.51-4.67 | 0.0042 | 0.0125-0.0130 | 0.027-0.031 |
+| tripod | models drift ($`\sigma^2 + \sigma_{\text{drift}}^2`$) | 5.89-6.07 | 2.96-3.05 | 0.0041 | 0.0121-0.0127 | 0.027-0.031 |
+| wave | ignores drift | 7.86-8.43 | 4.51-4.63 | 0.0036-0.0037 | 0.0109-0.0112 | 0.022-0.027 |
+| wave | models drift | 5.65-5.98 | 2.94-3.01 | 0.0035-0.0036 | 0.0106-0.0109 | 0.022-0.027 |
+
+- **Ignoring drift costs calibration, not accuracy.** Twist NEES is about 1.5× too high; RMSE changes by at most 0.0005.
+- **Why 1.5×.** The real one-tick std is $`\sqrt{2}`$ larger than the filter thinks, and by §2 the filter's variance scales with that std, so it is $`\sqrt{2} \approx 1.41`$ too small; its too-large gain adds a little real error on top.
+- **Drift itself costs accuracy, as §2 predicts.** Doubling the reading variance should raise RMSE by about $`2^{1/4} = 1.19`$: tripod $`u`$ goes from 0.0034 (§2) to 0.0041-0.0042 (1.21-1.24×).
+
+---
+
+## 5. Contact timing is uncertain: a swinging foot read as planted
+
+`--detect-time-noise-std` shifts every touchdown and liftoff the filter uses by its own Gaussian error, std $`\sigma_{\text{detect}}`$, rounded to ticks. The truth keeps the true schedule. When the filter thinks a foot is down but it is still swinging, it reads a moving foot as if planted.
+
+**Intuition: the swing speed decides the damage.** In one cycle the body travels $`u T = 0.12`$ m, and a foot must catch up all of it during its swing. Its mean swing speed is therefore $`u / (1 - \text{duty})`$: 0.2 m/s for the tripod, 0.6 m/s for the wave gait. The script's swing (a straight line with a smooth $`1 - \cos`$ speed profile, zero speed at liftoff and touchdown) gives, measured:
+
+| Gait | swing | peak foot speed | 1 tick from touchdown | 2 ticks |
+| --- | --- | --- | --- | --- |
+| tripod | 30 ticks (0.6 s) | 0.30 m/s | 0.031 m/s | 0.061 m/s |
+| wave | 10 ticks (0.2 s) | 0.85 m/s | 0.24 m/s | 0.46 m/s |
+
+One tick of timing error is 1.5× the reading noise for the tripod, but 12× for the wave gait.
+
+Three filters, same draws: **trust** the detected flags; the **per-foot gate** of §3; or **trim**, skipping readings within $`2\sigma_{\text{detect}}`$ of every detected touchdown and liftoff. Twist NEES (consistent: 3, 95% interval $`[2.54, 3.50]`$) / final position RMSE in m, 100 trials, seeds 0-2:
+
+| $`\sigma_{\text{detect}}`$ | tripod trust | tripod gate | tripod trim | wave trust | wave gate | wave trim |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0.02 s (1 tick) | 3.20-3.35 / 0.025-0.026 | 3.13-3.25 / 0.023-0.025 | 2.98-3.07 / 0.024 | 10.5-11.8 / 0.057-0.062 | 3.06-3.12 / 0.020-0.022 | 3.05-3.09 / 0.021-0.023 |
+| 0.05 s | 6.8-7.5 / 0.051-0.054 | 3.28-3.46 / 0.024-0.026 | 2.98-3.10 / 0.025-0.027 | 108-123 / 0.20-0.22 | 3.06-3.11 / 0.020-0.023 | 7.6-9.4 / 0.028-0.042 |
+| 0.1 s | 38.6-43.8 / 0.146-0.155 | 3.47-3.65 / 0.027-0.028 | 3.19-4.14 / 0.034-0.037 | 476-545 / 0.45-0.49 | 3.06-3.11 / 0.020-0.023 | 186-222 / 0.21-0.26 |
+
+- **Trusting the flags is fine for the tripod at 1 tick, never for the wave gait.** At 0.05 s the wave gait's twist NEES is 108-123 and its position error about 10× the gated value.
+- **The gate handles both gaits at every level.** A wave foot read mid-swing is off by many reading stds, so the gate drops it: 0.1-0.4 such readings get through per run. Tripod swing readings near the ends are slow enough to pass (36-81 per run), and cost little; only at 0.1 s does the tripod reach the 3.50 bound (3.47-3.65).
+- **Trimming works for the tripod, not the wave gait.** It only covers timing errors up to $`2\sigma_{\text{detect}}`$; the remaining ~5% of events still read a moving foot, harmless for the tripod's slow feet, costly for the wave's fast ones. At 0.1 s, a late liftoff and an early touchdown also add up to more than a 10-tick swing for 11.7% of wave swings: the swing vanishes from the detected flags, leaving no edge to trim around. Trimming also throws away good readings: at 0.1 s the trimmed tripod filter ends 0.034-0.037 m off, against 0.027-0.028 m with the gate.
+- **No $`\Xi`$ or timing-noise term would fix this**: both are trivial here (§1). The fix belongs on the measurement side.
+
+![Three panels from hexapod_gait_ekf.py: twist NEES bars for the tripod and wave gaits when every foot drifts, ignoring versus modeling the drift, against the consistent value 3; foot speed over one swing for the tripod (30 ticks, peak 0.30 m/s) and wave (10 ticks, peak 0.85 m/s) gaits, with the readings one and two ticks before touchdown marked; and twist NEES on log axes against contact-detection jitter from 0.02 to 0.1 s for trusting the detected times, the per-foot chi-squared gate and trimming, for both gaits](../../assets/hexapod_gait_ekf_extensions.png)
+
+*Figure: `use_numpy/hexapod_gait_ekf.py` at its defaults (seed 0, 100 trials), plotted by `uv run python assets/make_figures.py hexapod_gait_ekf_extensions` (about 3 minutes). Panel (a) is §4's drift experiment.*
+
+---
+
+## 6. Takeaway
 
 - **More feet down is a weak lever for the estimate.** With the filter averaging over time, the gait changes twist RMSE by $`n^{-1/4}`$ (12% from tripod to wave), not $`n^{-1/2}`$. On a real robot, the gait choice is driven by stability and speed.
 - **Keep stance feet spread out.** Three feet on one side are about 40% worse than a tripod triangle. Standard gaits already avoid this; a damaged-leg or custom gait might not.
 - **A slipping foot matters much more than the gait**, and a per-foot $`\chi^2`$ test against the prediction is a cheap, effective guard against large slips; small ones pass it. Real filters do the same: Bloesch et al. 2013 (ref. 3) add outlier rejection to the update step for a quadruped on slippery terrain.
+- **Model foot drift as reading noise.** Ignoring a drift as large as the reading noise leaves accuracy intact but NEES about 1.5× too high.
+- **Contact-timing errors hurt fast-swing gaits most.** The wave gait's feet swing 3× faster than the tripod's, so the same timing error reads a foot moving several times faster. Gate each foot's reading; trimming near detected touchdowns and liftoffs already fails for the wave gait at 0.05 s, a quarter of its swing.
 - **Position and heading always drift** with leg odometry alone. A real system adds an IMU, which fixes roll and pitch through gravity but not yaw, and an exteroceptive sensor for the rest.
 
 The next step up is a 3D filter that keeps each stance foot's position in the state (refs. 1-2) instead of using only its velocity.
 
 ---
 
-## 5. References
+## 7. References
 
 1. Bloesch, M., Hutter, M., Hoepflinger, M., Leutenegger, S., Gehring, C., Remy, C. D., & Siegwart, R. (2012). *State Estimation for Legged Robots - Consistent Fusion of Leg Kinematics and IMU*. Robotics: Science and Systems VIII. https://doi.org/10.15607/RSS.2012.VIII.003 - an EKF that fuses leg kinematics with an IMU and keeps the footholds' absolute positions in the state; the 3D, IMU-driven version of this toy's stance-foot measurement.
 2. Hartley, R., Ghaffari, M., Eustice, R. M., & Grizzle, J. W. (2020). *Contact-Aided Invariant Extended Kalman Filtering for Robot State Estimation*. The International Journal of Robotics Research, 39(4), 402-430. https://doi.org/10.1177/0278364919894385 - an invariant EKF ([glossary](../glossary.md#iekf-invariant-ekf)) with the current contact points in the state, including how to add and remove contacts as feet land and lift.

@@ -1597,6 +1597,96 @@ def fig_hexapod_gait_ekf_concept():
            "Arrows in (b) drawn to scale (1 m/s = 1 m).", tight=False)
 
 
+def fig_hexapod_gait_ekf_extensions():
+    """hexapod_gait_ekf.py: random foot drift (doc §4) and contact-timing jitter (doc §5)."""
+    import hexapod_gait_ekf as m
+
+    dt, period, n_steps, n_mc = 0.02, 1.2, 600, 100
+    tpc = int(round(period / dt))
+    meas_std, drift_std = 0.02, 0.02
+    gaits = ["tripod", "wave"]
+    ext_args = (n_steps, dt, tpc, gaits, np.array([0.1, 0.0, 0.2]), 0.05, 0.1, meas_std,
+                np.array([0.01, 0.01, 0.01, 0.05, 0.05, 0.05]), 0.1)
+    lo3, hi3 = __import__("utils").averaged_nees_bounds(3, n_mc)
+
+    fig, (ax_d, ax_s, ax_j) = plt.subplots(1, 3, figsize=(15, 5.4), gridspec_kw={"width_ratios": [0.8, 1.0, 1.25]})
+
+    # (a) drift: same rng stream as hexapod_gait_ekf.main (seed + 3) for both filters
+    width = 0.36
+    for j, (label, R_f, hatch) in enumerate((("ignores drift", None, None),
+                                             ("models drift", meas_std ** 2 + drift_std ** 2, "//"))):
+        mc = m.run_monte_carlo(n_mc, *ext_args, np.random.default_rng(SEED + 3), foot_drift_std=drift_std,
+                               R_meas_filter=R_f)
+        for i, gait in enumerate(gaits):
+            v = mc[(gait, False)]["nees_twist"][1:].mean()
+            x = i + (j - 0.5) * width
+            ax_d.bar(x, v, width * 0.92, color=HEX_GAIT_COLORS[gait], alpha=1.0 if j == 0 else 0.45,
+                     hatch=hatch, ec="white", label=label if i == 0 else None)
+            ax_d.text(x, v + 0.08, f"{v:.2f}", ha="center", fontsize=9)
+            print(f"    drift {gait:<6s} {label}: twist NEES {v:.2f}")
+    ax_d.axhspan(lo3, hi3, color=PRIOR, alpha=0.2, lw=0, label=f"consistent: 3, 95% band [{lo3:.2f}, {hi3:.2f}]")
+    ax_d.axhline(3.0, color=TRUTH, lw=1)
+    ax_d.set(xticks=[0, 1], xticklabels=gaits, ylabel="twist NEES", ylim=(0, 5.6),
+             title=f"(a) Every foot drifts at {drift_std} m/s (doc §4)")
+    ax_d.grid(axis="x", visible=False)
+    legend_below(ax_d, ncol=1)
+
+    # (b) swing foot speed: straight run at the nominal 0.1 m/s, no noise
+    x_line = m.simulate_body_trajectory(300, dt, np.array([0.1, 0.0, 0.0]), 0.0, 0.0, np.random.default_rng(0))
+    for gait in gaits:
+        st, r, rel = m.simulate_feet(x_line, dt, tpc, gait, 0.1)
+        i = 0
+        lift = int(np.flatnonzero(st[100:-1, i] & ~st[101:, i])[0]) + 101
+        land = lift + int(np.flatnonzero(st[lift:, i])[0])
+        speed = np.linalg.norm(rel[lift:land, i] + x_line[lift:land, 3:5]
+                               + x_line[lift:land, 5:6] * (m.J @ r[lift:land, i].T).T, axis=1)
+        t_sw = (np.arange(lift, land) - lift + 1) * dt
+        ax_s.plot(np.concatenate([[0], t_sw, [(land - lift + 1) * dt]]), np.concatenate([[0], speed, [0]]),
+                  "-o", ms=3, color=HEX_GAIT_COLORS[gait], label=f"{gait}: swing {land - lift} ticks")
+        for k_back, mk in ((1, "s"), (2, "D")):
+            ax_s.plot(t_sw[-k_back], speed[-k_back], mk, ms=9, mfc="none", mec=HEX_GAIT_COLORS[gait], mew=1.6)
+            ax_s.annotate(f"{speed[-k_back]:.3f}", (t_sw[-k_back], speed[-k_back]), textcoords="offset points",
+                          xytext=(8, 2), fontsize=8.5, color=HEX_GAIT_COLORS[gait])
+        print(f"    swing {gait}: {land - lift} ticks, peak {speed.max():.3f}, 1 tick {speed[-1]:.3f}, 2 ticks {speed[-2]:.3f}")
+    ax_s.axhline(meas_std, color=TRUTH, lw=1, ls="--", label=f"reading noise σ = {meas_std} m/s")
+    ax_s.plot([], [], "s", mfc="none", mec=TRUTH, label="1 tick before touchdown")
+    ax_s.plot([], [], "D", mfc="none", mec=TRUTH, label="2 ticks before touchdown")
+    ax_s.set(xlabel="time since liftoff (s)", ylabel="foot speed in the world (m/s)",
+             title="(b) A foot read too early is still moving (doc §5)")
+    legend_below(ax_s, ncol=2)
+
+    # (c) jitter sweep: same rng stream as main (seed + 4) for all three filters
+    sds = [0.02, 0.05, 0.1]
+    res = {(g, f): [] for g in gaits for f in ("trust", "gate", "trim")}
+    for sd in sds:
+        mc_j = m.run_monte_carlo(n_mc, *ext_args, np.random.default_rng(SEED + 4), detect_noise_std=sd,
+                                 gating_modes=(False, True))
+        mc_t = m.run_monte_carlo(n_mc, *ext_args, np.random.default_rng(SEED + 4), detect_noise_std=sd,
+                                 trim_ticks=int(np.ceil(2.0 * sd / dt)))
+        for g in gaits:
+            res[(g, "trust")].append(mc_j[(g, False)]["nees_twist"][1:].mean())
+            res[(g, "gate")].append(mc_j[(g, True)]["nees_twist"][1:].mean())
+            res[(g, "trim")].append(mc_t[(g, False)]["nees_twist"][1:].mean())
+    styles = {"trust": ("-", "o", "trust detected times"), "gate": ("--", "s", "per-foot χ² gate"),
+              "trim": (":", "^", "trim near detected edges")}
+    for (g, f), vals in res.items():
+        ls, mk, lab = styles[f]
+        ax_j.plot(sds, vals, ls=ls, marker=mk, color=HEX_GAIT_COLORS[g], lw=1.6, label=f"{g}, {lab}")
+        print(f"    jitter {g:<6s} {f:<5s}: " + ", ".join(f"{v:.2f}" for v in vals))
+    ax_j.axhspan(lo3, hi3, color=PRIOR, alpha=0.2, lw=0)
+    ax_j.axhline(3.0, color=TRUTH, lw=1)
+    ax_j.set(xscale="log", yscale="log", xticks=sds, xlabel="detection-time jitter σ_detect (s)",
+             ylabel="twist NEES (consistent: 3)", title=f"(c) Contact-timing jitter, {n_mc} runs each (doc §5)")
+    ax_j.set_xticklabels([f"{v:g}" for v in sds])
+    ax_j.xaxis.set_minor_formatter(FuncFormatter(lambda v, _: ""))
+    plain_log_ticks(ax_j)
+    legend_below(ax_j, ncol=2)
+
+    finish(fig, "hexapod_gait_ekf_extensions", "Hexapod leg odometry: foot drift and contact-timing errors",
+           f"hexapod_gait_ekf.py defaults, seed 0, tripod and wave gaits: run_monte_carlo ({n_mc} trials, 12 s), "
+           "same draws for every filter in a panel. (b): one swing of leg L1 on a straight 0.1 m/s walk.", bottom=0.06)
+
+
 def fig_hexapod_gait_ekf():
     """hexapod_gait_ekf.py: gait effect on twist RMSE (vs. the (q r)^(1/4) estimate) and one slipping leg."""
     import hexapod_gait_ekf as m
@@ -1680,6 +1770,7 @@ FIGURES = {
     "pnp_estimation_concept": fig_pnp_estimation_concept,
     "hexapod_gait_ekf": fig_hexapod_gait_ekf,
     "hexapod_gait_ekf_concept": fig_hexapod_gait_ekf_concept,
+    "hexapod_gait_ekf_extensions": fig_hexapod_gait_ekf_extensions,
 }
 
 

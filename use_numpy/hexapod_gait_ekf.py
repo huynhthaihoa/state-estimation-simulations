@@ -40,11 +40,30 @@ stance foot; `gating=True` tests each foot's innovation against the
 predicted state (chi-squared, 2 DoF, 99%) and drops the ones that fail
 before the joint update.
 
-Simplifications: kinematics are perfect (the filter knows each stance
-foot's true offset r_i; only the velocity reading is noisy), swing is not
-simulated beyond "the foot lands at its next foothold", there is no IMU, and
-the stance schedule is known (contact detection is a separate problem -- see
-docs/filtering/hybrid_saltation_ekf.md §8). See
+Experiments 3 and 4 run on the tripod and wave gaits only:
+
+  - Experiment 3, random foot drift (--foot-drift-std): every stance foot
+    also slides at a small white random velocity. In this velocity-reading
+    model that is extra reading noise, so the comparison is a filter that
+    ignores it (R = sigma^2) vs. one that includes it (R = sigma^2 +
+    sigma_drift^2).
+  - Experiment 4, contact-detection jitter (--detect-time-noise-std): the
+    filter uses detected touchdown/liftoff times, each off by its own
+    Gaussian error, so it sometimes reads a foot that is still swinging.
+    Three filters: trust the detected flags, the per-foot gate, or skip
+    readings within 2 sigma of a detected touchdown/liftoff.
+
+No saltation matrix: a touchdown changes which feet are measured, not the
+body state (the legs are massless and the schedule is time-triggered), so
+the reset map is the identity, the flow is the same on both sides and the
+guard has no state gradient -- the saltation matrix is exactly I, and the
+timing-noise term of invariant_saltation_ekf.py (s^2 w w^T, w = f+ - DR f-)
+is exactly 0. Detection jitter shows up on the measurement side instead.
+
+Simplifications: kinematics are perfect (the filter knows each foot's true
+offset r_i; only the velocity reading is noisy), a swing foot moves in a
+straight line between footholds with a smooth (1 - cos) speed profile, there
+is no IMU, and except in experiment 4 the stance schedule is known. See
 docs/filtering/hexapod_gait_ekf.md.
 '''
 
@@ -148,13 +167,20 @@ def simulate_body_trajectory(n_steps, dt, twist0, lin_accel_std, ang_accel_std, 
     return x_true
 
 
-def simulate_feet(x_true, dt, ticks_per_cycle, gait, nominal_speed, slip=None):
+def simulate_feet(x_true, dt, ticks_per_cycle, gait, nominal_speed, slip=None, drift=None):
     """Footholds and true foot velocities relative to the body, per tick.
     A foot lands at its nominal offset shifted forward by half a stride, then
-    stays fixed in the world for the rest of its stance (unless slipping), so
-    its body-frame offset is r_i = R(theta)^T (f_i - p) and it moves in the
-    body frame at -(b + omega x r_i). Feet already down at t=0 are placed as
-    if they had landed earlier at the nominal stride.
+    stays fixed in the world for the rest of its stance (unless slipping or
+    drifting), so its body-frame offset is r_i = R(theta)^T (f_i - p) and it
+    moves in the body frame at -(b + omega x r_i). Feet already down at t=0
+    are placed as if they had landed earlier at the nominal stride.
+    Swing: the foot travels in a straight line from where it lifted off to
+    its next foothold, with a smooth (1 - cos) profile, so its speed is zero
+    at liftoff and at touchdown and peaks mid-swing. In the body frame it
+    moves at R^T df/dt - (b + omega x r_i). Only a filter that wrongly treats
+    a swinging foot as planted ever reads these values (detection jitter).
+    A swing at the very start or end of the run, with no foothold on one
+    side, is given a virtual one a stride away along the body's heading.
     Arguments:
         x_true: (N, 6) array of true states
         dt: step interval (s)
@@ -167,11 +193,12 @@ def simulate_feet(x_true, dt, ticks_per_cycle, gait, nominal_speed, slip=None):
         slip: None, or (leg_index, t_start, t_end, slip_vel_body (2,)): while
             in stance and t_start <= t < t_end, that foot slides at
             slip_vel_body (body frame, m/s) instead of staying planted
+        drift: None, or (N, 6, 2) body-frame velocities (m/s): every stance
+            foot also slides by drift[k, i] on tick k (random foot drift)
     Returns:
         stance: (N, 6) bool array
-        r: (N, 6, 2) body-frame foot offsets (meaningful only where stance)
+        r: (N, 6, 2) body-frame foot offsets
         rel_vel: (N, 6, 2) true body-frame foot velocity relative to the body
-            (zero where not in stance)
     """
     n_pts = len(x_true)
     duty, _ = GAITS[gait]
@@ -182,6 +209,7 @@ def simulate_feet(x_true, dt, ticks_per_cycle, gait, nominal_speed, slip=None):
 
     r = np.zeros((n_pts, 6, 2))
     rel_vel = np.zeros((n_pts, 6, 2))
+    f_world = np.zeros((n_pts, 6, 2))  # foothold at each stance tick (before that tick's slide)
     footholds = np.zeros((6, 2))
     for k in range(n_pts):
         p, theta, b, omega = x_true[k, :2], x_true[k, 2], x_true[k, 3:5], x_true[k, 5]
@@ -195,12 +223,92 @@ def simulate_feet(x_true, dt, ticks_per_cycle, gait, nominal_speed, slip=None):
                 footholds[i] = p + R @ r0
             elif not stance[k - 1, i]:
                 footholds[i] = p + R @ touchdown[i]
+            f_world[k, i] = footholds[i]
             r[k, i] = R.T @ (footholds[i] - p)
             rel_vel[k, i] = -(b + omega * J @ r[k, i])
             if slip is not None and slip[0] == i and slip[1] <= k * dt < slip[2]:
                 rel_vel[k, i] += slip[3]
                 footholds[i] = footholds[i] + R @ slip[3] * dt
+            if drift is not None:
+                rel_vel[k, i] += drift[k, i]
+                footholds[i] = footholds[i] + R @ drift[k, i] * dt
+
+    swing_ticks = int(round((1.0 - duty) * ticks_per_cycle))
+    for i in range(6):
+        k = 0
+        while k < n_pts:
+            if stance[k, i]:
+                k += 1
+                continue
+            c = k
+            while c < n_pts and not stance[c, i]:
+                c += 1
+            a = k - 1  # last stance tick before this swing (-1 if none)
+            if a >= 0:
+                start = f_world[a, i] + rot(x_true[a, 2]) @ (rel_vel[a, i] + x_true[a, 3:5]
+                                                            + x_true[a, 5] * J @ r[a, i]) * dt
+            if c < n_pts:
+                end = f_world[c, i]
+            if a < 0:
+                a = c - swing_ticks - 1
+                start = end - rot(x_true[c, 2]) @ np.array([stride, 0.0])
+            if c >= n_pts:
+                c = a + swing_ticks + 1
+                end = start + rot(x_true[-1, 2]) @ np.array([stride, 0.0])
+            span = (c - a) * dt
+            for j in range(k, min(c, n_pts)):
+                s = (j - a) / (c - a)
+                f = start + (end - start) * 0.5 * (1.0 - np.cos(np.pi * s))
+                f_dot = (end - start) * 0.5 * np.pi * np.sin(np.pi * s) / span
+                p, theta, b, omega = x_true[j, :2], x_true[j, 2], x_true[j, 3:5], x_true[j, 5]
+                R = rot(theta)
+                r[j, i] = R.T @ (f - p)
+                rel_vel[j, i] = R.T @ f_dot - (b + omega * J @ r[j, i])
+            k = c
     return stance, r, rel_vel
+
+
+def detected_stance(stance, dt, detect_noise_std, event_noise):
+    """Stance flags as a contact detector would report them: every touchdown
+    and liftoff is shifted by its own timing error, N(0, detect_noise_std^2)
+    rounded to whole ticks. The run's first and last ticks are not events.
+    Arguments:
+        stance: (N, 6) true stance flags
+        dt: step interval (s)
+        detect_noise_std: std-dev of each event's timing error (s)
+        event_noise: (6, M) standard-normal draws, consumed in order per leg
+            (one per event); shared across gaits for a controlled comparison
+    Returns:
+        (N, 6) bool detected stance flags
+    """
+    n_pts = len(stance)
+    out = np.zeros_like(stance)
+    for i in range(6):
+        edges = np.diff(np.concatenate([[False], stance[:, i], [False]]).astype(int))
+        starts, ends = np.where(edges == 1)[0], np.where(edges == -1)[0]
+        e = 0
+        for s, t in zip(starts, ends):
+            if s > 0:
+                s = s + int(round(event_noise[i, e] * detect_noise_std / dt))
+                e += 1
+            if t < n_pts:
+                t = t + int(round(event_noise[i, e] * detect_noise_std / dt))
+                e += 1
+            out[max(s, 0):min(t, n_pts), i] = True
+    return out
+
+
+def trim_transitions(mask, n_ticks):
+    """Drops readings within n_ticks of any switch in `mask` (per leg): the
+    filter skips the ticks right after a detected touchdown and right before
+    a detected liftoff, where a timing error would make it read a moving foot."""
+    out = mask.copy()
+    n_pts = len(mask)
+    for i in range(mask.shape[1]):
+        edges = np.flatnonzero(np.diff(mask[:, i].astype(int)) != 0) + 1  # first tick after a switch
+        for e in edges:
+            out[max(e - n_ticks, 0):min(e + n_ticks, n_pts), i] = False
+    return out
 
 
 def propagate(x, dt):
@@ -352,10 +460,13 @@ def twist_geometry_std(r, stance, meas_noise_std):
 
 
 def simulate_trial(n_steps, dt, ticks_per_cycle, gaits, twist0, lin_accel_std, ang_accel_std,
-                   meas_noise_std, init_std, nominal_speed, rng, slip=None):
+                   meas_noise_std, init_std, nominal_speed, rng, slip=None, foot_drift_std=0.0):
     """One trial: one true body trajectory, one set of per-foot noise draws
     and one initial-guess error, shared by every gait in `gaits` -- so
-    gaits differ only in which feet are down and where.
+    gaits differ only in which feet are down and where. With
+    foot_drift_std > 0, every stance foot also drifts at a white body-frame
+    velocity of that std (drawn after the other draws, so the rest of the
+    trial is unchanged).
     Returns:
         x_true: (N, 6)
         x_init: (6,)
@@ -364,39 +475,57 @@ def simulate_trial(n_steps, dt, ticks_per_cycle, gaits, twist0, lin_accel_std, a
     x_true = simulate_body_trajectory(n_steps, dt, twist0, lin_accel_std, ang_accel_std, rng)
     noise = rng.normal(0.0, meas_noise_std, (n_steps + 1, 6, 2))
     x_init = x_true[0] + rng.normal(0.0, 1.0, 6) * init_std
+    drift = rng.normal(0.0, foot_drift_std, (n_steps + 1, 6, 2)) if foot_drift_std > 0 else None
     feet = {}
     for gait in gaits:
-        stance, r, rel_vel = simulate_feet(x_true, dt, ticks_per_cycle, gait, nominal_speed, slip)
+        stance, r, rel_vel = simulate_feet(x_true, dt, ticks_per_cycle, gait, nominal_speed, slip, drift)
         feet[gait] = (stance, r, rel_vel + noise)
     return x_true, x_init, feet
 
 
 def run_monte_carlo(n_trials, n_steps, dt, ticks_per_cycle, gaits, twist0, lin_accel_std,
                     ang_accel_std, meas_noise_std, init_std, nominal_speed, rng, slip=None,
-                    gating_modes=(False,)):
+                    gating_modes=(False,), foot_drift_std=0.0, R_meas_filter=None,
+                    detect_noise_std=0.0, trim_ticks=0):
     """Monte Carlo over fresh truths and noise. For each (gait, gating) pair:
     per-tick average NEES (full 6-DoF and twist-only 3-DoF), per-tick mean
     squared error (N, 6), and acceptance counts of the slipping foot's
-    readings (slip ticks) and of every other stance reading.
+    readings (slip ticks), of every other stance reading, and of readings
+    taken from a foot that was really in swing (only possible with
+    detection jitter).
+    Extensions (all off by default):
+        foot_drift_std: random drift of every stance foot (see simulate_trial)
+        R_meas_filter: the filter's per-axis reading variance; default
+            meas_noise_std^2 (i.e. a filter that ignores any drift)
+        detect_noise_std: contact-detection timing jitter (s); the filter then
+            uses detected_stance flags instead of the true schedule. Event
+            draws come after the trial's other draws.
+        trim_ticks: skip readings within this many ticks of a detected
+            touchdown or liftoff (trim_transitions)
     Returns:
         dict (gait, gating) -> dict with keys nees_full, nees_twist, mse,
-            slip_used, slip_total, other_used, other_total
+            slip_used, slip_total, other_used, other_total, swing_used
     """
     Q = process_noise_covariance(dt, lin_accel_std, ang_accel_std)
-    R_meas = meas_noise_std ** 2
+    R_meas = meas_noise_std ** 2 if R_meas_filter is None else R_meas_filter
     P_init = np.diag(init_std ** 2)
     n_pts = n_steps + 1
     keys = [(g, gm) for g in gaits for gm in gating_modes]
     acc = {key: dict(nees_full=np.zeros(n_pts), nees_twist=np.zeros(n_pts), mse=np.zeros((n_pts, 6)),
-                     slip_used=0, slip_total=0, other_used=0, other_total=0) for key in keys}
+                     slip_used=0, slip_total=0, other_used=0, other_total=0, swing_used=0) for key in keys}
     t = np.arange(n_pts) * dt
     for _ in range(n_trials):
         x_true, x_init, feet = simulate_trial(n_steps, dt, ticks_per_cycle, gaits, twist0,
                                               lin_accel_std, ang_accel_std, meas_noise_std,
-                                              init_std, nominal_speed, rng, slip)
+                                              init_std, nominal_speed, rng, slip, foot_drift_std)
+        if detect_noise_std > 0:
+            event_noise = rng.normal(0.0, 1.0, (6, 2 * (n_pts // ticks_per_cycle + 2)))
         for gait, gating in keys:
             stance, r, z = feet[gait]
-            x_est, P_list, accepted = run_ekf(x_init, P_init, z, r, stance, dt, Q, R_meas, gating)
+            used = detected_stance(stance, dt, detect_noise_std, event_noise) if detect_noise_std > 0 else stance
+            if trim_ticks > 0:
+                used = trim_transitions(used, trim_ticks)
+            x_est, P_list, accepted = run_ekf(x_init, P_init, z, r, used, dt, Q, R_meas, gating)
             err = state_errors(x_true, x_est)
             a = acc[(gait, gating)]
             a["mse"] += err ** 2
@@ -412,6 +541,7 @@ def run_monte_carlo(n_trials, n_steps, dt, ticks_per_cycle, gaits, twist0, lin_a
             a["slip_total"] += int(slipping.sum())
             a["other_used"] += int(accepted[others].sum())
             a["other_total"] += int(others.sum())
+            a["swing_used"] += int(accepted[~stance].sum())
     for a in acc.values():
         a["nees_full"] /= n_trials
         a["nees_twist"] /= n_trials
@@ -446,6 +576,10 @@ def main():
     parser.add_argument("--slip-speed", type=float, default=0.1,
                          help="Sideways (outward) slip speed of the slipping foot (m/s)")
 
+    parser.add_argument("--foot-drift-std", type=float, default=0.02,
+                         help="Experiment 3: std-dev of every stance foot's random drift velocity (m/s)")
+    parser.add_argument("--detect-time-noise-std", type=float, default=0.05,
+                         help="Experiment 4: std-dev of each touchdown/liftoff detection time error (s)")
     parser.add_argument("--n-mc-trials", type=int, default=100, help="Number of Monte Carlo trials")
     parser.add_argument("--seed", type=int, default=0, help="RNG seed")
     parser.add_argument("--out", type=str, default=None, help="Save the figure to this path instead of showing it")
@@ -532,6 +666,39 @@ def main():
                   f"final RMSE pos={np.sqrt(a['mse'][-1, :2].sum()):.4f} m | "
                   f"slip readings used {a['slip_used'] / max(a['slip_total'], 1):.1%}, "
                   f"good readings used {a['other_used'] / a['other_total']:.1%}")
+
+    # --- Monte Carlo, random foot drift (tripod and wave) ---
+    ext_gaits = ["tripod", "wave"]
+    ext_args = (n_steps, args.dt, ticks_per_cycle, ext_gaits) + sim_args[4:]
+    print(f"\nMonte Carlo, every stance foot drifting at a random {args.foot_drift_std} m/s (white, per axis) "
+          f"({args.n_mc_trials} trials, same draws for both filters)...")
+    drift_var = args.meas_noise_std ** 2 + args.foot_drift_std ** 2
+    for label, R_filter in (("ignores drift", None), ("models drift", drift_var)):
+        mc_d = run_monte_carlo(args.n_mc_trials, *ext_args, np.random.default_rng(args.seed + 3),
+                               foot_drift_std=args.foot_drift_std, R_meas_filter=R_filter)
+        for gait in ext_gaits:
+            a = mc_d[(gait, False)]
+            rmse = np.sqrt(a["mse"][1:].mean(axis=0))
+            print(f"  {gait:<7s} {label}: NEES full={a['nees_full'][1:].mean():.2f}, twist={a['nees_twist'][1:].mean():.2f} | "
+                  f"RMSE u={rmse[3]:.4f} m/s, omega={rmse[5]:.4f} rad/s | "
+                  f"final RMSE pos={np.sqrt(a['mse'][-1, :2].sum()):.4f} m")
+
+    # --- Monte Carlo, contact-detection jitter (tripod and wave) ---
+    trim = int(np.ceil(2.0 * args.detect_time_noise_std / args.dt))
+    print(f"\nMonte Carlo, touchdown/liftoff detected with {args.detect_time_noise_std} s timing jitter "
+          f"({args.n_mc_trials} trials, same draws for all three filters; trim = {trim} ticks)...")
+    mc_j = run_monte_carlo(args.n_mc_trials, *ext_args, np.random.default_rng(args.seed + 4),
+                           detect_noise_std=args.detect_time_noise_std, gating_modes=(False, True))
+    mc_t = run_monte_carlo(args.n_mc_trials, *ext_args, np.random.default_rng(args.seed + 4),
+                           detect_noise_std=args.detect_time_noise_std, trim_ticks=trim)
+    for gait in ext_gaits:
+        for label, a in (("trust flags", mc_j[(gait, False)]), ("per-foot gate", mc_j[(gait, True)]),
+                         ("trim edges", mc_t[(gait, False)])):
+            rmse = np.sqrt(a["mse"][1:].mean(axis=0))
+            print(f"  {gait:<7s} {label:<13s}: NEES full={a['nees_full'][1:].mean():.2f}, "
+                  f"twist={a['nees_twist'][1:].mean():.2f} | RMSE u={rmse[3]:.4f} m/s, omega={rmse[5]:.4f} rad/s | "
+                  f"final RMSE pos={np.sqrt(a['mse'][-1, :2].sum()):.4f} m | "
+                  f"swing-foot readings used {a['swing_used'] / args.n_mc_trials:.1f} per run")
 
     colors = {"tripod": "tab:red", "ripple": "tab:orange", "wave": "tab:blue"}
     fig, axes = plt.subplots(2, 2, figsize=(12, 9))

@@ -160,3 +160,78 @@ def test_monte_carlo_consistent_without_slip(hexapod_gait_ekf):
     lo, hi = averaged_nees_bounds(3, n_trials)
     nees_twist = acc[("tripod", False)]["nees_twist"][1:].mean()
     assert lo < nees_twist < hi
+
+
+# --- swing motion, detection jitter, foot drift ---
+
+def test_swing_foot_continuous_and_stops_at_both_ends(hexapod_gait_ekf):
+    m = hexapod_gait_ekf
+    x_true = _truth(m)
+    stance, r, rel_vel = m.simulate_feet(x_true, DT, TICKS_PER_CYCLE, "tripod", 0.1)
+    world = x_true[:, None, :2] + np.einsum("kab,kib->kia", np.array([m.rot(th) for th in x_true[:, 2]]), r)
+    i = 0
+    lift = int(np.flatnonzero(stance[:-1, i] & ~stance[1:, i])[0]) + 1  # first swing tick
+    land = lift + int(np.flatnonzero(stance[lift:, i])[0])              # next stance tick
+    steps = np.linalg.norm(np.diff(world[lift - 1:land + 1, i], axis=0), axis=1)
+    assert steps.max() < 0.3 * 0.1 * DT * TICKS_PER_CYCLE  # no jump anywhere along the swing
+    assert steps[0] < 0.2 * steps.max() and steps[-1] < 0.2 * steps.max()  # slow at liftoff and touchdown
+
+
+def test_swing_relative_velocity_matches_finite_difference(hexapod_gait_ekf):
+    m = hexapod_gait_ekf
+    x_true = m.simulate_body_trajectory(300, DT, np.array([0.1, 0.0, 0.2]), 0.0, 0.0, np.random.default_rng(0))
+    stance, r, rel_vel = m.simulate_feet(x_true, DT, TICKS_PER_CYCLE, "tripod", 0.1)
+    i = 0
+    k = 100 + int(np.flatnonzero(~stance[100:, i])[0]) + 5  # well inside a swing
+    assert not stance[k, i] and not stance[k + 1, i]
+    fd = (r[k + 1, i] - r[k, i]) / DT
+    assert np.allclose(fd, rel_vel[k, i], atol=0.01)
+
+
+def test_detected_stance_without_jitter_is_exact(hexapod_gait_ekf):
+    m = hexapod_gait_ekf
+    stance = m.stance_mask(300, TICKS_PER_CYCLE, "wave")
+    noise = np.random.default_rng(0).normal(size=(6, 20))
+    assert np.array_equal(m.detected_stance(stance, DT, 0.0, noise), stance)
+    shifted = m.detected_stance(stance, DT, 0.05, noise)
+    assert not np.array_equal(shifted, stance)
+    assert np.array_equal(shifted[0], stance[0])  # t=0 is not an event
+
+
+def test_trim_transitions_drops_ticks_next_to_switches(hexapod_gait_ekf):
+    m = hexapod_gait_ekf
+    mask = np.zeros((20, 1), dtype=bool)
+    mask[5:15, 0] = True
+    out = m.trim_transitions(mask, 2)
+    assert np.flatnonzero(out[:, 0]).tolist() == list(range(7, 13))
+
+
+def test_foot_drift_moves_stance_feet_and_keeps_other_draws(hexapod_gait_ekf):
+    m = hexapod_gait_ekf
+    args = (200, DT, TICKS_PER_CYCLE, ["tripod"], np.array([0.1, 0.0, 0.2]), 0.05, 0.1, 0.02, np.full(6, 0.01), 0.1)
+    xa, ia, fa = m.simulate_trial(*args, np.random.default_rng(3))
+    xb, ib, fb = m.simulate_trial(*args, np.random.default_rng(3), foot_drift_std=0.02)
+    assert np.array_equal(xa, xb) and np.array_equal(ia, ib)
+    sa, _, za = fa["tripod"]
+    _, _, zb = fb["tripod"]
+    assert not np.allclose(za[sa], zb[sa])  # drift changes stance readings
+
+
+def test_monte_carlo_extensions_off_match_default(hexapod_gait_ekf):
+    m = hexapod_gait_ekf
+    args = (3, 100, DT, TICKS_PER_CYCLE, ["tripod"], np.array([0.1, 0.0, 0.2]), 0.05, 0.1, 0.02,
+            np.full(6, 0.01), 0.1)
+    a = m.run_monte_carlo(*args, np.random.default_rng(0))[("tripod", False)]
+    b = m.run_monte_carlo(*args, np.random.default_rng(0), foot_drift_std=0.0, detect_noise_std=0.0,
+                          trim_ticks=0)[("tripod", False)]
+    assert np.array_equal(a["mse"], b["mse"]) and b["swing_used"] == 0
+
+
+def test_jitter_on_wave_gait_is_caught_by_gate(hexapod_gait_ekf):
+    m = hexapod_gait_ekf
+    args = (10, 300, DT, TICKS_PER_CYCLE, ["wave"], np.array([0.1, 0.0, 0.2]), 0.05, 0.1, 0.02,
+            np.full(6, 0.01), 0.1)
+    acc = m.run_monte_carlo(*args, np.random.default_rng(0), detect_noise_std=0.05, gating_modes=(False, True))
+    trust, gated = acc[("wave", False)], acc[("wave", True)]
+    assert trust["nees_twist"][1:].mean() > 10 * gated["nees_twist"][1:].mean()
+    assert gated["swing_used"] < 0.05 * trust["swing_used"]

@@ -747,6 +747,8 @@ uv run python use_numpy/invariant_saltation_ekf.py --duration 5.0 --dt 0.01 --me
 
 - **No slip:** every gait is consistent (100 trials, seeds 0-2: twist NEES 2.96-3.02 against 3). Wave beats tripod on twist RMSE by only 12%, not the 22% of a single tick, because the filter's steady-state std scales as $`n^{-1/4}`$. Three feet on one side would be about 40% worse than the tripod's triangle. Position and heading are never measured and drift for every gait.
 - **One slipping leg** (L2, 0.1 m/s sideways for 4 s): trusting every foot gives about 5× the velocity error and twist NEES 34-37; a per-foot $`\chi^2`$ gate (99%) drops about 98% of the slipping readings and restores the no-slip numbers for every gait. A 0.03 m/s slip mostly passes the gate.
+- **Random foot drift** (tripod and wave, `--foot-drift-std 0.02`): it acts as extra reading noise. Ignoring it leaves accuracy intact but twist NEES about 1.5× too high (4.51-4.67); including it in the reading variance restores 2.94-3.05.
+- **Contact-timing jitter** (`--detect-time-noise-std`): a filter that trusts the detected touchdown/liftoff times reads swinging feet as planted. The wave gait's fast swings make this far worse than for the tripod (twist NEES 108-123 vs 6.8-7.5 at 0.05 s). The per-foot gate stays near 3 for both gaits from 0.02 to 0.1 s; trimming readings near detected touchdowns and liftoffs works for the tripod only. Touchdown changes no body state here, so the saltation matrix is the identity and its timing-noise term is zero (doc §1).
 
 ![Three panels from hexapod_gait_ekf.py: forward-speed and turn-rate RMSE per gait with the (q s^2)^(1/4) steady-state estimate, and sideways-velocity RMSE over time with leg L2 slipping, trusting every foot versus the per-foot chi-squared gate](assets/hexapod_gait_ekf.png)
 
@@ -758,7 +760,7 @@ uv run python use_numpy/invariant_saltation_ekf.py --duration 5.0 --dt 0.01 --me
 #### Usage
 
 ```
-uv run python use_numpy/hexapod_gait_ekf.py --duration 12.0 --dt 0.02 --cycle-period 1.2 --forward-speed 0.1 --turn-rate 0.2 --lin-accel-std 0.05 --ang-accel-std 0.1 --meas-noise-std 0.02 --init-pos-noise-std 0.01 --init-heading-noise-std 0.01 --init-twist-noise-std 0.05 --slip-leg L2 --slip-start 4.0 --slip-end 8.0 --slip-speed 0.1 --n-mc-trials 100 --seed 0
+uv run python use_numpy/hexapod_gait_ekf.py --duration 12.0 --dt 0.02 --cycle-period 1.2 --forward-speed 0.1 --turn-rate 0.2 --lin-accel-std 0.05 --ang-accel-std 0.1 --meas-noise-std 0.02 --init-pos-noise-std 0.01 --init-heading-noise-std 0.01 --init-twist-noise-std 0.05 --slip-leg L2 --slip-start 4.0 --slip-end 8.0 --slip-speed 0.1 --foot-drift-std 0.02 --detect-time-noise-std 0.05 --n-mc-trials 100 --seed 0
 ```
 
 - `--duration`: simulation length in seconds (default `12.0`)
@@ -771,6 +773,8 @@ uv run python use_numpy/hexapod_gait_ekf.py --duration 12.0 --dt 0.02 --cycle-pe
 - `--slip-leg`: leg that slips in the slip experiment, one of `L1`-`L3`, `R1`-`R3` (default `L2`)
 - `--slip-start`/`--slip-end`: slip window, s (defaults `4.0`/`8.0`)
 - `--slip-speed`: outward sideways slip speed, m/s (default `0.1`)
-- `--n-mc-trials`: number of Monte Carlo trials (default `100`; about 2 minutes)
+- `--foot-drift-std`: random drift velocity std-dev of every stance foot in the drift experiment, m/s (default `0.02`)
+- `--detect-time-noise-std`: touchdown/liftoff detection-time error std-dev in the jitter experiment, s (default `0.05`)
+- `--n-mc-trials`: number of Monte Carlo trials (default `100`; about 3 minutes)
 - `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
