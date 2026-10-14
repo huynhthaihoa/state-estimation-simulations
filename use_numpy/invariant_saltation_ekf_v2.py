@@ -694,7 +694,7 @@ class Filter:
         else:
             self.X, self.P = update_ri(self.X, self.P, y, self.landmarks, self.meas_noise_std)
 
-    def state(self):
+    def get_state(self):
         """Returns:
             copies of X (5,5) and P (9,9), and the cumulative number of bounces resolved
         """
@@ -722,13 +722,13 @@ def run_filter(name, X_init, P_init, gyro, accel, meas, dt, e, g_vec, landmarks,
     filt = Filter(name, X_init, P_init, dt, e, g_vec, landmarks,
                   gyro_noise_std, accel_noise_std, meas_noise_std,
                   detect_time_bias, detect_time_noise_std, detect_rng)
-    X, P, n_bounces = filt.state()
+    X, P, n_bounces = filt.get_state()
     X_list, P_list, counts = [X], [P], [n_bounces]
     for k in range(len(gyro)):
         filt.predict(gyro[k], accel[k])
         if k + 1 in meas:
             filt.update(meas[k + 1])
-        X, P, n_bounces = filt.state()
+        X, P, n_bounces = filt.get_state()
         X_list.append(X)
         P_list.append(P)
         counts.append(n_bounces)

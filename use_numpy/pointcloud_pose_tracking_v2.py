@@ -233,7 +233,7 @@ class PointCloudEKF:
         self.T = motion_model(self.T, u, self.dt, J_self, J_tau)
         self.P = J_self @ self.P @ J_self.T + J_tau @ self.Q_tangent @ J_tau.T
 
-    def measurement_update(self, z):
+    def update(self, z):
         """World-frame point residual, Jacobian re-derived at the current estimate.
         Arguments:
             z: noisy point-cloud measurement (M,3)
@@ -255,9 +255,9 @@ class PointCloudEKF:
     def step(self, u, z):
         """Perform one filter step: predict with twist u, then update with measurement z."""
         self.predict(u)
-        self.measurement_update(z)
+        self.update(z)
 
-    def state(self):
+    def get_state(self):
         """Return copies of the current pose estimate and covariance."""
         return self.T.copy(), self.P.copy()
 
@@ -279,11 +279,13 @@ def run_ekf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_s
         T_list: list of estimated poses (4,4)
     """
     kf = PointCloudEKF(T_init, P_init, body_points, dt, Q_tangent, point_noise_std)
-    T, _ = kf.state()
+    T, _ = kf.get_state()
     T_list = [T]
     for k in range(len(u_meas)):
-        kf.step(u_meas[k], z[k + 1])
-        T, _ = kf.state()
+        kf.predict(u_meas[k])
+        kf.update(z[k + 1])
+        # kf.step(u_meas[k], z[k + 1])
+        T, _ = kf.get_state()
         T_list.append(T)
     return T_list
 
@@ -303,7 +305,7 @@ class PointCloudIEKF(PointCloudEKF):
             self.H[3 * i:3 * i + 3, 0:3] = np.eye(3)
             self.H[3 * i:3 * i + 3, 3:6] = -skew(p)
 
-    def measurement_update(self, z):
+    def update(self, z):
         """Body-frame residual z_body = T^-1 @ z against the fixed Jacobian.
         Arguments:
             z: noisy point-cloud measurement (M,3)
@@ -343,11 +345,12 @@ def run_iekf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_
         T_list: list of estimated poses (4,4)
     """
     kf = PointCloudIEKF(T_init, P_init, body_points, dt, Q_tangent, point_noise_std)
-    T, _ = kf.state()
+    T, _ = kf.get_state()
     T_list = [T]
     for k in range(len(u_meas)):
-        kf.step(u_meas[k], z[k + 1])
-        T, _ = kf.state()
+        kf.predict(u_meas[k])
+        kf.update(z[k + 1])
+        T, _ = kf.get_state()
         T_list.append(T)
     return T_list
 
@@ -400,7 +403,7 @@ class PointCloudUKF:
 
         self.T, self.P = T_pred_mean, P_pred
 
-    def measurement_update(self, z):
+    def update(self, z):
         """Fresh sigma points around the predicted mean, pushed through the
         exact observation model.
         Arguments:
@@ -431,9 +434,9 @@ class PointCloudUKF:
     def step(self, u, z):
         """Perform one filter step: predict with twist u, then update with measurement z."""
         self.predict(u)
-        self.measurement_update(z)
+        self.update(z)
 
-    def state(self):
+    def get_state(self):
         """Return copies of the current pose estimate and covariance."""
         return self.T.copy(), self.P.copy()
 
@@ -476,11 +479,12 @@ def run_ukf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_s
     """
     kf = PointCloudUKF(T_init, P_init, body_points, dt, Q_tangent, point_noise_std,
                        ukf_alpha, ukf_beta, ukf_kappa)
-    T, _ = kf.state()
+    T, _ = kf.get_state()
     T_list = [T]
     for k in range(len(u_meas)):
-        kf.step(u_meas[k], z[k + 1])
-        T, _ = kf.state()
+        kf.predict(u_meas[k])
+        kf.update(z[k + 1])
+        T, _ = kf.get_state()
         T_list.append(T)
     return T_list
 
@@ -582,7 +586,7 @@ class VanillaKF:
         self.x = A @ self.x
         self.P = A @ self.P @ A.T + Q12
 
-    def measurement_update(self, z):
+    def update(self, z):
         """Exactly linear update, then re-project R back onto SO(3) via SVD.
         Arguments:
             z: noisy point-cloud measurement (M,3)
@@ -602,9 +606,9 @@ class VanillaKF:
     def step(self, u, z):
         """Perform one filter step: predict with twist u, then update with measurement z."""
         self.predict(u)
-        self.measurement_update(z)
+        self.update(z)
 
-    def state(self):
+    def get_state(self):
         """Return the current pose estimate (4,4), rebuilt from the ambient
         state, and a copy of the 12x12 ambient covariance.
         """
@@ -648,11 +652,13 @@ def run_vanilla_kf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_
         T_list: list of estimated poses (4,4)
     """
     kf = VanillaKF(T_init, P_init, body_points, dt, Q_tangent, point_noise_std)
-    T, _ = kf.state()
+    T, _ = kf.get_state()
     T_list = [T]
     for k in range(len(u_meas)):
-        kf.step(u_meas[k], z[k + 1])
-        T, _ = kf.state()
+        kf.predict(u_meas[k])
+        kf.update(z[k + 1])
+        # kf.step(u_meas[k], z[k + 1])
+        T, _ = kf.get_state()
         T_list.append(T)
     return T_list
 

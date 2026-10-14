@@ -283,7 +283,7 @@ class InchwormEKF:
         if apply_zupt:
             self.measurement_update_zupt()
 
-    def state(self):
+    def get_state(self):
         """Returns copies of (x, P), safe to store as history."""
         return self.x.copy(), self.P.copy()
 
@@ -311,11 +311,11 @@ def run_ekf(x_init, P_init, z, dt, n_steps, process_noise_std, R_pos, R_zupt, is
         P_list: list of (2,2) estimated covariances
     """
     ekf = InchwormEKF(x_init, P_init, dt, process_noise_std, R_pos, R_zupt, zupt_mode)
-    x, P = ekf.state()
+    x, P = ekf.get_state()
     x_list, P_list = [x], [P]
     for k in range(n_steps):
         ekf.step(z[k + 1], is_anchor[k + 1])
-        x, P = ekf.state()
+        x, P = ekf.get_state()
         x_list.append(x)
         P_list.append(P)
     return np.array(x_list), P_list

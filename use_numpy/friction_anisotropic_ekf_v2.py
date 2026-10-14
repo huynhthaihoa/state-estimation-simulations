@@ -278,7 +278,7 @@ class FrictionAnisotropicEKF:
         self.x = x_new
         self.P = F @ self.P @ F.T + Q
 
-    def measurement_update(self, z):
+    def update(self, z):
         """Linear-Gaussian update against a direct noisy position observation
         z = [p_x, p_y] + noise (H = [[1,0,0],[0,1,0]]).
         Arguments:
@@ -294,9 +294,9 @@ class FrictionAnisotropicEKF:
     def step(self, z):
         """Perform one EKF step: predict and then update with measurement z."""
         self.predict()
-        self.measurement_update(z)
+        self.update(z)
 
-    def state(self):
+    def get_state(self):
         """Return copies of the current state estimate and covariance."""
         return self.x.copy(), self.P.copy()
 
@@ -326,11 +326,13 @@ def run_ekf(x_init, P_init, z, dt, n_steps, v_cmd, omega_cmd, sigma_grip, sigma_
     """
     ekf = FrictionAnisotropicEKF(x_init, P_init, dt, v_cmd, omega_cmd, sigma_grip, sigma_slip,
                                  sigma_theta, R_pos, q_policy, theta_ref)
-    x, P = ekf.state()
+    x, P = ekf.get_state()
     x_list, P_list = [x], [P]
     for k in range(n_steps):
-        ekf.step(z[k + 1])
-        x, P = ekf.state()
+        ekf.predict()
+        ekf.update(z[k + 1])
+        # ekf.step(z[k + 1])
+        x, P = ekf.get_state()
         x_list.append(x)
         P_list.append(P)
     return np.array(x_list), P_list

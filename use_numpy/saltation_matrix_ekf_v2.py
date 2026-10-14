@@ -540,7 +540,7 @@ class HybridEKF:
                                      detect_time_noise_std=self.detect_time_noise_std,
                                      detect_rng=self.detect_rng)
 
-    def measurement_update(self, z):
+    def update(self, z):
         """Linear-Gaussian EKF update against a direct noisy position observation
         z = p + noise (H = [I_3 | 0_3]) -- deliberately the simplest possible
         measurement model, to keep focus on step_hybrid's bounce-covariance
@@ -562,9 +562,9 @@ class HybridEKF:
             z: position measurement (3,)
         """
         self.predict()
-        self.measurement_update(z)
+        self.update(z)
 
-    def state(self):
+    def get_state(self):
         """Return copies of the current state estimate and covariance."""
         return self.x.copy(), self.P.copy()
 
@@ -600,11 +600,13 @@ def run_ekf(x_init, P_init, z, dt, n_steps, e, g, accel_noise_std, impact_noise_
     ekf = HybridEKF(x_init, P_init, dt, e, g, accel_noise_std, impact_noise_std, R,
                     use_saltation, detect_time_bias=detect_time_bias,
                     detect_time_noise_std=detect_time_noise_std, detect_rng=detect_rng)
-    x, P = ekf.state()
+    x, P = ekf.get_state()
     x_list, P_list = [x], [P]
     for k in range(n_steps):
-        ekf.step(z[k + 1])
-        x, P = ekf.state()
+        ekf.predict()
+        ekf.update(z[k + 1])
+        # ekf.step(z[k + 1])
+        x, P = ekf.get_state()
         x_list.append(x)
         P_list.append(P)
     return x_list, P_list
