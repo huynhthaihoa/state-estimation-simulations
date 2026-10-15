@@ -147,7 +147,7 @@ A filter carries only the current state and its covariance. Each new measurement
      known stationary phases → phase-gated ZUPT       (inchworm_zupt_ekf)
      direction-dependent Q   → heading-aware Q        (friction_anisotropic_ekf)
      several feet, one slips → per-foot gated update  (hexapod_gait_ekf)
-     feet in the state, IMU   → contact-aided IEKF     (hexapod_contact_inekf)
+     feet in the state, IMU  → contact-aided IEKF     (hexapod_contact_inekf)
 ```
 
 | Topic | Key idea | Doc | Script |
