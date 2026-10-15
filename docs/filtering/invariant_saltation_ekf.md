@@ -142,7 +142,7 @@ What this shows:
 - **The invariant-naive shortcut is clearly overconfident after bounces** (NEES 1.5-1.8× the consistent value), and recovers only slowly, over several measurement updates.
 - **Reset-Jacobian vs. saltation is a modest gap**, as for the point mass: both are close to consistent, and in the sparse-measurement case only the saltation-corrected filter's after-bounce NEES stays inside the 95% interval (before the first bounce, all three RIEKFs sit slightly above it, at 10.22). Getting the state dependence right matters more here than the timing correction.
 - **The world-frame EKF is inconsistent before any bounce** (NEES 14-19), most likely because its propagation and measurement Jacobians are evaluated at a poor initial estimate, which the invariant filter's constant $`\Phi`$ and $`H`$ avoid - the usual invariant-filter advantage, independent of the hybrid event (not isolated further here).
-- **RMSEs are nearly identical** across the three RIEKFs (e.g. 1.29° / 0.12 m/s / 0.11 m in the single default run): as in [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md), the effect is in whether the reported uncertainty can be trusted, not in the point estimate.
+- **RMSEs** ([glossary](../glossary.md#rmse-root-mean-square-error)) **are nearly identical** across the three RIEKFs (e.g. 1.29° / 0.12 m/s / 0.11 m in the single default run): as in [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md), the effect is in whether the reported uncertainty can be trusted, not in the point estimate.
 
 ![Three panels from invariant_saltation_ekf.py: height of the bouncing body for the ground truth and the filters (the dashed saltation + timing noise line coincides with saltation here); single-run position error; Monte Carlo average NEES over time with the consistent value of 9 and its 95% interval, the invariant-naive filter spiking after each bounce and the world-frame EKF elevated before the first bounce](../../assets/invariant_saltation_ekf.png)
 
@@ -197,7 +197,7 @@ What this shows:
 
 ## 8. Scope and caveats
 
-- **No IMU biases** ([glossary](../glossary.md#bias)). Biases break the exact group-affine property: an invariant EKF that carries them anyway is called "imperfect", because its error dynamics then depend on the estimate again; leaving them out keeps the comparison about the bounce.
+- **No IMU biases** ([glossary](../glossary.md#bias)). Biases break the exact group-affine property: an invariant EKF that carries them anyway is called "imperfect", because its error dynamics then depend on the estimate again ([`hexapod_contact_inekf.md` §5](hexapod_contact_inekf.md#5-imu-biases-the-imperfect-invariant-ekf) runs one); leaving them out keeps the comparison about the bounce.
 - **The impact changes velocity only.** A real impact also changes the angular velocity; here the body rate is an input, continuous across the bounce.
 - **Contact detection is a timing error only** (§7), clipped into the current tick, and the timing term is given the true detector's $`s`$. A real filter would have to estimate $`s`$, and a detector can also miss an impact or fire without one, which is not modeled.
 - **Short runs only.** `step_hybrid_ri` raises if an impact is slower than `min_bounce_speed` rather than modeling the settling phase, where the bounces get ever shorter (**Zeno** behavior, [glossary](../glossary.md#zeno-behavior)).
@@ -205,6 +205,6 @@ What this shows:
 
 ## 9. References
 
-1. Barrau, A., & Bonnabel, S. (2017). *The Invariant Extended Kalman Filter as a Stable Observer*. IEEE Transactions on Automatic Control, 62(4), 1797–1812. https://arxiv.org/abs/1410.1465 - group-affine systems, invariant observations and the trajectory-independent error dynamics used in §2.
-2. Hartley, R., Ghaffari, M., Eustice, R. M., & Grizzle, J. W. (2020). *Contact-Aided Invariant Extended Kalman Filtering for Robot State Estimation*. The International Journal of Robotics Research, 39(4), 402–430. https://doi.org/10.1177/0278364919894385 - the right-invariant IMU filter on $`SE_2(3)`$ / $`SE_{K+2}(3)`$ (with $K$ contact points added to the state) that §2's propagation and measurement model follow.
+1. Barrau, A., & Bonnabel, S. (2017). *The Invariant Extended Kalman Filter as a Stable Observer*. IEEE Transactions on Automatic Control, 62(4), 1797–1812. https://doi.org/10.1109/TAC.2016.2594085 (preprint: https://arxiv.org/abs/1410.1465) - group-affine systems, invariant observations and the trajectory-independent error dynamics used in §2.
+2. Hartley, R., Ghaffari, M., Eustice, R. M., & Grizzle, J. W. (2020). *Contact-Aided Invariant Extended Kalman Filtering for Robot State Estimation*. The International Journal of Robotics Research, 39(4), 402–430. https://doi.org/10.1177/0278364919894385 - the right-invariant IMU filter on $`SE_2(3)`$ / $`SE_{K+2}(3)`$ (with $K$ contact points added to the state) that §2's propagation and measurement model follow. The $`SE_{K+2}(3)`$ version is implemented for a hexapod in [`hexapod_contact_inekf.md`](hexapod_contact_inekf.md).
 3. Kong, N. J., Payne, J. J., Zhu, J., & Johnson, A. M. (2024). *Saltation Matrices: The Essential Tool for Linearizing Hybrid Dynamical Systems*. Proceedings of the IEEE, 112(6), 585–608. https://doi.org/10.1109/JPROC.2024.3440211 - the saltation-matrix definition used in §4.

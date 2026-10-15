@@ -2,7 +2,7 @@
 
 ## Intuition
 
-A planted foot doesn't move. So if the joint encoders say a stance foot is sliding backward under the body at 0.1 m/s, the body is moving forward at 0.1 m/s. That is **leg odometry**: every foot on the ground is a velocity sensor for the body ([glossary](../glossary.md#odometry)).
+A planted foot doesn't move. So if the joint encoders (angle sensors in each leg joint) say a stance foot is sliding backward under the body at 0.1 m/s, the body is moving forward at 0.1 m/s. That is **leg odometry**: every foot on the ground is a velocity sensor for the body ([glossary](../glossary.md#odometry)).
 
 A hexapod has six legs, and its **gait** decides which ones are down on each **tick** (one filter time step, $`\Delta t = 0.02`$ s):
 
@@ -149,13 +149,13 @@ Results (100 trials, seeds 0-2; **naive** = trusts every stance foot, **gated** 
 - **Gated: back to the no-slip numbers.** RMSE and NEES return to the §2 values for every gait. The gate drops about 98% of the slipping readings and 1.0% of the good ones, the false-alarm rate it was set for.
 - **Why 2% get through.** A 0.1 m/s bias against a per-axis std of 0.02 m/s contributes about $`(0.1/0.02)^2 = 25`$ to the test value; noise adds about 2 on average, and sometimes pulls the total under 9.21.
 - **What this needs.** Gating works because the *other* feet agree with the prediction. With a tripod, two good feet still carry 4 readings for 3 twist unknowns.
+- **Small slips get through.** At `--slip-speed 0.03` (1.5× the reading std; seed 0, 100 trials) the gate lets 93.3-93.8% of the slipping readings through. Gated and naive then look alike: in-window $`v`$ RMSE 0.0056-0.0063 vs 0.0060-0.0066 m/s, twist NEES 5.6-5.8 vs 6.0-6.3, all about twice the no-slip values. A per-tick test cannot separate a slip of that size from noise.
+
 The same experiment, one run (seed 0, tripod gait), animated. The top-down view shows each stance foot at its simulated foothold, red while L2 slides; trusting every foot drags the sideways velocity off whenever L2 is down, and its estimated path drifts away (final position error 0.083 m vs 0.020 m with the gate). Swing feet are drawn faded at their simulated positions (§5 describes the swing model).
 
 ![Animation of one tripod-gait run: left, a top-down view of the hexapod walking its curved path with stance feet at their footholds, leg L2 turning red while it slides, and the estimated paths of the filter that trusts every foot and the gated filter; right, the true sideways body velocity and both estimates over time, with the slip window shaded](../../assets/hexapod_gait_ekf.gif)
 
 *Animation: `use_numpy/animate_hexapod_gait_ekf.py` at its defaults, rendered by `uv run python use_numpy/animate_hexapod_gait_ekf.py --out assets/hexapod_gait_ekf.gif`.*
-
-- **Small slips get through.** At `--slip-speed 0.03` (1.5× the reading std; seed 0, 100 trials) the gate lets 93.3-93.8% of the slipping readings through. Gated and naive then look alike: in-window $`v`$ RMSE 0.0056-0.0063 vs 0.0060-0.0066 m/s, twist NEES 5.6-5.8 vs 6.0-6.3, all about twice the no-slip values. A per-tick test cannot separate a slip of that size from noise.
 
 ---
 
@@ -163,7 +163,7 @@ The same experiment, one run (seed 0, tripod gait), animated. The top-down view 
 
 So far a planted foot is perfectly still. Real feet creep: soil gives, rubber rolls. `--foot-drift-std` makes every stance foot slide at a small random velocity, white (independent from tick to tick) and independent per foot and per axis (std $`\sigma_{\text{drift}} = 0.02`$ m/s, as large as the reading noise).
 
-**Intuition.** The filter only sees the foot's velocity relative to the body, so a random slide looks exactly like extra reading noise. A filter that models the drift just uses a larger reading variance, $`\sigma^2 + \sigma_{\text{drift}}^2`$. (With foot positions in the state, as in refs. 1-2, the same drift would be process noise on each foot.)
+**Intuition.** The filter only sees the foot's velocity relative to the body, so a random slide looks exactly like extra reading noise. A filter that models the drift just uses a larger reading variance, $`\sigma^2 + \sigma_{\text{drift}}^2`$. (With foot positions in the state, as in refs. 1-2, the same drift would be process noise on each foot: the contact noise of [`hexapod_contact_inekf.md` §1](hexapod_contact_inekf.md#1-model).)
 
 Results (tripod and wave, 100 trials, seeds 0-2; both filters see the same draws):
 
