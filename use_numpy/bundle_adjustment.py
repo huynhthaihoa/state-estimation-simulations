@@ -523,7 +523,7 @@ def main():
     ax_scene.set_title("Scene (top-down): ground truth vs. noisy init vs. joint BA")
     ax_scene.legend(fontsize=7, loc="upper left")
 
-    metric_names = ["Pose rot RMS\n(deg)", "Pose pos RMS\n(m)", "Landmark RMS\n(m)", "Reprojection RMS\n(px)"]
+    metric_names = ["Pose rot RMSE\n(deg)", "Pose pos RMSE\n(m)", "Landmark RMSE\n(m)", "Reprojection RMSE\n(px)"]
     row_names = [name for name, _, _ in rows]
     colors = ["tab:gray", "tab:orange", "tab:purple", "tab:blue"]
 
@@ -534,7 +534,7 @@ def main():
     ax_bar.set_xticks(x)
     ax_bar.set_xticklabels(metric_names)
     ax_bar.set_yscale("log")
-    ax_bar.set_title("RMS metrics by method")
+    ax_bar.set_title("RMSE metrics by method")
     ax_bar.legend(fontsize=7)
 
     fig.tight_layout()

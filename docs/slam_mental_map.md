@@ -44,7 +44,7 @@ Several docs already draw a partial map of their own corner. We treat those as z
                                   │
                                   ▼
   OUTPUT      trajectory + map
-  EVALUATION  Umeyama alignment → RMS error  ·  NEES consistency
+  EVALUATION  Umeyama alignment → RMSE  ·  NEES consistency
 
   FOUNDATIONS (used at every layer above)
   Jacobian · Lie groups SO(3)/SE(3) · quaternion · linear vs. nonlinear

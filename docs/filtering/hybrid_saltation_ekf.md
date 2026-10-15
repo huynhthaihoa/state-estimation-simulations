@@ -363,12 +363,12 @@ Under detection jitter, `saltation_matrix` is evaluated at an $x^{-}$ that is of
 - With exact detection every crossing is descending by construction, so the rule changes no result above.
 - Without it, any detection jitter produces nonsense. Measured by temporarily using the alternative rule (smallest positive root, ascending or not) and rerunning this section's sweep (seed 0, 500 trials):
 
-| $\sigma_{\text{detect}}$ | Post-bounce NEES, descending-only (naive/saltation) | Post-bounce NEES, any positive root (naive/saltation) | RMS position error, descending-only (naive/saltation) | RMS position error, any positive root (naive/saltation) |
+| $\sigma_{\text{detect}}$ | Post-bounce NEES, descending-only (naive/saltation) | Post-bounce NEES, any positive root (naive/saltation) | Position RMSE, descending-only (naive/saltation) | Position RMSE, any positive root (naive/saltation) |
 | --- | --- | --- | --- | --- |
 | $`0.001\,\text{s}`$ | 4.16/5.32 | $`1.32\times10^{5}`$/$`1.17\times10^{5}`$ | 0.023/0.024 m | 0.155/0.565 m |
 | $`0.01\,\text{s}`$ | 89.77/144.15 | $`1.17\times10^{5}`$/$`1.06\times10^{5}`$ | 0.046/0.037 m | 0.156/0.531 m |
 
-Post-bounce NEES jumps by roughly 3-4.5 orders of magnitude, and it sits at $`\sim\!10^{5}`$ regardless of how small the jitter is - the signature of the spurious re-bounces rather than of the jitter itself. RMS position error (from a single illustrative run) grows far less, about 3-23x. A hypothesis, not tested here: most of the NEES jump comes from $P$ being far too small relative to the actual errors rather than from the errors themselves. (The RMS errors come from one run and the NEES from the Monte Carlo average, so we have no direct evidence about $P$.)
+Post-bounce NEES jumps by roughly 3-4.5 orders of magnitude, and it sits at $`\sim\!10^{5}`$ regardless of how small the jitter is - the signature of the spurious re-bounces rather than of the jitter itself. Position RMSE (from a single illustrative run) grows far less, about 3-23x. A hypothesis, not tested here: most of the NEES jump comes from $P$ being far too small relative to the actual errors rather than from the errors themselves. (The RMSEs come from one run and the NEES from the Monte Carlo average, so we have no direct evidence about $P$.)
 
 With the descending-only rule, sweeping $\sigma_{\text{detect}}$ (with $b_{\text{detect}} = 0$, i.e. jitter only, no systematic delay) at $`\Delta t = 0.02\,\text{s}`$, averaged over seeds 0-3 (mean NEES over the same 5-tick post-bounce window as §6; every individual seed is within 7% of the 4-seed mean at every setting):
 

@@ -219,7 +219,7 @@ def main():
     axr.set_yscale("log")
     axr.set_xlim(-0.3, n_it + 0.3)
     axr.set_ylim(0.6, max(rms) * 2.5)
-    axr.set_xlabel("Gauss-Newton iteration"); axr.set_ylabel("reprojection RMS (px)")
+    axr.set_xlabel("Gauss-Newton iteration"); axr.set_ylabel("reprojection RMSE (px)")
     axr.set_title("Reprojection error", fontsize=10)
     axr.legend(fontsize=7, loc="upper right")
     val_text = axr.text(0.97, 0.45, "", transform=axr.transAxes, ha="right", fontsize=11, color="tab:blue")

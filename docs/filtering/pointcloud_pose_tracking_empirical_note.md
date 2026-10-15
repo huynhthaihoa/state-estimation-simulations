@@ -281,7 +281,7 @@ There is no line search or Levenberg-Marquardt schedule. It starts from the dead
 - Each iteration is plain Gauss-Newton: treat every factor as linear around the current trajectory, solve for all the pose corrections $`\delta`$ together, apply them, repeat ([gauss_newton.md §2](../optimization/gauss_newton.md#2-intuition-fit-a-bowl-jump-to-its-bottom)).
 - Worked numbers (defaults, 51 poses):
 
-| | Error at $`T_0`$ | Final error | RMS, all poses | RMS, poses 1-50 |
+| | Error at $`T_0`$ | Final error | RMSE, all poses | RMSE, poses 1-50 |
 |---|---|---|---|---|
 | EKF, rotation | 6.08° | 0.289° | 1.043° | 0.609° |
 | Batch GN, rotation | 0.80° | 0.287° | 0.422° | 0.411° |
@@ -290,14 +290,14 @@ There is no line search or Levenberg-Marquardt schedule. It starts from the dead
 
 - **$`T_0`$ shows smoothing most clearly.** The EKF never revisits it, so it keeps the initial guess's 6° error. Batch GN pulls it to 0.8° using measurements from later times.
 - **At the last pose** both have seen the same measurements, so their errors nearly match.
-- **In between**, the later measurements still help: rotation RMS over poses 1-50 is about 1.5x lower. Position gains only about 10%, so most of the 5x gap in the all-poses RMS comes from $`T_0`$ alone (see the note on $`k = 0`$ under Error metrics below).
+- **In between**, the later measurements still help: rotation RMSE over poses 1-50 is about 1.5x lower. Position gains only about 10%, so most of the 5x gap in the all-poses RMSE comes from $`T_0`$ alone (see the note on $`k = 0`$ under Error metrics below).
 
 #### Error metrics (`pose_errors`, `rotation_geodesic_error`)
 
 - The **rotation error** is the angle $\theta$ of the relative rotation $`W = R^\top \hat R`$, in degrees. It is computed as $`\mathrm{atan2}(s, c)`$, where $`c = (\mathrm{tr}\,W - 1)/2 = \cos\theta`$ is read off the symmetric part of $W$ and $`s = \tfrac12 \lVert (W - W^\top)^\vee \rVert = \sin\theta`$ off its skew part ($`^\vee`$ is the inverse of the hat map, [glossary](../glossary.md#hat-operator)). Unlike $\arccos(c)$, this stays accurate for tiny angles, down to round-off. The `use_manif` version computes the same angle as $`\lVert \hat R\ \text{rminus}\ R \rVert`$, and manif's $SO(3)$ $\mathrm{Log}$ also uses `atan2`, so the same accuracy holds there.
 - The **position error** is $\lVert t - \hat t \rVert$.
 
-"Final" is the error in the last pose, whereas "RMS" is calculated over all $N+1$ poses, including $k = 0$. At $k = 0$ the five recursive methods (dead reckoning, EKF, IEKF, UKF, vanilla KF) all still sit at the initial guess, so they share the same initial error in their RMS, while batch GN already re-optimizes $T_0$. Small RMS gaps between GN and the recursive filters therefore partly reflect this difference at $k = 0$.
+"Final" is the error in the last pose, whereas "RMSE" is calculated over all $N+1$ poses, including $k = 0$. At $k = 0$ the five recursive methods (dead reckoning, EKF, IEKF, UKF, vanilla KF) all still sit at the initial guess, so they share the same initial error in their RMSE, while batch GN already re-optimizes $T_0$. Small RMSE gaps between GN and the recursive filters therefore partly reflect this difference at $k = 0$.
 
 
 ---
@@ -345,7 +345,7 @@ The step $`R_{\text{big}}\,R_{\text{diag}}\,R_{\text{big}}^\top = R_{\text{diag}
 
 ### 2.3 Empirical verification
 
-- Printed final/RMS rotation+position error rows are identical between EKF and IEKF across seed 0 (default args) and stress tests (`--init-pose-noise-std 0.5`/`0.8`, `--duration 8`).
+- Printed final-error and RMSE rotation+position rows are identical between EKF and IEKF across seed 0 (default args) and stress tests (`--init-pose-noise-std 0.5`/`0.8`, `--duration 8`).
 - Direct numerical diff of the full trajectory (duration 5.0, seed 0, 51 poses): max position diff ~2e-14 m, and max rotation diff ~6e-13 deg (~1e-14 rad) from the script's own `rotation_geodesic_error`. Both are floating-point round-off. Don't measure this with $`\lVert\mathrm{Log}(R_{\text{EKF}}^\top R_{\text{IEKF}})\rVert`$: `se3_log`'s small-angle branch returns exactly 0 for any angle below $10^{-6}$ rad, so it can't show differences this small.
 - Saved trajectory/error plots show the IEKF line drawn exactly on top of the EKF line everywhere (invisible because identical).
 

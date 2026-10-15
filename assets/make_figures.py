@@ -115,13 +115,13 @@ def fig_pose_tracking():
     t = np.arange(len(T_true)) * dt
     for name, T_est, col, ls in runs:
         _, pos_err = m.pose_errors(T_true, T_est)
-        ax_xy.plot(*xy_of(T_est), color=col, ls=ls, lw=1.6, label=f"{name}  (RMS {rms(pos_err) * 100:.1f} cm)")
+        ax_xy.plot(*xy_of(T_est), color=col, ls=ls, lw=1.6, label=f"{name}  (RMSE {rms(pos_err) * 100:.1f} cm)")
         ax_err.plot(t, pos_err, color=col, ls=ls, lw=1.8)
         print(f"    {name:<28s} RMS pos = {rms(pos_err):.4f} m")
     ax_xy.set(title="Object trajectory (x-y)", xlabel="x (m)", ylabel="y (m)")
     ax_xy.axis("equal")
     fig.legend(*ax_xy.get_legend_handles_labels(), loc="lower center", ncol=4, fontsize=9,
-               title="in brackets: position error, RMS over the run", title_fontsize=8.5)
+               title="in brackets: position RMSE over the run", title_fontsize=8.5)
     ax_err.set(title="Position error", xlabel="time (s)", ylabel="position error (m)", yscale="log")
     finish(fig, "pose_tracking", "Point-cloud pose tracking on SE(3)",
            f"Noisy twist prior + {n_points} noisy body-frame points per step (z = T·p + noise); "
@@ -263,8 +263,8 @@ def fig_pose_graph():
 
     k = np.arange(len(gt))
     w = 0.38
-    ax_e.bar(k - w / 2, e_dr, w, color=PRIOR, label=f"Odometry only (RMS {rms(e_dr) * 100:.1f} cm)")
-    ax_e.bar(k + w / 2, e_opt, w, color=C["blue"], label=f"Optimized (RMS {rms(e_opt) * 100:.1f} cm)")
+    ax_e.bar(k - w / 2, e_dr, w, color=PRIOR, label=f"Odometry only (RMSE {rms(e_dr) * 100:.1f} cm)")
+    ax_e.bar(k + w / 2, e_opt, w, color=C["blue"], label=f"Optimized (RMSE {rms(e_opt) * 100:.1f} cm)")
     ax_e.set_xticks(k, ["X0\n(anchored)"] + [f"X{n}" for n in k[1:]])
     ax_e.set(title="Position error per pose", ylabel="position error (m)")
     ax_e.legend(loc="upper left")
@@ -318,7 +318,7 @@ def fig_bundle_adjustment():
     for r, ((name, _, _), col) in enumerate(zip(rows, cols)):
         ax_b.bar(x + (r - 1.5) * w, vals[r], w, color=col, label=name)
     ax_b.set_xticks(x, names)
-    ax_b.set(yscale="log", ylim=(1e-3, 1e5), title="RMS error by method (after similarity alignment)")
+    ax_b.set(yscale="log", ylim=(1e-3, 1e5), title="RMSE by method (after similarity alignment)")
     ax_b.legend(loc="upper center", ncol=2)
     finish(fig, "bundle_adjustment", "Bundle adjustment: joint camera-pose and landmark refinement",
            "Synthetic scene, cameras on an arc looking inward, 640×480 image (f = 800 px), 1 px pixel noise; seed 0, script defaults")
@@ -362,7 +362,7 @@ def fig_bundle_adjustment_advanced():
     ax_d.plot(h_hyb["traj_step"], h_hyb["traj_rms_pos_err"], color=C["blue"], lw=1.6, label="Local + periodic Global BA")
     for k in h_hyb["global_step"]:
         ax_d.axvline(k, color=PRIOR, ls=":", lw=0.8)
-    ax_d.set(title="Trajectory error (last 10 keyframes)", xlabel="keyframe", ylabel="RMS position error (m)")
+    ax_d.set(title="Trajectory error (last 10 keyframes)", xlabel="keyframe", ylabel="position RMSE (m)")
     ax_d.legend(loc="upper left")
     finish(fig, "bundle_adjustment_advanced", "Local vs. Global bundle adjustment on a growing map",
            "Keyframes arrive one at a time; each triggers a Local BA over its covisible neighbors, and every 8th "
@@ -593,11 +593,11 @@ def fig_pose_graph_incremental():
 
     fig, (ax_xy, ax_c) = plt.subplots(1, 2, gridspec_kw={"width_ratios": [1.1, 1]})
     ax_xy.plot(*closed(gt), "-", color=TRUTH, lw=2.2, label="ground truth")
-    ax_xy.plot(*xy_of(T_dr), "--", color=PRIOR, lw=1.6, label=f"odometry only (RMS {rms(errs['odo']) * 100:.1f} cm)")
+    ax_xy.plot(*xy_of(T_dr), "--", color=PRIOR, lw=1.6, label=f"odometry only (RMSE {rms(errs['odo']) * 100:.1f} cm)")
     ax_xy.plot(*xy_of(T_batch), "o-", color=C["blue"], ms=3, lw=1.4,
-               label=f"batch re-solve per node (RMS {rms(errs['batch']) * 100:.1f} cm)")
+               label=f"batch re-solve per node (RMSE {rms(errs['batch']) * 100:.1f} cm)")
     ax_xy.plot(*xy_of(T_incr), "x:", color=C["orange"], ms=5, lw=1.4,
-               label=f"incremental sqrt-SAM (RMS {rms(errs['incr']) * 100:.1f} cm)")
+               label=f"incremental sqrt-SAM (RMSE {rms(errs['incr']) * 100:.1f} cm)")
     ax_xy.set(title=f"{n} poses streamed in one at a time, loop closed at the end", xlabel="x (m)", ylabel="y (m)")
     ax_xy.axis("equal")
     legend_below(ax_xy, ncol=2)
@@ -674,7 +674,7 @@ def fig_pnp_estimation():
     for (name, _, _, reproj, proj), col in zip(rows, [C["orange"], C["blue"]]):
         d = (proj - z) * mag
         ax_i.quiver(z[:, 0], z[:, 1], d[:, 0], d[:, 1], angles="xy", scale_units="xy", scale=1, color=col,
-                    width=0.005, label=f"reprojection residual ×{mag}, {name} pose (RMS {reproj:.2f} px)")
+                    width=0.005, label=f"reprojection residual ×{mag}, {name} pose (RMSE {reproj:.2f} px)")
     outside = int(np.sum((z[:, 0] < 0) | (z[:, 0] > 640) | (z[:, 1] < 0) | (z[:, 1] > 480)))
     print(f"    {outside} of {len(z)} observed pixels fall outside the 640x480 frame")
     frame_note = f", {outside} outside the 640×480 frame (gray)" if outside else " in the 640×480 frame (gray)"
@@ -688,7 +688,7 @@ def fig_pnp_estimation():
     w = 0.36
     for k, ((name, rot, pos, reproj, _), col) in enumerate(zip(rows, [C["orange"], C["blue"]])):
         ax_b.bar(x + (k - 0.5) * w, [rot, pos * 100, reproj], w, color=col, label=name)
-    ax_b.set_xticks(x, ["rotation error\n(deg)", "position error\n(cm)", "reprojection RMS\n(px)"])
+    ax_b.set_xticks(x, ["rotation error\n(deg)", "position error\n(cm)", "reprojection RMSE\n(px)"])
     ax_b.set(title="Closed-form guess vs. refined pose")
     ax_b.legend(loc="upper left")
     finish(fig, "pnp_estimation", "Perspective-n-Point: camera pose from known 3D–2D matches",
@@ -727,7 +727,7 @@ def fig_sliding_window_marginalization():
     ax_e.plot(n, e_b * 100, "o-", color=C["red"], lw=1.8, label="full batch re-solve")
     ax_e.plot(n, e_w * 100, "o--", color=C["blue"], lw=1.8, label="sliding window")
     ax_e.set(xscale="log", title="Accuracy (no loop closures)", xlabel="trajectory length (poses)",
-             ylabel="RMS position error (cm)")
+             ylabel="position RMSE (cm)")
     ax_e.legend(loc="upper left", fontsize=8.5)
     finish(fig, "sliding_window_marginalization", "Sliding-window marginalization: bounded cost on a growing trajectory",
            f"Odometry-only square path swept from {n[0]} to {n[-1]} poses; the window keeps {window} poses and folds "

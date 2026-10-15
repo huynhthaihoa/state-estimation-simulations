@@ -93,6 +93,9 @@ An estimator is consistent when its reported covariance matches the errors it ac
 ### Monte Carlo trials
 Repeating a randomized simulation many times with different noise to measure typical behavior instead of one lucky or unlucky run. For a NEES check, each trial should redraw every random source the filter models; this repo's saltation script redraws only the initial error and measurement noise (its truth has no process noise), so its NEES reads low. See [hybrid_saltation_ekf.md §1.1](filtering/hybrid_saltation_ekf.md#11-the-filter-math-concretely) and [§6](filtering/hybrid_saltation_ekf.md#6-the-empirical-finding-a-modest-real-gap-not-a-dramatic-one).
 
+### RMSE (root-mean-square error)
+The square root of the mean squared error, $`\sqrt{\tfrac{1}{N}\sum_k \|e_k\|^2}`$, in the error's own units; it weights large errors more than the mean absolute error does. Each doc states what the mean runs over (ticks, Monte Carlo trials, poses or keyframes). For a trajectory RMSE taken after aligning to ground truth, see Umeyama alignment and trajectory RMSE (§5).
+
 ### Observability
 A direction of the state is observable if some measurement can determine it, and unobservable if none can. A solver that wrongly gains information in an unobservable direction becomes overconfident, the problem FEJ (§4) addresses. See [marginalization.md §6](optimization/marginalization.md#6-the-consistency-gotcha-why-fej-exists).
 
@@ -237,8 +240,8 @@ A gyroscope plus an accelerometer, measuring the body's angular rate and specifi
 ### IMU preintegration
 Summarizing all IMU samples between two keyframes into one relative-motion measurement ($\Delta R$, $\Delta v$, $\Delta p$: the change in rotation, velocity and position), with bias Jacobians so a bias change can be corrected without re-integrating. See [imu_preintegration.md §3](optimization/imu_preintegration.md#3-what-gets-compressed) and [§5](optimization/imu_preintegration.md#5-the-payoff-correcting-for-a-bias-change-without-re-integrating).
 
-### Umeyama alignment and RMS trajectory error
-Aligning an estimated trajectory to ground truth over only the directions the sensors cannot observe (7 DoF for monocular, 6 for stereo/RGB-D, 4 for visual-inertial), then reporting the root-mean-square position error. See [umeyama_alignment.md §1](foundations/umeyama_alignment.md#1-why-an-alignment-step-is-needed-at-all) and [§1.1](foundations/umeyama_alignment.md#11-align-only-whats-actually-unobservable).
+### Umeyama alignment and trajectory RMSE
+Aligning an estimated trajectory to ground truth over only the directions the sensors cannot observe (7 DoF for monocular, 6 for stereo/RGB-D, 4 for visual-inertial), then reporting the position RMSE (root-mean-square error). See [umeyama_alignment.md §1](foundations/umeyama_alignment.md#1-why-an-alignment-step-is-needed-at-all) and [§1.1](foundations/umeyama_alignment.md#11-align-only-whats-actually-unobservable).
 
 ---
 

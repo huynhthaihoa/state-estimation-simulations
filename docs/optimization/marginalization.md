@@ -241,7 +241,7 @@ Two measurements, only one of them deterministic:
 - **Memory (`max_dof`)**: full-batch's system size grows linearly with trajectory length (so its dense-matrix memory grows *quadratically* - visible directly in the table, roughly $4\times$ per doubling of length) and never stops. Sliding-window's caps at exactly $`6 \times \text{window\_size}`$ the moment the window first fills, and never moves again, confirmed identically across multiple seeds (`max_dof` depends only on trajectory length and `window_size`, not on the noise realization). `max_dof` (and the byte counts derived from it) is the deterministic part.
 - **Average per-step wall-clock time** tells the same story less starkly, and absolute values depend on the machine and its load. One run gave full-batch 1.5 ms → 61 ms as length grows 8 → 256, and sliding-window 1.6 ms → 7.0 ms. A later run on a different machine state gave full-batch 2.4 ms → 317 ms and sliding-window 0.78 ms → 3.8 ms. In both runs, sliding-window time flattens once trajectories exceed `window_size`, while full-batch time keeps growing.
 
-![Three panels from sliding_window_marginalization.py: largest information-matrix size, time per new pose and RMS position error against trajectory length from 8 to 256 poses, for a full batch re-solve and a 10-pose sliding window](../../assets/sliding_window_marginalization.png)
+![Three panels from sliding_window_marginalization.py: largest information-matrix size, time per new pose and position RMSE against trajectory length from 8 to 256 poses, for a full batch re-solve and a 10-pose sliding window](../../assets/sliding_window_marginalization.png)
 
 *Figure: `use_numpy/sliding_window_marginalization.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py sliding_window_marginalization`.*
 
@@ -252,7 +252,7 @@ The same streaming, animated for a 64-pose run with a 10-pose window. The window
 *Animation: `use_numpy/animate_sliding_window_marginalization.py` at its defaults (seed 0), rendered by `uv run python use_numpy/animate_sliding_window_marginalization.py --out assets/sliding_window_marginalization.gif`. The batch curve is computed (6 unknowns per pose), not re-solved.*
 
 **Accuracy is identical here, but that's guaranteed by the setup, not evidence that marginalization loses nothing.**
-- Final RMS position error is the same for full-batch and sliding-window at every trajectory length.
+- Final position RMSE is the same for full-batch and sliding-window at every trajectory length.
 - The reason is the one in §8.1 (all residuals are zero): the least-squares optimum *is* the dead-reckoned trajectory. Both solvers return exactly that. Checked at seed 0, both match dead reckoning with a maximum difference of 0.0 at 8, 16 and 32 poses.
 - So any correct solver would tie. The comparison can't reveal whether marginalization throws information away, and the figure's accuracy panel is simply dead-reckoning error. The memory bound above is the real result.
 

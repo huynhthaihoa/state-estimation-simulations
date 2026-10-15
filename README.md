@@ -245,7 +245,7 @@ Tracks a rigid object's $SE(3)$ pose from a combination of a motion-model prior 
 
 How the solvers compare, and why, is explained in [docs/filtering/pointcloud_pose_tracking_empirical_note.md](docs/filtering/pointcloud_pose_tracking_empirical_note.md): EKF and invariant EKF corrections and covariance agree to round-off (~1e-14), the UKF differs mainly during the initial correction and agrees to micrometers once converged, and the vanilla KF stays millimeters away after convergence, with a gap roughly proportional to `--dt`. Batch Gauss-Newton matches the filters at the final pose but is more accurate earlier, because as a smoother it also uses later measurements for earlier poses, most visibly at the initial pose, which the filters never revise.
 
-Prints final/RMS rotation+position error per method, plus each method's empirical average per-step wall-clock time and peak memory (`measure_performance`, via `time.perf_counter` + `tracemalloc`), and plots rotation error, position error, and the x-y trajectory of all seven (ground truth included).
+Prints final rotation+position error and RMSE per method, plus each method's empirical average per-step wall-clock time and peak memory (`measure_performance`, via `time.perf_counter` + `tracemalloc`), and plots rotation error, position error, and the x-y trajectory of all seven (ground truth included).
 
 ![Two panels from pointcloud_pose_tracking.py at its defaults: the x-y trajectories of ground truth, dead reckoning and five estimators (EKF, invariant EKF, UKF, vanilla KF, batch Gauss-Newton), and each one's position error over time on a log scale](assets/pose_tracking.png)
 
@@ -282,7 +282,7 @@ uv run python use_numpy/pointcloud_pose_tracking.py --duration 5.0 --dt 0.1 --n-
 A robot drives a closed 4-node square loop, accumulating drift from noisy relative-pose ("odometry") edges between consecutive nodes, then detects it has returned to the start and adds one loop-closure edge back to node 0.
 - **Solver**: all node poses are jointly refined by Levenberg-Marquardt against every edge's residual $e_{ij} = \log(Z_{ij}^{-1} X_i^{-1} X_j)$.
 - **Jacobians**: analytical `compose`/`rminus` Jacobians chained together (hand-rolled $SE(3)$ $Exp$/$`Log`$/adjoint math via `lie_utils.py` in `use_numpy`; `manifpy`'s out-parameters in `use_manif`). This is the same motion-factor Jacobian-chaining pattern as `run_batch_gn` in `pointcloud_pose_tracking.py`, generalized from a twist-based motion model to a directly-measured relative pose.
-- **Output**: per-iteration [chi-squared](docs/glossary.md#chi-square-distribution) error plus final/RMS rotation+position error (uncorrected odometry vs. optimized), and an XY trajectory plot against ground truth.
+- **Output**: per-iteration [chi-squared](docs/glossary.md#chi-square-distribution) error plus final rotation+position error and RMSE (uncorrected odometry vs. optimized), and an XY trajectory plot against ground truth.
 
 ![Two panels from pose_graph.py: the four-pose square loop with ground truth, drifting odometry, the optimized estimate and the loop-closure edge, and each pose's position error before and after optimization](assets/pose_graph.png)
 
@@ -320,9 +320,9 @@ uv run python use_numpy/pose_graph.py --side-length 2.0 --pos-noise-std 0.05 --r
   - **Gauge freedom**: joint BA reintroduces the monocular gauge freedom (6-DoF rigid + 1-DoF scale). It is fixed with a prior factor on the first two camera poses (mean = their own noisy initial guess), the same prior-factor pattern as `run_batch_gn`'s initial-pose prior in `pointcloud_pose_tracking.py`.
   - **Alignment**: the result is aligned to ground truth via Umeyama's least-squares similarity fit (standard for evaluating monocular BA/SfM output) before computing absolute pose/landmark error. Reprojection error is unaffected by this alignment.
 
-Camera-pose Jacobians come from a hand-derived closed form ($\partial p_c/\partial(\text{right-perturbation of }T) = [-I \mid \mathrm{skew}(p_c)]$, finite-difference verified) in the `use_numpy` version, and from chaining `manifpy`'s own `inverse`/`act` Jacobian out-parameters in the `use_manif` version - no manifold formula hand-rolled there. Prints RMS pose rotation/position error, landmark error, and reprojection error for all four rows (noisy init, landmarks-only, poses-only, joint BA), and plots a top-down scene view (ground truth vs. noisy init vs. joint BA) alongside a grouped bar chart of the four RMS metrics.
+Camera-pose Jacobians come from a hand-derived closed form ($\partial p_c/\partial(\text{right-perturbation of }T) = [-I \mid \mathrm{skew}(p_c)]$, finite-difference verified) in the `use_numpy` version, and from chaining `manifpy`'s own `inverse`/`act` Jacobian out-parameters in the `use_manif` version - no manifold formula hand-rolled there. Prints pose rotation/position RMSE, landmark RMSE, and reprojection error for all four rows (noisy init, landmarks-only, poses-only, joint BA), and plots a top-down scene view (ground truth vs. noisy init vs. joint BA) alongside a grouped bar chart of the four RMSE metrics.
 
-![Two panels from bundle_adjustment.py: a top-down view of cameras on an arc around a landmark cluster (ground truth, noisy initial guess, joint BA), and log-scale RMS errors for the noisy initial guess, landmarks-only, poses-only and joint bundle adjustment](assets/bundle_adjustment.png)
+![Two panels from bundle_adjustment.py: a top-down view of cameras on an arc around a landmark cluster (ground truth, noisy initial guess, joint BA), and log-scale RMSE for the noisy initial guess, landmarks-only, poses-only and joint bundle adjustment](assets/bundle_adjustment.png)
 
 #### Scripts
 
@@ -372,14 +372,14 @@ The incremental loop (`run_incremental_local_ba`) runs keyframe-by-keyframe:
 
 **What it reports.** The incremental loop runs twice off the same scene, once with Global BA disabled and once enabled, and prints/plots:
 - wall-clock solve time (should stay flat for the local window, grow for Global BA as the map grows);
-- a trailing-window RMS trajectory error (drift accumulating vs. periodically corrected).
+- a trailing-window trajectory RMSE (drift accumulating vs. periodically corrected).
 
 **Findings:**
-- On the default open path, Global BA has no *new* geometric constraint beyond what the overlapping local windows already used. Across two seed sweeps it's close to a wash against Local-only (6/15 wins in the regression test's sweep, with a median RMS-trajectory-error difference of +0.06 m; 11/20 wins at the defaults, median -0.02 m; see `docs/optimization/bundle_adjustment.md` §13.6), not a reliable win the way a real loop closure is.
+- On the default open path, Global BA has no *new* geometric constraint beyond what the overlapping local windows already used. Across two seed sweeps it's close to a wash against Local-only (6/15 wins in the regression test's sweep, with a median trajectory-RMSE difference of +0.06 m; 11/20 wins at the defaults, median -0.02 m; see `docs/optimization/bundle_adjustment.md` §13.6), not a reliable win the way a real loop closure is.
 - A few individual seeds diverge to thousands of meters in *either* run mode. The cause is a rare bad local minimum in the windowed GN/LM solve, which neither mode guards against. The two backends agree to ~1e-5 relative on the same scenario (per the regression test's notes), so a diverging seed diverges in both.
 - The covisibility/window/Global-BA machinery itself is loop-closure-agnostic - see "Loop closure example" below for a path that actually has one.
 
-![Three panels from bundle_adjustment_advanced.py: the keyframe path through a landmark corridor with the Local-only and Local plus Global estimates, solve time per call for the bounded Local BA window versus Global BA, and trailing RMS trajectory error over keyframes for both modes](assets/bundle_adjustment_advanced.png)
+![Three panels from bundle_adjustment_advanced.py: the keyframe path through a landmark corridor with the Local-only and Local plus Global estimates, solve time per call for the bounded Local BA window versus Global BA, and trailing trajectory RMSE over keyframes for both modes](assets/bundle_adjustment_advanced.png)
 
 #### Scripts
 
@@ -421,7 +421,7 @@ The default `--arc-span-deg 90` path never revisits a place, so Global BA never 
 uv run python use_numpy/bundle_adjustment_advanced.py --arc-span-deg 350 --n-keyframes 190 --seed 0 --out loop_closure.png
 ```
 
-This prints an extra line (in place of the "never revisits" caveat) identifying exactly which keyframe closed the loop and against which earlier one, plus the measured trajectory-RMS change once the next Global BA pass runs (closure is detected on all of seeds 0-4, but the Local+Global result on this long run is unstable - seed- and BLAS-thread-dependent - so it does not show that a Global pass reliably helps; see [bundle_adjustment.md §13.6](docs/optimization/bundle_adjustment.md#136-in-this-repo)), and adds a labeled green "Loop closure" marker to the drift plot at that keyframe.
+This prints an extra line (in place of the "never revisits" caveat) identifying exactly which keyframe closed the loop and against which earlier one, plus the measured trajectory-RMSE change once the next Global BA pass runs (closure is detected on all of seeds 0-4, but the Local+Global result on this long run is unstable - seed- and BLAS-thread-dependent - so it does not show that a Global pass reliably helps; see [bundle_adjustment.md §13.6](docs/optimization/bundle_adjustment.md#136-in-this-repo)), and adds a labeled green "Loop closure" marker to the drift plot at that keyframe.
 
 ### 8. Incremental (square-root SAM) vs. batch pose-graph solving
 
@@ -432,7 +432,7 @@ This prints an extra line (in place of the "never revisits" caveat) identifying 
 - **Batch streaming** (`run_batch_streaming`): the expensive baseline - every new node triggers a full re-solve of the entire graph so far, from a fresh dead-reckoning guess, by calling `pose_graph.py`'s own `run_pose_graph_optimization` unmodified.
 - **Incremental square-root SAM** (`run_incremental_pose_graph`): absorbs each new odometry edge into a running upper-triangular square-root-information matrix via Givens-rotation row insertion (`qr_insert_row` in `utils.py`), touching only the new node's columns - no other row is re-evaluated. Every `--relinearize-every` nodes, and unconditionally on the loop-closure edge (which, unlike a sequential odometry edge, connects the newest node all the way back to the first one), it instead relinearizes fully: adopts the current estimate as a new linearization point and rebuilds the whole system from one `np.linalg.qr` call, iterating to Gauss-Newton convergence exactly like the batch solver does.
 
-This deliberately does **not** implement iSAM2's Bayes tree (selective relinearization of only the affected subtree) or variable reordering - see the module docstring and `docs/optimization/isam_optimization.md` §14 for exactly what is/isn't in scope. Both solvers are timed via `utils.py`'s `measure_performance` and converge to matching final/RMS pose error; the printed relinearization counts and per-node wall-clock time are the actual point of the comparison.
+This deliberately does **not** implement iSAM2's Bayes tree (selective relinearization of only the affected subtree) or variable reordering - see the module docstring and `docs/optimization/isam_optimization.md` §14 for exactly what is/isn't in scope. Both solvers are timed via `utils.py`'s `measure_performance` and converge to matching final pose error and RMSE; the printed relinearization counts and per-node wall-clock time are the actual point of the comparison.
 
 ![Two panels from pose_graph_incremental.py: a 64-pose square loop with ground truth, odometry, and the batch and incremental estimates lying on top of each other, and the average wall-clock cost per streamed node with the number of full solves each approach ran](assets/pose_graph_incremental.png)
 
@@ -665,9 +665,9 @@ uv run python use_numpy/friction_anisotropic_ekf.py --duration 20.0 --dt 0.05 --
 - **Sliding window**: whenever the live window would exceed `--window-size`, the oldest pose is marginalized out via the Schur complement and dropped; every other pose keeps optimizing inside a bounded-size Gauss-Newton solve.
 - **Baseline**: `run_full_batch_growing` re-solves the entire graph from scratch at every new node, compared across a sweep of trajectory lengths (`--nodes-per-side-sweep`).
 - **Result**: full-batch's largest dense information matrix (`max_dof`) grows linearly with trajectory length (so its memory grows quadratically), while sliding-window's caps at exactly `6 * window_size` the moment the window first fills and never moves again.
-- **Identical final RMS position error** between the two - a consequence of the no-loop-closure scope: a pure odometry chain has no redundant measurements, so both solvers return exactly the dead-reckoned trajectory (see the doc §9).
+- **Identical final position RMSE** between the two - a consequence of the no-loop-closure scope: a pure odometry chain has no redundant measurements, so both solvers return exactly the dead-reckoned trajectory (see the doc §9).
 
-![Three panels from sliding_window_marginalization.py: largest information-matrix size, time per new pose and RMS position error against trajectory length from 8 to 256 poses, for a full batch re-solve and a 10-pose sliding window](assets/sliding_window_marginalization.png)
+![Three panels from sliding_window_marginalization.py: largest information-matrix size, time per new pose and position RMSE against trajectory length from 8 to 256 poses, for a full batch re-solve and a 10-pose sliding window](assets/sliding_window_marginalization.png)
 
 #### Scripts
 
@@ -701,10 +701,10 @@ Five filters, identical apart from the bounce treatment or the error coordinates
  1. **RIEKF, invariant-naive**: $`\mathrm{blockdiag}(I, M, I)`$ - applies the reset to the velocity error as if it were an automorphism.
  2. **RIEKF, reset-Jacobian**: $`T(X^+)^{-1} DR\, T(X^-)`$ - correct state dependence, no impact-timing correction.
  3. **RIEKF, saltation**: $`\Xi_{RI} = T(X^+)^{-1} \Xi_{\text{world}} T(X^-)`$ - both; matches a finite-difference ground truth of the exact hybrid map on $`SE_2(3)`$ to about $`10^{-9}`$ (the other two are off by order one).
- 4. **RIEKF, saltation + timing noise**: saltation plus $`s^2 w w^\top`$ at each bounce, where $`w = T(X^+)^{-1}(f^+ - DR\, f^-)`$ is how far the post-impact state moves per second of contact-detection timing error and $`s`$ is that error's RMS. Identical to saltation with exact detection (the default).
+ 4. **RIEKF, saltation + timing noise**: saltation plus $`s^2 w w^\top`$ at each bounce, where $`w = T(X^+)^{-1}(f^+ - DR\, f^-)`$ is how far the post-impact state moves per second of contact-detection timing error and $`s`$ is that error's RMSE. Identical to saltation with exact detection (the default).
  5. **World-frame EKF, saltation**: the non-invariant baseline.
 
-Results (Monte Carlo NEES over mode-matched ticks, 200 trials; consistent value 9, 95% interval [8.42, 9.60]): after bounces the invariant-naive filter is overconfident (13.45 at the defaults, 16.44 with `--meas-every 25`), reset-Jacobian and saltation are close to consistent (9.33/8.89 and 10.36/9.37), and the world-frame EKF is already inconsistent before the first bounce (14.01/18.92). RMS errors are nearly identical across the RIEKFs - the effect is in the reported uncertainty.
+Results (Monte Carlo NEES over mode-matched ticks, 200 trials; consistent value 9, 95% interval [8.42, 9.60]): after bounces the invariant-naive filter is overconfident (13.45 at the defaults, 16.44 with `--meas-every 25`), reset-Jacobian and saltation are close to consistent (9.33/8.89 and 10.36/9.37), and the world-frame EKF is already inconsistent before the first bounce (14.01/18.92). RMSEs are nearly identical across the RIEKFs - the effect is in the reported uncertainty.
 
 With contact-detection jitter (`--detect-time-noise-std`, doc §7), every filter without the timing term becomes overconfident after bounces, the saltation one more than the reset-Jacobian one from 2 ms of jitter on (30.99 vs. 22.55 at 5 ms, seeds 0-3), while saltation + timing noise stays consistent (8.68-9.03 from 0 to 5 ms).
 

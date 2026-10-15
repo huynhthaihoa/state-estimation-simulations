@@ -136,7 +136,7 @@ BA doesn't say "the cameras are correct, I'll fix the points" or "the points are
 
 > **"I'll adjust everything together until the entire reconstruction explains the image measurements as well as possible."**
 
-To see why both must move, look at the RMS-error panel of the figure in [§6.1](#61-the-ba-math-concretely). It compares landmarks-only, poses-only and joint bundle adjustment.
+To see why both must move, look at the RMSE panel of the figure in [§6.1](#61-the-ba-math-concretely). It compares landmarks-only, poses-only and joint bundle adjustment.
 
 ---
 
@@ -211,13 +211,13 @@ Real implementations usually wrap the squared reprojection error in a **robust l
 
 `bundle_adjustment.py` minimizes the objective above with plain Gauss-Newton ([glossary](../glossary.md#gauss-newton)). Each pose $T_i$ is a $4\times4$ camera-to-world matrix with rotation $R_i$ and translation $t_i$. Each landmark $P_j$ is a world point. Pose corrections are 6-vectors $\delta = [\delta v, \delta\omega]$, translation first.
 
-![Two panels from bundle_adjustment.py: a top-down view of cameras on an arc around a landmark cluster (ground truth, noisy initial guess, joint BA), and log-scale RMS errors for the noisy initial guess, landmarks-only, poses-only and joint bundle adjustment](../../assets/bundle_adjustment.png)
+![Two panels from bundle_adjustment.py: a top-down view of cameras on an arc around a landmark cluster (ground truth, noisy initial guess, joint BA), and log-scale RMSE for the noisy initial guess, landmarks-only, poses-only and joint bundle adjustment](../../assets/bundle_adjustment.png)
 
 *Figure: `use_numpy/bundle_adjustment.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py bundle_adjustment`.*
 
 The same run, animated over its Gauss-Newton iterations. Optimizing poses and landmarks jointly brings the reprojection error from 127.7 px to 1.2 px within three iterations, while the one-sided solvers, which hold either the landmarks or the poses at their noisy guess, stop at 100.1 px and 53.9 px.
 
-![Animation of bundle_adjustment.py: left, a top-down view of cameras and landmarks moving from the noisy initial guess onto ground truth over the Gauss-Newton iterations; right, the reprojection RMS falling to about 1.2 px on a log scale, below the landmarks-only (100 px) and poses-only (54 px) levels](../../assets/bundle_adjustment.gif)
+![Animation of bundle_adjustment.py: left, a top-down view of cameras and landmarks moving from the noisy initial guess onto ground truth over the Gauss-Newton iterations; right, the reprojection RMSE falling to about 1.2 px on a log scale, below the landmarks-only (100 px) and poses-only (54 px) levels](../../assets/bundle_adjustment.gif)
 
 *Animation: `use_numpy/animate_bundle_adjustment.py` at its defaults (seed 0), rendered by `uv run python use_numpy/animate_bundle_adjustment.py --out assets/bundle_adjustment.gif`. Each iterate is aligned to ground truth for display (**gauge freedom**: the whole scene can shift, rotate or rescale without changing any reprojection error), and the motion between the 7 iterates is interpolated.*
 
@@ -293,7 +293,7 @@ Script defaults:
 - Camera: $f_x = f_y = 800$ px on a 640×480 image (about 44°×33° field of view).
 - Noise: $\sigma_{\text{pose}} = 0.1$, $\sigma_{\text{lm}} = 0.3$ m, $\sigma_{\text{px}} = 1$ px.
 - Solver: `gn_tol` = $10^{-6}$, at most 30 iterations.
-- `reprojection_rms` reports the RMS of $`\|z_{ij} - \pi(T_i^{-1}P_j)\|`$. It is unaffected by the Umeyama alignment of §14, because reprojection error is invariant to a **similarity transform** (rotation, translation and uniform scale).
+- `reprojection_rms` reports the RMSE of $`\|z_{ij} - \pi(T_i^{-1}P_j)\|`$. It is unaffected by the Umeyama alignment of §14, because reprojection error is invariant to a **similarity transform** (rotation, translation and uniform scale).
 
 
 ---
@@ -552,7 +552,7 @@ Use **Global BA** for offline reconstruction - meshes, NeRF/Gaussian-Splatting i
 - **Local BA**: every new keyframe triggers a bounded solve over an active window (the new keyframe plus its covisible neighbors, with other observing keyframes held fixed) - §13.2's diagram, made concrete.
 - **Global BA**: a periodic pass over the whole map runs alongside for comparison.
 
-![Three panels from bundle_adjustment_advanced.py: the keyframe path through a landmark corridor with the Local-only and Local plus Global estimates, solve time per call for the bounded Local BA window versus Global BA, and trailing RMS trajectory error over keyframes for both modes](../../assets/bundle_adjustment_advanced.png)
+![Three panels from bundle_adjustment_advanced.py: the keyframe path through a landmark corridor with the Local-only and Local plus Global estimates, solve time per call for the bounded Local BA window versus Global BA, and trailing trajectory RMSE over keyframes for both modes](../../assets/bundle_adjustment_advanced.png)
 
 *Figure: `use_numpy/bundle_adjustment_advanced.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py bundle_adjustment_advanced`.*
 
@@ -561,7 +561,7 @@ Use **Global BA** for offline reconstruction - meshes, NeRF/Gaussian-Splatting i
 
 **What it doesn't confirm:** a reliable accuracy payoff from Global BA on this small scene.
 
-- **Open path (default):** the default seed happens to look like a loss for Global BA (final RMS trajectory error 2.1359 m Local-only → 2.7124 m Local+Global, +27%), and no single seed is representative.
+- **Open path (default):** the default seed happens to look like a loss for Global BA (final trajectory RMSE 2.1359 m Local-only → 2.7124 m Local+Global, +27%), and no single seed is representative.
   - The 15-seed sweep in the script's regression test gives 6/15 wins and a median difference of +0.06 m. That test uses a different scene: 12 keyframes, 10 landmarks per keyframe, 8 m view range, `min_observations` = 2 and a Global pass every 4 keyframes.
   - A 20-seed sweep at the script's defaults gives 11/20 wins and a median of −0.02 m.
   - That's a wash either way, plus an occasional seed that diverges to thousands of meters in *either* mode from a rare bad local minimum in the windowed GN/LM solve.
@@ -575,14 +575,14 @@ So judge Global BA's benefit here from the aggregate statistics, not from any si
 
 **Why Global BA rarely helps on the open path.** §13.3 predicts the answer: most of the error is the kind Global BA can't see. A one-off check over seeds 0-4 at the script's defaults (not part of the test suite) confirms this, and finds a second, script-specific error source:
 
-- **Most of the final error is one transform of the whole map.** Aligning each final trajectory to ground truth with a single similarity transform (Umeyama, §14) removes 47-97% of the Local-only RMS position error over keyframes 2-49 (default seed: 1.27 m → 0.44 m). What remains, the inconsistency Global BA can actually fix, is small.
+- **Most of the final error is one transform of the whole map.** Aligning each final trajectory to ground truth with a single similarity transform (Umeyama, §14) removes 47-97% of the Local-only position RMSE over keyframes 2-49 (default seed: 1.27 m → 0.44 m). What remains, the inconsistency Global BA can actually fix, is small.
 - **That transform has two parts:**
   - **Orientation drift** of up to ~7° (0.9-7.3°), which stays even with a perfect anchor: §13.3's unobservable drift.
   - **Scale error.** Keyframes 0 and 1 are hard-fixed and keyframe 1 keeps its noisy front-end pose. The anchor pair sets the map's scale, and its errors (with keyframe 1's orientation error and window-to-window scale drift) contribute to the scale error. The Local-only fitted scale is off by up to ~19% (0.81-1.08).
   - Re-running with keyframe 1 fixed at its true pose (only its initial pose is replaced; the rest of the front-end chain is unchanged) brings the scale within 3% of correct on three of the five seeds (the default seed stays at 1.25) and lowers the median final Local-only error from 2.92 m to 1.33 m. The mean doesn't improve, because seed 3 falls into a mirrored local minimum (a 171° orientation offset) once the anchor changes.
 - **Global BA can make the scale worse.** On seed 2 with the noisy anchor, Global BA pulls the rest of the map into agreement with the wrong baseline: the fitted scale goes from 0.90 to 0.67 and the final error from 2.92 m to 9.55 m. With keyframe 1 at its true pose, the same seed improves instead (1.33 m → 0.70 m).
 
-(Final errors are the script's own metric, RMS over the last 10 keyframes. The alignment figures use keyframes 2-49 on both sides.)
+(Final errors are the script's own metric, RMSE over the last 10 keyframes. The alignment figures use keyframes 2-49 on both sides.)
 
 The anchor choice mirrors real monocular SLAM, where the first two keyframes' baseline sets the map's otherwise arbitrary scale. That's why monocular results are normally scored after a similarity alignment (§14), and why this script's raw, unaligned error mostly measures drift and gauge rather than what BA itself can fix.
 

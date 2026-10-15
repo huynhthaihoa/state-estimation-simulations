@@ -171,13 +171,13 @@ One might expect `always` to match `phase_conditional` during genuine anchor tic
 
 *Figure: `use_numpy/inchworm_zupt_ekf.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py inchworm_zupt_ekf`.*
 
-The same run, animated over five anchor/extend cycles. The top strip shows the point mass crawling along its track, gold while anchored and green while extending, with a gray footprint at each anchor point and each policy's position estimate below it; `always` falls several centimetres behind (position **RMS** error 0.060 m vs 0.015-0.016 m). The middle panel shows each policy's velocity estimate with its ±2σ band: `always` collapses its band during motion, and `phase_conditional` tightens only on anchor ticks. The bottom panel shows the Monte Carlo NEES building up cycle by cycle; `always` climbs to a per-tick peak of about 940, and none of the three is consistent at these defaults.
+The same run, animated over five anchor/extend cycles. The top strip shows the point mass crawling along its track, gold while anchored and green while extending, with a gray footprint at each anchor point and each policy's position estimate below it; `always` falls several centimetres behind (position **RMSE** 0.060 m vs 0.015-0.016 m). The middle panel shows each policy's velocity estimate with its ±2σ band: `always` collapses its band during motion, and `phase_conditional` tightens only on anchor ticks. The bottom panel shows the Monte Carlo NEES building up cycle by cycle; `always` climbs to a per-tick peak of about 940, and none of the three is consistent at these defaults.
 
 ![Animation of the inchworm gait over five cycles: top, the point mass crawling along its track with its anchor footprints and the three position estimates; middle, true velocity and the never, always and phase_conditional estimates with their ±2-sigma bands, anchor phases shaded; bottom, each policy's Monte Carlo averaged NEES on a log scale against the expected value 2](../../assets/inchworm_zupt_ekf.gif)
 
 *Animation: `use_numpy/animate_inchworm_zupt_ekf.py` at its defaults (seed 0, 500 trials), rendered by `uv run python use_numpy/animate_inchworm_zupt_ekf.py --out assets/inchworm_zupt_ekf.gif`.*
 
-| Variant | anchor-only NEES | cruise-only NEES | velocity RMS (single run) |
+| Variant | anchor-only NEES | cruise-only NEES | velocity RMSE (single run) |
 | --- | --- | --- | --- |
 | `never` | ~6.0 | ~10.8 | ~0.055-0.060 m/s |
 | `always` | ~299 | ~521 | ~0.060 m/s |
@@ -200,11 +200,11 @@ A consistent 2-DoF filter averages $\text{NEES} = 2$; for an average over 500 tr
 
 - `always`'s NEES at the first tick of anchor phases 2-5 (seed 0; phase 1 precedes any cruise, so it's still ~2 there) is 230, 564, 732, then 798, and within phase 4 it decays only from 732 to 266.
 - `phase_conditional`'s starts near 20 and settles near 3.6 in each of those phases.
-- `always` gets no accuracy benefit for the trouble. Its velocity RMS (~0.060 m/s) matches `never`'s, and its position RMS is far worse (0.060-0.062 m vs. `never`'s 0.011-0.015 m, single runs, seeds 0-3), while it is overconfident throughout.
+- `always` gets no accuracy benefit for the trouble. Its velocity RMSE (~0.060 m/s) matches `never`'s, and its position RMSE is far worse (0.060-0.062 m vs. `never`'s 0.011-0.015 m, single runs, seeds 0-3), while it is overconfident throughout.
 
 **A second finding, and what actually causes it.** At the defaults, `phase_conditional` has the best *velocity* accuracy of the three, but not the best position accuracy or calibration:
 
-- RMS position error (seeds 0-3): `never` 0.0107-0.0147 m vs. `phase_conditional` 0.0157-0.0184 m, worse in every seed.
+- Position RMSE (seeds 0-3): `never` 0.0107-0.0147 m vs. `phase_conditional` 0.0157-0.0184 m, worse in every seed.
 - Cruise-window NEES: `never` ~10.8 vs. `phase_conditional` ~16.4.
 
 The per-tick NEES shows the mechanism. By the end of an anchor phase, ZUPT has made `phase_conditional` very confident in its velocity (NEES about 3.5). Then the ramp-up arrives with an acceleration its process model doesn't allow for, and the more confident filter is hit harder: at the end of the ramp its NEES jumps to about 30, against about 25 for `never`, and it stays higher through the cruise. The lag in velocity also drags its position.

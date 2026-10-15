@@ -850,7 +850,7 @@ def main():
     if lc_keyframe is not None:
         ax_drift.axvline(lc_keyframe, color="tab:green", linestyle="-", linewidth=1.5, label="Loop closure")
     ax_drift.set_xlabel("Keyframe index")
-    ax_drift.set_ylabel("RMS trajectory position error (m)")
+    ax_drift.set_ylabel("Trajectory position RMSE (m)")
     ax_drift.set_title("Drift vs. periodic Global BA correction")
     ax_drift.legend(fontsize=7)
 
