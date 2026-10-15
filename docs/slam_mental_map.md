@@ -147,6 +147,7 @@ A filter carries only the current state and its covariance. Each new measurement
      known stationary phases → phase-gated ZUPT       (inchworm_zupt_ekf)
      direction-dependent Q   → heading-aware Q        (friction_anisotropic_ekf)
      several feet, one slips → per-foot gated update  (hexapod_gait_ekf)
+     feet in the state, IMU   → contact-aided IEKF     (hexapod_contact_inekf)
 ```
 
 | Topic | Key idea | Doc | Script |
@@ -160,6 +161,7 @@ A filter carries only the current state and its covariance. Each new measurement
 | Phase-gated measurements | Free zero-velocity information, but wrong gating is catastrophic and a confident gated filter is hit harder by unmodeled acceleration | [inchworm_zupt_ekf.md §3](filtering/inchworm_zupt_ekf.md#3-the-finding-not-just-always-is-wrong-while-moving) | `inchworm_zupt_ekf.py` |
 | Shaped process noise | A wrongly oriented $Q$ is worse than an isotropic one | [friction_anisotropic_ekf.md §2](filtering/friction_anisotropic_ekf.md#2-the-dominant-finding-fixed_anisotropic-is-dramatically-worse-everywhere), [§3](filtering/friction_anisotropic_ekf.md#3-a-secondary-finding-the-worst-mismatch-is-90-not-180) | `friction_anisotropic_ekf.py` |
 | Multi-leg odometry | More feet down helps less than expected ($`n^{-1/4}`$ after filtering); one slipping foot matters more than the gait, and a per-foot $`\chi^2`$ gate catches large slips and contact-timing errors | [hexapod_gait_ekf.md §2](filtering/hexapod_gait_ekf.md#2-no-slip-the-gait-matters-but-less-than-youd-think), [§3](filtering/hexapod_gait_ekf.md#3-one-slipping-leg-the-gait-barely-matters-gating-does), [§5](filtering/hexapod_gait_ekf.md#5-contact-timing-is-uncertain-a-swinging-foot-read-as-planted) | `hexapod_gait_ekf.py` |
+| Contact-aided IEKF | Stance feet as states on $`SE_{K+2}(3)`$; yaw is unobservable, and only the invariant EKF keeps it so (a world-frame EKF gains spurious yaw information and becomes overconfident) | [hexapod_contact_inekf.md §2](filtering/hexapod_contact_inekf.md#2-two-filters-one-model), [§3](filtering/hexapod_contact_inekf.md#3-no-biases-equal-accuracy-different-honesty) | `hexapod_contact_inekf.py` |
 
 ---
 
@@ -289,13 +291,14 @@ Loop closure is what lets SLAM correct accumulated drift, which odometry alone c
 
 ### 6.5 Consistency, not just accuracy
 
-Accuracy and covariance calibration are separate properties, and NEES measures the second ([linear_nonlinear.md §4.4](filtering/linear_nonlinear.md#44-after-the-fact-consistency-tests)). Five docs report a calibration problem:
+Accuracy and covariance calibration are separate properties, and NEES measures the second ([linear_nonlinear.md §4.4](filtering/linear_nonlinear.md#44-after-the-fact-consistency-tests)). Six docs report a calibration problem:
 
 - ZUPT: the one clean accuracy-vs-consistency trade. `phase_conditional` has better velocity but worse position and cruise NEES than `never` ([inchworm_zupt_ekf.md §3](filtering/inchworm_zupt_ekf.md#3-the-finding-not-just-always-is-wrong-while-moving)).
 - Hybrid: both filters are underconfident, and the saltation matrix is slightly closer to consistent ([hybrid_saltation_ekf.md §6](filtering/hybrid_saltation_ekf.md#6-the-empirical-finding-a-modest-real-gap-not-a-dramatic-one)).
 - Hybrid on a Lie group: an RIEKF that skips the state-dependent reset Jacobian is overconfident after bounces (NEES about 13.5 against a consistent 9), and under contact-detection jitter only the filter with the timing-noise term stays consistent ([invariant_saltation_ekf.md §6](filtering/invariant_saltation_ekf.md#6-results-consistency-through-the-bounces), [§7](filtering/invariant_saltation_ekf.md#7-contact-detection-jitter)).
 - Friction: `fixed_anisotropic` is overconfident ([friction_anisotropic_ekf.md §2](filtering/friction_anisotropic_ekf.md#2-the-dominant-finding-fixed_anisotropic-is-dramatically-worse-everywhere)).
 - Hexapod: trusting a slipping foot, ignoring random foot drift, or trusting jittered contact times all make the filter overconfident; per-foot gating (or, for drift, a larger reading variance) restores consistency ([hexapod_gait_ekf.md §3](filtering/hexapod_gait_ekf.md#3-one-slipping-leg-the-gait-barely-matters-gating-does), [§4](filtering/hexapod_gait_ekf.md#4-every-foot-drifts-a-little-model-it-as-reading-noise), [§5](filtering/hexapod_gait_ekf.md#5-contact-timing-is-uncertain-a-swinging-foot-read-as-planted)).
+- Contact-aided IEKF: equally accurate filters, but the world-frame EKF gains yaw information it cannot have; its NEES is 18 at a 0.1 rad initial rotation error and 481 at 0.3 rad, while the invariant EKF stays at 9.3-9.4 ([hexapod_contact_inekf.md §3](filtering/hexapod_contact_inekf.md#3-no-biases-equal-accuracy-different-honesty)).
 
 ---
 
@@ -313,6 +316,7 @@ Accuracy and covariance calibration are separate properties, and NEES measures t
 | `inchworm_zupt_ekf.py` | Back-end, filtering | Phase-gated ZUPT | [inchworm_zupt_ekf.md](filtering/inchworm_zupt_ekf.md) |
 | `friction_anisotropic_ekf.py` | Back-end, filtering | Heading-dependent $Q$ | [friction_anisotropic_ekf.md](filtering/friction_anisotropic_ekf.md) |
 | `hexapod_gait_ekf.py` | Back-end, filtering | Multi-leg odometry, gait comparison, per-foot gating | [hexapod_gait_ekf.md](filtering/hexapod_gait_ekf.md) |
+| `hexapod_contact_inekf.py` | Back-end, filtering | Contact-aided IEKF on $`SE_{K+2}(3)`$ vs. world-frame EKF, yaw consistency | [hexapod_contact_inekf.md](filtering/hexapod_contact_inekf.md) |
 | `pose_graph.py` | Back-end, smoothing (batch) | PGO with one loop closure, LM | [pose_graph_optimization.md](optimization/pose_graph_optimization.md) |
 | `bundle_adjustment.py` | Back-end, smoothing (batch) | Joint pose + landmark BA, GN | [bundle_adjustment.md](optimization/bundle_adjustment.md) |
 | `bundle_adjustment_advanced.py` | Front-end + back-end | Triangulation, local vs. global BA, LM (no [Umeyama](foundations/umeyama_alignment.md) alignment, so the raw error includes a **similarity offset**: one rotation, translation and scale of the whole map) | [bundle_adjustment.md §13](optimization/bundle_adjustment.md#13-local-vs-global-bundle-adjustment-real-systems) |
@@ -336,7 +340,7 @@ Each path follows one branch of the map from the root to its leaves. Start with 
 
 **Visual-inertial.** [quaternion.md](foundations/quaternion.md) → [lie_algebra.md](foundations/lie_algebra.md) → [imu_preintegration.md](optimization/imu_preintegration.md) → [triangulation_pnp.md](frontend/triangulation_pnp.md) → [vi_initialization.md](frontend/vi_initialization.md) → [marginalization.md](optimization/marginalization.md)
 
-**Unusual robot motion.** [kf_ekf_iekf.md](filtering/kf_ekf_iekf.md) → [hybrid_saltation_ekf.md](filtering/hybrid_saltation_ekf.md) → [invariant_saltation_ekf.md](filtering/invariant_saltation_ekf.md) (after [left_right_invariant.md](filtering/left_right_invariant.md)) → [inchworm_zupt_ekf.md](filtering/inchworm_zupt_ekf.md) → [friction_anisotropic_ekf.md](filtering/friction_anisotropic_ekf.md) → [hexapod_gait_ekf.md](filtering/hexapod_gait_ekf.md) → [filtering_smoothing.md §11](filtering_smoothing.md#11-and-this-matters-a-lot-for-slam--state-estimation-for-resource-constrained-robots-with-discontinuoushybrid-motion)
+**Unusual robot motion.** [kf_ekf_iekf.md](filtering/kf_ekf_iekf.md) → [hybrid_saltation_ekf.md](filtering/hybrid_saltation_ekf.md) → [invariant_saltation_ekf.md](filtering/invariant_saltation_ekf.md) (after [left_right_invariant.md](filtering/left_right_invariant.md)) → [inchworm_zupt_ekf.md](filtering/inchworm_zupt_ekf.md) → [friction_anisotropic_ekf.md](filtering/friction_anisotropic_ekf.md) → [hexapod_gait_ekf.md](filtering/hexapod_gait_ekf.md) → [hexapod_contact_inekf.md](filtering/hexapod_contact_inekf.md) → [filtering_smoothing.md §11](filtering_smoothing.md#11-and-this-matters-a-lot-for-slam--state-estimation-for-resource-constrained-robots-with-discontinuoushybrid-motion)
 
 ---
 

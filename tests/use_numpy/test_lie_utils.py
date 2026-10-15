@@ -260,3 +260,32 @@ def test_namespace_methods_callable_without_instance(lie_utils):
     np.testing.assert_allclose(lie_utils.SE3.log(T), xi, atol=1e-12)
     np.testing.assert_allclose(lie_utils.SE3.inv(T) @ T, np.eye(4), atol=1e-12)
     np.testing.assert_allclose(lie_utils.SO3.exp(xi[3:6]), T[0:3, 0:3], atol=1e-15)
+
+
+# --- SE_K(3) ---
+
+@pytest.mark.parametrize("k", [1, 2, 5])
+def test_sek3_exp_log_inverse_round_trip(lie_utils, k):
+    rng = np.random.default_rng(k)
+    xi = 0.5 * rng.normal(size=3 + 3 * k)
+    X = lie_utils.SEK3.exp(xi)
+    np.testing.assert_allclose(lie_utils.SEK3.log(X), xi, atol=1e-12)
+    np.testing.assert_allclose(lie_utils.SEK3.inv(X) @ X, np.eye(3 + k), atol=1e-12)
+
+
+@pytest.mark.parametrize("k", [1, 2, 5])
+def test_sek3_adjoint_conjugates_the_exponential(lie_utils, k):
+    rng = np.random.default_rng(10 + k)
+    X = lie_utils.SEK3.exp(rng.normal(size=3 + 3 * k))
+    z = rng.normal(size=3 + 3 * k)
+    eps = 1e-6
+    lhs = lie_utils.SEK3.log(X @ lie_utils.SEK3.exp(eps * z) @ lie_utils.SEK3.inv(X)) / eps
+    np.testing.assert_allclose(lhs, lie_utils.SEK3.adjoint(X) @ z, atol=1e-5)
+
+
+def test_sek3_with_two_columns_is_se23(lie_utils):
+    xi = np.array([0.3, -0.5, 0.7, 1.0, 2.0, -1.0, 0.5, 0.1, -0.2])
+    X = lie_utils.se23_exp(xi)
+    np.testing.assert_allclose(lie_utils.sek3_exp(xi), X, atol=1e-15)
+    np.testing.assert_allclose(lie_utils.sek3_adjoint(X), lie_utils.se23_adjoint(X), atol=1e-15)
+    np.testing.assert_allclose(lie_utils.sek3_inv(X), lie_utils.se23_inv(X), atol=1e-15)

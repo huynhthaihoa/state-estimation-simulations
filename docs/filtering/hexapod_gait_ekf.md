@@ -221,7 +221,7 @@ Three filters, same draws: **trust** the detected flags; the **per-foot gate** o
 - **Contact-timing errors hurt fast-swing gaits most.** The wave gait's feet swing 3× faster than the tripod's, so the same timing error reads a foot moving several times faster. Gate each foot's reading; trimming near detected touchdowns and liftoffs already fails for the wave gait at 0.05 s, a quarter of its swing.
 - **Position and heading always drift** with leg odometry alone. A real system adds an IMU, which fixes roll and pitch (tilt about the forward and sideways axes) through gravity but not yaw, and an exteroceptive sensor (one that senses the surroundings, e.g. a camera or lidar) for the rest.
 
-The next step up is a 3D filter that keeps each stance foot's position in the state (refs. 1-2) instead of using only its velocity.
+The next step up is a 3D filter that keeps each stance foot's position in the state (refs. 1-2) instead of using only its velocity: [`hexapod_contact_inekf.md`](hexapod_contact_inekf.md) builds ref. 2's invariant version and compares it with a world-frame EKF.
 
 ---
 

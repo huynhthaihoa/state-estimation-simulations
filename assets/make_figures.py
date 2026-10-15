@@ -1742,6 +1742,67 @@ def fig_hexapod_gait_ekf():
            bottom=0.03)
 
 
+def fig_hexapod_contact_inekf():
+    """hexapod_contact_inekf.py: yaw consistency (InEKF vs world EKF) and one slipping leg."""
+    from dataclasses import replace
+    import hexapod_contact_inekf as m
+    from utils import averaged_nees_bounds
+
+    cfg, n_mc = m.Config(), 50
+    colors = {"inekf": C["blue"], "world": C["red"]}
+    labels = {"inekf": "invariant EKF", "world": "world-frame EKF"}
+    t = np.arange(cfg.n_steps + 1) * cfg.dt
+    # same rng streams as hexapod_contact_inekf.main at seed 0 (sweep: seed + 4, slip: seed + 2)
+    sweep = {rs: m.run_monte_carlo(replace(cfg, init_rot_std=rs), n_mc, ["tripod"], np.random.default_rng(SEED + 4))
+             for rs in (0.02, 0.1, 0.3)}
+    slip = (1, 4.0, 8.0, np.array([0.0, 0.1, 0.0]))
+    mc_slip = m.run_monte_carlo(cfg, n_mc, ["tripod", "wave"], np.random.default_rng(SEED + 2), kinds=("inekf",),
+                                gating_modes=(False, True), slip=slip)
+
+    fig, (ax_y, ax_n, ax_s) = plt.subplots(1, 3, figsize=(15, 5.4), gridspec_kw={"width_ratios": [1.2, 1, 1.2]})
+    for kind in m.FILTERS:
+        a = sweep[0.1][("tripod", kind, False)]
+        ax_y.plot(t, np.degrees(np.sqrt(a["mse_rot"][:, 2])), color=colors[kind], lw=1.6,
+                  label=f"{labels[kind]}: actual RMSE")
+        ax_y.plot(t, np.degrees(np.sqrt(a["yaw_var"])), color=colors[kind], lw=1.6, ls="--",
+                  label=f"{labels[kind]}: reported σ")
+        print(f"    0.1 rad {kind}: final yaw RMSE {np.degrees(np.sqrt(a['mse_rot'][-1, 2])):.2f} deg, "
+              f"reported {np.degrees(np.sqrt(a['yaw_var'][-1])):.2f}")
+    ax_y.set(xlabel="time (s)", ylabel="yaw error (deg)", ylim=(0, None), xlim=(0, t[-1]),
+             title=f"Yaw, initial rotation σ 0.1 rad ({n_mc} runs)")
+    legend_below(ax_y)
+
+    lo, hi = averaged_nees_bounds(9, n_mc)
+    ax_n.axhspan(lo, hi, color=PRIOR, alpha=0.25, lw=0, label="95% band for 9 DoF")
+    for j, rs in enumerate(sweep):
+        for dx, kind in ((-0.18, "inekf"), (0.18, "world")):
+            val = sweep[rs][("tripod", kind, False)]["nees"][1:].mean()
+            ax_n.bar(j + dx, val, width=0.34, color=colors[kind], label=labels[kind] if j == 0 else None)
+            ax_n.text(j + dx, val * 1.08, f"{val:.1f}", ha="center", fontsize=8.5)
+            print(f"    init {rs} rad {kind}: NEES {val:.2f}")
+    ax_n.set_yscale("log")
+    plain_log_ticks(ax_n)
+    ax_n.set(xticks=range(3), xticklabels=[f"{rs} rad" for rs in sweep], xlabel="initial rotation σ",
+             ylabel="average NEES of (R, v, p)", ylim=(5, 900), title="Consistency vs. initial rotation error")
+    ax_n.grid(axis="x", visible=False)
+    legend_below(ax_n)
+
+    ax_s.axvspan(slip[1], slip[2], color=C["gold"], alpha=0.25, lw=0, label="L2 slipping sideways (0.1 m/s)")
+    for gait, col in (("tripod", C["purple"]), ("wave", C["green"])):  # red/blue mean the filters elsewhere
+        for gating, ls in ((False, "-"), (True, "--")):
+            a = mc_slip[(gait, "inekf", gating)]
+            ax_s.plot(t, np.sqrt(a["mse_vel"].sum(axis=1)), color=col, ls=ls, lw=1.4,
+                      label=f"{gait}, {'per-foot χ² gate' if gating else 'trust every foot'}")
+    ax_s.set(xlabel="time (s)", ylabel="velocity RMSE (m/s)", xlim=(0, t[-1]), ylim=(0, 0.05),
+             title=f"InEKF, one slipping leg ({n_mc} runs)")
+    legend_below(ax_s, ncol=3)
+
+    finish(fig, "hexapod_contact_inekf", "Contact-aided EKF on a hexapod: only the invariant filter knows yaw is unobservable",
+           f"hexapod_contact_inekf.py defaults, seed 0: run_monte_carlo ({n_mc} trials, 12 s, tripod unless noted). "
+           "The two filters are about equally accurate; the world EKF reports far less yaw uncertainty than it has.",
+           bottom=0.05)
+
+
 FIGURES = {
     "pose_tracking": fig_pose_tracking,
     "robot_imu_tracking": fig_robot_imu_tracking,
@@ -1771,6 +1832,7 @@ FIGURES = {
     "hexapod_gait_ekf": fig_hexapod_gait_ekf,
     "hexapod_gait_ekf_concept": fig_hexapod_gait_ekf_concept,
     "hexapod_gait_ekf_extensions": fig_hexapod_gait_ekf_extensions,
+    "hexapod_contact_inekf": fig_hexapod_contact_inekf,
 }
 
 

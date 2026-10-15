@@ -316,6 +316,84 @@ def se23_adjoint(X):
     return Ad
 
 
+def sek3_make(R, cols):
+    """Builds the (3+K, 3+K) SE_K(3) matrix [[R, c_1 .. c_K], [0, I_K]].
+    SE_2(3) is K = 2 with cols = (v, p); a contact-aided state adds one
+    column per foot (SE_{K+2}(3) with cols = (v, p, d_1 .. d_K)).
+    Arguments:
+        R: (3,3) rotation
+        cols: (K,3) translation-like columns
+    Returns:
+        X: (3+K, 3+K) SE_K(3) element
+    """
+    cols = np.asarray(cols, dtype=float).reshape(-1, 3)
+    X = np.eye(3 + len(cols))
+    X[0:3, 0:3] = R
+    X[0:3, 3:] = cols.T
+    return X
+
+
+def sek3_parts(X):
+    """Splits an SE_K(3) matrix into (R, cols) copies.
+    Arguments:
+        X: (3+K, 3+K) SE_K(3) element
+    Returns:
+        R: (3,3), cols: (K,3)
+    """
+    return X[0:3, 0:3].copy(), X[0:3, 3:].T.copy()
+
+
+def sek3_inv(X):
+    """Closed-form inverse: (R, c_k)^-1 = (R^T, -R^T c_k).
+    Arguments:
+        X: (3+K, 3+K) SE_K(3) element
+    Returns:
+        X_inv: (3+K, 3+K) inverse
+    """
+    R, cols = sek3_parts(X)
+    return sek3_make(R.T, -cols @ R)
+
+
+def sek3_exp(xi):
+    """Exponential map, xi = (xi_R, xi_1 .. xi_K) -> (Exp(xi_R), J_l xi_k).
+    Arguments:
+        xi: (3+3K,) tangent vector
+    Returns:
+        X: (3+K, 3+K) SE_K(3) element
+    """
+    J = so3_left_jacobian(xi[0:3])
+    return sek3_make(so3_exp(xi[0:3]), xi[3:].reshape(-1, 3) @ J.T)
+
+
+def sek3_log(X):
+    """Logarithm map, the inverse of sek3_exp.
+    Arguments:
+        X: (3+K, 3+K) SE_K(3) element
+    Returns:
+        xi: (3+3K,) tangent vector
+    """
+    R, cols = sek3_parts(X)
+    phi = so3_log(R)
+    J_inv = np.linalg.inv(so3_left_jacobian(phi))
+    return np.concatenate([phi, (cols @ J_inv.T).reshape(-1)])
+
+
+def sek3_adjoint(X):
+    """(3+3K, 3+3K) adjoint, Ad_X xi = vee(X hat(xi) X^-1): R on the
+    diagonal, c_k^ R in the first block column of row block k.
+    Arguments:
+        X: (3+K, 3+K) SE_K(3) element
+    Returns:
+        Ad: (3+3K, 3+3K) adjoint matrix
+    """
+    R, cols = sek3_parts(X)
+    n = 3 + 3 * len(cols)
+    Ad = np.kron(np.eye(n // 3), R)
+    for k, c in enumerate(cols):
+        Ad[3 + 3 * k:6 + 3 * k, 0:3] = skew(c) @ R
+    return Ad
+
+
 def se3_ad(xi):
     """
     The 6x6 "little adjoint" ad(xi) of an SE(3) tangent vector -- the linear
@@ -424,3 +502,16 @@ class SE23:
     exp = staticmethod(se23_exp)
     log = staticmethod(se23_log)
     adjoint = staticmethod(se23_adjoint)
+
+
+class SEK3:
+    """Groups the SE_K(3) helpers above under short, consistent names
+    (SEK3.exp, SEK3.log, ...), [xi_R, xi_1 .. xi_K] tangent convention, so
+    SE_2(3) is the K = 2 case of SE23. Same staticmethod-alias design as SO3.
+    """
+    make = staticmethod(sek3_make)
+    parts = staticmethod(sek3_parts)
+    inv = staticmethod(sek3_inv)
+    exp = staticmethod(sek3_exp)
+    log = staticmethod(sek3_log)
+    adjoint = staticmethod(sek3_adjoint)

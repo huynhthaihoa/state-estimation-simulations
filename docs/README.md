@@ -33,6 +33,7 @@ Conceptual notes on the state-estimation and SLAM ideas behind the code in [`use
 - [inchworm_zupt_ekf.md](filtering/inchworm_zupt_ekf.md): a known-schedule anchor/dwell gait as a switched-linear system, and when to apply zero-velocity updates (ZUPT: correctly, always, or never); implemented in `inchworm_zupt_ekf.py`.
 - [friction_anisotropic_ekf.md](filtering/friction_anisotropic_ekf.md): a crawling unicycle on a friction-anisotropic pad, where process-noise variance depends on heading relative to the pad's axis; implemented in `friction_anisotropic_ekf.py`.
 - [hexapod_gait_ekf.md](filtering/hexapod_gait_ekf.md): planar hexapod leg odometry, where each stance foot measures the body's velocity and turn rate; how much the gait (tripod, ripple, wave) changes the estimate, catching a slipping leg with a per-foot $`\chi^2`$ test, random foot drift, and contact-timing jitter (which hurts fast-swing gaits most); implemented in `hexapod_gait_ekf.py`.
+- [hexapod_contact_inekf.md](filtering/hexapod_contact_inekf.md): the 3D, IMU-driven follow-up, the contact-aided invariant EKF on $`SE_{K+2}(3)`$ with each stance foot's position in the state; yaw is unobservable, and only the invariant EKF's covariance respects that (the world-frame EKF reaches NEES 481 at a 0.3 rad initial rotation error), plus a slipping leg and IMU biases; implemented in `hexapod_contact_inekf.py`.
 
 ## [`optimization/`](optimization/) - The factor-graph/smoothing lineage
 
