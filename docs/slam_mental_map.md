@@ -254,9 +254,9 @@ The EKF linearizes once per predict/update step, at the current estimate. GN/LM 
 
 The same question appears on both branches: in which frame, and on which space, is the error measured?
 
-- Filtering: EKF vs. IEKF differ only in how they define the error ([kf_ekf_iekf.md §5](filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error), [left_right_invariant.md §4](filtering/left_right_invariant.md#4-why-it-actually-matters-not-just-bookkeeping)).
-- Filtering through a jump: the invariant error's propagation is [trajectory-independent](glossary.md#group-affine-dynamics-trajectory-independence), but a bounce's reset is not a group automorphism, so its Jacobian in invariant coordinates depends on the state again ([invariant_saltation_ekf.md §3](filtering/invariant_saltation_ekf.md#3-what-the-bounce-breaks)).
-- Smoothing: PGO's residual is the $\mathrm{Log}$ of a relative-pose mismatch ([pose_graph_optimization.md §7](optimization/pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive)).
+- **Filtering**: EKF vs. IEKF differ only in how they define the error ([kf_ekf_iekf.md §5](filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error), [left_right_invariant.md §4](filtering/left_right_invariant.md#4-why-it-actually-matters-not-just-bookkeeping)).
+- **Filtering through a jump**: the invariant error's propagation is [trajectory-independent](glossary.md#group-affine-dynamics-trajectory-independence), but a bounce's reset is not a group automorphism, so its Jacobian in invariant coordinates depends on the state again ([invariant_saltation_ekf.md §3](filtering/invariant_saltation_ekf.md#3-what-the-bounce-breaks)).
+- **Smoothing**: PGO's residual is the $\mathrm{Log}$ of a relative-pose mismatch ([pose_graph_optimization.md §7](optimization/pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive)).
 
 ### 6.3 Variable elimination: one operation, three uses
 
