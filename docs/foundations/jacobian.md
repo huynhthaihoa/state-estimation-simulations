@@ -277,7 +277,21 @@ $$J_l(\varphi) = I + \frac{1-\cos\theta}{\theta^2}[\varphi]_\times + \frac{\thet
 
 $$J_r(\varphi) = I - \frac{1-\cos\theta}{\theta^2}[\varphi]_\times + \frac{\theta-\sin\theta}{\theta^3}[\varphi]_\times^2$$
 
-Useful identities. The first two follow from $`[\varphi]_\times`$ being antisymmetric and $`[\varphi]_\times^2`$ symmetric; the third also needs the Rodrigues form $`R = I + \frac{\sin\theta}{\theta}[\varphi]_\times + \frac{1-\cos\theta}{\theta^2}[\varphi]_\times^2`$ (all three checked numerically against `so3_right_jacobian` and `so3_exp` in `use_numpy/lie_utils.py`):
+**Where the formulas come from.** In short, $`J_l(\varphi)`$ is the average of the rotation matrices along the path from $`I`$ to $`\mathrm{Exp}(\varphi)`$. Write $`\Phi = [\varphi]_\times`$ and $`B = [\delta\varphi]_\times`$, so $`\mathrm{Exp}(\varphi) = e^{\Phi}`$. The left perturbation of §11.2 is $`Y = \mathrm{Exp}(\varphi+\delta\varphi)\,\mathrm{Exp}(\varphi)^{-1}`$. Grow it along $`t \in [0, 1]`$ as $`Y(t) = e^{t(\Phi+B)}e^{-t\Phi}`$, which starts at $`Y(0) = I`$:
+
+```math
+\dot Y(t) = e^{t(\Phi+B)}\,B\,e^{-t\Phi} \approx e^{t\Phi}\,B\,e^{-t\Phi} = \big[\mathrm{Exp}(t\varphi)\,\delta\varphi\big]_\times
+```
+
+The approximation drops terms of second order in $`\delta\varphi`$, and the last step uses $`R\,[b]_\times R^\top = [R\,b]_\times`$. Integrating from 0 to 1:
+
+```math
+Y(1) \approx I + \big[J_l(\varphi)\,\delta\varphi\big]_\times \approx \mathrm{Exp}\big(J_l(\varphi)\,\delta\varphi\big), \qquad J_l(\varphi) = \int_0^1 \mathrm{Exp}(t\varphi)\,dt
+```
+
+The closed form follows by integrating the Rodrigues form $`\mathrm{Exp}(t\varphi) = I + \frac{\sin t\theta}{\theta}\Phi + \frac{1-\cos t\theta}{\theta^2}\Phi^2`$ term by term: $`\int_0^1 \sin t\theta\,dt = \frac{1-\cos\theta}{\theta}`$ and $`\int_0^1 (1-\cos t\theta)\,dt = \frac{\theta-\sin\theta}{\theta}`$ give the two coefficients above. The same steps with the perturbation on the right, $`\mathrm{Exp}(\varphi)^{-1}\mathrm{Exp}(\varphi+\delta\varphi)`$, give $`J_r(\varphi) = \int_0^1 \mathrm{Exp}(-t\varphi)\,dt`$.
+
+Useful identities. Each follows in one line from the two integrals: flip the sign of $`\varphi`$; use $`\mathrm{Exp}(t\varphi)^\top = \mathrm{Exp}(-t\varphi)`$; and use $`\mathrm{Exp}(\varphi)\,\mathrm{Exp}(-t\varphi) = \mathrm{Exp}\big((1-t)\varphi\big)`$ (all three checked numerically against `so3_right_jacobian` and `so3_exp` in `use_numpy/lie_utils.py`):
 
 ```math
 J_r(\varphi) = J_l(-\varphi) \qquad J_r(\varphi) = J_l(\varphi)^\top \qquad J_l(\varphi) = R(\varphi)\,J_r(\varphi)
