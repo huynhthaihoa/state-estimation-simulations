@@ -43,7 +43,7 @@ This is the extended pose $`SE_2(3)`$ ([glossary](../glossary.md#extended-pose))
 R^+ = R\,\mathrm{Exp}(\omega \Delta t), \quad v^+ = v + g\Delta t + R a \Delta t, \quad p^+ = p + v\Delta t + \tfrac12 g \Delta t^2 + \tfrac12 R a \Delta t^2
 ```
 
-A stance foot stays put up to a small **contact noise**, a body-frame velocity $`w_d`$ (std 0.01 m/s): $`d^+ = d + R w_d \Delta t`$. The truth uses exactly these models, so the noise the filters assume is the noise that is there.
+A stance foot stays put up to a **contact noise** $`w_d`$, which is a small random body-frame velocity (std 0.01 m/s): $`d^+ = d + R w_d \Delta t`$. The truth uses exactly these models, so the noise the filters assume is the noise that is there.
 
 **Measure** (leg kinematics), for each stance foot, with noise $`n`$ (std $`\sigma_{\text{kin}} = 5`$ mm per axis):
 
@@ -61,7 +61,7 @@ Both filters run the same mean propagation and the same bookkeeping. They differ
 
 **Invariant EKF** (`InvariantContactEKF`). The right-invariant error $`\xi = \log(\hat X X^{-1})`$ ([glossary](../glossary.md#invariant-and-equivariant)). Three things come out independent of the estimate:
 
-- **Propagation.** IMU kinematics are group-affine ([glossary](../glossary.md#group-affine-dynamics-trajectory-independence)), so the error transition is the constant $`SE_2(3)`$ matrix of [`invariant_saltation_ekf.md`](invariant_saltation_ekf.md#2-why-the-riekf-is-attractive-between-bounces), with the identity on every foot.
+- **Propagation.** IMU kinematics are **group-affine** ([glossary](../glossary.md#group-affine-dynamics-trajectory-independence)), so the error transition is the constant $`SE_2(3)`$ matrix of [`invariant_saltation_ekf.md`](invariant_saltation_ekf.md#2-why-the-riekf-is-attractive-between-bounces), with the identity on every foot.
 - **Measurement.** The residual $`r_i = \hat R y_i + \hat p - \hat d_i`$ ([glossary](../glossary.md#residual-error)) is, to first order, $`\xi_p - \xi_{d_i}`$: the Jacobian is $`H_i = [0, 0, I, \dots, -I, \dots]`$, with no rotation columns and no dependence on the estimate.
 - **Touchdown.** The new foot's error is $`\xi_p + \hat R n`$: the position rows of $P$, plus the reading noise.
 
