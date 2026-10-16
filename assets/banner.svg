@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 440" width="1200" height="440" role="img" aria-labelledby="t d">
 <title id="t">State Estimation Simulations</title>
-<desc id="d">Pipeline overview: sensors feed a front-end (PnP, triangulation, visual-inertial initialization), whose constraints go to two back-end families - Kalman filtering and factor-graph optimization - producing a trajectory and map estimate, all built on Lie-group and Jacobian foundations.</desc>
+<desc id="d">Pipeline overview: sensors feed a front-end (PnP, triangulation, visual-inertial initialization, LiDAR primitives), whose constraints go to two back-end families - Kalman filtering (including legged robots) and factor-graph optimization - producing a trajectory and map estimate, all built on Lie-group and Jacobian foundations.</desc>
 <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16213b"/><stop offset="1" stop-color="#0b1222"/></linearGradient><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#94a3b8"/></marker></defs>
 <rect width="1200" height="440" rx="18" fill="url(#bg)"/>
 <text x="48.0" y="64.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="34" font-weight="700" fill="#e2e8f0" text-anchor="start">State Estimation Simulations</text>
@@ -12,13 +12,13 @@
 <text x="66.0" y="276.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">point clouds</text>
 <rect x="278" y="170" width="214" height="132" rx="14" fill="#38bdf8" fill-opacity=".10" stroke="#38bdf8" stroke-opacity=".65" stroke-width="2"/>
 <text x="296.0" y="200.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#38bdf8" text-anchor="start" letter-spacing="1.5">FRONT-END</text>
-<text x="296.0" y="228.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">PnP</text>
-<text x="296.0" y="252.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">triangulation</text>
-<text x="296.0" y="276.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">VI initialization</text>
+<text x="296.0" y="228.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">PnP · triangulation</text>
+<text x="296.0" y="252.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">VI initialization</text>
+<text x="296.0" y="276.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">LiDAR primitives</text>
 <rect x="532" y="126" width="336" height="106" rx="14" fill="#a78bfa" fill-opacity=".10" stroke="#a78bfa" stroke-opacity=".65" stroke-width="2"/>
 <text x="550.0" y="156.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#a78bfa" text-anchor="start" letter-spacing="1.5">FILTERING</text>
 <text x="550.0" y="184.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">KF · EKF · IEKF · UKF</text>
-<text x="550.0" y="208.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">saltation · ZUPT · friction</text>
+<text x="550.0" y="208.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">saltation · ZUPT · friction · legged</text>
 <rect x="532" y="246" width="336" height="106" rx="14" fill="#34d399" fill-opacity=".10" stroke="#34d399" stroke-opacity=".65" stroke-width="2"/>
 <text x="550.0" y="276.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#34d399" text-anchor="start" letter-spacing="1.5">OPTIMIZATION</text>
 <text x="550.0" y="304.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">GN · LM · factor graphs · BA</text>

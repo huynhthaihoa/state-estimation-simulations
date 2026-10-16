@@ -1,6 +1,6 @@
 # State Estimation Simulations
 
-![State Estimation Simulations: sensors feed a front-end, whose constraints go to Kalman filtering or factor-graph optimization, producing a trajectory and map estimate, all built on Lie-group and Jacobian foundations](assets/banner.svg)
+![State Estimation Simulations: sensors feed a front-end (PnP, triangulation, VI initialization, LiDAR primitives), whose constraints go to Kalman filtering (including legged robots) or factor-graph optimization, producing a trajectory and map estimate, all built on Lie-group and Jacobian foundations](assets/banner.svg)
 
 > New here? [GETTING_STARTED.md](GETTING_STARTED.md) is a suggested reading-and-running order through every doc and script in this repo, phase by phase. Terms such as SLAM, IMU and pose are defined in [docs/glossary.md](docs/glossary.md).
 
