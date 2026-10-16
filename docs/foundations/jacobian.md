@@ -277,7 +277,7 @@ $$J_l(\varphi) = I + \frac{1-\cos\theta}{\theta^2}[\varphi]_\times + \frac{\thet
 
 $$J_r(\varphi) = I - \frac{1-\cos\theta}{\theta^2}[\varphi]_\times + \frac{\theta-\sin\theta}{\theta^3}[\varphi]_\times^2$$
 
-**Where the formulas come from.** In short, $`J_l(\varphi)`$ is the average of the rotation matrices along the path from $`I`$ to $`\mathrm{Exp}(\varphi)`$. Write $`\Phi = [\varphi]_\times`$ and $`B = [\delta\varphi]_\times`$, so $`\mathrm{Exp}(\varphi) = e^{\Phi}`$. The left perturbation of §11.2 is $`Y = \mathrm{Exp}(\varphi+\delta\varphi)\,\mathrm{Exp}(\varphi)^{-1}`$. Grow it along $`t \in [0, 1]`$ as $`Y(t) = e^{t(\Phi+B)}e^{-t\Phi}`$, which starts at $`Y(0) = I`$:
+**Where the formulas come from.** In short, $`J_l(\varphi)`$ is the average of the **rotation matrices** along the path from $`I`$ to $`\mathrm{Exp}(\varphi)`$. Write $`\Phi = [\varphi]_\times`$ and $`B = [\delta\varphi]_\times`$, so $`\mathrm{Exp}(\varphi) = e^{\Phi}`$. The left perturbation of §11.2 is $`Y = \mathrm{Exp}(\varphi+\delta\varphi)\,\mathrm{Exp}(\varphi)^{-1}`$. Grow it along $`t \in [0, 1]`$ as $`Y(t) = e^{t(\Phi+B)}e^{-t\Phi}`$, which starts at $`Y(0) = I`$:
 
 ```math
 \dot Y(t) = e^{t(\Phi+B)}\,B\,e^{-t\Phi} \approx e^{t\Phi}\,B\,e^{-t\Phi} = \big[\mathrm{Exp}(t\varphi)\,\delta\varphi\big]_\times
