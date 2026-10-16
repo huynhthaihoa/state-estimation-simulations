@@ -20,6 +20,7 @@ Several docs already draw a partial map of their own corner. We treat those as z
                                   ▼
 ┌─ FRONT-END ─ "What happened between these observations?" ─────────────────┐
 │  features, matching, data association    triangulation · PnP              │
+│  LiDAR planes/cylinders (RANSAC)         scan registration (ICP, shapes)  │
 │  visual-inertial initialization          IMU preintegration               │
 │  keyframe selection                      loop-closure detection           │
 └─────────────────────────────────┬─────────────────────────────────────────┘
@@ -97,6 +98,7 @@ Three questions organize the whole map:
                            ├──► PnP             (known 3D points → pose)  ├──► constraints
                            └──► loop-closure detection (place revisited) ─┤    for the
                                                                           │    back-end
+ LiDAR scans ──► normals, RANSAC planes/cylinders ──► registration T_ij ──┤
  IMU samples (100+ Hz) ──► preintegration  (ΔR, Δv, Δp + bias Jacobians) ─┤
                                                                           │
  camera + IMU at start-up ──► VI initialization (scale, gravity, v, b_g) ─┘
@@ -113,6 +115,7 @@ Here $`\Delta R, \Delta v, \Delta p`$ are the preintegrated rotation, velocity a
 | Loop-closure detection | A constraint between non-consecutive poses | [frontend_backend.md §3](frontend_backend.md#3-example-loop-closure) | `pose_graph.py` (the constraint is given, not detected) |
 | IMU preintegration | One relative-motion bundle per keyframe pair (bundle + bias Jacobians + $O(1)$ correction) | [imu_preintegration.md §3](optimization/imu_preintegration.md#3-what-gets-compressed), [§6](optimization/imu_preintegration.md#6-where-this-fits-in-a-slam-back-end) | `imu_preintegration.py` |
 | VI (visual-inertial) initialization | Scale, gravity, velocities, gyro bias | [vi_initialization.md §2](frontend/vi_initialization.md#2-the-classic-linear-alignment-pipeline), [§4](frontend/vi_initialization.md#4-the-hand-off) | - (conceptual only) |
+| LiDAR primitives and scan registration | Planes and cylinders fitted to each scan; a relative pose from point-to-point ICP, point-to-plane ICP or matched primitives | [lidar_primitives.md §1](frontend/lidar_primitives.md#1-extraction), [§3](frontend/lidar_primitives.md#3-three-residuals-one-solver), [§4](frontend/lidar_primitives.md#4-convergence-basin-experiment-2) | `lidar_primitives.py` |
 
 Two things sit on the boundary:
 
@@ -209,6 +212,7 @@ The bottom row is the solve strategy. GN/LM is the step rule, a separate axis: i
 | Robust kernels | Down-weight outliers such as false loop closures | [pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures) | - |
 | Bundle adjustment | Poses + landmarks against reprojection error | [bundle_adjustment.md §4](optimization/bundle_adjustment.md#4-heres-the-important-part-both-cameras-and-points-are-adjusted), [§9](optimization/bundle_adjustment.md#9-ba-vs-pose-graph-optimization) | `bundle_adjustment.py` |
 | Local vs. global BA | A **covisibility window** (keyframes sharing landmarks with the current one) every keyframe, a full re-solve occasionally | [bundle_adjustment.md §13](optimization/bundle_adjustment.md#13-local-vs-global-bundle-adjustment-real-systems) | `bundle_adjustment_advanced.py` |
+| Plane landmarks | World planes observed from many poses; one plane factor per extracted plane | [lidar_primitives.md §6](frontend/lidar_primitives.md#6-planes-as-landmarks-experiment-4) | `lidar_primitives.py` (experiment 4) |
 | IMU factors | Preintegrated edges between (pose, v, bias) nodes | [imu_preintegration.md §6](optimization/imu_preintegration.md#6-where-this-fits-in-a-slam-back-end) | - (the script stops before building the factor) |
 
 ### 5.2 The solver
@@ -274,6 +278,8 @@ The Schur complement/variable elimination shows up three times with three differ
                                 affected)                    leaves a prior)
 ```
 
+Plane landmarks in LiDAR mapping belong to the structural column too: BALM eliminates them in closed form ([lidar_primitives.md §7](frontend/lidar_primitives.md#7-where-this-sits-on-the-map)).
+
 A filter is the extreme case of the temporal column: it marginalizes every past state immediately ([filtering_smoothing.md §9](filtering_smoothing.md#9-the-precise-distinction)).
 
 ### 6.4 Loop closure
@@ -291,7 +297,7 @@ Loop closure is what lets SLAM correct accumulated drift, which odometry alone c
 
 ### 6.5 Consistency, not just accuracy
 
-Accuracy and covariance calibration are separate properties, and NEES measures the second ([linear_nonlinear.md §4.4](filtering/linear_nonlinear.md#44-after-the-fact-consistency-tests)). Six docs report a calibration problem:
+Accuracy and covariance calibration are separate properties, and NEES measures the second ([linear_nonlinear.md §4.4](filtering/linear_nonlinear.md#44-after-the-fact-consistency-tests)). Seven docs report a calibration problem:
 
 - **ZUPT**: the one clean accuracy-vs-consistency trade. `phase_conditional` has better velocity but worse position and cruise NEES than `never` ([inchworm_zupt_ekf.md §3](filtering/inchworm_zupt_ekf.md#3-the-finding-not-just-always-is-wrong-while-moving)).
 - **Hybrid**: both filters are underconfident, and the saltation matrix is slightly closer to consistent ([hybrid_saltation_ekf.md §6](filtering/hybrid_saltation_ekf.md#6-the-empirical-finding-a-modest-real-gap-not-a-dramatic-one)).
@@ -299,6 +305,7 @@ Accuracy and covariance calibration are separate properties, and NEES measures t
 - **Friction**: `fixed_anisotropic` is overconfident ([friction_anisotropic_ekf.md §2](filtering/friction_anisotropic_ekf.md#2-the-dominant-finding-fixed_anisotropic-is-dramatically-worse-everywhere)).
 - **Hexapod**: trusting a slipping foot, ignoring random foot drift, or trusting jittered contact times all make the filter overconfident; per-foot gating (or, for drift, a larger reading variance) restores consistency ([hexapod_gait_ekf.md §3](filtering/hexapod_gait_ekf.md#3-one-slipping-leg-the-gait-barely-matters-gating-does), [§4](filtering/hexapod_gait_ekf.md#4-every-foot-drifts-a-little-model-it-as-reading-noise), [§5](filtering/hexapod_gait_ekf.md#5-contact-timing-is-uncertain-a-swinging-foot-read-as-planted)).
 - **Contact-aided IEKF**: equally accurate filters, but the world-frame EKF gains yaw information it cannot have; its NEES is 18 at a 0.1 rad initial rotation error and 481 at 0.3 rad, while the invariant EKF stays at 9.3-9.4 ([hexapod_contact_inekf.md §3](filtering/hexapod_contact_inekf.md#3-no-biases-equal-accuracy-different-honesty)).
+- **LiDAR registration**: in a planes-only corridor, point-to-point ICP reports 0.11 mm along the corridor while off by 118 mm, and point-to-plane ICP 2.1 mm while off by 288 mm; only the primitive method's Hessian admits that the axis is unconstrained, and with pillars only it is consistent ([lidar_primitives.md §5](frontend/lidar_primitives.md#5-degeneracy-what-the-hessian-knows-experiment-3)).
 
 ---
 
@@ -323,8 +330,9 @@ Accuracy and covariance calibration are separate properties, and NEES measures t
 | `pose_graph_incremental.py` | Back-end, smoothing (incremental) | iSAM v1: Givens updates for odometry, full rebuild at loop closure, no reordering | [isam_optimization.md §14](optimization/isam_optimization.md#14-where-this-is-implemented-in-this-repo) |
 | `bayes_tree_construction.py` | Back-end, smoothing (incremental) | Elimination tree + affected path | [bayes_tree.md §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo) |
 | `sliding_window_marginalization.py` | Back-end, smoothing (bounded) | Schur-complement marginalization | [marginalization.md §8](optimization/marginalization.md#8-what-this-repo-implements) |
+| `lidar_primitives.py` | Front-end (+ back-end, experiment 4) | Plane/cylinder extraction; point-to-point vs. point-to-plane vs. primitive registration; degeneracy; plane landmarks | [lidar_primitives.md](frontend/lidar_primitives.md) |
 
-`lie_utils.py` and `numpy_utils.py` (in `use_numpy/`), `manif_utils.py` (in `use_manif/`) and `utils.py` (at the repo root) are shared helpers, not stops on the map; see [README.md §C](../README.md#c-library-structure).
+`lie_utils.py` and `numpy_utils.py` (in `use_numpy/`), `manif_utils.py` (in `use_manif/`), and `utils.py` and `lidar_utils.py` (at the repo root) are shared helpers, not stops on the map; see [README.md §C](../README.md#c-library-structure).
 
 ---
 
@@ -341,6 +349,8 @@ Each path follows one branch of the map from the root to its leaves. Start with 
 **Visual-inertial.** [quaternion.md](foundations/quaternion.md) → [lie_algebra.md](foundations/lie_algebra.md) → [imu_preintegration.md](optimization/imu_preintegration.md) → [triangulation_pnp.md](frontend/triangulation_pnp.md) → [vi_initialization.md](frontend/vi_initialization.md) → [marginalization.md](optimization/marginalization.md)
 
 **Unusual robot motion.** [kf_ekf_iekf.md](filtering/kf_ekf_iekf.md) → [hybrid_saltation_ekf.md](filtering/hybrid_saltation_ekf.md) → [invariant_saltation_ekf.md](filtering/invariant_saltation_ekf.md) (after [left_right_invariant.md](filtering/left_right_invariant.md)) → [inchworm_zupt_ekf.md](filtering/inchworm_zupt_ekf.md) → [friction_anisotropic_ekf.md](filtering/friction_anisotropic_ekf.md) → [hexapod_gait_ekf.md](filtering/hexapod_gait_ekf.md) → [hexapod_contact_inekf.md](filtering/hexapod_contact_inekf.md) → [filtering_smoothing.md §11](filtering_smoothing.md#11-and-this-matters-a-lot-for-slam--state-estimation-for-resource-constrained-robots-with-discontinuoushybrid-motion)
+
+**LiDAR.** [pointcloud_pose_tracking_empirical_note.md](filtering/pointcloud_pose_tracking_empirical_note.md) (correspondences given) → [lidar_primitives.md](frontend/lidar_primitives.md) (correspondences found) → [pose_graph_optimization.md](optimization/pose_graph_optimization.md) → [bundle_adjustment.md §12](optimization/bundle_adjustment.md#12-block-sparsity-and-the-schur-complement)
 
 ---
 

@@ -1803,6 +1803,152 @@ def fig_hexapod_contact_inekf():
            bottom=0.05)
 
 
+def fig_lidar_primitives_concept():
+    """lidar_primitives.py: what the extraction sees in one scan, and the L-corridor of experiment 4."""
+    import lidar_primitives as m
+    from lidar_utils import (ExtractionConfig, LidarConfig, corridor_scene, inlier_threshold, l_corridor_scene,
+                             l_corridor_trajectory)
+
+    noise = 0.01
+    src, tgt, _, T_tgt = m.make_scan_pair(corridor_scene(pillars=True), [SEED, 0], LidarConfig(range_noise_std=noise),
+                                          ExtractionConfig(inlier_dist=inlier_threshold(noise)))
+    P = tgt.points @ T_tgt[:3, :3].T + T_tgt[:3, 3]
+    fig, (ax_s, ax_l) = plt.subplots(1, 2, figsize=(15, 5.6), gridspec_kw={"width_ratios": [1.6, 1]})
+    used = np.zeros(len(P), bool)
+    for pl in tgt.planes:
+        used[pl["inliers"]] = True
+    rest = ~used
+    for cyl in tgt.cylinders:
+        rest[cyl["inliers"]] = False
+    ax_s.scatter(P[rest, 0], P[rest, 1], s=1, c=PRIOR, lw=0, label="not assigned")
+    walls = [pl for pl in tgt.planes if abs((T_tgt[:3, :3] @ pl["n"])[2]) < 0.5]
+    flat = [pl for pl in tgt.planes if abs((T_tgt[:3, :3] @ pl["n"])[2]) >= 0.5]
+    for group, col, lab in ((flat, C["gold"], "floor / ceiling plane"), (walls, C["blue"], "wall plane")):
+        idx = np.concatenate([pl["inliers"] for pl in group])
+        ax_s.scatter(P[idx, 0], P[idx, 1], s=1, c=col, lw=0, label=f"{lab} ({len(group)})")
+    idx = np.concatenate([cyl["inliers"] for cyl in tgt.cylinders])
+    ax_s.scatter(P[idx, 0], P[idx, 1], s=3, c=C["green"], lw=0, label=f"cylinder ({len(tgt.cylinders)})")
+    ax_s.plot(*T_tgt[:2, 3], marker="^", color="k", ms=8, ls="")
+    c = T_tgt[:2, 3]
+    ax_s.set(xlim=(c[0] - 16, c[0] + 16), ylim=(-3.6, 3.6), aspect="equal", xlabel="x (m)", ylabel="y (m)",
+             title="One scan of the corridor with pillars, as extracted (seen from above; triangle: sensor)")
+    ax_s.legend(loc="upper center", bbox_to_anchor=(0.5, -0.2), ncol=4, markerscale=6, fontsize=8.5)
+    print(f"    scan: {len(P)} points, {len(tgt.planes)} planes, {len(tgt.cylinders)} cylinders, "
+          f"{rest.sum()} unassigned")
+
+    scene = l_corridor_scene()
+    for r in scene.rects:
+        if abs(r.n[2]) > 0.5:
+            continue
+        ends = np.array([r.c - r.half_u * r.u - r.half_v * r.v, r.c + r.half_u * r.u + r.half_v * r.v])
+        ax_l.plot(ends[:, 0], ends[:, 1], color=C["blue"], lw=2)
+    for cyl in scene.cylinders:
+        ax_l.add_patch(plt.Circle(cyl.base[:2], cyl.r, color=C["green"]))
+    traj = np.array([t for _, t in l_corridor_trajectory()])
+    ax_l.plot(traj[:, 0], traj[:, 1], "o-", color=TRUTH, ms=2.5, lw=0.8, label=f"{len(traj)} sensor poses, 1 m apart")
+    ax_l.set(xlim=(-23, 6), ylim=(-6, 23), aspect="equal", xlabel="x (m)", ylabel="y (m)",
+             title="Experiment 4: L-shaped corridor (walls, pillars, path)")
+    ax_l.legend(loc="lower right", fontsize=8.5)
+    finish(fig, "lidar_primitives_concept", "LiDAR primitives: planes and cylinders extracted from one scan",
+           "lidar_primitives.py, seed 0: make_scan_pair (32 rings x 360, 1 cm range noise), sequential RANSAC "
+           "with competing plane and cylinder hypotheses.", bottom=0.02)
+
+
+def fig_lidar_primitives_extraction():
+    """lidar_primitives.py experiment 1: radius bias of the two cylinder fits, and detection vs. point density."""
+    import lidar_primitives as m
+    from lidar_utils import corridor_scene
+
+    noise_levels, az = [0.005, 0.01, 0.02, 0.04], [180, 360, 720]
+    out = m.run_extraction_experiment(corridor_scene(pillars=True), noise_levels, az, 10, SEED, min_points=150)
+    x = 1e3 * np.array(noise_levels)
+    fig, (ax_b, ax_p, ax_d) = plt.subplots(1, 3, figsize=(15, 5.2))
+    cols = {180: C["purple"], 360: C["blue"], 720: C["orange"]}
+    for j, n_az in enumerate(az):
+        ax_b.plot(x, out["cyl_radius_bias_mm_mean"][:, j], "o-", color=cols[n_az], label=f"orthogonal fit, {n_az}/ring")
+        ax_b.plot(x, out["cyl_radius_bias_mm_range_mean"][:, j], "s--", color=cols[n_az], label=f"range fit, {n_az}/ring")
+        ax_p.plot(x, out["cyl_pos_mm_median"][:, j], "o-", color=cols[n_az])
+        ax_p.plot(x, out["cyl_pos_mm_range_median"][:, j], "s--", color=cols[n_az])
+        ax_d.plot(x, 100 * out["cyl_detection"][:, j], "o-", color=cols[n_az], label=f"{n_az} points per ring")
+        print(f"    {n_az}/ring: radius bias ODR {np.round(out['cyl_radius_bias_mm_mean'][:, j], 1)} "
+              f"range {np.round(out['cyl_radius_bias_mm_range_mean'][:, j], 1)} mm; axis pos median ODR "
+              f"{np.round(out['cyl_pos_mm_median'][:, j], 1)} range {np.round(out['cyl_pos_mm_range_median'][:, j], 1)};"
+              f" detection {np.round(out['cyl_detection'][:, j], 3)}; false positives {out['false_positives'][:, j]}")
+    ax_b.axhline(0, color=TRUTH, lw=0.8)
+    ax_b.set(xlabel="range noise σ (mm)", ylabel="mean radius error (mm)", xticks=x,
+             title="Pillar radius: bias of the two fits")
+    legend_below(ax_b, ncol=2)
+    ax_p.set(xlabel="range noise σ (mm)", ylabel="median axis position error (mm)", xticks=x,
+             title="Pillar axis position (solid: orthogonal, dashed: range)")
+    ax_d.set(xlabel="range noise σ (mm)", ylabel="pillars detected (%)", xticks=x, ylim=(50, 102),
+             title="Detection: more points per ring is not better")
+    legend_below(ax_d, ncol=3)
+    print(f"    planes: detection {out['plane_detection'].min():.2f}-{out['plane_detection'].max():.2f}, normal error "
+          f"median {out['plane_angle_deg_median'].min():.3f}-{out['plane_angle_deg_median'].max():.3f} deg, offset "
+          f"median {out['plane_offset_mm_median'].min():.2f}-{out['plane_offset_mm_median'].max():.2f} mm")
+    finish(fig, "lidar_primitives_extraction", "Extraction: a range-only noise model biases the usual cylinder fit",
+           "lidar_primitives.py experiment 1 (run_extraction_experiment, 10 sensor poses per cell, seed 0; pillars "
+           "with at least 150 points). Both fits use the same RANSAC inliers.", bottom=0.06)
+
+
+def fig_lidar_primitives():
+    """lidar_primitives.py experiments 2-4: convergence basin, degeneracy, planes as landmarks."""
+    import lidar_primitives as m
+    from lidar_utils import METHODS
+
+    labels = {"point_to_point": "point-to-point", "point_to_plane": "point-to-plane", "primitive": "primitives"}
+    cols = {"point_to_point": C["red"], "point_to_plane": C["blue"], "primitive": C["green"]}
+    levels = [(0.1, 2), (0.25, 5), (0.5, 10), (1.0, 20), (2.0, 30)]
+    basin = m.run_basin_experiment(levels, 10, 5, SEED)
+    deg = m.run_degeneracy_experiment(10, SEED)
+    lmk = m.run_landmark_experiment(5, SEED)
+
+    fig, (ax_b, ax_g, ax_l) = plt.subplots(1, 3, figsize=(16, 5.4), gridspec_kw={"width_ratios": [1, 1.3, 0.9]})
+    for meth in METHODS:
+        ax_b.plot(range(len(levels)), 100 * basin[meth]["success"], "o-", color=cols[meth], label=labels[meth])
+        print(f"    basin {meth}: success {basin[meth]['success']}, trans mm {np.round(basin[meth]['trans_mm'], 1)}, "
+              f"iters {basin[meth]['iters']}")
+    ax_b.set(xticks=range(len(levels)), xticklabels=[f"{t} m\n{r}°" for t, r in levels], ylim=(-3, 103),
+             xlabel="initial error", ylabel="converged within 5 cm and 1° (%)", title="Convergence basin (50 starts)")
+    ax_b.legend(loc="upper center", bbox_to_anchor=(0.5, -0.24), ncol=3, fontsize=8.5)
+
+    xs = np.arange(len(METHODS))
+    for k, (scene, title) in enumerate((("corridor", "planes only"), ("corridor_pillars", "with pillars"))):
+        for j, meth in enumerate(METHODS):
+            r = deg[scene][meth]
+            act, pred = np.median(np.abs(r["axis_err_mm"])), np.median(r["axis_sigma_mm"])
+            x0 = k * 3.6 + j
+            ax_g.bar(x0 - 0.2, act, width=0.38, color=cols[meth])
+            ax_g.bar(x0 + 0.2, pred, width=0.38, color=cols[meth], alpha=0.35, hatch="//", edgecolor=cols[meth])
+            fmt = lambda v, sig: f"{v:,.0f}" if v >= 1000 else f"{v:.{sig}g}"
+            ax_g.text(x0 - 0.2, act * 1.3, fmt(act, 3), ha="center", fontsize=7.5)
+            ax_g.text(x0 + 0.2, pred * 1.3, fmt(pred, 2), ha="center", fontsize=7.5, color="#555555")
+            print(f"    degeneracy {scene} {meth}: |axis err| median {act:.3g} mm, predicted sigma {pred:.3g} mm, "
+                  f"eig ratio {np.median(r['eig_ratio']):.2e}")
+        ax_g.text(k * 3.6 + 1, 3e5, title, ha="center", fontsize=10, fontweight="bold")
+    ax_g.set_yscale("log")
+    ax_g.set(ylim=(0.05, 1e6), xticks=[k * 3.6 + j for k in range(2) for j in range(3)],
+             xticklabels=[labels[meth].replace("-to-", "-to-\n") for _ in range(2) for meth in METHODS],
+             ylabel="error along the corridor (mm)",
+             title="Degeneracy: actual (solid) vs. predicted σ (hatched)")
+    ax_g.tick_params(axis="x", labelsize=8)
+    ax_g.grid(axis="x", visible=False)
+
+    runs = np.arange(len(lmk["odometry"]["end_mm"]))
+    for name, col, mk in (("odometry", C["orange"], "o"), ("graph", C["purple"], "s")):
+        ax_l.plot(runs, lmk[name]["end_mm"], mk + "-", color=col, label=f"{name}: end-point drift")
+        ax_l.plot(runs, lmk[name]["ate_mm"], mk + ":", color=col, label=f"{name}: ATE (aligned)")
+        print(f"    landmarks {name}: end mm {np.round(lmk[name]['end_mm'], 2)}, ATE mm {np.round(lmk[name]['ate_mm'], 2)},"
+              f" end deg {np.round(lmk[name]['end_deg'], 4)}")
+    print(f"    landmarks per run {lmk['n_landmarks']}")
+    ax_l.set(xticks=runs, xlabel="run (noise realization)", ylabel="error after 40 scans (mm)", ylim=(0, None),
+             title="Planes as landmarks (L-corridor)")
+    legend_below(ax_l, ncol=2)
+    finish(fig, "lidar_primitives", "Scan registration with primitives: accurate, honest about degeneracy, narrower basin",
+           "lidar_primitives.py experiments 2-4 at their defaults (seed 0, 1 cm range noise): run_basin_experiment, "
+           "run_degeneracy_experiment, run_landmark_experiment.", bottom=0.04)
+
+
 FIGURES = {
     "pose_tracking": fig_pose_tracking,
     "robot_imu_tracking": fig_robot_imu_tracking,
@@ -1833,6 +1979,9 @@ FIGURES = {
     "hexapod_gait_ekf_concept": fig_hexapod_gait_ekf_concept,
     "hexapod_gait_ekf_extensions": fig_hexapod_gait_ekf_extensions,
     "hexapod_contact_inekf": fig_hexapod_contact_inekf,
+    "lidar_primitives_concept": fig_lidar_primitives_concept,
+    "lidar_primitives_extraction": fig_lidar_primitives_extraction,
+    "lidar_primitives": fig_lidar_primitives,
 }
 
 

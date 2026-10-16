@@ -69,6 +69,8 @@ After all nine phases, [`docs/README.md`](docs/README.md) is the fuller index fo
 
 **Side quest:** [`docs/frontend/triangulation_pnp.md`](docs/frontend/triangulation_pnp.md) + [README.md §10](README.md#10-perspective-n-point-pnp-recovering-a-camera-pose-from-known-3d-2d-correspondences) - [`use_numpy/pnp_estimation.py`](use_numpy/pnp_estimation.py) - the inverse of triangulation, using the same closed-form-then-Gauss-Newton recipe.
 
+**Second side quest, the LiDAR front-end:** [`docs/frontend/lidar_primitives.md`](docs/frontend/lidar_primitives.md) + [README.md §18](README.md#18-lidar-primitives-planes-and-cylinders-for-scan-registration) - [`use_numpy/lidar_primitives.py`](use_numpy/lidar_primitives.py) - the correspondence step that `pointcloud_pose_tracking.py` (Phase 4) skips: point-to-point and point-to-plane ICP against fitted planes and cylinders, one Gauss-Newton loop for all three. Its §5 shows a corridor's degeneracy and which method's Hessian admits it; its §6 uses Phase 5's factor graph with planes as landmarks.
+
 ## Phase 7 - Scaling BA to a real system
 
 **Read:** `bundle_adjustment.md` §13 (Local vs. Global BA, already covered in Phase 6).

@@ -20,6 +20,7 @@ Conceptual notes on the state-estimation and SLAM ideas behind the code in [`use
 
 - [triangulation_pnp.md](frontend/triangulation_pnp.md): recovering a 3D point from known camera poses (triangulation, implemented in `bundle_adjustment_advanced.py`) and the inverse, recovering a camera pose from known 3D points (PnP, implemented in `pnp_estimation.py`).
 - [vi_initialization.md](frontend/vi_initialization.md): bootstrapping scale, gravity direction, and initial velocity and bias, which IMU preintegration and factor-graph optimization need before they can run. Conceptual only, no script.
+- [lidar_primitives.md](frontend/lidar_primitives.md): fitting planes and cylinders to LiDAR scans and registering scans with them, against point-to-point and point-to-plane ICP; the corridor degeneracy and which method's Hessian admits it; planes as factor-graph landmarks. Implemented in `lidar_primitives.py` (both backends).
 
 ## [`filtering/`](filtering/) - The Kalman-filter lineage
 
