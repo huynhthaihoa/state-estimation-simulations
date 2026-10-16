@@ -62,7 +62,7 @@ H_i = \begin{bmatrix} 0 & 0 & 0 & -1 & 0 & r_{i,y} \\ 0 & 0 & 0 & 0 & -1 & -r_{i
 
 All stance feet enter one **joint update** per tick: their readings are stacked into a single measurement.
 
-**What is never measured.** No reading involves $`p_x, p_y, \theta`$, so they are **unobservable** ([glossary](../glossary.md#observability)): leg odometry integrates the twist, and position and heading drift. This matches the real-robot result that, with leg kinematics and an IMU, everything except global position and yaw is observable (Bloesch et al. 2013, ref. 3).
+**What is never measured.** No reading involves $`p_x, p_y, \theta`$, so they are **unobservable** ([glossary](../glossary.md#observability)): leg odometry only integrates the **twist**, so errors in position and heading accumulate: they **drift**. This matches the real-robot result that, with leg kinematics and an IMU, everything except global position and heading (yaw) is observable (Bloesch et al. 2013, ref. 3).
 
 **Controlled comparison** (`simulate_trial`): each Monte Carlo trial ([glossary](../glossary.md#monte-carlo-trials)) draws one true trajectory, one initial-guess error and one noise stream per foot, and every gait uses the same draws. Only which feet are down, and where, changes between gaits.
 
