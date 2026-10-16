@@ -29,13 +29,13 @@ Short answer: both are about equally *accurate*, but the world-frame EKF gains s
 
 ## 1. Model
 
-**State.** Rotation $`R`$ (body to world), velocity $`v`$, position $`p`$ and the world positions $`d_1, \dots, d_K`$ of the $K$ feet on the ground, packed into one matrix:
+**State.** Rotation $`R`$ (body to world), velocity $`v`$, position $`p`$ and the world positions $`d_1, \dots, d_k`$ of the $k$ feet on the ground, packed into one matrix:
 
 ```math
-X = \begin{bmatrix} R & v & p & d_1 & \cdots & d_K \\ 0 & & I_{K+2} & & \end{bmatrix} \in SE_{K+2}(3)
+X = \begin{bmatrix} R & v & p & d_1 & \cdots & d_k \\ 0 & & I_{k+2} & & \end{bmatrix} \in SE_{k+2}(3)
 ```
 
-This is the extended pose $`SE_2(3)`$ ([glossary](../glossary.md#extended-pose)) with one more column per foot. $K$ follows the gait: 3, 4 or 5 feet for tripod, ripple and wave. A foot joins the state at touchdown and leaves it at liftoff.
+This is the extended pose $`SE_2(3)`$ ([glossary](../glossary.md#extended-pose)) with one more column per foot. $k$ follows the gait: 3, 4 or 5 feet for **tripod**, **ripple** and **wave**. A foot joins the state at touchdown and leaves it at liftoff.
 
 **Propagate** (`propagate_base`), with gyro $`\omega`$ and accelerometer $`a`$ over one step $`\Delta t`$, gravity $`g`$, and $`\mathrm{Exp}`$ turning a rotation vector into a rotation ([glossary](../glossary.md#exp-and-log-maps)):
 
