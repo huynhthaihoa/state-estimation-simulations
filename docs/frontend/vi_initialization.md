@@ -1,6 +1,6 @@
 # Visual-inertial initialization
 
-> **Note**: A visual-inertial state estimator combines a camera with an [IMU](../glossary.md#imu-inertial-measurement-unit) to track the position, velocity, and orientation of a moving robot or device.
+> **Note:** A visual-inertial state estimator combines a camera with an [IMU](../glossary.md#imu-inertial-measurement-unit) to track the position, velocity, and orientation of a moving robot or device.
 
 Before a visual-inertial estimator can run its normal loop (preintegrate IMU, optimize against camera constraints), it has to solve a chicken-and-egg bootstrapping problem. It must find **metric scale** (real-world units such as meters), gravity direction, initial velocity, and IMU bias. A **monocular** (single) camera or a bias-corrupted IMU cannot give any of these on its own.
 
@@ -14,9 +14,9 @@ This builds on:
 
 Every other doc in this repo assumes a decent initial guess already exists: `pose_graph.py`'s optimizer starts from [dead reckoning](../optimization/factor_graph.md#2-why-do-we-need-it), `bundle_adjustment_advanced.py`'s Gauss-Newton starts from a triangulated point, `pnp_estimation.py`'s Gauss-Newton starts from a linear DLT solve ([triangulation_pnp.md](triangulation_pnp.md)). Visual-inertial initialization has *no* such starting point yet. Four unknowns must be pinned down before anything else can proceed:
 
-- **Scale**: a monocular camera recovers structure and motion only up to an unknown positive scale factor. "This camera moved some distance $d$" could mean 1 meter or 100, and vision alone can't say which.
-- **Gravity direction**: the accelerometer senses specific force ([glossary](../glossary.md#imu-inertial-measurement-unit)), so gravity enters the preintegration residual (see [imu_preintegration.md §7](../optimization/imu_preintegration.md#7-what-the-accompanying-scripts-actually-do-and-dont), where the demo omits it). Handling it requires knowing which way gravity points in the estimator's frame.
-- **Velocity**: the IMU measures acceleration, so integrating it gives velocity only up to an unknown starting value. Each keyframe's velocity must be recovered too.
+- **Scale:** a monocular camera recovers structure and motion only up to an unknown positive scale factor. "This camera moved some distance $d$" could mean 1 meter or 100, and vision alone can't say which.
+- **Gravity direction:** the accelerometer senses specific force ([glossary](../glossary.md#imu-inertial-measurement-unit)), so gravity enters the preintegration residual (see [imu_preintegration.md §7](../optimization/imu_preintegration.md#7-what-the-accompanying-scripts-actually-do-and-dont), where the demo omits it). Handling it requires knowing which way gravity points in the estimator's frame.
+- **Velocity:** the IMU measures acceleration, so integrating it gives velocity only up to an unknown starting value. Each keyframe's velocity must be recovered too.
 - **Bias** ($b_g$, $b_a$): [imu_preintegration.md §1](../optimization/imu_preintegration.md#1-the-problem)'s "Problem B". Every raw sample was integrated using *some* bias estimate, and an uninitialized (zero) guess can be badly wrong, especially for the gyroscope.
 
 If any of these is wrong at the start, the optimizer's very first linearization is already off.
@@ -39,7 +39,7 @@ Step 2: gravity + scale + velocities
 Hand off to IMU preintegration + factor-graph optimization
 ```
 
-> **Note**: Structure from Motion (SfM) is a computer-vision technique that recovers camera poses and sparse 3D point positions from a sequence of 2D images taken from different viewpoints.
+> **Note:** Structure from Motion (SfM) is a computer-vision technique that recovers camera poses and sparse 3D point positions from a sequence of 2D images taken from different viewpoints.
 
 With a single (monocular) camera, SfM translations and structure are correct only up to an unknown scale factor, while rotations are not affected. That is why §1 lists scale, not rotation, as an unknown.
 

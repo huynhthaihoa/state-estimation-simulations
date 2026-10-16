@@ -9,13 +9,13 @@ Notation follows the docs. These symbols are shared by many entries: $^\top$ is 
 ## 1. Geometry and Lie groups
 
 ### Pose
-**Symbol**: $T$. Position and orientation together. In 3D it is a $4\times4$ matrix holding a rotation $R$ and a translation $t$, i.e., an element of $SE(3)$. See [pose_graph_optimization.md §1](optimization/pose_graph_optimization.md#1-first-what-is-a-pose).
+**Symbol:** $T$. Position and orientation together. In 3D it is a $4\times4$ matrix holding a rotation $R$ and a translation $t$, i.e., an element of $SE(3)$. See [pose_graph_optimization.md §1](optimization/pose_graph_optimization.md#1-first-what-is-a-pose).
 
 ### SO(3) and SE(3)
-**Symbols**: $`SO(3)`$, $`SE(3)`$. The group of 3D rotations and the group of 3D rigid motions (rotation + translation). They have 3 and 6 degrees of freedom. See [lie_algebra.md §5](foundations/lie_algebra.md#5-lie-group-the-space-of-valid-transformations) and [§11](foundations/lie_algebra.md#11-se3-this-is-where-robotics-gets-really-interesting).
+**Symbols:** $`SO(3)`$, $`SE(3)`$. The group of 3D rotations and the group of 3D rigid motions (rotation + translation). They have 3 and 6 degrees of freedom. See [lie_algebra.md §5](foundations/lie_algebra.md#5-lie-group-the-space-of-valid-transformations) and [§11](foundations/lie_algebra.md#11-se3-this-is-where-robotics-gets-really-interesting).
 
 ### Extended pose
-**Symbol**: $`SE_2(3)`$. A rotation $`R`$, a velocity $`v`$ and a position $`p`$ packed into one $`5\times5`$ matrix, 9 degrees of freedom. The group product rotates $`v`$ and $`p`$ together, which makes IMU kinematics group-affine, the property the invariant EKF relies on. See [lie_algebra.md §11.1](foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity).
+**Symbol:** $`SE_2(3)`$. A rotation $`R`$, a velocity $`v`$ and a position $`p`$ packed into one $`5\times5`$ matrix, 9 degrees of freedom. The group product rotates $`v`$ and $`p`$ together, which makes IMU kinematics group-affine, the property the invariant EKF relies on. See [lie_algebra.md §11.1](foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity).
 
 ### Degrees of freedom (DoF)
 The number of independent numbers needed to describe something: 3 for a 3D rotation, 6 for a 3D pose. See [lie_algebra.md §11](foundations/lie_algebra.md#11-se3-this-is-where-robotics-gets-really-interesting).
@@ -30,34 +30,34 @@ A curved space that is locally flat. Rotations and poses live on one, so they ca
 A smooth set of transformations that can be composed and inverted, such as $SO(3)$ and $SE(3)$. See [lie_algebra.md §5](foundations/lie_algebra.md#5-lie-group-the-space-of-valid-transformations).
 
 ### Lie algebra and tangent space
-**Symbols**: $`\mathfrak{so}(3)`$, $`\mathfrak{se}(3)`$. The flat vector space of small motions at a point of a Lie group. The Lie algebra is the tangent space at the identity: $`\mathfrak{so}(3)`$ for rotations, $`\mathfrak{se}(3)`$ for poses. Optimizers and filters compute their steps and covariances here. See [lie_algebra.md §6](foundations/lie_algebra.md#6-lie-algebra-zoom-in-locally).
+**Symbols:** $`\mathfrak{so}(3)`$, $`\mathfrak{se}(3)`$. The flat vector space of small motions at a point of a Lie group. The Lie algebra is the tangent space at the identity: $`\mathfrak{so}(3)`$ for rotations, $`\mathfrak{se}(3)`$ for poses. Optimizers and filters compute their steps and covariances here. See [lie_algebra.md §6](foundations/lie_algebra.md#6-lie-algebra-zoom-in-locally).
 
 ### Hat operator
-**Symbols**: $(\cdot)^\wedge$, also written $`[\cdot]_\times`$. Turns a 3-vector $a$ into its skew-symmetric matrix, so that $a^\wedge b = a \times b$ for any 3-vector $b$. The **vee** operator $(\cdot)^\vee$ is its inverse, reading the vector back out of the matrix. See [lie_algebra.md §7](foundations/lie_algebra.md#7-the-weird-looking-skew-symmetric-matrix).
+**Symbols:** $(\cdot)^\wedge$, also written $`[\cdot]_\times`$. Turns a 3-vector $a$ into its skew-symmetric matrix, so that $a^\wedge b = a \times b$ for any 3-vector $b$. The **vee** operator $(\cdot)^\vee$ is its inverse, reading the vector back out of the matrix. See [lie_algebra.md §7](foundations/lie_algebra.md#7-the-weird-looking-skew-symmetric-matrix).
 
 ### Exp and Log maps
-**Symbols**: $\mathrm{Exp}$, $\mathrm{Log}$. $\mathrm{Exp}$ turns a tangent vector into an actual rotation or pose, and $\mathrm{Log}$ goes back. See [lie_algebra.md §8](foundations/lie_algebra.md#8-the-exponential-map) and [§9](foundations/lie_algebra.md#9-the-logarithm-map).
+**Symbols:** $\mathrm{Exp}$, $\mathrm{Log}$. $\mathrm{Exp}$ turns a tangent vector into an actual rotation or pose, and $\mathrm{Log}$ goes back. See [lie_algebra.md §8](foundations/lie_algebra.md#8-the-exponential-map) and [§9](foundations/lie_algebra.md#9-the-logarithm-map).
 
 ### Retraction
-**Symbols**: $\oplus$, $\boxplus$. How an estimate on a manifold takes a step: $T \leftarrow T\cdot\mathrm{Exp}(\Delta x)$ instead of $T + \Delta x$. Some docs write this step as $`T \oplus \Delta x`$ or $`x \boxplus \Delta x`$. See [gauss_newton.md §8](optimization/gauss_newton.md#8-why-is-this-everywhere-in-slam) and [pose_graph_optimization.md §15.6](optimization/pose_graph_optimization.md#156-retractionstate-update).
+**Symbols:** $\oplus$, $\boxplus$. How an estimate on a manifold takes a step: $T \leftarrow T\cdot\mathrm{Exp}(\Delta x)$ instead of $T + \Delta x$. Some docs write this step as $`T \oplus \Delta x`$ or $`x \boxplus \Delta x`$. See [gauss_newton.md §8](optimization/gauss_newton.md#8-why-is-this-everywhere-in-slam) and [pose_graph_optimization.md §15.6](optimization/pose_graph_optimization.md#156-retractionstate-update).
 
 ### Left and right perturbation
 The two ways to nudge a rotation or pose by a small tangent vector $\xi$: on the right, $T\cdot\mathrm{Exp}(\xi)$ (used by most docs here), or on the left, $\mathrm{Exp}(\xi)\cdot T$. They give different Jacobians, because matrix multiplication does not commute. Solà et al. and `manif` call the right one "right-plus"; it goes with the *left*-invariant error. The exception is [invariant_saltation_ekf.md](filtering/invariant_saltation_ekf.md), which perturbs on the left, $`\exp(\xi)\,X`$ ("left-plus", manif's `lplus`), because it uses the *right*-invariant error. Its world-frame EKF baseline also perturbs the rotation on the left, $`\mathrm{Exp}(\delta\theta)\,R`$. See [jacobian.md §11.1](foundations/jacobian.md#111-why-plain-addition-breaks) and [left_right_invariant.md §1](filtering/left_right_invariant.md#1-the-setup).
 
 ### Twist
-**Symbols**: $`u`$, $`\xi`$. A 6-vector of linear and angular velocity (translation part first in this repo). Composing a pose with $`\mathrm{Exp}(u\,\Delta t)`$ applies the motion over $`\Delta t`$. See [lie_algebra.md §11](foundations/lie_algebra.md#11-se3-this-is-where-robotics-gets-really-interesting).
+**Symbols:** $`u`$, $`\xi`$. A 6-vector of linear and angular velocity (translation part first in this repo). Composing a pose with $`\mathrm{Exp}(u\,\Delta t)`$ applies the motion over $`\Delta t`$. See [lie_algebra.md §11](foundations/lie_algebra.md#11-se3-this-is-where-robotics-gets-really-interesting).
 
 ### Adjoint
-**Symbol**: $`\mathrm{Ad}(T)`$. The $6\times6$ matrix that re-expresses a tangent vector from one frame's coordinates in another's; the **little adjoint** $`\mathrm{ad}_\xi`$ is its small-motion version (the Lie bracket, which measures how two motions fail to commute). See [lie_algebra.md §11.2](foundations/lie_algebra.md#112-the-adjoint-moving-a-small-motion-between-frames) and [pose_graph_optimization.md §15.4](optimization/pose_graph_optimization.md#154-manifold-optimization-and-linearization).
+**Symbol:** $`\mathrm{Ad}(T)`$. The $6\times6$ matrix that re-expresses a tangent vector from one frame's coordinates in another's; the **little adjoint** $`\mathrm{ad}_\xi`$ is its small-motion version (the Lie bracket, which measures how two motions fail to commute). See [lie_algebra.md §11.2](foundations/lie_algebra.md#112-the-adjoint-moving-a-small-motion-between-frames) and [pose_graph_optimization.md §15.4](optimization/pose_graph_optimization.md#154-manifold-optimization-and-linearization).
 
 ### Right and left Jacobians
-**Symbols**: $J_r$, $J_l$, $`J_r^{-1}`$. How a small change $\delta\varphi$ in a tangent vector moves $\mathrm{Exp}(\varphi)$, expressed as an extra small rotation or motion on the right ($`\mathrm{Exp}(\varphi+\delta\varphi) \approx \mathrm{Exp}(\varphi)\,\mathrm{Exp}(J_r(\varphi)\,\delta\varphi)`$) or on the left ($J_l$). The inverse $`J_r^{-1}`$ answers the reverse question for $\mathrm{Log}$, which is why it appears in pose-graph and smoother residual Jacobians. Both equal $I$ at $\varphi = 0$. See [jacobian.md §11](foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space).
+**Symbols:** $J_r$, $J_l$, $`J_r^{-1}`$. How a small change $\delta\varphi$ in a tangent vector moves $\mathrm{Exp}(\varphi)$, expressed as an extra small rotation or motion on the right ($`\mathrm{Exp}(\varphi+\delta\varphi) \approx \mathrm{Exp}(\varphi)\,\mathrm{Exp}(J_r(\varphi)\,\delta\varphi)`$) or on the left ($J_l$). The inverse $`J_r^{-1}`$ answers the reverse question for $\mathrm{Log}$, which is why it appears in pose-graph and smoother residual Jacobians. Both equal $I$ at $\varphi = 0$. See [jacobian.md §11](foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space).
 
 ### Quaternion
-**Symbol**: $q$. Four numbers $q = (w, x, y, z)$ encoding a 3D rotation as an axis plus a half-angle. $q$ and $-q$ represent the same rotation. See [quaternion.md §2](foundations/quaternion.md#2-the-intuitive-idea-a-quaternion-is-an-axis--angle-in-disguise) and [§10](foundations/quaternion.md#10-q-and--q-are-the-same-rotation).
+**Symbol:** $q$. Four numbers $q = (w, x, y, z)$ encoding a 3D rotation as an axis plus a half-angle. $q$ and $-q$ represent the same rotation. See [quaternion.md §2](foundations/quaternion.md#2-the-intuitive-idea-a-quaternion-is-an-axis--angle-in-disguise) and [§10](foundations/quaternion.md#10-q-and--q-are-the-same-rotation).
 
 ### Invariant and equivariant
-**Symbol**: $\eta$. An error is **invariant** if a transformation applied to both the true and estimated state leaves it unchanged. The left- and right-invariant errors $`\eta_L = \hat X^{-1} X`$ and $`\eta_R = X \hat X^{-1}`$ underlie the Invariant EKF ($`X`$ is the true state as a group element, $`\hat X`$ its estimate). **Equivariant** is the more general property: the quantity changes, but in a matching, predictable way. See [left_right_invariant.md §3](filtering/left_right_invariant.md#3-why-invariant---and-why-leftright) and [kf_ekf_iekf.md §9](filtering/kf_ekf_iekf.md#9-other-prominent-variants-worth-keeping-in-mind) for the Equivariant Filter.
+**Symbol:** $\eta$. An error is **invariant** if a transformation applied to both the true and estimated state leaves it unchanged. The left- and right-invariant errors $`\eta_L = \hat X^{-1} X`$ and $`\eta_R = X \hat X^{-1}`$ underlie the Invariant EKF ($`X`$ is the true state as a group element, $`\hat X`$ its estimate). **Equivariant** is the more general property: the quantity changes, but in a matching, predictable way. See [left_right_invariant.md §3](filtering/left_right_invariant.md#3-why-invariant---and-why-leftright) and [kf_ekf_iekf.md §9](filtering/kf_ekf_iekf.md#9-other-prominent-variants-worth-keeping-in-mind) for the Equivariant Filter.
 
 ### Group-affine dynamics (trajectory independence)
 Dynamics for which the invariant error's propagation Jacobian does not depend on the state estimate, so a poor estimate cannot distort the predicted covariance. IMU kinematics on $`SE_2(3)`$ are the standard example, and the Invariant EKF relies on the property. A bounce's reset map is not group-affine and breaks it. See [lie_algebra.md §11.1](foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity) and [invariant_saltation_ekf.md §2-§3](filtering/invariant_saltation_ekf.md#2-why-the-riekf-is-attractive-between-bounces).
@@ -70,16 +70,16 @@ Isotropic noise or uncertainty is the same in every direction: a covariance $\si
 ## 2. Uncertainty and probability
 
 ### Gaussian noise
-**Symbol**: $`\mathcal{N}(0, \Sigma)`$. Measurement noise modelled as a zero-mean normal distribution with covariance $\Sigma$. Under it, minimizing weighted squared errors gives the maximum-likelihood estimate (the unknowns that make the observed measurements most probable; a local one, since the problem is nonlinear). See [nonlinear_least_square.md §12](optimization/nonlinear_least_square.md#12-add-measurement-uncertainty).
+**Symbol:** $`\mathcal{N}(0, \Sigma)`$. Measurement noise modelled as a zero-mean normal distribution with covariance $\Sigma$. Under it, minimizing weighted squared errors gives the maximum-likelihood estimate (the unknowns that make the observed measurements most probable; a local one, since the problem is nonlinear). See [nonlinear_least_square.md §12](optimization/nonlinear_least_square.md#12-add-measurement-uncertainty).
 
 ### Covariance
-**Symbols**: $P$ or $\Sigma$. A matrix describing how uncertain an estimate or a measurement is, and how its errors are correlated. See [kf_ekf_iekf.md §1](filtering/kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear).
+**Symbols:** $P$ or $\Sigma$. A matrix describing how uncertain an estimate or a measurement is, and how its errors are correlated. See [kf_ekf_iekf.md §1](filtering/kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear).
 
 ### Information matrix
-**Symbol**: $\Omega = \Sigma^{-1}$. The inverse covariance. It weights each error so that precise measurements count more. [nonlinear_least_square.md](optimization/nonlinear_least_square.md) writes the same quantity as $W$. See [factor_graph.md §4](optimization/factor_graph.md#4-optimization-means-minimizing-all-those-errors).
+**Symbol:** $\Omega = \Sigma^{-1}$. The inverse covariance. It weights each error so that precise measurements count more. [nonlinear_least_square.md](optimization/nonlinear_least_square.md) writes the same quantity as $W$. See [factor_graph.md §4](optimization/factor_graph.md#4-optimization-means-minimizing-all-those-errors).
 
 ### Mahalanobis distance
-**Symbol**: $d$. $`d^2 = r^\top \Omega\, r`$ for a residual $r$ with information matrix $\Omega$. Its square root $d$ is the error measured in standard deviations, accounting for the noise's shape. For isotropic noise with standard deviation $\sigma$, $\Omega = I/\sigma^2$, so it reduces to plain squared error divided by $\sigma^2$. See [pose_graph_optimization.md §15.3](optimization/pose_graph_optimization.md#153-objective-function) and [factor_graph.md §4](optimization/factor_graph.md#4-optimization-means-minimizing-all-those-errors).
+**Symbol:** $d$. $`d^2 = r^\top \Omega\, r`$ for a residual $r$ with information matrix $\Omega$. Its square root $d$ is the error measured in standard deviations, accounting for the noise's shape. For isotropic noise with standard deviation $\sigma$, $\Omega = I/\sigma^2$, so it reduces to plain squared error divided by $\sigma^2$. See [pose_graph_optimization.md §15.3](optimization/pose_graph_optimization.md#153-objective-function) and [factor_graph.md §4](optimization/factor_graph.md#4-optimization-means-minimizing-all-those-errors).
 
 ### Prior (unary factor)
 A factor on a single variable, e.g. one that pins the first pose (to remove gauge freedom) or one that carries information left behind by marginalization. See [filtering_smoothing.md §7](filtering_smoothing.md#7-this-is-where-factor-graphs-fit) and [marginalization.md §4](optimization/marginalization.md#4-the-math-turning-an-eliminated-pose-into-a-prior).
@@ -88,7 +88,7 @@ A factor on a single variable, e.g. one that pins the first pose (to remove gaug
 An estimator is consistent when its reported covariance matches the errors it actually makes. NEES, $(x_{\text{true}} - x_{\text{est}})^\top P^{-1}(x_{\text{true}} - x_{\text{est}})$ with $P$ the reported covariance, should average $n$ (the state's DoF) over many trials: persistently larger means overconfident, smaller means underconfident. See [linear_nonlinear.md §4.4](filtering/linear_nonlinear.md#44-after-the-fact-consistency-tests) for the confidence band and [hybrid_saltation_ekf.md §6](filtering/hybrid_saltation_ekf.md#6-the-empirical-finding-a-modest-real-gap-not-a-dramatic-one).
 
 ### Chi-square distribution
-**Symbol**: $`\chi^2_k`$. The distribution of a sum of $k$ squared independent standard-normal values ($k$ degrees of freedom); its mean is $k$. A consistent filter's NEES and NIS follow it, and so, roughly, does a correctly weighted squared error $`e^\top \Omega\, e`$. That is why optimizers print their weighted cost as "chi-squared error", and why consistency bounds and outlier-gating thresholds are its quantiles (e.g. 6.63 is the 99% point for $k = 1$). See [linear_nonlinear.md §4.4](filtering/linear_nonlinear.md#44-after-the-fact-consistency-tests).
+**Symbol:** $`\chi^2_k`$. The distribution of a sum of $k$ squared independent standard-normal values ($k$ degrees of freedom); its mean is $k$. A consistent filter's NEES and NIS follow it, and so, roughly, does a correctly weighted squared error $`e^\top \Omega\, e`$. That is why optimizers print their weighted cost as "chi-squared error", and why consistency bounds and outlier-gating thresholds are its quantiles (e.g. 6.63 is the 99% point for $k = 1$). See [linear_nonlinear.md §4.4](filtering/linear_nonlinear.md#44-after-the-fact-consistency-tests).
 
 ### Monte Carlo trials
 Repeating a randomized simulation many times with different noise to measure typical behavior instead of one lucky or unlucky run. For a NEES check, each trial should redraw every random source the filter models; this repo's saltation script redraws only the initial error and measurement noise (its truth has no process noise), so its NEES reads low. See [hybrid_saltation_ekf.md §1.1](filtering/hybrid_saltation_ekf.md#11-the-filter-math-concretely) and [§6](filtering/hybrid_saltation_ekf.md#6-the-empirical-finding-a-modest-real-gap-not-a-dramatic-one).
@@ -100,20 +100,20 @@ The square root of the mean squared error, $`\sqrt{\tfrac{1}{N}\sum_k \|e_k\|^2}
 A direction of the state is observable if some measurement can determine it, and unobservable if none can. A solver that wrongly gains information in an unobservable direction becomes overconfident, the problem FEJ (§4) addresses. See [marginalization.md §6](optimization/marginalization.md#6-the-consistency-gotcha-why-fej-exists).
 
 ### Bias
-**Symbols**: $b_g$, $b_a$. The slowly varying offset in an IMU's gyroscope and accelerometer readings, usually estimated as part of the state. See [vi_initialization.md §1](frontend/vi_initialization.md#1-the-bootstrapping-problem) and [imu_preintegration.md §4](optimization/imu_preintegration.md#4-the-bias-sensitivity-jacobians).
+**Symbols:** $b_g$, $b_a$. The slowly varying offset in an IMU's gyroscope and accelerometer readings, usually estimated as part of the state. See [vi_initialization.md §1](frontend/vi_initialization.md#1-the-bootstrapping-problem) and [imu_preintegration.md §4](optimization/imu_preintegration.md#4-the-bias-sensitivity-jacobians).
 
 ---
 
 ## 3. Least-squares optimization
 
 ### Residual (error)
-**Symbols**: $e$ or $r$. The difference between what the model predicts and what was measured. See [nonlinear_least_square.md §4](optimization/nonlinear_least_square.md#4-the-general-form).
+**Symbols:** $e$ or $r$. The difference between what the model predicts and what was measured. See [nonlinear_least_square.md §4](optimization/nonlinear_least_square.md#4-the-general-form).
 
 ### Nonlinear least squares
 Choosing the unknowns that minimize the sum of weighted squared residuals, $\sum_i e_i^\top \Omega_i e_i$, where residual $e_i$ has information matrix $\Omega_i$. It is *nonlinear* when the residuals depend nonlinearly on the unknowns, as they do in SLAM. See [nonlinear_least_square.md §3](optimization/nonlinear_least_square.md#3-then-what-makes-it-nonlinear).
 
 ### Jacobian
-**Symbol**: $J$. The matrix of first derivatives of the residuals with respect to the unknowns: entry $(i,j)$ says how much residual $i$ changes when unknown $j$ is nudged. See [jacobian.md §2](foundations/jacobian.md#2-now-imagine-multiple-inputs-and-outputs).
+**Symbol:** $J$. The matrix of first derivatives of the residuals with respect to the unknowns: entry $(i,j)$ says how much residual $i$ changes when unknown $j$ is nudged. See [jacobian.md §2](foundations/jacobian.md#2-now-imagine-multiple-inputs-and-outputs).
 
 ### Linearization
 Replacing a nonlinear function by its first-order approximation around the current estimate (the **linearization point**), $e(x+\Delta x) \approx e(x) + J\Delta x$. See [nonlinear_least_square.md §7](optimization/nonlinear_least_square.md#7-the-key-trick-make-the-nonlinear-problem-locally-linear).
@@ -122,7 +122,7 @@ Replacing a nonlinear function by its first-order approximation around the curre
 The starting estimate an iterative solver refines, often from dead reckoning. A poor one can make Gauss-Newton diverge. See [vi_initialization.md §1](frontend/vi_initialization.md#1-the-bootstrapping-problem) and [levenberg_marquardt.md §2](optimization/levenberg_marquardt.md#2-why-not-just-use-gauss-newton).
 
 ### Normal equations and Hessian
-**Symbols**: $H$, $b$. Each Gauss-Newton step solves $H\Delta x = -b$ for the step $\Delta x$, with $H = J^\top \Omega J$ and $b = J^\top \Omega e$. This $H$ approximates the Hessian (the second derivatives) of the cost. See [gauss_newton.md §4](optimization/gauss_newton.md#4-the-optimization-problem) and [§7](optimization/gauss_newton.md#7-why-is-it-called-gauss-newton).
+**Symbols:** $H$, $b$. Each Gauss-Newton step solves $H\Delta x = -b$ for the step $\Delta x$, with $H = J^\top \Omega J$ and $b = J^\top \Omega e$. This $H$ approximates the Hessian (the second derivatives) of the cost. See [gauss_newton.md §4](optimization/gauss_newton.md#4-the-optimization-problem) and [§7](optimization/gauss_newton.md#7-why-is-it-called-gauss-newton).
 
 ### Gradient descent
 The step $`\Delta x = -\alpha J^\top \Omega e`$ (or $-\alpha J^\top e$ for $\Omega = I$, as the linked doc writes it): straight downhill with step size $\alpha$. Safe with a small step, slow on badly scaled problems. See [levenberg_marquardt.md §3](optimization/levenberg_marquardt.md#3-gradient-descent-has-the-opposite-problem).
@@ -131,7 +131,7 @@ The step $`\Delta x = -\alpha J^\top \Omega e`$ (or $-\alpha J^\top e$ for $\Ome
 An iteration that linearizes the residuals, solves the normal equations, updates the estimate and repeats. See [gauss_newton.md §1](optimization/gauss_newton.md#1-the-basic-idea).
 
 ### Levenberg-Marquardt (LM) and damping
-**Symbol**: $\lambda$. Gauss-Newton with a damping term added to $H$ ($\lambda I$, or $`\lambda\,\mathrm{diag}(H)`$ in Marquardt's form). Large $\lambda$ gives cautious, gradient-descent-like steps; small $\lambda$ gives Gauss-Newton steps. $\lambda$ goes down when a step lowers the cost, and up when it does not (the step is then retried); it does not track distance from the solution. LM is still a local method. See [levenberg_marquardt.md §4](optimization/levenberg_marquardt.md#4-the-damping-idea), [§6](optimization/levenberg_marquardt.md#6-how-does-lm-decide-whether-to-be-cautious) and [§10](optimization/levenberg_marquardt.md#10-marquardts-scaling).
+**Symbol:** $\lambda$. Gauss-Newton with a damping term added to $H$ ($\lambda I$, or $`\lambda\,\mathrm{diag}(H)`$ in Marquardt's form). Large $\lambda$ gives cautious, gradient-descent-like steps; small $\lambda$ gives Gauss-Newton steps. $\lambda$ goes down when a step lowers the cost, and up when it does not (the step is then retried); it does not track distance from the solution. LM is still a local method. See [levenberg_marquardt.md §4](optimization/levenberg_marquardt.md#4-the-damping-idea), [§6](optimization/levenberg_marquardt.md#6-how-does-lm-decide-whether-to-be-cautious) and [§10](optimization/levenberg_marquardt.md#10-marquardts-scaling).
 
 ### Gauge freedom
 Directions in which the whole solution can move without changing any residual, e.g. shifting and rotating the entire trajectory and map (plus scale, for monocular, i.e. single-camera, BA). It is removed by anchoring (a prior on, or fixing, the first pose, or the first two cameras in monocular BA) or handled at evaluation time by alignment. See [gauss_newton.md §4](optimization/gauss_newton.md#4-the-optimization-problem) and [bundle_adjustment.md §14](optimization/bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment).
@@ -159,7 +159,7 @@ A factor graph whose variables are only poses, linked by relative-pose factors (
 Most entries of $J$ and $H$ are zero, because each measurement involves only a few variables. Efficient solvers depend on it. See [sparse_cholesky_factorization.md §1](optimization/sparse_cholesky_factorization.md#1-why-does-sparsity-matter).
 
 ### Cholesky factorization
-**Symbol**: $L$. Writing $H = LL^\top$ with $L$ lower-triangular, so the solve becomes two cheap triangular solves. See [sparse_cholesky_factorization.md §2](optimization/sparse_cholesky_factorization.md#2-the-basic-idea).
+**Symbol:** $L$. Writing $H = LL^\top$ with $L$ lower-triangular, so the solve becomes two cheap triangular solves. See [sparse_cholesky_factorization.md §2](optimization/sparse_cholesky_factorization.md#2-the-basic-idea).
 
 ### Back-substitution
 Solving a triangular system one row at a time, with no matrix inverse. After $H = LL^\top$, $Ly = -b$ is solved top-down (forward substitution), then $L^\top \Delta x = y$ bottom-up. See [pose_graph_optimization.md §15.5](optimization/pose_graph_optimization.md#155-solving-the-linear-system-gauss-newton-step).
@@ -254,19 +254,19 @@ The generic recursion every filter here implements. It keeps a **belief** (a pro
 Alternates a **predict** step (motion model) and an **update** step (measurement), carrying a mean $\hat x$ and a covariance $P$. It is optimal for linear models with Gaussian noise. See [kf_ekf_iekf.md §1](filtering/kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear).
 
 ### Predict and update steps
-**Symbols**: $F$, $Q$. **Predict** pushes the estimate through the motion model $F$ (of $x_{k+1} = Fx_k + w$, process noise $w$ with covariance $Q$) and grows the covariance: $\hat x^- = F\hat x$, $`P^- = FPF^\top + Q`$. **Update** corrects the prediction with a measurement and shrinks the covariance. A superscript $-$ marks predicted (prior) quantities, and $+$ (or no superscript) marks updated (posterior) ones. See [kf_ekf_iekf.md §1](filtering/kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear).
+**Symbols:** $F$, $Q$. **Predict** pushes the estimate through the motion model $F$ (of $x_{k+1} = Fx_k + w$, process noise $w$ with covariance $Q$) and grows the covariance: $\hat x^- = F\hat x$, $`P^- = FPF^\top + Q`$. **Update** corrects the prediction with a measurement and shrinks the covariance. A superscript $-$ marks predicted (prior) quantities, and $+$ (or no superscript) marks updated (posterior) ones. See [kf_ekf_iekf.md §1](filtering/kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear).
 
 ### Innovation and Kalman gain
-**Symbols**: $\nu$, $S$, $K$. The innovation $`\nu = z - H\hat x^-`$ is how far a measurement $z$ is from what the prediction expected, with covariance $`S = HP^-H^\top + R`$. The gain $`K = P^-H^\top S^{-1}`$ sets how much of it to apply: large when the prediction is uncertain compared with the sensor. Its normalized square $`\nu^\top S^{-1}\nu`$ (NIS) is a consistency check that needs no ground truth. See [kf_ekf_iekf.md §1](filtering/kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear) and [linear_nonlinear.md §4.4](filtering/linear_nonlinear.md#44-after-the-fact-consistency-tests).
+**Symbols:** $\nu$, $S$, $K$. The innovation $`\nu = z - H\hat x^-`$ is how far a measurement $z$ is from what the prediction expected, with covariance $`S = HP^-H^\top + R`$. The gain $`K = P^-H^\top S^{-1}`$ sets how much of it to apply: large when the prediction is uncertain compared with the sensor. Its normalized square $`\nu^\top S^{-1}\nu`$ (NIS) is a consistency check that needs no ground truth. See [kf_ekf_iekf.md §1](filtering/kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear) and [linear_nonlinear.md §4.4](filtering/linear_nonlinear.md#44-after-the-fact-consistency-tests).
 
 ### EKF (Extended Kalman Filter)
-**Symbols**: $f$, $h$. The Kalman filter for a nonlinear motion model $x_{k+1} = f(x_k, u_k) + w$ (control input $u$) and measurement model $z = h(x) + v$ (measurement noise $v$, not the translation part $v$ of $\xi$), linearizing them with the Jacobians $`F = \partial f/\partial x`$ and $`H = \partial h/\partial x`$ at the current estimate. See [kf_ekf_iekf.md §2](filtering/kf_ekf_iekf.md#2-extended-kalman-filter-the-world-is-nonlinear-so-ill-approximate-it-locally).
+**Symbols:** $f$, $h$. The Kalman filter for a nonlinear motion model $x_{k+1} = f(x_k, u_k) + w$ (control input $u$) and measurement model $z = h(x) + v$ (measurement noise $v$, not the translation part $v$ of $\xi$), linearizing them with the Jacobians $`F = \partial f/\partial x`$ and $`H = \partial h/\partial x`$ at the current estimate. See [kf_ekf_iekf.md §2](filtering/kf_ekf_iekf.md#2-extended-kalman-filter-the-world-is-nonlinear-so-ill-approximate-it-locally).
 
 ### IEKF (Invariant EKF)
 An EKF that uses an invariant error $\eta$ defined on the Lie group (see Invariant and equivariant, §1). In this repo "IEKF" always means the Invariant EKF, not the Iterated EKF of [kf_ekf_iekf.md §9](filtering/kf_ekf_iekf.md#9-other-prominent-variants-worth-keeping-in-mind). See [kf_ekf_iekf.md §3](filtering/kf_ekf_iekf.md#3-invariant-ekf-lets-respect-the-geometry-of-the-problem).
 
 ### ESKF (Error-State Kalman Filter)
-**Symbol**: $\delta x$. Propagates a nominal state $\hat x$ with the full nonlinear model, while the filter estimates only a small error state $\delta x$, folded into $\hat x$ after each update and reset to zero. Its rotation error $`\delta\theta = \log(\hat R^{-1}R)`$ is already the left-invariant one (the position/velocity errors stay additive). See [extra_kf_variants.md §2](filtering/extra_kf_variants.md#2-error-state-kalman-filter-eskf).
+**Symbol:** $\delta x$. Propagates a nominal state $\hat x$ with the full nonlinear model, while the filter estimates only a small error state $\delta x$, folded into $\hat x$ after each update and reset to zero. Its rotation error $`\delta\theta = \log(\hat R^{-1}R)`$ is already the left-invariant one (the position/velocity errors stay additive). See [extra_kf_variants.md §2](filtering/extra_kf_variants.md#2-error-state-kalman-filter-eskf).
 
 ### UKF (Unscented Kalman Filter)
 Pushes $2n+1$ deterministically chosen **sigma points** (for an $n$-dimensional state) through the nonlinear functions instead of linearizing them with Jacobians. See [extra_kf_variants.md §1](filtering/extra_kf_variants.md#1-unscented-kalman-filter-ukf).
@@ -279,7 +279,7 @@ Pushes $2n+1$ deterministically chosen **sigma points** (for an $n$-dimensional 
 A hybrid system alternates smooth motion with instantaneous jumps, like a bouncing ball. The **guard** $g(x) = 0$ triggers a jump; the **reset map** $R$ (not a rotation here) is the possibly discontinuous map applied then. In this setting a superscript $-$/$`+`$ means just before/after the jump, not before/after a measurement update. See [hybrid_saltation_ekf.md §1](filtering/hybrid_saltation_ekf.md#1-what-a-hybrid-dynamical-system-is-here).
 
 ### Saltation matrix
-**Symbol**: $\Xi$. The Jacobian that carries a small state perturbation, and so a covariance, across a jump. The reset map's own Jacobian $DR$ is not enough, because a perturbed trajectory reaches the guard slightly earlier or later; $\Xi$ adds the correction for that timing difference. See [hybrid_saltation_ekf.md §2](filtering/hybrid_saltation_ekf.md#2-why-the-reset-maps-own-jacobian-is-not-enough) and [§4](filtering/hybrid_saltation_ekf.md#4-deriving-xi---including-a-wrong-turn-caught-by-verification).
+**Symbol:** $\Xi$. The Jacobian that carries a small state perturbation, and so a covariance, across a jump. The reset map's own Jacobian $DR$ is not enough, because a perturbed trajectory reaches the guard slightly earlier or later; $\Xi$ adds the correction for that timing difference. See [hybrid_saltation_ekf.md §2](filtering/hybrid_saltation_ekf.md#2-why-the-reset-maps-own-jacobian-is-not-enough) and [§4](filtering/hybrid_saltation_ekf.md#4-deriving-xi---including-a-wrong-turn-caught-by-verification).
 
 ### Zeno behavior
 A hybrid system making infinitely many jumps in a finite time, e.g. a lossy ball bouncing ever more often as it settles. It is a standard pathology to guard against in hybrid-system simulation, not something specific to saltation matrices. See [hybrid_saltation_ekf.md §7](filtering/hybrid_saltation_ekf.md#7-two-things-worth-knowing-before-reusing-this-pattern).

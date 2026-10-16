@@ -24,8 +24,8 @@ Each `use_manif/<name>.py` is the manifpy counterpart of `use_numpy/<name>.py` o
 ## B. Documentation
 
 [docs/](docs/) has the conceptual write-ups behind these simulations:
-- **Math foundations**: Jacobian, Lie algebra, quaternions, Umeyama alignment
-- The **front-end**: triangulation and PnP, visual-inertial initialization, LiDAR primitives and scan registration
+- **Math foundations:** Jacobian, Lie algebra, quaternions, Umeyama alignment
+- The **front-end:** triangulation and PnP, visual-inertial initialization, LiDAR primitives and scan registration
 - The **Kalman-filter** family: KF/EKF/IEKF, telling linear from nonlinear systems (and when linearization holds), UKF/ESKF/MSCKF and other variants, left- vs. right-invariant errors, an empirical note on the point-cloud tracking results, and non-smooth-motion filters (saltation-matrix EKF, ZUPT, friction-anisotropic process noise, hexapod leg odometry, contact-aided invariant EKF)
 - The **factor-graph/smoothing** family: NLS, Gauss-Newton, Levenberg-Marquardt, factor graphs,
 pose-graph optimization, bundle adjustment, sparse Cholesky factorization, IMU preintegration, iSAM/iSAM2, elimination and Bayes trees, marginalization
@@ -78,8 +78,8 @@ printers. `docs/frontend/lidar_primitives.md`.
 - [pose_graph_incremental.py](use_numpy/pose_graph_incremental.py): the [iSAM](docs/optimization/isam_optimization.md) counterpart to `pose_graph.py`'s batch solver - a longer loop streams in one node at a time, and an incremental square-root-SAM solver (Givens-rotation QR row insertion via `qr_insert_row` in `utils.py`, plus periodic/loop-closure-triggered full relinearization) is timed against a from-scratch batch re-solve at every step.
 - [bayes_tree_construction.py](use_numpy/bayes_tree_construction.py): builds the elimination tree underlying the [Bayes tree](docs/optimization/bayes_tree.md) `iSAM2` relies on (one node per variable, not merged into cliques) - symbolic variable elimination (`symbolic_eliminate` in `utils.py`) over the same square-loop pose-graph topology, then a root-ward affected-path query (`bayes_tree_affected_path`) contrasting a local odometry edge against the loop-closure edge.
 - [bundle_adjustment.py](use_numpy/bundle_adjustment.py): jointly refines camera poses **and** 3D landmarks against pinhole reprojection error - cameras on an arc around a landmark cluster, and a landmark counts as observed only if it projects inside the image, so not every camera observes every landmark. Compares three solvers:
-  - **landmarks-only refinement** and **poses-only refinement**: independent $3\times3$ / $6\times6$ GN solves, each a "fix one side" strawman;
-  - **full joint bundle adjustment**: coupled dense GN over poses + landmarks, gauge-fixed with a prior factor on the first two camera poses;
+  - **landmarks-only refinement** and **poses-only refinement:** independent $3\times3$ / $6\times6$ GN solves, each a "fix one side" strawman;
+  - **full joint bundle adjustment:** coupled dense GN over poses + landmarks, gauge-fixed with a prior factor on the first two camera poses;
   - joint-BA results are [Umeyama-aligned](docs/foundations/umeyama_alignment.md) to ground truth before reporting absolute error, since monocular BA only recovers the scene up to an unknown similarity transform.
 - [bundle_adjustment_advanced.py](use_numpy/bundle_adjustment_advanced.py): Local **and** Global bundle adjustment, run back to back for direct comparison - the real-time-behavior counterpart to `bundle_adjustment.py`'s single-batch scene.
   - A camera moves keyframe-by-keyframe along a forward-facing arc through a landmark corridor (not a static ring), building a covisibility graph incrementally.
@@ -181,9 +181,9 @@ uv run python use_numpy/imu_integration_comparison.py --duration 20.0 --dt 0.005
 #### Purpose
 
 Simulates a robot with a 100 Hz IMU (noisy body twist) and a 1 Hz noisy global position fix (e.g. GPS). Each second:
-- **Propagate**: the pose estimate goes through 100 noisy IMU micro-steps on $SE(3)$.
-- **Correct**: Gauss-Newton against the noisy position-only fix, until the step norm drops below `--gn-tol` or `--gn-max-iters` is hit.
-- **Why orientation is untouched**: the measurement's Jacobian wrt a right perturbation is $[R_{\text{est}} \mid 0]$, so the angular block is exactly zero and no weighting can make it correct orientation. Orientation is left to the IMU's dead reckoning between corrections.
+- **Propagate:** the pose estimate goes through 100 noisy IMU micro-steps on $SE(3)$.
+- **Correct:** Gauss-Newton against the noisy position-only fix, until the step norm drops below `--gn-tol` or `--gn-max-iters` is hit.
+- **Why orientation is untouched:** the measurement's Jacobian wrt a right perturbation is $[R_{\text{est}} \mid 0]$, so the angular block is exactly zero and no weighting can make it correct orientation. Orientation is left to the IMU's dead reckoning between corrections.
 
 Prints pre/post correction error each second (no plot).
 
@@ -295,9 +295,9 @@ uv run python use_numpy/pointcloud_pose_tracking.py --duration 5.0 --dt 0.1 --n-
 #### Purpose
 
 A robot drives a closed 4-node square loop, accumulating drift from noisy relative-pose ("odometry") edges between consecutive nodes, then detects it has returned to the start and adds one loop-closure edge back to node 0.
-- **Solver**: all node poses are jointly refined by Levenberg-Marquardt against every edge's residual $e_{ij} = \log(Z_{ij}^{-1} X_i^{-1} X_j)$.
-- **Jacobians**: analytical `compose`/`rminus` Jacobians chained together (hand-rolled $SE(3)$ $Exp$/$`Log`$/adjoint math via `lie_utils.py` in `use_numpy`; `manifpy`'s out-parameters in `use_manif`). This is the same motion-factor Jacobian-chaining pattern as `run_batch_gn` in `pointcloud_pose_tracking.py`, generalized from a twist-based motion model to a directly-measured relative pose.
-- **Output**: per-iteration [chi-squared](docs/glossary.md#chi-square-distribution) error plus final rotation+position error and RMSE (uncorrected odometry vs. optimized), and an XY trajectory plot against ground truth.
+- **Solver:** all node poses are jointly refined by Levenberg-Marquardt against every edge's residual $e_{ij} = \log(Z_{ij}^{-1} X_i^{-1} X_j)$.
+- **Jacobians:** analytical `compose`/`rminus` Jacobians chained together (hand-rolled $SE(3)$ $Exp$/$`Log`$/adjoint math via `lie_utils.py` in `use_numpy`; `manifpy`'s out-parameters in `use_manif`). This is the same motion-factor Jacobian-chaining pattern as `run_batch_gn` in `pointcloud_pose_tracking.py`, generalized from a twist-based motion model to a directly-measured relative pose.
+- **Output:** per-iteration [chi-squared](docs/glossary.md#chi-square-distribution) error plus final rotation+position error and RMSE (uncorrected odometry vs. optimized), and an XY trajectory plot against ground truth.
 
 ![Two panels from pose_graph.py: the four-pose square loop with ground truth, drifting odometry, the optimized estimate and the loop-closure edge, and each pose's position error before and after optimization](assets/pose_graph.png)
 
@@ -329,11 +329,11 @@ uv run python use_numpy/pose_graph.py --side-length 2.0 --pos-noise-std 0.05 --r
 
 `n_cameras` cameras are placed on a horizontal arc around a cluster of `n_landmarks` 3D landmarks, each looking inward via a look-at rotation. A landmark counts as observed only if it lies in front of a camera and projects inside its image, so not every camera observes every landmark (landmarks seen by fewer than `--min-observations` cameras are dropped as not triangulable) - this is `docs/optimization/bundle_adjustment.md`'s observed set ${\mathcal{O}}$, a real strict subset of all camera-landmark pairs, not "every camera sees everything." Every camera pose and every landmark is perturbed from ground truth to build a noisy initial guess, then three solvers are compared:
 
-- **Landmarks-only refinement**: poses held fixed at their noisy initial guess, only landmarks refined (the "cameras are correct" strawman) - decouples into independent $3\times3$ Gauss-Newton solves per landmark (classic triangulation from known poses).
-- **Poses-only refinement**: landmarks held fixed, only poses refined (the "points are correct" strawman) - decouples into independent $6\times6$ Gauss-Newton solves per camera (classic PnP-style **resection**: solving for a camera's pose from known 3D points).
-- **Full joint bundle adjustment**: both refined together in one coupled dense Gauss-Newton solve over every pose and landmark. This is bundle adjustment proper.
-  - **Gauge freedom**: joint BA reintroduces the monocular gauge freedom (6-DoF rigid + 1-DoF scale). It is fixed with a prior factor on the first two camera poses (mean = their own noisy initial guess), the same prior-factor pattern as `run_batch_gn`'s initial-pose prior in `pointcloud_pose_tracking.py`.
-  - **Alignment**: the result is aligned to ground truth via Umeyama's least-squares similarity fit (standard for evaluating monocular BA/SfM output) before computing absolute pose/landmark error. Reprojection error is unaffected by this alignment.
+- **Landmarks-only refinement:** poses held fixed at their noisy initial guess, only landmarks refined (the "cameras are correct" strawman) - decouples into independent $3\times3$ Gauss-Newton solves per landmark (classic triangulation from known poses).
+- **Poses-only refinement:** landmarks held fixed, only poses refined (the "points are correct" strawman) - decouples into independent $6\times6$ Gauss-Newton solves per camera (classic PnP-style **resection**: solving for a camera's pose from known 3D points).
+- **Full joint bundle adjustment:** both refined together in one coupled dense Gauss-Newton solve over every pose and landmark. This is bundle adjustment proper.
+  - **Gauge freedom:** joint BA reintroduces the monocular gauge freedom (6-DoF rigid + 1-DoF scale). It is fixed with a prior factor on the first two camera poses (mean = their own noisy initial guess), the same prior-factor pattern as `run_batch_gn`'s initial-pose prior in `pointcloud_pose_tracking.py`.
+  - **Alignment:** the result is aligned to ground truth via Umeyama's least-squares similarity fit (standard for evaluating monocular BA/SfM output) before computing absolute pose/landmark error. Reprojection error is unaffected by this alignment.
 
 Camera-pose Jacobians come from a hand-derived closed form ($\partial p_c/\partial(\text{right-perturbation of }T) = [-I \mid \mathrm{skew}(p_c)]$, finite-difference verified) in the `use_numpy` version, and from chaining `manifpy`'s own `inverse`/`act` Jacobian out-parameters in the `use_manif` version - no manifold formula hand-rolled there. Prints pose rotation/position RMSE, landmark RMSE, and reprojection error for all four rows (noisy init, landmarks-only, poses-only, joint BA), and plots a top-down scene view (ground truth vs. noisy init vs. joint BA) alongside a grouped bar chart of the four RMSE metrics.
 
@@ -379,7 +379,7 @@ uv run python use_numpy/bundle_adjustment.py --n-cameras 8 --n-landmarks 60 --ca
 
 The incremental loop (`run_incremental_local_ba`) runs keyframe-by-keyframe:
 
-- **Reveal + triangulate**: each keyframe's observations are revealed one at a time; a landmark is triangulated (closed-form ray intersection, then a few Gauss-Newton iterations) the moment it crosses `--min-observations` observers, and committed only if it passes a cheirality (positive-depth) check - a weakly-constrained point can otherwise converge to a reflection behind a camera that still fits that view's pixel almost exactly, since the projected pixel ($fx \cdot x/z + c_x$, in code terms) is unchanged when the whole camera-frame point is negated.
+- **Reveal + triangulate:** each keyframe's observations are revealed one at a time; a landmark is triangulated (closed-form ray intersection, then a few Gauss-Newton iterations) the moment it crosses `--min-observations` observers, and committed only if it passes a cheirality (positive-depth) check - a weakly-constrained point can otherwise converge to a reflection behind a camera that still fits that view's pixel almost exactly, since the projected pixel ($fx \cdot x/z + c_x$, in code terms) is unchanged when the whole camera-frame point is negated.
 - **Bounded local BA window** (`build_active_window` + `run_local_ba_step`): the new keyframe plus its strongest covisible neighbors (up to `--max-window-keyframes`) are optimized together; every other keyframe that also observes one of the window's landmarks is held fixed as a rigid anchor. Keyframes 0/1 are hard-fixed forever as the gauge anchor - no prior factor needed. Keyframe 1 keeps its noisy front-end pose, so the anchor pins a wrong scale and orientation (see [bundle_adjustment.md §13.6](docs/optimization/bundle_adjustment.md#136-in-this-repo)).
 - **Periodic Global BA** (`run_global_ba`): every `--global-ba-interval` keyframes (plus once at the end), every keyframe and landmark seen so far is jointly re-solved in one system, for direct comparison against the bounded local window.
 
@@ -547,13 +547,13 @@ uv run python use_numpy/pnp_estimation.py --n-points 20 --pixel-noise-std 1.0 --
 The earlier filtering scripts assume smooth, continuous motion between measurements. `docs/filtering/hybrid_saltation_ekf.md` introduces the exception: a **hybrid dynamical system**, where a point mass in free-fall bounces (inelastically, restitution `e`) off the ground $p_z = 0$. Between bounces the dynamics is exactly linear (mean/covariance propagate exactly, no linearization at all), so any disagreement between the two EKF variants below is attributable entirely to how each one handles the bounce itself.
 
 Three methods are compared:
-- A **dead-reckoning baseline**: propagates the exact dynamics from an uncertain initial guess, never looking at measurements - an initial-condition error still causes growing error, since bounce *timing* is sensitive to the state even though the dynamics model itself is exact
-- An **EKF with naive bounce handling**: $`P^+ = DR\,P^-\,DR^\top`$, the reset map's own Jacobian alone - the common mistake, since it is not the correct linearization of "post-impact state as a function of pre-impact state" once a perturbed trajectory reaches the guard at a different time
-- An **EKF with saltation-corrected bounce handling**: $`P^+ = \Xi\,P^-\,\Xi^\top`$, the true `saltation_matrix` composed with the ordinary flow Jacobians before/after the bounce, so the covariance is mapped over the whole filter tick that contains it, derived from first principles and verified against a finite-difference ground truth to ~7e-6
+- A **dead-reckoning baseline:** propagates the exact dynamics from an uncertain initial guess, never looking at measurements - an initial-condition error still causes growing error, since bounce *timing* is sensitive to the state even though the dynamics model itself is exact
+- An **EKF with naive bounce handling:** $`P^+ = DR\,P^-\,DR^\top`$, the reset map's own Jacobian alone - the common mistake, since it is not the correct linearization of "post-impact state as a function of pre-impact state" once a perturbed trajectory reaches the guard at a different time
+- An **EKF with saltation-corrected bounce handling:** $`P^+ = \Xi\,P^-\,\Xi^\top`$, the true `saltation_matrix` composed with the ordinary flow Jacobians before/after the bounce, so the covariance is mapped over the whole filter tick that contains it, derived from first principles and verified against a finite-difference ground truth to ~7e-6
 
 A Monte Carlo consistency check (`run_monte_carlo_consistency`, [NEES](docs/glossary.md#consistency-and-nees)) repeats both EKFs over many independent noise realizations of the same nominal trajectory. The expected "naive is overconfident, saltation fixes it" does not hold at exact detection:
-- **Exact contact detection**: both filters are *under*confident after a bounce - post-bounce NEES is about 2.35 (naive) and 2.49 (saltation) at seed 0 against a consistent value of 6. So saltation is slightly *closer* to consistent, and which filter comes out ahead depends on the tuning (doc §6).
-- **Mechanism**: the saltation matrix shrinks, but does not zero out, the guard-normal (height) variance at every bounce ($`Dg\,\Xi = -e\,Dg`$ identically, verified). That is only right if the detected bounce time is right.
+- **Exact contact detection:** both filters are *under*confident after a bounce - post-bounce NEES is about 2.35 (naive) and 2.49 (saltation) at seed 0 against a consistent value of 6. So saltation is slightly *closer* to consistent, and which filter comes out ahead depends on the tuning (doc §6).
+- **Mechanism:** the saltation matrix shrinks, but does not zero out, the guard-normal (height) variance at every bounce ($`Dg\,\Xi = -e\,Dg`$ identically, verified). That is only right if the detected bounce time is right.
 - **Jittered detection** (`--detect-time-noise-std`, doc §8): from 2 ms of jitter on (10% of `--dt`), both filters become overconfident and the saltation-corrected one more so, by about 1.4-1.6× the naive filter's NEES - a modest gap, not a blow-up: saltation matrices assume a known transition time.
 - Both EKFs' mean trajectories look nearly identical throughout - this entire effect is invisible in the point estimate.
 
@@ -595,13 +595,13 @@ uv run python use_numpy/saltation_matrix_ekf.py --duration 5.0 --dt 0.02 --resti
 
 `docs/filtering/inchworm_zupt_ekf.md` works through a known-schedule anchor(dwell)/extend gait - a 1D point mass alternates between being exactly stationary (anchor) and moving at a commanded cruise speed (extend), state $x=[p,v]$. Unlike `saltation_matrix_ekf.py`, this is *not* a discontinuous-state-reset problem - velocity is externally commanded per phase, an ordinary switched-linear system - so the entire interesting question sits on the *measurement* side: whether the filter exploits the free zero-velocity information an anchor phase provides. Three ZUPT policies sharing an identical predict step and the same noisy position measurement every tick are compared via the same Monte Carlo NEES pattern as `saltation_matrix_ekf.py`:
 
-- **`never`**: only the position measurement is ever fused - never wrong, but leaves free information on the table during every anchor tick.
-- **`always`**: an unconditional ZUPT is fused every tick regardless of true phase - the schedule-unaware mistake.
-- **`phase_conditional`**: ZUPT is fused only on ticks the known schedule marks as anchor - the correct policy.
+- **`never`:** only the position measurement is ever fused - never wrong, but leaves free information on the table during every anchor tick.
+- **`always`:** an unconditional ZUPT is fused every tick regardless of true phase - the schedule-unaware mistake.
+- **`phase_conditional`:** ZUPT is fused only on ticks the known schedule marks as anchor - the correct policy.
 
 Findings:
 - **`always`** is dramatically worse than `phase_conditional` in *both* the anchor and cruise windows, not just during motion: the overconfidence from misapplying ZUPT during cruise bleeds into the next anchor phase.
-- **No variant is consistent at the defaults**: the velocity ramps' acceleration is about 3.3× the filters' assumed process noise.
+- **No variant is consistent at the defaults:** the velocity ramps' acceleration is about 3.3× the filters' assumed process noise.
 - **`never` beats `phase_conditional`** in calibration and position accuracy at the defaults, because ZUPT has just made `phase_conditional` confident when the ramp arrives. With the process noise sized to cover the ramps, `phase_conditional` wins on both.
 - See the doc for the full numbers and mechanism.
 
@@ -639,9 +639,9 @@ uv run python use_numpy/inchworm_zupt_ekf.py --duration 10.0 --dt 0.05 --t-ancho
 
 `docs/filtering/friction_anisotropic_ekf.md` applies this repo's own `pointcloud_pose_tracking_empirical_note.md` argument (a noise ellipsoid fixed in a body frame looks anisotropic-and-rotating in the world frame) to *process* noise instead of measurement noise. A unicycle drives an exact, known circular arc (heading is exact and noise-free, driven by a known commanded turn rate) while true position picks up a random slip disturbance each tick, drawn anisotropically in the pad's own body frame - low variance along grip/forward, high variance along slip/lateral - then rotated into world coordinates by the *true* heading. Three ways of building the position block of the filter's process-noise covariance $Q$ are compared, sharing an identical predict step and the same noisy position measurement each tick:
 
-- **`isotropic`**: direction-blind, same total noise budget as the other two.
-- **`fixed_anisotropic`**: correctly anisotropic in shape, but fixed to the heading at $t=0$ and never updated - the mistake of knowing the pad is anisotropic without re-deriving $Q$ as the robot turns.
-- **`heading_aware`**: correctly anisotropic and re-oriented every predict step using the filter's own current heading estimate - the correct policy.
+- **`isotropic`:** direction-blind, same total noise budget as the other two.
+- **`fixed_anisotropic`:** correctly anisotropic in shape, but fixed to the heading at $t=0$ and never updated - the mistake of knowing the pad is anisotropic without re-deriving $Q$ as the robot turns.
+- **`heading_aware`:** correctly anisotropic and re-oriented every predict step using the filter's own current heading estimate - the correct policy.
 
 `fixed_anisotropic` comes out dramatically worse than *both* alternatives at every heading checkpoint, and the worst mismatch sits at a 90° heading difference from its stale reference, not 180° - a covariance ellipse has period $\pi$, not $2\pi$. Past 90° its NEES recovers only partly, likely because the mismatch leaves error in the heading estimate, which is never measured directly (mechanism not isolated; see the doc). See the doc for the full Monte Carlo NEES table (each trial redraws the slip, the initial error and the measurement noise).
 
@@ -676,10 +676,10 @@ uv run python use_numpy/friction_anisotropic_ekf.py --duration 20.0 --dt 0.05 --
 #### Purpose
 
 `docs/optimization/marginalization.md` §4 derives the Schur complement that turns an eliminated pose into a prior factor over its surviving neighbors; this script implements it.
-- **Setup**: a pure odometry chain streams in one node at a time. It deliberately has no loop closures, so the marginal produced at each step is provably unary - isolating the memory-*bounding* property from the fill-in problem `bayes_tree.md`/`isam2_optimization.md` already cover.
-- **Sliding window**: whenever the live window would exceed `--window-size`, the oldest pose is marginalized out via the Schur complement and dropped; every other pose keeps optimizing inside a bounded-size Gauss-Newton solve.
-- **Baseline**: `run_full_batch_growing` re-solves the entire graph from scratch at every new node, compared across a sweep of trajectory lengths (`--nodes-per-side-sweep`).
-- **Result**: full-batch's largest dense information matrix (`max_dof`) grows linearly with trajectory length (so its memory grows quadratically), while sliding-window's caps at exactly `6 * window_size` the moment the window first fills and never moves again.
+- **Setup:** a pure odometry chain streams in one node at a time. It deliberately has no loop closures, so the marginal produced at each step is provably unary - isolating the memory-*bounding* property from the fill-in problem `bayes_tree.md`/`isam2_optimization.md` already cover.
+- **Sliding window:** whenever the live window would exceed `--window-size`, the oldest pose is marginalized out via the Schur complement and dropped; every other pose keeps optimizing inside a bounded-size Gauss-Newton solve.
+- **Baseline:** `run_full_batch_growing` re-solves the entire graph from scratch at every new node, compared across a sweep of trajectory lengths (`--nodes-per-side-sweep`).
+- **Result:** full-batch's largest dense information matrix (`max_dof`) grows linearly with trajectory length (so its memory grows quadratically), while sliding-window's caps at exactly `6 * window_size` the moment the window first fills and never moves again.
 - **Identical final position RMSE** between the two - a consequence of the no-loop-closure scope: a pure odometry chain has no redundant measurements, so both solvers return exactly the dead-reckoned trajectory (see the doc §9).
 
 ![Three panels from sliding_window_marginalization.py: largest information-matrix size, time per new pose and position RMSE against trajectory length from 8 to 256 poses, for a full batch re-solve and a 10-pose sliding window](assets/sliding_window_marginalization.png)
@@ -713,11 +713,11 @@ uv run python use_numpy/sliding_window_marginalization.py --nodes-per-side-sweep
 `docs/filtering/invariant_saltation_ekf.md` lifts §11's bouncing point mass to a **tumbling rigid body carrying an IMU**, with state $`X = (R, v, p) \in SE_2(3)`$, tracked by a **right-invariant EKF (RIEKF)**. Between bounces the RIEKF's error dynamics are exactly linear and trajectory-independent ($`\Phi = e^{A h}`$ with constant $`A`$), and body-frame landmark measurements give a constant $`H`$. The bounce $`(R, v, p) \mapsto (R, M v, p)`$ is not a group automorphism, so its Jacobian in invariant coordinates is state-dependent.
 
 Five filters, identical apart from the bounce treatment or the error coordinates:
- 1. **RIEKF, invariant-naive**: $`\mathrm{blockdiag}(I, M, I)`$ - applies the reset to the velocity error as if it were an automorphism.
- 2. **RIEKF, reset-Jacobian**: $`T(X^+)^{-1} DR\, T(X^-)`$ - correct state dependence, no impact-timing correction.
- 3. **RIEKF, saltation**: $`\Xi_{RI} = T(X^+)^{-1} \Xi_{\text{world}} T(X^-)`$ - both; matches a finite-difference ground truth of the exact hybrid map on $`SE_2(3)`$ to about $`10^{-9}`$ (the other two are off by order one).
- 4. **RIEKF, saltation + timing noise**: saltation plus $`s^2 w w^\top`$ at each bounce, where $`w = T(X^+)^{-1}(f^+ - DR\, f^-)`$ is how far the post-impact state moves per second of contact-detection timing error and $`s`$ is that error's RMSE. Identical to saltation with exact detection (the default).
- 5. **World-frame EKF, saltation**: the non-invariant baseline.
+ 1. **RIEKF, invariant-naive:** $`\mathrm{blockdiag}(I, M, I)`$ - applies the reset to the velocity error as if it were an automorphism.
+ 2. **RIEKF, reset-Jacobian:** $`T(X^+)^{-1} DR\, T(X^-)`$ - correct state dependence, no impact-timing correction.
+ 3. **RIEKF, saltation:** $`\Xi_{RI} = T(X^+)^{-1} \Xi_{\text{world}} T(X^-)`$ - both; matches a finite-difference ground truth of the exact hybrid map on $`SE_2(3)`$ to about $`10^{-9}`$ (the other two are off by order one).
+ 4. **RIEKF, saltation + timing noise:** saltation plus $`s^2 w w^\top`$ at each bounce, where $`w = T(X^+)^{-1}(f^+ - DR\, f^-)`$ is how far the post-impact state moves per second of contact-detection timing error and $`s`$ is that error's RMSE. Identical to saltation with exact detection (the default).
+ 5. **World-frame EKF, saltation:** the non-invariant baseline.
 
 Results (Monte Carlo NEES over mode-matched ticks, 200 trials; consistent value 9, 95% interval [8.42, 9.60]): after bounces the invariant-naive filter is overconfident (13.45 at the defaults, 16.44 with `--meas-every 25`), reset-Jacobian and saltation are close to consistent (9.33/8.89 and 10.36/9.37), and the world-frame EKF is already inconsistent before the first bounce (14.01/18.92). RMSEs are nearly identical across the RIEKFs - the effect is in the reported uncertainty.
 
@@ -802,7 +802,7 @@ uv run python use_numpy/hexapod_gait_ekf.py --duration 12.0 --dt 0.02 --cycle-pe
 
 - **No biases, small initial error** (rotation std 0.02 rad, 50 trials): both filters consistent (NEES 8.9-9.3 against 9) and equally accurate for every gait, but the world-frame EKF's reported yaw σ already falls below its prior (1.03-1.06° vs 1.146°).
 - **Larger initial rotation error** (tripod): at 0.1 / 0.3 rad the world-frame EKF's NEES is 18.2 / 481, with a reported yaw σ of 1.9° / 1.3° against an actual 6.8° / 20.2°; the invariant EKF stays at 9.3-9.4. Accuracy is within 6-9%.
-- **One slipping leg**: a per-foot $`\chi^2`$ gate (3 DoF, 99%) halves the in-window velocity error and brings NEES back to about 10, but passes 30-52% of the slipping readings, since the residual is the distance slid since touchdown.
+- **One slipping leg:** a per-foot $`\chi^2`$ gate (3 DoF, 99%) halves the in-window velocity error and brings NEES back to about 10, but passes 30-52% of the slipping readings, since the residual is the distance slid since touchdown.
 - **IMU biases** in the state (the "imperfect" InEKF): the invariant EKF stays consistent (NEES 8.9-9.5, bias NEES 6.1-6.3); the world-frame EKF is again mildly overconfident in yaw.
 
 ![Three panels from hexapod_contact_inekf.py: yaw error with 0.1 rad initial rotation std, actual RMSE versus reported sigma for both filters; average NEES against initial rotation std 0.02, 0.1 and 0.3 rad, invariant EKF 9.3-9.4 and world-frame EKF 9.6, 18.2 and 481; and the invariant EKF's velocity RMSE with leg L2 slipping, trusting every foot versus the per-foot chi-squared gate](assets/hexapod_contact_inekf.png)

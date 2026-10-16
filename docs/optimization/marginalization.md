@@ -36,7 +36,7 @@ Eliminate x1:
 
 That is marginalization. `bayes_tree.md` uses it to build a **solve order**, where nothing is thrown away for good. We use the same step to drop $x_1$ **permanently**, on purpose: it is the oldest pose in the window and the estimator will never touch it again.
 
-**Why not just delete $x_1$?**
+### Why not just delete $`x_1`$?
 Two naive shortcuts go wrong, in opposite directions. Marginalization is the third option:
 - **Delete $x_1$ and its factors:** everything those factors told us about $x_2$ is lost, so we become less sure than we should be.
 - **Cut $x_1$'s row and column out of $\Lambda$ (ignore the Schur term):** $\Lambda$ is the [information matrix](../glossary.md#information-matrix) of the §4 example. Here $x_2$ keeps information $2$, as if $x_1$ were known exactly. The true value is $`\Lambda' = 1.5`$ ($`\Lambda'`$ = information after marginalizing, §4), so the variance is $0.5$ instead of $0.667$: overconfident.
@@ -220,7 +220,8 @@ The solve therefore never exceeds `window_size` poses, so `max_dof` is capped at
 
 **Baseline** (`run_full_batch_growing`). For $k = 1 \dots n$, the baseline re-solves the whole graph of the first $k$ poses from scratch. It uses `pose_graph.run_pose_graph_optimization` (adaptive Levenberg-Marquardt ([levenberg_marquardt.md](levenberg_marquardt.md)) starting at λ = 0, via `damping=0.0`), starting from dead reckoning from the first ground-truth pose, with node 0 anchored by $10^6 I$ inside that function. Its `max_dof` is $6n$.
 
-**Defaults:** `--window-size 10`; `--nodes-per-side-sweep 2 4 8 16 32 64` (8 to 256 poses); `--side-length 2.0` m; `--pos-noise-std 0.05` m; `--rot-noise-std 0.01` rad; `--anchor-weight 1e6`; `--gn-tol 1e-6`; `--gn-max-iters 10`; `--seed 0`.
+#### Defaults
+`--window-size 10`; `--nodes-per-side-sweep 2 4 8 16 32 64` (8 to 256 poses); `--side-length 2.0` m; `--pos-noise-std 0.05` m; `--rot-noise-std 0.01` rad; `--anchor-weight 1e6`; `--gn-tol 1e-6`; `--gn-max-iters 10`; `--seed 0`.
 
 ---
 
@@ -238,7 +239,7 @@ The solve therefore never exceeds `window_size` poses, so `max_dof` is capped at
 | 256 | 1536 | 18,874,368 | 60 | 28,800 |
 
 Two measurements, only one of them deterministic:
-- **Memory (`max_dof`)**: full-batch's system size grows linearly with trajectory length (so its dense-matrix memory grows *quadratically* - visible directly in the table, roughly $4\times$ per doubling of length) and never stops. Sliding-window's caps at exactly $`6 \times \text{window\_size}`$ the moment the window first fills, and never moves again, confirmed identically across multiple seeds (`max_dof` depends only on trajectory length and `window_size`, not on the noise realization). `max_dof` (and the byte counts derived from it) is the deterministic part.
+- **Memory (`max_dof`):** full-batch's system size grows linearly with trajectory length (so its dense-matrix memory grows *quadratically* - visible directly in the table, roughly $4\times$ per doubling of length) and never stops. Sliding-window's caps at exactly $`6 \times \text{window\_size}`$ the moment the window first fills, and never moves again, confirmed identically across multiple seeds (`max_dof` depends only on trajectory length and `window_size`, not on the noise realization). `max_dof` (and the byte counts derived from it) is the deterministic part.
 - **Average per-step wall-clock time** tells the same story less starkly, and absolute values depend on the machine and its load. One run gave full-batch 1.5 ms → 61 ms as length grows 8 → 256, and sliding-window 1.6 ms → 7.0 ms. A later run on a different machine state gave full-batch 2.4 ms → 317 ms and sliding-window 0.78 ms → 3.8 ms. In both runs, sliding-window time flattens once trajectories exceed `window_size`, while full-batch time keeps growing.
 
 ![Three panels from sliding_window_marginalization.py: largest information-matrix size, time per new pose and position RMSE against trajectory length from 8 to 256 poses, for a full batch re-solve and a 10-pose sliding window](../../assets/sliding_window_marginalization.png)

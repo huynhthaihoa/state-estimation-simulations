@@ -95,7 +95,7 @@ Here $`A`$ is the stacked, **noise-whitened** (each row scaled so its residual h
 
 Instead of solving this from scratch every time, we factorize $A = QR$ (or work with a related factorization of the information/Hessian system).
 
-> **Note**: QR decomposition factors a matrix as $A=QR$, with $Q$ orthogonal and $R$ upper-triangular. Because $Q$ is orthogonal, it doesn't change the least-squares solution. Minimizing $`\lVert A\Delta x - b \rVert^2`$ therefore reduces to the cheap triangular solve $R\Delta x = Q^\top b$.
+> **Note:** QR decomposition factors a matrix as $A=QR$, with $Q$ orthogonal and $R$ upper-triangular. Because $Q$ is orthogonal, it doesn't change the least-squares solution. Minimizing $`\lVert A\Delta x - b \rVert^2`$ therefore reduces to the cheap triangular solve $R\Delta x = Q^\top b$.
 >
 > For iSAM, the key property is that $R$ can be updated incrementally with **Givens rotations** (plane rotations that zero one entry by mixing two rows) when a new row (factor) arrives. No refactorization of $A$ is needed.
 
@@ -430,14 +430,14 @@ Each rotation is orthogonal, so after the sweep ${R^\top R}$ has gained exactly 
 
 Between rebuilds, the linearization points ${\bar{X}}$ of old nodes never move. Only $\boldsymbol{\delta}$ changes, so old rows keep the Jacobians they were built with.
 
-**Relinearization triggers**: a full `relinearize_to_convergence` runs:
+**Relinearization triggers:** a full `relinearize_to_convergence` runs:
 - once at the start (node 0 only);
 - whenever ${k \bmod r = 0}$ with $r$ = `--relinearize-every` (default 8);
 - at the last node, when a loop-closure edge exists.
 
 It starts from the read-out estimate $X$, not from ${\bar{X}}$. The script never inserts the loop-closure edge with Givens rotations: it enters $R$ only through that final full rebuild. The module docstring gives the reason: a loop closure affects many old poses, so it would touch nearly every column of $R$ anyway. Here the edge connects the last node to node 0, so a Givens sweep would start at column 0.
 
-**Defaults**:
+#### Defaults
 - `--nodes-per-side 16` gives 64 nodes, which stream in as ${k = 1, \ldots, 63}$.
 - That makes 9 full relinearizations: the initial one, 7 periodic ones (${k = 8, 16, \ldots, 56}$) and the loop-closure one at ${k = 63}$.
 - The `run_batch_streaming` baseline instead runs `pose_graph.py`'s damped solver from scratch 63 times, starting at `--damping 0.01`.

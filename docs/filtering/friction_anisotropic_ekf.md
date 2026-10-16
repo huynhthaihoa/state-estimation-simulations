@@ -19,7 +19,8 @@ So a filter that fixes the ellipse orientation once (say at $t = 0$) is right on
 - `heading_aware`: ellipse re-oriented every step to the current heading.
 - `isotropic`: no directional claim at all, the safe fallback.
 
-**Where the question comes from.** Hybrid-systems filtering usually models friction as discrete contact modes (stuck or sliding), each switch with its own saltation matrix ([glossary](../glossary.md#saltation-matrix)). Kong et al. (2024, §V-F) derive that matrix for stick-slip under **Coulomb friction** (the textbook law: friction can reach a fixed coefficient times the normal force, and equals that bound while sliding), whose single coefficient $\mu$ has no preferred direction. For an anisotropic pad that is not enough: slip variance depends on the heading relative to the pad's own friction axes, not only on the active mode. A filter that switches modes correctly but keeps an isotropic process-noise covariance $`Q`$ (defined in §1) treats slip along the low-friction axis like slip along the high-friction one.
+### Where the question comes from
+Hybrid-systems filtering usually models friction as discrete contact modes (stuck or sliding), each switch with its own saltation matrix ([glossary](../glossary.md#saltation-matrix)). Kong et al. (2024, §V-F) derive that matrix for stick-slip under **Coulomb friction** (the textbook law: friction can reach a fixed coefficient times the normal force, and equals that bound while sliding), whose single coefficient $\mu$ has no preferred direction. For an anisotropic pad that is not enough: slip variance depends on the heading relative to the pad's own friction axes, not only on the active mode. A filter that switches modes correctly but keeps an isotropic process-noise covariance $`Q`$ (defined in §1) treats slip along the low-friction axis like slip along the high-friction one.
 
 We work through the simplest concrete version, using [`friction_anisotropic_ekf.py`](../../use_numpy/friction_anisotropic_ekf.py)'s crawling unicycle.
 
@@ -27,12 +28,14 @@ We work through the simplest concrete version, using [`friction_anisotropic_ekf.
 
 *Figure: the setup at `use_numpy/friction_anisotropic_ekf.py`'s defaults, plotted by `uv run python assets/make_figures.py friction_anisotropic_ekf_concept`. Ellipses are enlarged to be visible; their 5:1 axis ratio is exact.*
 
-**Relation to the point-cloud note.** This applies an argument the repo already made, on the other side of the filter:
+### Relation to the point-cloud note
+This applies an argument the repo already made, on the other side of the filter:
 - [`pointcloud_pose_tracking_empirical_note.md`](pointcloud_pose_tracking_empirical_note.md) §2/§5 (terms in the [glossary](../glossary.md#isotropic-and-anisotropic)) showed that a noise ellipsoid fixed in an object's own frame looks anisotropic-and-rotating in the world frame, and that what matters is whether the filter's noise model tracks that rotation, not "rigid vs. non-rigid." That note was about *measurement* noise in a point-cloud registration EKF/IEKF.
 - Here we apply the same argument to *process* noise, for a robot that is actually moving and turning.
 - We stay with an ordinary EKF throughout: no new IEKF/Lie-group derivation, since the question is purely "does $Q$'s shape track heading," not a linearization-frame question.
 
-**Scope.** Heading is exact and noise-free, driven only by a known, constant commanded turn rate. Only *position* picks up random slip. This isolates one question (does the process-noise ellipse's orientation track heading?) from heading estimation, which the toy deliberately leaves out.
+### Scope
+Heading is exact and noise-free, driven only by a known, constant commanded turn rate. Only *position* picks up random slip. This isolates one question (does the process-noise ellipse's orientation track heading?) from heading estimation, which the toy deliberately leaves out.
 
 ---
 
@@ -48,7 +51,8 @@ We compare three ways of building the position block of the filter's process-noi
 
 All three variants run the same EKF over $x = [p_x, p_y, \theta]^\top$. Each tick is one **predict step** followed by one **position update** (`run_ekf`). The only difference between the variants is how the position block of $Q$ is built inside the **predict step**. Superscripts mark the step: $x^-$, $P^-$ are predicted (before the update) and $x^+$, $P^+$ are updated ([kf_ekf_iekf.md §1](kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear)).
 
-**Predict, mean and Jacobian** (`exact_arc_step`). With constant commanded speed $v$ and turn rate $\omega$, the robot moves along an exact circular arc of radius $r = v/\omega$:
+#### Predict, mean and Jacobian (`exact_arc_step`)
+With constant commanded speed $v$ and turn rate $\omega$, the robot moves along an exact circular arc of radius $r = v/\omega$:
 
 ```math
 \theta^{-} = \theta + \omega\,\Delta t, \qquad
@@ -56,7 +60,8 @@ p_x^{-} = p_x + r\left(\sin\theta^{-} - \sin\theta\right), \qquad
 p_y^{-} = p_y - r\left(\cos\theta^{-} - \cos\theta\right)
 ```
 
-**Intuition for $F$'s third column (heading as a lever arm):** a heading error pushes the robot sideways a little on every step.
+#### Intuition for $F$'s third column (heading as a lever arm)
+A heading error pushes the robot sideways a little on every step.
 - At the defaults ($0.2$ m/s, $\Delta t = 0.05$ s) one step is $`0.2 \times 0.05 = 0.01`$ m long.
 - A $1^\circ$ heading error ($`0.0175`$ rad) turns that step into a $`0.01 \times 0.0175 \approx 1.7\times10^{-4}`$ m sideways error.
 - Tiny per step, but it repeats every step, so it adds up.
@@ -73,7 +78,7 @@ F = \frac{\partial x^{-}}{\partial x} =
 
 The mean is propagated exactly, with no linearization. $F$ is still needed for the covariance, because heading enters the predicted position nonlinearly (through $\sin$ and $\cos$): its third column says how an error in $\theta$ turns into a position error over one step. When $|\omega| < 10^{-9}$ the code switches to the straight-line limit, $`p^{-} = p + v\,\Delta t\,(\cos\theta, \sin\theta)`$, to avoid dividing by $\omega$.
 
-**Predict, covariance** (`predict`):
+#### Predict, covariance (`predict`)
 
 ```math
 P^{-} = F\,P\,F^\top + Q, \qquad
@@ -82,7 +87,8 @@ Q = \begin{bmatrix} Q_{\text{pos}} & 0 \\ 0 & (\sigma_\theta\,\Delta t)^2 \end{b
 
 $`\sigma_\theta`$ is the heading process-noise standard deviation. $Q_{\text{pos}}$ is the 2×2 position block, the only thing that changes between variants. Two functions build it: `isotropic_Q_pos` (a circle) and `anisotropic_Q_pos` (a rotated ellipse). The three variants are then defined by which function they call and, for the ellipse, which heading they pass in.
 
-**Isotropic block** (`isotropic_Q_pos`). The same variance in every direction:
+#### Isotropic block (`isotropic_Q_pos`)
+The same variance in every direction:
 
 ```math
 Q_{\text{pos}}^{\text{iso}} = \sigma_{\text{iso}}^2\,\Delta t^2\,I_2,
@@ -92,7 +98,8 @@ Q_{\text{pos}}^{\text{iso}} = \sigma_{\text{iso}}^2\,\Delta t^2\,I_2,
 
 Here $`\sigma_{\text{grip}}`$ and $`\sigma_{\text{slip}}`$ are the body-frame slip standard deviations along the grip (forward) and slip (lateral) axes, and $\sigma_{\text{iso}}^2$ is the average of the two body-frame slip variances. Rotation doesn't change a matrix's trace, so the circle has the same total variance as the ellipse below, namely $2\sigma_{\text{iso}}^2 \Delta t^2 = (\sigma_{\text{grip}}^2 + \sigma_{\text{slip}}^2)\Delta t^2$. The isotropic variant does not assume more or less noise overall; it only lacks direction. A circle looks the same at every rotation, so this block needs no heading.
 
-**Anisotropic block** (`anisotropic_Q_pos`). It starts from an ellipse in the pad's own body frame (small variance along the grip/forward axis, large variance along the slip/lateral axis) and rotates it into the world frame by some heading $\theta_Q$:
+#### Anisotropic block (`anisotropic_Q_pos`)
+It starts from an ellipse in the pad's own body frame (small variance along the grip/forward axis, large variance along the slip/lateral axis) and rotates it into the world frame by some heading $\theta_Q$:
 
 ```math
 Q_{\text{pos}}^{\text{aniso}}(\theta_Q) = R(\theta_Q)
@@ -112,7 +119,8 @@ a c^2 + b s^2 & (a - b)\,c s \\
 \end{bmatrix}
 ```
 
-**Intuition (off-diagonal term):** the off-diagonal is what tilts the ellipse. At 45° it says "slip in $x$ and slip in $y$ move together".
+#### Intuition (off-diagonal term)
+The off-diagonal is what tilts the ellipse. At 45° it says "slip in $x$ and slip in $y$ move together".
 - At 45°, $`cs = 1/2`$, so both diagonal entries are $`(a+b)/2`$ and the off-diagonal is $`(a-b)/2`$.
 - The correlation is $`(a-b)/(a+b)`$.
 - At the script defaults, $`a = 4\times10^{-4}\,\Delta t^2`$ and $`b = 10^{-2}\,\Delta t^2`$, so the correlation is $`-0.0096/0.0104 \approx -0.92`$.
@@ -120,7 +128,8 @@ a c^2 + b s^2 & (a - b)\,c s \\
 
 This function doesn't decide which heading to use. The caller does, and that choice separates the variants.
 
-**The three variants.** At predict step $k$ (propagating from tick $k-1$ to tick $k$), `predict` branches on `q_policy`:
+#### The three variants
+At predict step $k$ (propagating from tick $k-1$ to tick $k$), `predict` branches on `q_policy`:
 
 | `q_policy` | $Q_{\text{pos}}$ | Heading used to orient it |
 | --- | --- | --- |
@@ -133,7 +142,8 @@ This function doesn't decide which heading to use. The caller does, and that cho
 
 This mirrors how the simulator generates the truth (`generate_ground_truth_and_data`): each tick it draws slip in the body frame with standard deviations $\sigma_{\text{grip}}$ and $\sigma_{\text{slip}}$ (scaled by $\Delta t$) and rotates it by the *true* heading. `heading_aware` is the only variant whose noise model has nearly the same shape and orientation as that process (0.9° offset, §1.1), apart from its own heading-estimate error.
 
-**Position update** (`measurement_update`). Only position is measured:
+#### Position update (`measurement_update`)
+Only position is measured:
 
 ```math
 H = \begin{bmatrix} 1 & 0 & 0 \\ 0 & 1 & 0 \end{bmatrix}, \qquad R = \sigma_{\text{pos}}^2 I

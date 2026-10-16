@@ -11,9 +11,11 @@ State lives on a Lie group, e.g. a pose $X \in SE(3)$ mapping body coordinates t
 $$\eta_L = \hat X^{-1} X \qquad \text{(left-invariant error)}$$
 $$\eta_R = X \hat X^{-1} \qquad \text{(right-invariant error)}$$
 
-**Convention note.** Barrau & Bonnabel (2017, Eqs. 18 and 25) define the inverses, $\eta^L = X^{-1}\hat X$ and $\eta^R = \hat X X^{-1}$. An inverted error ignores the same frame changes, so everything below holds for both. Only the sign of the small error vector $\xi$ flips.
+### Convention note
+Barrau & Bonnabel (2017, Eqs. 18 and 25) define the inverses, $\eta^L = X^{-1}\hat X$ and $\eta^R = \hat X X^{-1}$. An inverted error ignores the same frame changes, so everything below holds for both. Only the sign of the small error vector $\xi$ flips.
 
-**Naming trap.** The perturbation $`X = \hat X\,\mathrm{Exp}(\xi)`$ used in most of this repo is what Solà et al. and the `manif` library call "right-plus" ($\hat X \oplus \xi$), because $\mathrm{Exp}(\xi)$ multiplies on the right. It is the **left**-invariant error: $\eta_L = \hat X^{-1}X = \mathrm{Exp}(\xi)$.
+### Naming trap
+The perturbation $`X = \hat X\,\mathrm{Exp}(\xi)`$ used in most of this repo is what Solà et al. and the `manif` library call "right-plus" ($\hat X \oplus \xi$), because $\mathrm{Exp}(\xi)$ multiplies on the right. It is the **left**-invariant error: $\eta_L = \hat X^{-1}X = \mathrm{Exp}(\xi)$.
 
 - "Right" in "right-plus" says where the increment is applied.
 - "Left" in "left-invariant" says which frame change the error ignores.
@@ -41,7 +43,7 @@ Each error is unaffected by one specific kind of frame change, and the name says
 - $\eta_L$ is unchanged if we left-multiply both $X$ and $\hat X$ by the same fixed transform $g$ (we redefine the *world/global* frame: rotate the map, shift the origin). That cancels out: $(g\hat X)^{-1}(gX) = \hat X^{-1}X$. So it's invariant to **global frame redefinition** - which makes sense, since a body-frame quantity shouldn't care how we labeled the world frame.
 - $\eta_R$ is unchanged if we right-multiply both by $g$ (we redefine the *body* frame convention: recalibrate where the robot frame origin sits, e.g. **sensor extrinsics**, the fixed sensor-to-body pose). That cancels out too: $(Xg)(\hat Xg)^{-1} = X\hat X^{-1}$. So it's invariant to **body-frame redefinition**.
 
-**Picture (re-drawing the map):**
+### Picture (re-drawing the map)
 - Redraw the world map: move the origin or rotate the axes. The true pose and our estimate both get new coordinates.
 - But "where the truth sits as seen from my estimate" does not change, because both moved together. That is $`\eta_L`$.
 - Now re-bolt the sensor to a different spot on the robot body (new body frame). Both poses shift in the same body way.
@@ -64,7 +66,7 @@ $$\hat\omega^b = R^\top\dot R \qquad \hat\omega^s = \dot RR^\top$$
 
 So $\hat\omega^b$ plays the same role as $\eta_L$ above (indifferent to how we label the world) and $\hat\omega^s$ plays the same role as $\eta_R$ (indifferent to how we label the body).
 
-**Picture (gyro vs. ground watcher):**
+#### Picture (gyro vs. ground watcher)
 - $`\hat\omega^b`$ is what a gyro bolted to the robot reads: how fast I spin, in my own axes.
 - Rename the map axes ($`R\mapsto R_0R`$) and the gyro reading does not change: $`(R_0R)^\top R_0\dot R = R^\top\dot R`$.
 - $`\hat\omega^s`$ is what an observer standing on the ground sees: how fast the robot spins, in map axes.
@@ -76,9 +78,9 @@ So $\hat\omega^b$ plays the same role as $\eta_L$ above (indifferent to how we l
 
 The whole point of IEKF is that with the *right* choice of error, the linearized error dynamics stop depending on the current state estimate. The Jacobians can still change over time with known inputs (for example the gyro and accelerometer readings), but not with the estimate, unlike an ordinary EKF's. Barrau & Bonnabel (2017) build its convergence guarantee in three steps:
 
-- **Theorem 1**: for [group-affine](../glossary.md#group-affine-dynamics-trajectory-independence) dynamics, the error evolves independently of the trajectory.
+- **Theorem 1:** for [group-affine](../glossary.md#group-affine-dynamics-trajectory-independence) dynamics, the error evolves independently of the trajectory.
 - **Theorem 2**, the **log-linear** property: the error's Log then obeys an exact linear equation, even for large errors.
-- **Theorem 4**: so the IEKF is a locally asymptotically stable observer around any trajectory, under the same conditions that make a linear Kalman filter stable.
+- **Theorem 4:** so the IEKF is a locally asymptotically stable observer around any trajectory, under the same conditions that make a linear Kalman filter stable.
 
 The log-linear property also helps consistency.
 

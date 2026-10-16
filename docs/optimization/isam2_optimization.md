@@ -243,7 +243,7 @@ The exact behavior depends on the graph and ordering, but that is the intuition.
 
 The amount of computation in sparse Cholesky depends heavily on the [variable ordering](../glossary.md#variable-ordering), which decides two things at once:
 
-- **Fill-in**: how dense the factorization gets ([sparse_cholesky_factorization.md](sparse_cholesky_factorization.md)).
+- **Fill-in:** how dense the factorization gets ([sparse_cholesky_factorization.md](sparse_cholesky_factorization.md)).
 - **Where each variable sits in the Bayes tree.** The last variable eliminated becomes the root, and an update's affected region is the path from the touched cliques up to the root (§8-§9).
 
 A fixed order can be fine for one and terrible for the other. This repo's own example ([bayes_tree.md §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo)) eliminates a square loop of 16 poses oldest first. Fill-in stays small (no **separator**, the variables a clique shares with its parent, larger than 2). But the tree comes out as a single chain with the first pose at the bottom, so a loop closure touching the first pose invalidates all 16 variables.
@@ -298,7 +298,7 @@ Putting everything together, one iSAM2 update (simplified from Algorithm 1 of Ka
 
 Everything below the removed top of the tree keeps its factorization untouched (its estimates can still be updated in step 6).
 
-**Intuition for step 6:**
+### Intuition for step 6
 - Each clique's estimate is computed from its parent's: in symbols, child $`\delta = (d - R_{sep}\,\delta_{parent}) / R_{cc}`$, where $`\delta`$ is the clique's update step, $`R_{cc}`$ is the clique's own diagonal block of the triangular factor $R$, $d$ is the clique's own right-hand side and $R_{sep}$ couples it to its parent.
 - If the parent's $\delta$ barely moved and the clique's own $d$ is unchanged, the child's $\delta$ does not change either.
 - So the update can stop at that branch, and everything below it is skipped safely.

@@ -6,7 +6,7 @@ A LiDAR scan is a cloud of points. To turn two scans into a relative pose, the f
 
 - **point-to-point ICP** ([Iterative Closest Point](../foundations/umeyama_alignment.md), ref. 1): pair each source point with its nearest target point and pull them together;
 - **point-to-plane ICP** (ref. 2): the same pairs, but only the distance along the target surface's normal counts, so a point may slide along the surface;
-- **primitives**: first fit a few **geometric primitives** (infinite planes, cylinders) to each scan, then match primitives between scans and pull each source primitive's points onto its matched target surface.
+- **primitives:** first fit a few **geometric primitives** (infinite planes, cylinders) to each scan, then match primitives between scans and pull each source primitive's points onto its matched target surface.
 
 Man-made scenes are full of primitives: floors, walls and ceilings are planes; pillars, pipes and tree trunks are close to cylinders. A primitive summarizes thousands of points with a handful of parameters that do not depend on where the LiDAR's rings happened to hit. That has three consequences, each measured below:
 
@@ -20,7 +20,8 @@ The price is a narrower convergence basin than point-to-plane ICP's: primitives 
 
 *Figure: one scan of the corridor with pillars as the extraction sees it, and the scene of §6. Plotted by `uv run python assets/make_figures.py lidar_primitives_concept`.*
 
-**Scope.** Simulated scans only: an open-ended corridor (6 m wide, 3 m high), optionally with two staggered rows of floor-to-ceiling pillars (radius 0.25 m, every 8 m), and an L-shaped version of it; a spinning 32-ring LiDAR (±20°, 360 points per ring, 20 m range) with Gaussian noise on the range only. Static scenes, no motion distortion within a scan, no intensity. Run with `uv run python use_numpy/lidar_primitives.py` (several minutes per experiment; `--experiment 1|2|3|4` for one). [`use_manif/lidar_primitives.py`](../../use_manif/lidar_primitives.py) is the same with manif poses. It agrees with the numpy version to round-off, except in runs that pass through a nearly singular step (§4), where round-off decides the outcome: of the experiment 2 starts compared (2 pairs, 2 starts per size), one at 2 m and 30° converges in numpy and fails in manif.
+### Scope
+Simulated scans only: an open-ended corridor (6 m wide, 3 m high), optionally with two staggered rows of floor-to-ceiling pillars (radius 0.25 m, every 8 m), and an L-shaped version of it; a spinning 32-ring LiDAR (±20°, 360 points per ring, 20 m range) with Gaussian noise on the range only. Static scenes, no motion distortion within a scan, no intensity. Run with `uv run python use_numpy/lidar_primitives.py` (several minutes per experiment; `--experiment 1|2|3|4` for one). [`use_manif/lidar_primitives.py`](../../use_manif/lidar_primitives.py) is the same with manif poses. It agrees with the numpy version to round-off, except in runs that pass through a nearly singular step (§4), where round-off decides the outcome: of the experiment 2 starts compared (2 pairs, 2 starts per size), one at 2 m and 30° converges in numpy and fails in manif.
 
 ---
 
@@ -115,13 +116,17 @@ with $`p^\wedge`$ the skew-symmetric matrix of $p$ ([glossary](../glossary.md#ha
 
 **Association happens at every iteration**, from the current estimate; nothing is handed over. Primitives are matched one-to-one, cheapest first, inside gates: normals within 20° and offsets within 1 m for planes; axes within 20°, axis distance within 1 m and radii within 0.1 m for cylinders.
 
-**A coarse-to-fine pairing gate.** Nearest neighbors farther apart than a gate are dropped. A fixed 1 m gate was a strawman: started exactly at the truth with no noise, point-to-plane drifted to 4-12 mm and 0.1-0.2° (4 scan pairs), and point-to-point kept only 85-98% of the true motion. The likely cause is pairs whose nearest neighbor lies on another surface, where the target scan did not sample that surface (between rings, behind a pillar): tightening the gate to 0.1 m shrank the point-to-plane error to 0.6-2.6 mm and 0.014-0.020°. A gate that starts at 1 m and shrinks by 0.7 per iteration down to 0.1 m, common ICP practice, keeps the 1 m reach for the first iterations; on one pair it brings the drift from the truth to 7 mm (point-to-point) and 2.6 mm / 0.02° (point-to-plane). What remains is the sampling floor: the two scans never hit the same surface points.
+### A coarse-to-fine pairing gate
+Nearest neighbors farther apart than a gate are dropped. A fixed 1 m gate was a strawman: started exactly at the truth with no noise, point-to-plane drifted to 4-12 mm and 0.1-0.2° (4 scan pairs), and point-to-point kept only 85-98% of the true motion. The likely cause is pairs whose nearest neighbor lies on another surface, where the target scan did not sample that surface (between rings, behind a pillar): tightening the gate to 0.1 m shrank the point-to-plane error to 0.6-2.6 mm and 0.014-0.020°. A gate that starts at 1 m and shrinks by 0.7 per iteration down to 0.1 m, common ICP practice, keeps the 1 m reach for the first iterations; on one pair it brings the drift from the truth to 7 mm (point-to-point) and 2.6 mm / 0.02° (point-to-plane). What remains is the sampling floor: the two scans never hit the same surface points.
 
-**A side check for cylinders.** The distance to a cylinder does not know which side was scanned. In 2 of 50 starts, primitive registration converged 0.34 m off along the corridor with the correct matches; at that solution every point of 2 of the 3 matched pillars sat on the far side of its target pillar (none did at the truth). A point now counts only if its normal, mapped by $T$, points away from the target axis, as on the side a sensor can see. That removed those failures.
+### A side check for cylinders
+The distance to a cylinder does not know which side was scanned. In 2 of 50 starts, primitive registration converged 0.34 m off along the corridor with the correct matches; at that solution every point of 2 of the 3 matched pillars sat on the far side of its target pillar (none did at the truth). A point now counts only if its normal, mapped by $T$, points away from the target axis, as on the side a sensor can see. That removed those failures.
 
-**Steps.** Each step is the minimum-norm least-squares solution, with singular values below $`10^{-6}`$ of the largest treated as zero. That only drops directions with no information at all, up to round-off; a merely weak direction is kept, which matters in §5.
+### Steps
+Each step is the minimum-norm least-squares solution, with singular values below $`10^{-6}`$ of the largest treated as zero. That only drops directions with no information at all, up to round-off; a merely weak direction is kept, which matters in §5.
 
-**Checked.** `tests/use_numpy/test_lidar_primitives.py` compares every registration and factor Jacobian with finite differences, and recovers the noise-free truth exactly (below a micrometer) with the primitive method from a 0.37 m, 5.7° start.
+### Checked
+`tests/use_numpy/test_lidar_primitives.py` compares every registration and factor Jacobian with finite differences, and recovers the noise-free truth exactly (below a micrometer) with the primitive method from a 0.37 m, 5.7° start.
 
 ---
 
@@ -173,7 +178,8 @@ Three different behaviors:
 
 The pillars fix the axis because a vertical cylinder constrains both horizontal directions: its axis is a point in the floor plan. Of the six ratios in the table (about 1,100, 140, 2.7, 116, 3.3 and 0.74), only one is close to the Gaussian 0.67: the primitive method's with pillars.
 
-**What a real system does about it.** Zhang, Kaess and Singh (ref. 6) detect degeneracy from the eigenvalues of exactly this Hessian and then **remap the solution**: the update is applied only along well-constrained eigenvectors, and the weak directions keep their prior value (from odometry or an IMU). The script implements only the diagnosis.
+### What a real system does about it
+Zhang, Kaess and Singh (ref. 6) detect degeneracy from the eigenvalues of exactly this Hessian and then **remap the solution**: the update is applied only along well-constrained eigenvectors, and the weak directions keep their prior value (from odometry or an IMU). The script implements only the diagnosis.
 
 ---
 

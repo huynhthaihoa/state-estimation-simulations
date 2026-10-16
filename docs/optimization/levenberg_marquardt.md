@@ -106,8 +106,8 @@ $$\boxed{(J^\top J+\lambda I)\Delta x=-J^\top e}$$
 
 That one extra term $\lambda I$ does two jobs:
 
-- **Controls the step**: $\lambda$ slides LM between Gauss-Newton and gradient descent (§5).
-- **Keeps the system solvable**: $J^\top J$ is only positive *semi*-definite, and in SLAM it's often singular (see [gauss_newton.md §4](gauss_newton.md#4-the-optimization-problem)). For any $\lambda > 0$, $v^\top(J^\top J+\lambda I)v = \|Jv\|^2 + \lambda\|v\|^2 > 0$ for every $v \neq 0$, so the damped system always has a unique solution.
+- **Controls the step:** $\lambda$ slides LM between Gauss-Newton and gradient descent (§5).
+- **Keeps the system solvable:** $J^\top J$ is only positive *semi*-definite, and in SLAM it's often singular (see [gauss_newton.md §4](gauss_newton.md#4-the-optimization-problem)). For any $\lambda > 0$, $v^\top(J^\top J+\lambda I)v = \|Jv\|^2 + \lambda\|v\|^2 > 0$ for every $v \neq 0$, so the damped system always has a unique solution.
 
 ---
 
@@ -165,9 +165,9 @@ Because a bad step is never kept, the error never goes up from one accepted step
 
 In practice $\lambda$ tends to grow while the linear model predicts poorly (often far from the solution) and shrink near the solution, where the model becomes accurate - but that's a consequence of the rule, not the rule itself.
 
-> **Note**: "did the error drop?" is the simplest acceptance test, and the one this repo uses (§13). Many solvers instead use the **gain ratio**: the actual cost reduction divided by the reduction the linear model predicted. A ratio near 1 means the model is trustworthy ($\lambda \downarrow$); a small or negative ratio means it isn't ($\lambda \uparrow$).
+> **Note:** "did the error drop?" is the simplest acceptance test, and the one this repo uses (§13). Many solvers instead use the **gain ratio**: the actual cost reduction divided by the reduction the linear model predicted. A ratio near 1 means the model is trustworthy ($\lambda \downarrow$); a small or negative ratio means it isn't ($\lambda \uparrow$).
 
-> **Note**: damping makes each step *safe*, not *global*. LM still only goes downhill from where it starts, so if a poor initial estimate sits in the basin of a wrong local minimum, LM converges to that minimum. In SLAM a reasonable initialization (odometry, a good front end) is still needed.
+> **Note:** damping makes each step *safe*, not *global*. LM still only goes downhill from where it starts, so if a poor initial estimate sits in the basin of a wrong local minimum, LM converges to that minimum. In SLAM a reasonable initialization (odometry, a good front end) is still needed.
 
 ---
 
@@ -245,10 +245,10 @@ The damping term is often written with a matrix $D$ instead of $I$:
 
 This is Marquardt's version: each parameter is damped in proportion to its own curvature.
 
-- **Unit-independent**: the step no longer depends on how individual parameters are scaled (e.g. metres vs. millimetres). Plain $\lambda I$ doesn't have that property.
-- **Per-parameter gradient descent**: with a large $\lambda$ it becomes a gradient-descent step scaled per parameter, rather than §5's plain one.
-- **Fixes §3's valley, if axis-aligned**: there $D = \text{diag}(1, 100)$, so with a large $\lambda$ the step becomes $-\tfrac{1}{\lambda}D^{-1}\nabla f = -\tfrac{1}{\lambda}(x,\ y)$. Both directions shrink at the same rate, and the zigzag is gone. A valley running diagonally to the axes keeps its zigzag, because a diagonal $D$ can't rescale a tilted direction.
-- **Catch**: a parameter that no measurement constrains has a zero on that diagonal and gets no damping at all, so implementations clamp the diagonal to a small positive floor.
+- **Unit-independent:** the step no longer depends on how individual parameters are scaled (e.g. metres vs. millimetres). Plain $\lambda I$ doesn't have that property.
+- **Per-parameter gradient descent:** with a large $\lambda$ it becomes a gradient-descent step scaled per parameter, rather than §5's plain one.
+- **Fixes §3's valley, if axis-aligned:** there $D = \text{diag}(1, 100)$, so with a large $\lambda$ the step becomes $-\tfrac{1}{\lambda}D^{-1}\nabla f = -\tfrac{1}{\lambda}(x,\ y)$. Both directions shrink at the same rate, and the zigzag is gone. A valley running diagonally to the axes keeps its zigzag, because a diagonal $D$ can't rescale a tilted direction.
+- **Catch:** a parameter that no measurement constrains has a zero on that diagonal and gets no damping at all, so implementations clamp the diagonal to a small positive floor.
 
 Implementations differ in the details, but the concept is the same: **add damping to make the optimization step safer**.
 

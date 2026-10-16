@@ -292,10 +292,10 @@ This gives us a useful trade-off:
 | Global consistency | Harder                         | Stronger                                   |
 | Typical idea       | EKF-SLAM                       | Pose graph/factor graph/BA             |
 
-**A caveat on cost**: "filtering is cheaper" holds for small, fixed-size problems, but it inverts at scale.
+**A caveat on cost:** "filtering is cheaper" holds for small, fixed-size problems, but it inverts at scale.
 - **EKF-SLAM** keeps a *dense* joint covariance, so every update costs roughly $O(n^2)$ in the number of landmarks (Dissanayake et al., 2001).
 - **Sparse factor-graph smoothing** exploits the sparsity of the graph instead. With an incremental solver such as iSAM2 (Kaess et al., 2012), an odometry measurement only re-eliminates a small part of the Bayes tree near the newest pose.
-- **There is no guaranteed bound**: a loop closure can force re-elimination of most or all of the tree, and the cost depends on the fill-in of the sparse factorization. This repo's [`bayes_tree_construction.py`](../use_numpy/bayes_tree_construction.py) shows both cases on a 16-node square loop. Under its fixed oldest-first ordering, an odometry edge affects 2 of 16 variables and a loop-closure edge affects all 16; iSAM2 additionally reorders the affected part, so its real cost is lower (see [`bayes_tree.md` §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo)).
+- **There is no guaranteed bound:** a loop closure can force re-elimination of most or all of the tree, and the cost depends on the fill-in of the sparse factorization. This repo's [`bayes_tree_construction.py`](../use_numpy/bayes_tree_construction.py) shows both cases on a 16-node square loop. Under its fixed oldest-first ordering, an odometry edge affects 2 of 16 variables and a loop-closure edge affects all 16; iSAM2 additionally reorders the affected part, so its real cost is lower (see [`bayes_tree.md` §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo)).
 
 The defensible claim is therefore that *most* updates in a typical SLAM graph (mostly odometry, occasionally a loop closure) are cheap under iSAM2, while EKF-SLAM pays $O(n^2)$ on every update. This is a main reason large-scale SLAM moved from EKF-SLAM toward factor-graph smoothing.
 
@@ -384,7 +384,7 @@ The more precise distinction is:
 
 > **Filtering recursively represents the current posterior (the belief of §2) and marginalizes old information, whereas smoothing maintains a posterior over multiple states and can jointly revise them.**
 
-**Tiny example (toy case, 1D):**
+### Tiny example (toy case, 1D)
 - Prior: $`x_0\sim N(0,1)`$, and $`x_1 = x_0 + 1`$ with extra noise of variance 1. So $`x_1`$ has mean 1 and variance 2.
 - Later we learn $`x_0 = 0.4`$ with variance 0.01 (a sharp reading).
 - Smoother (still holds $`x_0`$): $`x_0 = 40/101 \approx 0.396`$, so $`x_1 \approx 1.396`$, and var($`x_1`$) drops from 2 to about 1.01.

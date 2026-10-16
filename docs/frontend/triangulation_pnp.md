@@ -117,7 +117,7 @@ This is **linear and homogeneous** (right-hand side zero) in the 12 flattened en
 
 **Intuition:** the smallest singular vector is the direction that $A$ squashes the most. Toy case: $`A = \mathrm{diag}(3, 0.1)`$ stretches $`(1,0)`$ to length 3 but shrinks $`(0,1)`$ to 0.1, so $`(0,1)`$ is the best answer to $`Ax \approx 0`$.
 
-> **Note**: SVD (Singular Value Decomposition) factors any matrix as $A=U\Sigma V^\top$, with $U, V$ orthogonal and $\Sigma$ diagonal (the singular values, ranking how much each orthogonal direction contributes to $A$).
+> **Note:** SVD (Singular Value Decomposition) factors any matrix as $A=U\Sigma V^\top$, with $U, V$ orthogonal and $\Sigma$ diagonal (the singular values, ranking how much each orthogonal direction contributes to $A$).
 > - The smallest right-singular vector of $A$ (the column of $V$ paired with the smallest singular value) is the least-squares null-space solution (the unit $`x`$ that makes $`\|Ax\|`$ smallest) `linear_pnp_dlt` uses above.
 > - Taking $UV^\top$ from a matrix's own SVD gives the nearest orthogonal matrix (a rotation once $\det > 0$, handled below). The orthogonalization step below uses this.
 

@@ -219,7 +219,7 @@ The robot gets a new measurement involving $x_5$. iSAM2 doesn't rebuild everythi
 
 The tree has the shape of §4's chain, with $x_5$ as the root (new information arrives there) and $x_1$ as the leaf. An update only has to redo the path from the touched variables up to the root. Here $x_5$ *is* the root, so only the top of the tree changes, and $x_1$ to $`x_4`$ below it are left alone.
 
-**Why the path goes up, not down:**
+### Why the path goes up, not down
 - Each node's numbers are computed only from the factors in its own subtree (itself and everything below it). It never reads anything above.
 - A new factor on one variable changes that node, and every ancestor, because they absorb its summary.
 - Descendants and siblings never used that variable's numbers, so their rows stay valid and are reused as is.
@@ -397,13 +397,13 @@ So:
 
 Partially. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds the **elimination tree** of this repo's [pose-graph](../glossary.md#pose-graph) topology: one node per variable, no clique merging (§13). It is the structure a Bayes tree is built from, not a full Bayes tree.
 
-**What it does:**
+### What it does
 - `symbolic_eliminate`/`bayes_tree_affected_path` in `utils.py` run the elimination-game construction from §3-§4 (spelled out in §4.1) and the root-ward affected-path query from §7-§9. Every "N/16 affected" count is a count of variables, not cliques.
 - The tree is built once from all edges, the loop-closure edge included, and then queried for each scenario's edge; for this topology, building it without the loop edge gives the same chain and the same affected sets.
 - Defaults: `--nodes-per-side 4`, so 16 nodes; the newest odometry edge (14, 15) affects 2/16 variables and the loop-closure edge (15, 0) affects 16/16.
 - The script plots the "small vs. large affected region" contrast this doc argues for in prose (§7 vs. §8) using a real, computed example instead of an ASCII sketch.
 
-**What it doesn't:**
+### What it doesn't
 - It fixes the elimination order (oldest node first) instead of choosing one dynamically. So **iSAM2's variable reordering (CCOLAMD, a fill-reducing [ordering](sparse_cholesky_factorization.md#5-ordering-becomes-extremely-important) heuristic) is not implemented**.
 - Under that fixed order, this repo's loop-closure edge invalidates the *entire* tree, not just a subtree. This is where a fixed ordering hurts most. iSAM2 additionally reorders the affected part to limit fill-in.
 - There is no numeric **fluid-relinearization** (relinearizing only variables whose estimate has moved enough) solve integrated with this tree. [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`) separately implements the older [iSAM v1](isam_optimization.md) algorithm (incremental QR row insertion, no Bayes tree at all); see [`isam_optimization.md` §14](isam_optimization.md#14-where-this-is-implemented-in-this-repo) and [`isam2_optimization.md` §19](isam2_optimization.md#19-where-this-is-implemented-in-this-repo) for exactly where that numeric-solve line is drawn.

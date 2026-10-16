@@ -64,14 +64,14 @@ Then we update and repeat:
 
 $$x_{\text{new}} = x_{\text{old}}+\Delta x$$
 
-> **Note**: solving it needs $J^\top J$ to be invertible, i.e. $J$ must have full column rank. In SLAM it isn't by default: some motions of the whole solution change no residual (a [gauge freedom](../glossary.md#gauge-freedom)), so $J^\top J$ stays singular until something pins the solution down.
+> **Note:** solving it needs $J^\top J$ to be invertible, i.e. $J$ must have full column rank. In SLAM it isn't by default: some motions of the whole solution change no residual (a [gauge freedom](../glossary.md#gauge-freedom)), so $J^\top J$ stays singular until something pins the solution down.
 >
-> - **Pose graphs**: shifting or rotating the whole trajectory together (6 DoF in 3D). Anchoring the first pose fixes it - `pose_graph.py` does this, "heavily anchoring node 0".
-> - **Monocular BA**: also uniformly rescaling the scene (7 DoF), which one pose can't pin. The BA scripts fix *two* cameras instead (a prior on cameras 0 and 1, or two hard-fixed keyframes); see [bundle_adjustment.md §14](bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment).
+> - **Pose graphs:** shifting or rotating the whole trajectory together (6 DoF in 3D). Anchoring the first pose fixes it - `pose_graph.py` does this, "heavily anchoring node 0".
+> - **Monocular BA:** also uniformly rescaling the scene (7 DoF), which one pose can't pin. The BA scripts fix *two* cameras instead (a prior on cameras 0 and 1, or two hard-fixed keyframes); see [bundle_adjustment.md §14](bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment).
 >
 > [Levenberg-Marquardt](levenberg_marquardt.md)'s damping (its §4-§5; [glossary](../glossary.md#levenberg-marquardt-lm-and-damping)) also keeps the system solvable.
 
-> **Note on signs**: some docs in this repo, such as [bundle_adjustment.md §6.1](bundle_adjustment.md#61-the-ba-math-concretely), write the residual the other way round, $r = \text{measurement} - \text{prediction}$, and take $J$ as the Jacobian of the *prediction*. That $J$ is minus the Jacobian of their residual, so their equation reads $J^\top J\Delta x = +J^\top r$. It's the same step as $J^\top J\Delta x = -J^\top r$ above, just written with different sign conventions.
+> **Note on signs:** some docs in this repo, such as [bundle_adjustment.md §6.1](bundle_adjustment.md#61-the-ba-math-concretely), write the residual the other way round, $r = \text{measurement} - \text{prediction}$, and take $J$ as the Jacobian of the *prediction*. That $J$ is minus the Jacobian of their residual, so their equation reads $J^\top J\Delta x = +J^\top r$. It's the same step as $J^\top J\Delta x = -J^\top r$ above, just written with different sign conventions.
 
 ---
 
@@ -125,7 +125,7 @@ $$J^\top J\Delta x=-J^\top r$$
 
 The right-hand sides are the same thing: the gradient of $f(x) = \tfrac12\|r(x)\|^2$ is exactly $\nabla f = J^\top r$. Gauss-Newton only changes the left-hand side. Needing only first derivatives makes it **cheaper and well suited to least-squares problems**.
 
-> **Note**: dropping $\sum_i r_i \nabla^2 r_i$ is a good approximation when the residuals are small at the solution (the measurements fit well) or $r$ is only mildly nonlinear. With large residuals or strong nonlinearity, the Gauss-Newton step can overshoot and even increase the cost - exactly what [Levenberg-Marquardt's damping](levenberg_marquardt.md#4-the-damping-idea) guards against.
+> **Note:** dropping $\sum_i r_i \nabla^2 r_i$ is a good approximation when the residuals are small at the solution (the measurements fit well) or $r$ is only mildly nonlinear. With large residuals or strong nonlinearity, the Gauss-Newton step can overshoot and even increase the cost - exactly what [Levenberg-Marquardt's damping](levenberg_marquardt.md#4-the-damping-idea) guards against.
 
 ---
 
@@ -153,7 +153,7 @@ The residual is $r_{ij} = h(T_i,p_j)-z_{ij}$, and the SLAM problem becomes:
 
 where $\mathcal{O}$ is the set of pose-landmark pairs that were actually observed (not every landmark is seen from every pose).
 
-> **Note**: real systems also weight each residual by its measurement's information matrix ([glossary](../glossary.md#information-matrix)), $`r_{ij}^\top\Omega_{ij}\,r_{ij}`$ instead of $\|r_{ij}\|^2$, so precise sensors count more - left out here for readability. See [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty) and [factor_graph.md](factor_graph.md).
+> **Note:** real systems also weight each residual by its measurement's information matrix ([glossary](../glossary.md#information-matrix)), $`r_{ij}^\top\Omega_{ij}\,r_{ij}`$ instead of $\|r_{ij}\|^2$, so precise sensors count more - left out here for readability. See [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty) and [factor_graph.md](factor_graph.md).
 
 This is a huge nonlinear problem. Gauss-Newton linearizes every measurement function around the current estimates of the poses and landmarks:
 

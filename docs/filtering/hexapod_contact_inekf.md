@@ -23,7 +23,8 @@ Short answer: both are about equally *accurate*, but the world-frame EKF gains s
 
 *Figure: `use_numpy/hexapod_contact_inekf.py` at its defaults (seed 0, 50 trials), plotted by `uv run python assets/make_figures.py hexapod_contact_inekf` (about 2 minutes). The numbers match the script's printout.*
 
-**Scope.** 3D body walking at fixed height on flat ground, with a small roll, pitch and up-down bob at twice the gait frequency; tripod, ripple and wave gaits and their footholds from [`hexapod_gait_ekf.md`](hexapod_gait_ekf.md); the true stance schedule; isotropic kinematic noise (no joint-encoder model). Biases are off except in §5. Run with `uv run python use_numpy/hexapod_contact_inekf.py` (about 4 minutes).
+### Scope
+3D body walking at fixed height on flat ground, with a small roll, pitch and up-down bob at twice the gait frequency; tripod, ripple and wave gaits and their footholds from [`hexapod_gait_ekf.md`](hexapod_gait_ekf.md); the true stance schedule; isotropic kinematic noise (no joint-encoder model). Biases are off except in §5. Run with `uv run python use_numpy/hexapod_contact_inekf.py` (about 4 minutes).
 
 ---
 
@@ -51,7 +52,8 @@ A stance foot stays put up to a **contact noise** $`w_d`$, which is a small rand
 y_i = R^\top (d_i - p) + n
 ```
 
-**Touchdown and liftoff.** A foot that lands is initialized from its first reading, $`\hat d = \hat p + \hat R y`$. A foot that lifts is dropped by deleting its rows and columns of the covariance $P$ ([glossary](../glossary.md#covariance)), which is exact marginalization of a Gaussian ([glossary](../glossary.md#marginalization)).
+### Touchdown and liftoff
+A foot that lands is initialized from its first reading, $`\hat d = \hat p + \hat R y`$. A foot that lifts is dropped by deleting its rows and columns of the covariance $P$ ([glossary](../glossary.md#covariance)), which is exact marginalization of a Gaussian ([glossary](../glossary.md#marginalization)).
 
 ---
 
@@ -59,23 +61,28 @@ y_i = R^\top (d_i - p) + n
 
 Both filters run the same mean propagation and the same bookkeeping. They differ in the error they track, and so in their Jacobians.
 
-**Invariant EKF** (`InvariantContactEKF`). The right-invariant error $`\xi = \log(\hat X X^{-1})`$ ([glossary](../glossary.md#invariant-and-equivariant)). Three things come out independent of the estimate:
+### Invariant EKF (`InvariantContactEKF`)
+The right-invariant error $`\xi = \log(\hat X X^{-1})`$ ([glossary](../glossary.md#invariant-and-equivariant)). Three things come out independent of the estimate:
 
 - **Propagation.** IMU kinematics are **group-affine** ([glossary](../glossary.md#group-affine-dynamics-trajectory-independence)), so the error transition is the constant $`SE_2(3)`$ matrix of [`invariant_saltation_ekf.md`](invariant_saltation_ekf.md#2-why-the-riekf-is-attractive-between-bounces), with the identity on every foot.
 - **Measurement.** The residual $`r_i = \hat R y_i + \hat p - \hat d_i`$ ([glossary](../glossary.md#residual-error)) is, to first order, $`\xi_p - \xi_{d_i}`$: the Jacobian is $`H_i = [0, 0, I, \dots, -I, \dots]`$, with no rotation columns and no dependence on the estimate.
 - **Touchdown.** The new foot's error is $`\xi_p + \hat R n`$: the position rows of $P$, plus the reading noise.
 
-**World-frame EKF** (`WorldContactEKF`). The error $`(\delta\theta, \delta v, \delta p, \delta d)`$ with $`R = \mathrm{Exp}(\delta\theta)\hat R`$ and the rest additive, as in the baseline of [`invariant_saltation_ekf.md`](invariant_saltation_ekf.md). Its Jacobians all contain the estimate: the transition has $`-(\hat R a \Delta t)^\wedge`$ terms ($`(\cdot)^\wedge`$ is the skew-symmetric matrix of a vector, [glossary](../glossary.md#hat-operator)), the measurement Jacobian has a rotation column $`\hat R^\top (\hat d_i - \hat p)^\wedge`$, and a new foot's error depends on $`-(\hat R y)^\wedge \delta\theta`$.
+### World-frame EKF (`WorldContactEKF`)
+The error $`(\delta\theta, \delta v, \delta p, \delta d)`$ with $`R = \mathrm{Exp}(\delta\theta)\hat R`$ and the rest additive, as in the baseline of [`invariant_saltation_ekf.md`](invariant_saltation_ekf.md). Its Jacobians all contain the estimate: the transition has $`-(\hat R a \Delta t)^\wedge`$ terms ($`(\cdot)^\wedge`$ is the skew-symmetric matrix of a vector, [glossary](../glossary.md#hat-operator)), the measurement Jacobian has a rotation column $`\hat R^\top (\hat d_i - \hat p)^\wedge`$, and a new foot's error depends on $`-(\hat R y)^\wedge \delta\theta`$.
 
-**Why only one filter can learn yaw.** In the invariant EKF, a global yaw rotation by an angle $`\theta`$ is the fixed error direction $`\xi = (\theta e_z, 0, \dots, 0)`$, with $`e_z`$ the world's vertical unit vector. The measurement Jacobian has no rotation columns, and gravity has no yaw component, so the transition leaves that direction alone. No information can reach it: over 30 runs (3 gaits) its yaw variance never decreased on any step. In the world-frame EKF, the unobservable direction of the linearized system depends on the estimate at which each Jacobian is evaluated. Those estimates change from step to step, so the linearized system appears to observe yaw. This is the same mechanism that **FEJ** (first-estimate Jacobians, [glossary](../glossary.md#fej-first-estimate-jacobians)) addresses in sliding-window smoothers ([`marginalization.md` §6](../optimization/marginalization.md#6-the-consistency-gotcha-why-fej-exists)).
+### Why only one filter can learn yaw
+In the invariant EKF, a global yaw rotation by an angle $`\theta`$ is the fixed error direction $`\xi = (\theta e_z, 0, \dots, 0)`$, with $`e_z`$ the world's vertical unit vector. The measurement Jacobian has no rotation columns, and gravity has no yaw component, so the transition leaves that direction alone. No information can reach it: over 30 runs (3 gaits) its yaw variance never decreased on any step. In the world-frame EKF, the unobservable direction of the linearized system depends on the estimate at which each Jacobian is evaluated. Those estimates change from step to step, so the linearized system appears to observe yaw. This is the same mechanism that **FEJ** (first-estimate Jacobians, [glossary](../glossary.md#fej-first-estimate-jacobians)) addresses in sliding-window smoothers ([`marginalization.md` §6](../optimization/marginalization.md#6-the-consistency-gotcha-why-fej-exists)).
 
-**Checked.** `tests/use_numpy/test_hexapod_contact_inekf.py` compares every Jacobian with finite differences (numerical derivatives from small perturbations of the state): the invariant transition is exact (error about $`10^{-9}`$) and identical at two random states; the world-frame one matches but changes with the state. With no noise, both filters track the truth to about $`10^{-15}`$.
+### Checked
+`tests/use_numpy/test_hexapod_contact_inekf.py` compares every Jacobian with finite differences (numerical derivatives from small perturbations of the state): the invariant transition is exact (error about $`10^{-9}`$) and identical at two random states; the world-frame one matches but changes with the state. With no noise, both filters track the truth to about $`10^{-15}`$.
 
 ---
 
 ## 3. No biases: equal accuracy, different honesty
 
-**Default initial error** (rotation std 0.02 rad, about 1.1°). 50 trials, seed 0; NEES of $`(R, v, p)`$ ([glossary](../glossary.md#consistency-and-nees)) should be 9 (95% band $`[7.86, 10.21]`$) and yaw NEES 1 ($`[0.65, 1.43]`$). RMSE is the root-mean-square error over the trials:
+### Default initial error (rotation std 0.02 rad, about 1.1°)
+50 trials, seed 0; NEES of $`(R, v, p)`$ ([glossary](../glossary.md#consistency-and-nees)) should be 9 (95% band $`[7.86, 10.21]`$) and yaw NEES 1 ($`[0.65, 1.43]`$). RMSE is the root-mean-square error over the trials:
 
 | Gait | Filter | NEES | yaw NEES | final yaw RMSE / reported σ (°) | tilt RMSE (°) | velocity RMSE (m/s) | final position RMSE (m) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -90,7 +97,8 @@ Both filters run the same mean propagation and the same bookkeeping. They differ
 - **But the world-frame EKF already "learns" yaw.** Its reported yaw σ ends at 1.03-1.06°, *below* the 1.146° it started with; the invariant EKF's grows to 1.154° (gyro noise only).
 - **The gait barely matters**, as in [`hexapod_gait_ekf.md` §2](hexapod_gait_ekf.md#2-no-slip-the-gait-matters-but-less-than-youd-think): velocity RMSE 0.0134 → 0.0113 m/s from tripod to wave.
 
-**Larger initial rotation error** (tripod, 50 trials each). The world-frame EKF's Jacobians are evaluated further from the truth, so the spurious yaw information grows:
+### Larger initial rotation error (tripod, 50 trials each)
+The world-frame EKF's Jacobians are evaluated further from the truth, so the spurious yaw information grows:
 
 | initial rotation std | Filter | NEES | yaw NEES | final yaw RMSE / reported σ (°) | final position RMSE (m) |
 | --- | --- | --- | --- | --- | --- |
@@ -101,7 +109,7 @@ Both filters run the same mean propagation and the same bookkeeping. They differ
 | 0.3 rad | invariant | 9.40 | 1.22 | 18.98 / 17.19 | 0.316 |
 | 0.3 rad | world | **481** | **388** | 20.20 / **1.33** | 0.335 |
 
-- **The invariant EKF stays consistent at every level**: its error dynamics do not depend on the estimate, so a bad estimate does not distort its covariance.
+- **The invariant EKF stays consistent at every level:** its error dynamics do not depend on the estimate, so a bad estimate does not distort its covariance.
 - **The world-frame EKF claims to know yaw to 1.3°** when its actual error is 20°.
 - **Accuracy is close.** The world-frame EKF's yaw RMSE is 6-9% higher. Position error grows with the initial yaw error for both: a heading error turns the whole estimated path about its start, and 6° (0.108 rad) times the 0.94 m RMS distance walked in 12 s is about 0.10 m.
 - **Why it matters.** An overconfident filter rejects good measurements in a gate and weights a later loop closure ([glossary](../glossary.md#loop-closure)) or GPS fix too little against its own wrong yaw.
@@ -157,7 +165,7 @@ Each trial draws a constant gyro **bias** ([glossary](../glossary.md#bias)) (std
 | wave | world | 9.34 | 1.27 | 6.38 | 1.85 / 1.43 | 0.032 |
 
 - **The invariant EKF stays consistent** on every measure, even though it is no longer exactly invariant. Its yaw variance can now shrink, but only slightly: at most 0.05% on one step over 30 runs.
-- **The world-frame EKF is again mildly overconfident in yaw**: yaw NEES 1.27-1.54 against the invariant EKF's 0.84-1.11, above the 1.43 bound for ripple. This is at the default 0.02 rad initial error; §3 shows how it grows with a larger one.
+- **The world-frame EKF is again mildly overconfident in yaw:** yaw NEES 1.27-1.54 against the invariant EKF's 0.84-1.11, above the 1.43 bound for ripple. This is at the default 0.02 rad initial error; §3 shows how it grows with a larger one.
 - **A gyro bias makes yaw drift faster.** The reported yaw σ after 12 s roughly doubles compared with §3 (tripod 2.34° vs 1.15°). The final-tick values are from 50 runs, so their ratios are noisy; the time-averaged NEES is the reliable number.
 
 ---

@@ -69,7 +69,7 @@ x0  →  x1  →  x2  →  x3
 
 so the real position is about $`3.04`$ m. Zero-mean per-step errors partly cancel, but nothing corrects them, so on average the drift keeps growing (like $`\sqrt n`$ for $n$ independent steps). Here the estimate (3.00 m) and the real position (3.04 m) diverge.
 
-> **Note**: each per-step measurement ($x_1$ is 1m ahead of $x_0$, etc.) is **odometry**: an estimate of the *incremental* pose change from onboard motion sensors (wheel encoders, IMU, visual odometry, ...).
+> **Note:** each per-step measurement ($x_1$ is 1m ahead of $x_0$, etc.) is **odometry**: an estimate of the *incremental* pose change from onboard motion sensors (wheel encoders, IMU, visual odometry, ...).
 > - **Dead reckoning** chains ("integrates") these increments to track pose from a starting point, as the `3.00 m` estimate above was computed. With no correction, drift grows the longer we integrate; the loop closure below fixes exactly that.
 > - The term is also used for propagating a motion *model* with no measurements (e.g. the `saltation_matrix_ekf.py` baseline in the README): same "no correction" idea, same growing error.
 
@@ -165,7 +165,7 @@ $$
 
 where $\Omega_k=\Sigma_k^{-1}$ is the [**information matrix**](../glossary.md#information-matrix) (called $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty); downstream docs such as [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md) use $\Omega$).
 
-> **Note**: a precise sensor (small $\Sigma_k$) gives a *large* $\Omega_k$, so its error counts more in the sum; a noisy sensor (large $\Sigma_k$) gives a *small* $\Omega_k$ and is down-weighted. The term $e_k^\top\Omega_k e_k$ is a **squared Mahalanobis distance** - see the [glossary](../glossary.md#mahalanobis-distance) for the definition and the isotropic special case where it collapses to plain squared error divided by a constant.
+> **Note:** a precise sensor (small $\Sigma_k$) gives a *large* $\Omega_k$, so its error counts more in the sum; a noisy sensor (large $\Sigma_k$) gives a *small* $\Omega_k$ and is down-weighted. The term $e_k^\top\Omega_k e_k$ is a **squared Mahalanobis distance** - see the [glossary](../glossary.md#mahalanobis-distance) for the definition and the isotropic special case where it collapses to plain squared error divided by a constant.
 
 So:
 

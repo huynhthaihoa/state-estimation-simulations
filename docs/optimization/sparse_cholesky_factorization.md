@@ -176,8 +176,8 @@ So elimination creates a new edge $1 \leftrightarrow 3$, which corresponds to a 
 
 Take §4's chain `1 ─ 2 ─ 3` again:
 
-- Eliminate **2 first**: we create the edge `1 ─ 3`, so there is fill-in.
-- Eliminate **1 first**: only `2 ─ 3` remains, so there is no fill-in.
+- Eliminate **2 first:** we create the edge `1 ─ 3`, so there is fill-in.
+- Eliminate **1 first:** only `2 ─ 3` remains, so there is no fill-in.
 
 So the **order in which variables are eliminated** strongly affects the computation and memory required.
 
@@ -186,9 +186,9 @@ Both examples follow one rule: eliminating a variable connects all of its remain
 Finding the truly optimal order is NP-hard (no known polynomial-time algorithm), so solvers use heuristics built on that rule:
 
 - **AMD** (Approximate Minimum Degree): repeatedly eliminate the variable with the fewest remaining neighbors.
-- **COLAMD**: the same idea, computed from the columns of $J$ without forming $H$. It is a common choice for batch solvers.
-- **CCOLAMD**: constrained COLAMD, which can force chosen variables (for example the newest poses) to the end. iSAM2 uses it ([isam2_optimization.md §12](isam2_optimization.md#12-variable-ordering-is-also-crucial)).
-- **Nested dissection**: split the graph with a small **separator** (a set of variables whose removal disconnects it), order each half recursively, and put the separator last.
+- **COLAMD:** the same idea, computed from the columns of $J$ without forming $H$. It is a common choice for batch solvers.
+- **CCOLAMD:** constrained COLAMD, which can force chosen variables (for example the newest poses) to the end. iSAM2 uses it ([isam2_optimization.md §12](isam2_optimization.md#12-variable-ordering-is-also-crucial)).
+- **Nested dissection:** split the graph with a small **separator** (a set of variables whose removal disconnects it), order each half recursively, and put the separator last.
 
 [elimination_tree.md §9](elimination_tree.md#9-why-ordering-matters-so-much) works through the effect of ordering on a SLAM example.
 

@@ -219,7 +219,7 @@ The same run, animated over its Gauss-Newton iterations. Optimizing poses and la
 
 ![Animation of bundle_adjustment.py: left, a top-down view of cameras and landmarks moving from the noisy initial guess onto ground truth over the Gauss-Newton iterations; right, the reprojection RMSE falling to about 1.2 px on a log scale, below the landmarks-only (100 px) and poses-only (54 px) levels](../../assets/bundle_adjustment.gif)
 
-*Animation: `use_numpy/animate_bundle_adjustment.py` at its defaults (seed 0), rendered by `uv run python use_numpy/animate_bundle_adjustment.py --out assets/bundle_adjustment.gif`. Each iterate is aligned to ground truth for display (**gauge freedom**: the whole scene can shift, rotate or rescale without changing any reprojection error), and the motion between the 7 iterates is interpolated.*
+*Animation: `use_numpy/animate_bundle_adjustment.py` at its defaults (seed 0), rendered by `uv run python use_numpy/animate_bundle_adjustment.py --out assets/bundle_adjustment.gif`. Each iterate is aligned to ground truth for display (**gauge freedom:** the whole scene can shift, rotate or rescale without changing any reprojection error), and the motion between the 7 iterates is interpolated.*
 
 **Projection** (`camera_project`): move the point into the camera frame, then apply the **pinhole model** (an ideal camera whose rays all pass through one point) with intrinsics $(f_x, f_y, c_x, c_y)$:
 
@@ -502,9 +502,9 @@ The right measure of coupling falls out of §12:
 
 *Figure: windows recorded from `use_numpy/bundle_adjustment_advanced.py`'s own `build_active_window` calls at its defaults (seed 0), plotted by `uv run python assets/make_figures.py bundle_adjustment_advanced_concept`.*
 
-- **Active keyframes**: the new keyframe plus its neighbors in the covisibility graph.
-- **Active points**: every 3D point observed by an active keyframe.
-- **Fixed keyframes**: other keyframes that also see an active point, held fixed as rigid anchors.
+- **Active keyframes:** the new keyframe plus its neighbors in the covisibility graph.
+- **Active points:** every 3D point observed by an active keyframe.
+- **Fixed keyframes:** other keyframes that also see an active point, held fixed as rigid anchors.
 
 
 **Fixed, not marginalized.** The fixed keyframes do two jobs:
@@ -549,8 +549,8 @@ Use **Global BA** for offline reconstruction - meshes, NeRF/Gaussian-Splatting i
 
 `bundle_adjustment_advanced.py` fills that gap. A camera moves keyframe-by-keyframe through a landmark corridor while a covisibility graph is built incrementally:
 
-- **Local BA**: every new keyframe triggers a bounded solve over an active window (the new keyframe plus its covisible neighbors, with other observing keyframes held fixed) - §13.2's diagram, made concrete.
-- **Global BA**: a periodic pass over the whole map runs alongside for comparison.
+- **Local BA:** every new keyframe triggers a bounded solve over an active window (the new keyframe plus its covisible neighbors, with other observing keyframes held fixed) - §13.2's diagram, made concrete.
+- **Global BA:** a periodic pass over the whole map runs alongside for comparison.
 
 ![Three panels from bundle_adjustment_advanced.py: the keyframe path through a landmark corridor with the Local-only and Local plus Global estimates, solve time per call for the bounded Local BA window versus Global BA, and trailing trajectory RMSE over keyframes for both modes](../../assets/bundle_adjustment_advanced.png)
 
@@ -586,13 +586,11 @@ So judge Global BA's benefit here from the aggregate statistics, not from any si
 
 The anchor choice mirrors real monocular SLAM, where the first two keyframes' baseline sets the map's otherwise arbitrary scale. That's why monocular results are normally scored after a similarity alignment (§14), and why this script's raw, unaligned error mostly measures drift and gauge rather than what BA itself can fix.
 
-
-
 **The windowed solver** (`run_windowed_gn_lm`). Local and Global BA call the same solver. They differ only in which poses and points are unknowns:
 
 - **Local** (`build_active_window`, `run_local_ba_step`): the new keyframe $k$ plus up to `max_window_keyframes` − 1 of its covisible neighbors (keyframes sharing at least `min_shared_for_covisibility` landmarks with $k$, strongest first) are active. Every already-triangulated landmark those keyframes see is active too. Every other keyframe that observes an active landmark is held fixed.
 - **Global** (`run_global_ba`): every keyframe processed so far and every triangulated landmark are unknowns.
-- **Gauge**: keyframes 0 and 1 (`anchor_keyframes`) are never unknowns in either solve. Keyframe 0 starts at its true pose. Keyframe 1 keeps its front-end estimate. There is no prior factor.
+- **Gauge:** keyframes 0 and 1 (`anchor_keyframes`) are never unknowns in either solve. Keyframe 0 starts at its true pose. Keyframe 1 keeps its front-end estimate. There is no prior factor.
 
 It uses the residual and Jacobians from [§6.1](#61-the-ba-math-concretely), unweighted ($W = I$). An observation from a fixed keyframe adds only its $J_{\text{point}}$ block. Each iteration solves a Levenberg-Marquardt system:
 
@@ -617,7 +615,8 @@ Script defaults: 50 keyframes on a 90° arc of radius 15 m, 8 landmarks per keyf
 
 Monocular BA recovers the scene only up to an unknown similarity transform (rigid + scale). Shifting, rotating or uniformly rescaling the whole scene and every camera pose together leaves reprojection error unchanged.
 
-**Tiny example (scale):** use $`f_x = 800`$ and $`c_x = 320`$.
+### Tiny example (scale)
+Use $`f_x = 800`$ and $`c_x = 320`$.
 - A point at $`(1, 0, 5)`$ gives $`u = 800 \cdot 1/5 + 320 = 480`$ px.
 - Double everything to $`(2, 0, 10)`$ and $`u = 800 \cdot 2/10 + 320 = 480`$ px. Same pixel, so the image cannot tell the two scenes apart.
 - Fixing the distance between two cameras gives the scene a ruler. That is why both BA scripts pin two cameras.

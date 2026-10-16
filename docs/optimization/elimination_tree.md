@@ -127,7 +127,7 @@ x2 ─ factor ─ l2
 x2 ─ factor ─ l3
 ```
 
-**Elimination tree**: what must be computed before what? Here it is for the elimination order $l_1$, $l_2$, $l_3$, $x_1$, $x_2$:
+**Elimination tree:** what must be computed before what? Here it is for the elimination order $l_1$, $l_2$, $l_3$, $x_1$, $x_2$:
 
 ```text
         x2

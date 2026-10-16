@@ -394,7 +394,7 @@ except that the "+" is replaced by a group operation. This update is a [retracti
 
 ## 13. Why not just use Euler angles?
 
-We could optimize $x,y,z,\text{roll},\text{pitch},\text{yaw}$ directly, but Euler angles bring singularities (**gimbal lock**: at pitch 90° two rotation axes line up and one rotation direction is lost), awkward composition, coordinate-dependent behavior, and problematic derivatives. The Lie algebra gives a **local minimal representation** of the perturbation (as many numbers as degrees of freedom, none redundant) while the state stays on the correct **manifold** (a curved space that is locally flat).
+We could optimize $x,y,z,\text{roll},\text{pitch},\text{yaw}$ directly, but Euler angles bring singularities (**gimbal lock:** at pitch 90° two rotation axes line up and one rotation direction is lost), awkward composition, coordinate-dependent behavior, and problematic derivatives. The Lie algebra gives a **local minimal representation** of the perturbation (as many numbers as degrees of freedom, none redundant) while the state stays on the correct **manifold** (a curved space that is locally flat).
 
 ---
 

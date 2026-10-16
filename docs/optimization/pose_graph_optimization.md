@@ -42,7 +42,7 @@ Each edge says:
 
 > **"The relative transformation between these two poses should approximately equal this measurement."**
 
-> **Note**: "odometry" and "visual odometry" aren't the same sensor, just the same *kind* of measurement from different sources - wheel odometry counts wheel rotations, while visual odometry (VO) tracks features across camera frames to estimate the same incremental relative pose.
+> **Note:** "odometry" and "visual odometry" aren't the same sensor, just the same *kind* of measurement from different sources - wheel odometry counts wheel rotations, while visual odometry (VO) tracks features across camera frames to estimate the same incremental relative pose.
 > - The distinction matters for this graph's edges because a single (monocular) camera used this way can only recover relative motion up to an unknown **scale** factor - "the camera moved some distance" could mean 1 meter or 100 - see [vi_initialization.md §1](../frontend/vi_initialization.md#1-the-bootstrapping-problem) for why.
 > - This doc's $\Delta_{ij}$ edges are treated as already-metric (as from wheel odometry, stereo VO, or monocular VO with scale recovered via IMU fusion).
 > - So a pose graph's only gauge freedom is the rigid 6-DoF (3-DoF in 2D) gauge noted in [§7](#7-the-mathematics-is-actually-quite-intuitive), never a scale ambiguity - unlike monocular bundle adjustment's projective edges, whose unresolved scale is discussed in [umeyama_alignment.md](../foundations/umeyama_alignment.md).
@@ -172,7 +172,8 @@ In plain English:
 
 One subtlety this formula hides: since every constraint is *relative*, rigidly translating and rotating the entire graph together leaves every $e_{ij}$ unchanged. The cost therefore has flat directions with zero curvature: [**gauge freedom**](../glossary.md#gauge-freedom). In practice we anchor one pose (usually $T_0$), e.g. by giving it an enormous information weight. The linear system solved at each step then has a unique solution instead of infinitely many equally good ones.
 
-**Intuition:** picture a square of poses drawn on the floor.
+### Intuition
+Picture a square of poses drawn on the floor.
 - Slide or turn the whole square: every relative edge is unchanged, so the cost does not change.
 - Anchoring node 0 nails the square to the floor, leaving one best answer.
 
@@ -399,7 +400,7 @@ The global optimization minimizes the sum of squared Mahalanobis distances over 
 {F(X) = \sum_{(i,j) \in \mathcal{E}} r_{ij}(X)^\top \Omega_{ij} \, r_{ij}(X)}
 ```
 
-> **Note**: [Mahalanobis distance](../glossary.md#mahalanobis-distance) measures how far a point is from the center of a distribution, in units of its spread. Here the "point" is the residual ${r_{ij}(X)}$, the "distribution" is the measurement noise model (mean $\mathbf{0}$, covariance ${\Sigma_{ij} = \Omega_{ij}^{-1}}$), and ${\Omega_{ij}}$ is exactly the inverse-covariance weighting that turns a plain squared-error sum into a squared Mahalanobis-distance sum. See the tilestats.com video and amit's Medium explainer cited in [§17](#17-references), and [the isotropic special case](../glossary.md#isotropic-and-anisotropic), where this weighting collapses to a uniform scale factor.
+> **Note:** [Mahalanobis distance](../glossary.md#mahalanobis-distance) measures how far a point is from the center of a distribution, in units of its spread. Here the "point" is the residual ${r_{ij}(X)}$, the "distribution" is the measurement noise model (mean $\mathbf{0}$, covariance ${\Sigma_{ij} = \Omega_{ij}^{-1}}$), and ${\Omega_{ij}}$ is exactly the inverse-covariance weighting that turns a plain squared-error sum into a squared Mahalanobis-distance sum. See the tilestats.com video and amit's Medium explainer cited in [§17](#17-references), and [the isotropic special case](../glossary.md#isotropic-and-anisotropic), where this weighting collapses to a uniform scale factor.
 
 ### 15.4 Manifold Optimization and Linearization
 
@@ -574,9 +575,11 @@ So $g = -b$ in §15.5's notation, and the code solves $`(H + \lambda \, \mathrm{
 
 **Cost** (`cost`): $`F = \sum e_{ij}^\top \Omega \, e_{ij}`$, with no $\frac{1}{2}$ factor. It is the value printed as "total chi-squared error" and the value the accept test compares.
 
-**Retraction**: every node, node 0 included, is updated as $`X_k \leftarrow X_k \, \mathrm{Exp}(\boldsymbol{\delta}_k)`$ (`se3_exp`). `use_manif/` writes the same update as `T + manif.SE3Tangent(delta_k)`.
+#### Retraction
+Every node, node 0 included, is updated as $`X_k \leftarrow X_k \, \mathrm{Exp}(\boldsymbol{\delta}_k)`$ (`se3_exp`). `use_manif/` writes the same update as `T + manif.SE3Tangent(delta_k)`.
 
-**Defaults**: `--damping 0.01` (initial $\lambda$), `--gn-tol 1e-6`, `--gn-max-iters 10`, `--side-length 2.0`, one node per square corner (4 nodes, 3 odometry edges and 1 loop closure). With `--seed 0` the default run converges in 5 iterations.
+#### Defaults
+`--damping 0.01` (initial $\lambda$), `--gn-tol 1e-6`, `--gn-max-iters 10`, `--side-length 2.0`, one node per square corner (4 nodes, 3 odometry edges and 1 loop closure). With `--seed 0` the default run converges in 5 iterations.
 
 ---
 

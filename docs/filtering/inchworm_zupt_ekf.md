@@ -15,8 +15,8 @@ ANCHOR                    EXTEND                     ANCHOR
 
 *Illustrative: the toy itself is a point mass with a trapezoidal velocity.*
 
-- **Anchor**: one end is planted on the ground, so that segment is, ideally, stationary ($v = 0$). In this toy the whole point mass stands still, so it's known ground truth.
-- **Extend**: the anchor releases, the body pushes forward at some commanded speed, then the new end plants and grips.
+- **Anchor:** one end is planted on the ground, so that segment is, ideally, stationary ($v = 0$). In this toy the whole point mass stands still, so it's known ground truth.
+- **Extend:** the anchor releases, the body pushes forward at some commanded speed, then the new end plants and grips.
 
 The idea: during anchor, "velocity = 0" is a known, free measurement (a ZUPT, Zero-Velocity Update) that we can feed into the filter. It is valid only while we're still. Fed in during extend, it tells the filter something false with high confidence, which is the failure mode the `always` variant demonstrates.
 
@@ -38,7 +38,8 @@ We work through the simplest concrete version using [`inchworm_zupt_ekf.py`](../
 
 *Figure: the gait schedule at `use_numpy/inchworm_zupt_ekf.py`'s defaults, plotted by `uv run python assets/make_figures.py inchworm_zupt_ekf_concept`.*
 
-**Scope**: this is deliberately a small slice of the real idea.
+### Scope
+This is deliberately a small slice of the real idea.
 
 - It models translation only: ZUPT, not ZARU, which needs gyro-bias ([glossary](../glossary.md#bias)) and orientation states this toy doesn't carry.
 - It assumes the gait schedule (when anchor/extend happen) is *known*, not detected. What happens once the schedule itself is uncertain is the subject of [`hybrid_saltation_ekf.md` §8](hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter), which we lean on rather than repeat.
@@ -66,7 +67,8 @@ We compare three ways of using the ZUPT **pseudo-measurement** (a value the filt
 
 All three variants run the same Kalman filter over $x = [p, v]^\top$. The script calls it an EKF ([glossary](../glossary.md#ekf-extended-kalman-filter)) to match the rest of this repo, but every model here is exactly linear, so there is no linearization error and it is really a plain KF. Each tick runs up to three steps, in this order: **predict**, **position update**, then (depending on the variant) a **ZUPT update** (`run_ekf`).
 
-**Predict** (`predict`): a constant-velocity model, identical for all variants and both gait phases. The filter doesn't know the commanded velocity, only that it's roughly constant between ticks:
+#### Predict (`predict`)
+A constant-velocity model, identical for all variants and both gait phases. The filter doesn't know the commanded velocity, only that it's roughly constant between ticks:
 
 ```math
 \Phi = \begin{bmatrix} 1 & \Delta t \\ 0 & 1 \end{bmatrix}, \qquad
@@ -81,7 +83,8 @@ Superscripts mark the step: $x^-$, $P^-$ are predicted (before the update) and $
 
 $`\sigma_{\text{process}}`$ is the assumed acceleration-disturbance standard deviation (§2), and $Q$ (the **process-noise covariance**, [glossary](../glossary.md#predict-and-update-steps)) is a simple diagonal heuristic (the same formula as in `saltation_matrix_ekf.py`), not the textbook continuous white-noise-acceleration $Q$, which also has off-diagonal terms.
 
-**Measurement updates** (`_kf_update`): both updates go through the same standard linear-Gaussian update and differ only in $z$, $H$ and $R$ (the measurement, the **measurement Jacobian** and the **measurement-noise covariance**, [glossary](../glossary.md#ekf-extended-kalman-filter)):
+#### Measurement updates (`_kf_update`)
+Both updates go through the same standard linear-Gaussian update and differ only in $z$, $H$ and $R$ (the measurement, the **measurement Jacobian** and the **measurement-noise covariance**, [glossary](../glossary.md#ekf-extended-kalman-filter)):
 
 ```math
 r = z - H x^{-}, \qquad S = H P^{-} H^\top + R, \qquad K = P^{-} H^\top S^{-1}
@@ -100,7 +103,8 @@ x^{+} = x^{-} + K r, \qquad P^{+} = (I - K H)\,P^{-}
 
 ZUPT is a pseudo-measurement: no sensor produces that $z = 0$. The filter is simply told "velocity is zero, give or take $\sigma_{\text{zupt}}$", which is only true if the robot really is stationary. The script's defaults are $\sigma_{\text{pos}} = 0.02$ m and $\sigma_{\text{zupt}} = 0.01$ m/s. Because the two measurement noises are independent, running the ZUPT update right after the position update in the same tick gives the same result as one joint update with both rows of $H$ stacked.
 
-**The ZUPT update, written out.** With $`H = \begin{bmatrix} 0 & 1 \end{bmatrix}`$ everything reduces to scalars. Write the predicted covariance as
+#### The ZUPT update, written out
+With $`H = \begin{bmatrix} 0 & 1 \end{bmatrix}`$ everything reduces to scalars. Write the predicted covariance as
 
 ```math
 P^{-} = \begin{bmatrix} P_{pp} & P_{pv} \\ P_{pv} & P_{vv} \end{bmatrix}

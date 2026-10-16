@@ -304,7 +304,7 @@ consumer GPS fix → good to about ±5 m
 RTK-GPS fix      → good to about ±2 cm
 ```
 
-(**RTK-GPS**: real-time kinematic GPS, which corrects the fix using a nearby base station.)
+(**RTK-GPS:** real-time kinematic GPS, which corrects the fix using a nearby base station.)
 
 (Covariances let us compare sensors with different units: a camera measures pixels, an IMU measures rates, so each measurement carries its own $\Sigma_i$.)
 

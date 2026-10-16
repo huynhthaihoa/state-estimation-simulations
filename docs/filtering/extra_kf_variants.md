@@ -95,9 +95,9 @@ $$R = \hat R \exp(\delta\theta^\wedge)$$
 
 Each cycle has three steps:
 
-1. **Predict**: integrate the nominal state with the full nonlinear model (for example raw IMU samples), and propagate the error covariance $P$ with the linearized error dynamics.
-2. **Update**: a measurement produces an estimate of $\delta x$ through a normal EKF update.
-3. **Inject and reset**: fold $\delta x$ into the nominal state (for rotation, $`\hat R \leftarrow \hat R\exp(\delta\theta^\wedge)`$), then set $\delta x = 0$.
+1. **Predict:** integrate the nominal state with the full nonlinear model (for example raw IMU samples), and propagate the error covariance $P$ with the linearized error dynamics.
+2. **Update:** a measurement produces an estimate of $\delta x$ through a normal EKF update.
+3. **Inject and reset:** fold $\delta x$ into the nominal state (for rotation, $`\hat R \leftarrow \hat R\exp(\delta\theta^\wedge)`$), then set $\delta x = 0$.
 
 **Intuition:**
 - Think of a big map (the nominal state) plus a small sticky note (the error state) with the current correction.
@@ -142,7 +142,7 @@ For robotics we usually learn KF, EKF, ESKF and IEKF before spending much time o
 
 [kf_ekf_iekf.md](kf_ekf_iekf.md) covers this one in depth; here we place it in the broader family.
 
-**Naming**: in this repo "IEKF" always means the *Invariant* EKF. The literature also uses IEKF for the *Iterated* EKF, which relinearizes the update at the new estimate and repeats. That is an unrelated idea, covered in [kf_ekf_iekf.md §9](kf_ekf_iekf.md#9-other-prominent-variants-worth-keeping-in-mind).
+**Naming:** in this repo "IEKF" always means the *Invariant* EKF. The literature also uses IEKF for the *Iterated* EKF, which relinearizes the update at the new estimate and repeats. That is an unrelated idea, covered in [kf_ekf_iekf.md §9](kf_ekf_iekf.md#9-other-prominent-variants-worth-keeping-in-mind).
 
 The key idea:
 
@@ -239,7 +239,7 @@ This lets a PF represent **multimodal** beliefs - "the robot is either in room A
 - Naturally represents multimodal beliefs (ambiguous **data association**, i.e. which landmark a measurement belongs to; the **kidnapped-robot problem**, being moved without being told; **global localization**, finding the pose with no initial guess).
 - Classic robotics use case: **Monte Carlo Localization (MCL)** - localizing a robot on a known map from range/bearing measurements.
 
-**The catch**: accuracy scales with particle count, and in high-dimensional state spaces (like a full SLAM state vector) you need an impractically large number of particles to cover the space adequately. So plain particle filters are common for low-dimensional localization but rare for full SLAM state estimation, where EKF/UKF/factor-graph approaches dominate.
+**The catch:** accuracy scales with particle count, and in high-dimensional state spaces (like a full SLAM state vector) you need an impractically large number of particles to cover the space adequately. So plain particle filters are common for low-dimensional localization but rare for full SLAM state estimation, where EKF/UKF/factor-graph approaches dominate.
 
 The notable exception is the **Rao-Blackwellized particle filter**. Given the robot's trajectory, the landmarks become independent of each other, so each particle carries only a trajectory hypothesis plus one small EKF per landmark (**FastSLAM**, Montemerlo et al. 2002), or an **occupancy grid** (a map of which cells are free or occupied; **GMapping**, Grisetti et al. 2007). The particles then cover only the low-dimensional pose, which is what makes particle-filter SLAM practical.
 
@@ -251,7 +251,7 @@ Normally we assume the process noise covariance $Q$ and measurement noise covari
 
 An adaptive KF estimates or adjusts $Q$ and/or $R$ online. One family does this from the filter's own innovation sequence, the approach of Mehra (1970, reference 7). It is useful when the environment or sensor quality changes over time.
 
-**Intuition:**
+### Intuition
 - Before each measurement, the filter predicts how big its surprise (the [innovation](../glossary.md#innovation-and-kalman-gain)) should be: the **innovation covariance** $`S`$ ([glossary](../glossary.md#innovation-and-kalman-gain)).
 - Then it compares with the surprise it actually gets.
 - Surprises much bigger than $`S`$ say that $Q$ or $R$ is too small. Much smaller says too big.
@@ -279,7 +279,7 @@ measurements:
 A conventional KF may be pulled toward that outlier. Robust filtering reduces the influence of bad measurements. The two common approaches are:
 
 - **Innovation gating**, widely used. Before an update, compute the normalized innovation squared $`\nu^\top S^{-1}\nu`$ (the NIS from [linear_nonlinear.md §4.4](linear_nonlinear.md#44-after-the-fact-consistency-tests), with $`\nu`$ the innovation, measurement minus prediction). If it exceeds a chi-square threshold (for example the 99% bound for the measurement's dimension), reject the measurement outright.
-- **Down-weighting**: keep the measurement but inflate its $R$ in proportion to how surprising it is. This is the filter's version of the Huber-style robust losses in [pose_graph_optimization.md §16](../optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
+- **Down-weighting:** keep the measurement but inflate its $R$ in proportion to how surprising it is. This is the filter's version of the Huber-style robust losses in [pose_graph_optimization.md §16](../optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
 
 **Tiny example of gating** (1-D measurement, $S = 1$):
 - A 3σ surprise gives $`\nu^\top S^{-1}\nu = 9`$.

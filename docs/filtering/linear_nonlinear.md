@@ -13,12 +13,12 @@ The system is linear only if both $f$ and $h$ are linear in the state $x$, meani
 1. **Superposition.** $f(a x_1 + b x_2) = a f(x_1) + b f(x_2)$ must hold for every $x_1, x_2, a, b$. A constant offset (making $f$ **affine**: linear plus a constant) fails this test but is still fine for a KF, since it just adds to the mean.
 2. **The Jacobian doesn't depend on $x$.** Differentiate: if $\partial f / \partial x$ or $\partial h / \partial x$ still contains $x$, the system is nonlinear. This is the most practical test, and it is why the EKF has to recompute $F_k$ and $H_k$ at every step ([kf_ekf_iekf.md §2](kf_ekf_iekf.md#2-extended-kalman-filter-the-world-is-nonlinear-so-ill-approximate-it-locally)): they change as the estimate changes.
 3. **Look for these patterns.** Any of them makes a model nonlinear:
-   - **Trig of a state**: $\cos\theta$, $\sin\theta$ where $\theta$ is estimated. This is the unicycle in [kf_ekf_iekf.md §2](kf_ekf_iekf.md#2-extended-kalman-filter-the-world-is-nonlinear-so-ill-approximate-it-locally).
-   - **States multiplied together**: $v \cdot \cos\theta$ (here $`v`$ is a speed, not the measurement noise), or $`R\,p`$ when both $R$ and $p$ are estimated ($`R`$ the rotation, not the noise covariance; $`p`$ the position).
-   - **Rotations or poses in minimal coordinates**: composing $T \cdot \mathrm{Exp}(\xi)$ (pose $`T`$, tangent-space error $`\xi`$, **exponential map** $`\mathrm{Exp}`$; [glossary](../glossary.md#exp-and-log-maps)), or a pose parameterized by angles. The point-cloud observation $R\,p_i + t$ is the counter-example: it is exactly linear in the state $[\mathrm{vec}(R), t]$ ([pointcloud_pose_tracking_empirical_note.md §4.1](pointcloud_pose_tracking_empirical_note.md#41-what-vanilla-buys-and-costs)). The nonlinearity enters through the rotation constraint and the minimal error coordinates.
-   - **Division by a state**: camera projection $u = f_x X/Z$ (here $`u`$ is the pixel coordinate, not the control input; $`f_x`$ is the focal length in pixels, not the motion model $`f`$; $`X`$ and $`Z`$ are the lateral and depth coordinates of the point in the camera frame).
-   - **Norms and square roots**: range $\sqrt{(x-x_L)^2 + (y-y_L)^2}$ (robot position $`(x, y)`$, landmark position $`(x_L, y_L)`$).
-   - **Switching or contact**: impacts, or stick/slip friction. These are non-smooth, which is what the saltation-matrix EKF in [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) handles.
+   - **Trig of a state:** $\cos\theta$, $\sin\theta$ where $\theta$ is estimated. This is the unicycle in [kf_ekf_iekf.md §2](kf_ekf_iekf.md#2-extended-kalman-filter-the-world-is-nonlinear-so-ill-approximate-it-locally).
+   - **States multiplied together:** $v \cdot \cos\theta$ (here $`v`$ is a speed, not the measurement noise), or $`R\,p`$ when both $R$ and $p$ are estimated ($`R`$ the rotation, not the noise covariance; $`p`$ the position).
+   - **Rotations or poses in minimal coordinates:** composing $T \cdot \mathrm{Exp}(\xi)$ (pose $`T`$, tangent-space error $`\xi`$, **exponential map** $`\mathrm{Exp}`$; [glossary](../glossary.md#exp-and-log-maps)), or a pose parameterized by angles. The point-cloud observation $R\,p_i + t$ is the counter-example: it is exactly linear in the state $[\mathrm{vec}(R), t]$ ([pointcloud_pose_tracking_empirical_note.md §4.1](pointcloud_pose_tracking_empirical_note.md#41-what-vanilla-buys-and-costs)). The nonlinearity enters through the rotation constraint and the minimal error coordinates.
+   - **Division by a state:** camera projection $u = f_x X/Z$ (here $`u`$ is the pixel coordinate, not the control input; $`f_x`$ is the focal length in pixels, not the motion model $`f`$; $`X`$ and $`Z`$ are the lateral and depth coordinates of the point in the camera frame).
+   - **Norms and square roots:** range $\sqrt{(x-x_L)^2 + (y-y_L)^2}$ (robot position $`(x, y)`$, landmark position $`(x_L, y_L)`$).
+   - **Switching or contact:** impacts, or stick/slip friction. These are non-smooth, which is what the saltation-matrix EKF in [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) handles.
 
 The first two tests are exact. The third is a heuristic for spotting what will fail them.
 
@@ -44,8 +44,8 @@ Almost every real robot model is nonlinear. The useful question is whether it's 
 
 Compare that to the process or measurement noise.
 
-- **Much smaller than the noise**: the EKF is fine.
-- **Comparable to the noise or larger**: the Jacobian changes a lot within our uncertainty (for example, a large heading uncertainty, or a landmark close to the camera). Consider the UKF, an **iterated update** (repeated [relinearization](../glossary.md#relinearization) within one measurement update), or an invariant or manifold formulation.
+- **Much smaller than the noise:** the EKF is fine.
+- **Comparable to the noise or larger:** the Jacobian changes a lot within our uncertainty (for example, a large heading uncertainty, or a landmark close to the camera). Consider the UKF, an **iterated update** (repeated [relinearization](../glossary.md#relinearization) within one measurement update), or an invariant or manifold formulation.
 
 $P$ (the state covariance) changes over time, so the answer does too. Check at the worst moments:
 
@@ -77,10 +77,10 @@ The EKF keeps only the first two terms. With $\delta \sim \mathcal N(0, P)$ (and
 
 Compare both with the noise the model already carries: $R$ for $h$, $Q$ for $f$.
 
-- **Small**: the bias and the extra spread $`\sqrt{\tfrac12\mathrm{tr}(\nabla^2 f_i\,P\,\nabla^2 f_i\,P)}`$ are both much smaller than $`\sqrt{R_{ii}}`$ (the sensor's own standard deviation), so the linearization is adequate.
+- **Small:** the bias and the extra spread $`\sqrt{\tfrac12\mathrm{tr}(\nabla^2 f_i\,P\,\nabla^2 f_i\,P)}`$ are both much smaller than $`\sqrt{R_{ii}}`$ (the sensor's own standard deviation), so the linearization is adequate.
 - **Comparable or larger**, in either: the model is effectively nonlinear at this uncertainty.
 
-**Range sensor example (2D)**: the Hessian of $`h = \lVert p - L\rVert`$ is $`(I - uu^\top)/r`$. Here $u$ is the unit line-of-sight vector (not the control input), $`p`$ the position, $`L`$ the landmark, $`r`$ the range $`\lVert p-L\rVert`$ and $`\sigma_p`$ the position standard deviation. It has curvature $1/r$ across the line of sight, so the bias is about $\sigma_p^2 / (2r)$ (in 3D there are two perpendicular directions, which gives $\sigma_p^2 / r$). With $\sigma_p = 1$ m and $\sigma_{\text{range}} = 0.1$ m:
+**Range sensor example (2D):** the Hessian of $`h = \lVert p - L\rVert`$ is $`(I - uu^\top)/r`$. Here $u$ is the unit line-of-sight vector (not the control input), $`p`$ the position, $`L`$ the landmark, $`r`$ the range $`\lVert p-L\rVert`$ and $`\sigma_p`$ the position standard deviation. It has curvature $1/r$ across the line of sight, so the bias is about $\sigma_p^2 / (2r)$ (in 3D there are two perpendicular directions, which gives $\sigma_p^2 / r$). With $\sigma_p = 1$ m and $\sigma_{\text{range}} = 0.1$ m:
 
 | Range $r$ | Bias | Extra spread $\sqrt{\tfrac12 / r^2}$ | vs. 0.1 m noise |
 | --- | --- | --- | --- |
@@ -97,7 +97,7 @@ Some quick scalings, each giving the dropped second-order term relative to the f
 | Camera, $X/Z$ | $\sim (\sigma_Z / Z)^2$ ($`\sigma_Z`$ = depth standard deviation) | depth uncertainty comparable to depth → trouble |
 | Range (2D), $r$ | $\sim \tfrac12 (\sigma_p / r)^2$ | position uncertainty comparable to range → trouble |
 
-**Tiny example (why the bias is one-sided):**
+#### Tiny example (why the bias is one-sided)
 - Toy case: $\hat\theta = 0$, $\theta \sim \mathcal N(0, 0.5^2)$, so $\sigma_\theta = 0.5$ rad.
 - $\cos\theta$ has a flat top at $0$: an error of $+0.5$ and an error of $-0.5$ both push it below $1$.
 - The errors do not cancel. Exactly, $`E[\cos\theta] = e^{-\sigma_\theta^2/2} = 0.8825`$, about 11.8% below $1$.
@@ -150,8 +150,8 @@ Run the filter and check whether its reported uncertainty is believable (**consi
 
 A consistent filter's NEES averages the state dimension $n$ (NIS: the measurement dimension). Which bound to compare against depends on what we look at:
 
-- **One run**: a single NEES value is **chi-square** ([glossary](../glossary.md#chi-square-distribution)) with $n$ degrees of freedom, so its 95% upper bound is wide (7.81 for $n = 3$).
-- **An average over $N$ Monte Carlo runs**: $N$ times the average is chi-square with $nN$ degrees of freedom, so the interval is much tighter, about $`n \pm 1.96\sqrt{2n/N}`$. The scripts compute it with `averaged_nees_bounds(n, N)`, which uses the **Wilson-Hilferty approximation** (a closed-form estimate of chi-square quantiles). For $N = 500$:
+- **One run:** a single NEES value is **chi-square** ([glossary](../glossary.md#chi-square-distribution)) with $n$ degrees of freedom, so its 95% upper bound is wide (7.81 for $n = 3$).
+- **An average over $N$ Monte Carlo runs:** $N$ times the average is chi-square with $nN$ degrees of freedom, so the interval is much tighter, about $`n \pm 1.96\sqrt{2n/N}`$. The scripts compute it with `averaged_nees_bounds(n, N)`, which uses the **Wilson-Hilferty approximation** (a closed-form estimate of chi-square quantiles). For $N = 500$:
 
 | Script | $n$ | 95% band |
 | --- | --- | --- |

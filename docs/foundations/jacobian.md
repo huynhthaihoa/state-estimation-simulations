@@ -315,12 +315,12 @@ Notice $J_r = J_l^\top$, as the identity predicts. Plugging $\theta \to 0$ into 
 
 ### 11.6 Where this actually matters
 
-- **[IMU preintegration](../glossary.md#imu-preintegration)**: the effect of a small change in gyroscope bias is naturally expressed in the sensor's own (body) frame, so bias-correction Jacobians in preintegration use $J_r$ - worked out end-to-end in [imu_preintegration.md](../optimization/imu_preintegration.md).
-- **Covariance propagation on the manifold**: a rotation's uncertainty is a covariance on the tangent vector $\delta\varphi$, and what it numerically means depends on whether $\delta\varphi$ is defined via $`R\,\text{Exp}(\delta\varphi)`$ (right) or $`\text{Exp}(\delta\varphi)\, R`$ (left).
+- **[IMU preintegration](../glossary.md#imu-preintegration):** the effect of a small change in gyroscope bias is naturally expressed in the sensor's own (body) frame, so bias-correction Jacobians in preintegration use $J_r$ - worked out end-to-end in [imu_preintegration.md](../optimization/imu_preintegration.md).
+- **Covariance propagation on the manifold:** a rotation's uncertainty is a covariance on the tangent vector $\delta\varphi$, and what it numerically means depends on whether $\delta\varphi$ is defined via $`R\,\text{Exp}(\delta\varphi)`$ (right) or $`\text{Exp}(\delta\varphi)\, R`$ (left).
   - Converting between them is a multiplication by $R$ (the [adjoint](lie_algebra.md#112-the-adjoint-moving-a-small-motion-between-frames), which for rotations is $R$ itself): $`\text{Exp}(\delta\varphi_{\text{left}})\,R = R\,\text{Exp}(\delta\varphi_{\text{right}})`$ gives $`\delta\varphi_{\text{left}} = R\,\delta\varphi_{\text{right}}`$.
   - Hence $`\Sigma_{\text{left}} = R\,\Sigma_{\text{right}}R^\top`$: a change of frame, not a change of the underlying uncertainty.
   - The §11.4 identity $`J_l = R\,J_r`$ follows from the same fact.
-- **Factor graphs/bundle adjustment on $SE(3)$**: residual Jacobians w.r.t. a pose depend on which perturbation convention (left vs. right) the library uses, and the update must apply the step with the same convention. Mixing them gives wrong step directions: the optimization can converge slowly, converge to the wrong place, or diverge, all while the code runs without error.
+- **Factor graphs/bundle adjustment on $SE(3)$:** residual Jacobians w.r.t. a pose depend on which perturbation convention (left vs. right) the library uses, and the update must apply the step with the same convention. Mixing them gives wrong step directions: the optimization can converge slowly, converge to the wrong place, or diverge, all while the code runs without error.
 
 ### 11.7 One-sentence intuition
 

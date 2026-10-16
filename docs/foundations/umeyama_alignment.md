@@ -17,8 +17,8 @@ The same closed-form fit also runs *inside* SLAM pipelines:
 
 A monocular camera looking at a static scene can recover the *shape* of the scene and the *relative* motion of the cameras, but it cannot recover:
 
-- **absolute position/orientation**: the whole reconstruction could be picked up and rigidly moved anywhere, and every reprojection error would stay identical
-- **absolute scale**: shrinking the entire scene and every camera-to-point distance by the same factor, while changing nothing else, leaves every projected pixel where it was
+- **absolute position/orientation:** the whole reconstruction could be picked up and rigidly moved anywhere, and every reprojection error would stay identical
+- **absolute scale:** shrinking the entire scene and every camera-to-point distance by the same factor, while changing nothing else, leaves every projected pixel where it was
 
 **Tiny example (toy case: pinhole camera, ignoring the principal point):** a point at $`(X, Z) = (1, 5)`$ and another at $`(2, 10)`$ both land at $`u = f X / Z = f/5`$ (where $`f`$ is the focal length, $`u`$ the horizontal pixel coordinate, and $`X, Z`$ the point's lateral and depth coordinates). Doubling the whole scene changes no pixel.
 
