@@ -44,7 +44,9 @@ Four questions, answered with [`hexapod_gait_ekf.py`](../../use_numpy/hexapod_ga
 p_{k+1} = p_k + R(\theta_k)\, b_k\, \Delta t, \qquad \theta_{k+1} = \theta_k + \omega_k \Delta t, \qquad [b, \omega]_{k+1} = [b, \omega]_k + w_k
 ```
 
-$`R(\theta)`$ is the 2D rotation by $\theta$, taking body-frame vectors to the world frame. $`w_k`$ is the process noise on the twist: each tick adds an independent Gaussian step, so the twist does a **random walk**, with step std $`\sigma_a \Delta t`$ for $`u, v`$ ($`\sigma_a = 0.05\ \text{m/s}^2`$) and $`\sigma_\alpha \Delta t`$ for $`\omega`$ ($`\sigma_\alpha = 0.1\ \text{rad/s}^2`$). The truth twist is drawn from exactly this random walk, so $Q$, the covariance of $`w_k`$ ([glossary](../glossary.md#predict-and-update-steps)), is matched and NEES is a fair test ([glossary](../glossary.md#consistency-and-nees)).
+- $`R(\theta)`$ is the **2D rotation** by $\theta$, taking body-frame vectors to the world frame. 
+- $`w_k`$ is the **process noise** on the twist: each tick adds an independent Gaussian step, so the twist does a **random walk**, with step std $`\sigma_a \Delta t`$ for $`u, v`$ ($`\sigma_a = 0.05\ \text{m/s}^2`$) and $`\sigma_\alpha \Delta t`$ for $`\omega`$ ($`\sigma_\alpha = 0.1\ \text{rad/s}^2`$). Here $`\sigma_a`$ and $`\sigma_\alpha`$ are the stds of a random linear and angular acceleration: the twist wanders because random accelerations push it.
+- The **truth twist** is drawn from exactly this random walk, and the true pose is integrated with the filter's own discrete model (`propagate`). So the motion model is exact and $Q$, the **covariance** of $`w_k`$ ([glossary](../glossary.md#predict-and-update-steps)), is matched: NEES is a fair test ([glossary](../glossary.md#consistency-and-nees)).
 
 **Measure** (`measurement_update_feet`): each stance foot $i$ reports its velocity relative to the body, in the body frame:
 
@@ -60,7 +62,7 @@ H_i = \begin{bmatrix} 0 & 0 & 0 & -1 & 0 & r_{i,y} \\ 0 & 0 & 0 & 0 & -1 & -r_{i
 
 All stance feet enter one **joint update** per tick: their readings are stacked into a single measurement.
 
-**What is never measured.** No reading involves $`p_x, p_y, \theta`$, so they are unobservable ([glossary](../glossary.md#observability)): leg odometry integrates the twist, and position and heading drift. This matches the real-robot result that, with leg kinematics and an IMU, everything except global position and yaw is observable (Bloesch et al. 2013, ref. 3).
+**What is never measured.** No reading involves $`p_x, p_y, \theta`$, so they are **unobservable** ([glossary](../glossary.md#observability)): leg odometry integrates the twist, and position and heading drift. This matches the real-robot result that, with leg kinematics and an IMU, everything except global position and yaw is observable (Bloesch et al. 2013, ref. 3).
 
 **Controlled comparison** (`simulate_trial`): each Monte Carlo trial ([glossary](../glossary.md#monte-carlo-trials)) draws one true trajectory, one initial-guess error and one noise stream per foot, and every gait uses the same draws. Only which feet are down, and where, changes between gaits.
 
