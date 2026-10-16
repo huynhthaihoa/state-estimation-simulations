@@ -10,7 +10,7 @@ What can such a robot know? Picture the whole world, robot and footholds include
 - the accelerometer reads the same specific force (gravity is unchanged by that rotation),
 - every leg reports the same foot position in the body frame.
 
-No reading changes, so **yaw** (the heading, the rotation about gravity) **is unobservable**, and so is absolute position (shift the whole world sideways: same argument). **Roll** and **pitch**, together the body's **tilt**, are observable, because gravity points one way ([glossary](../glossary.md#observability)).
+No reading changes, so **yaw** (the heading, the rotation about gravity) is **unobservable**, and so is **absolute position** (shift the whole world sideways: same argument). **Roll** and **pitch**, together the body's **tilt**, are **observable**, because gravity points one way ([glossary](../glossary.md#observability)).
 
 So a correct filter can only ever *lose* information about yaw. The experiments below check which filter respects that:
 
