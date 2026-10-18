@@ -68,7 +68,7 @@ We compare three ways of using the ZUPT **pseudo-measurement** (a value the filt
 All three variants run the same Kalman filter over $x = [p, v]^\top$. The script calls it an EKF ([glossary](../glossary.md#ekf-extended-kalman-filter)) to match the rest of this repo, but every model here is exactly linear, so there is no linearization error and it is really a plain KF. Each tick runs up to three steps, in this order: **predict**, **position update**, then (depending on the variant) a **ZUPT update** (`run_ekf`).
 
 #### Predict (`predict`)
-A constant-velocity model, identical for all variants and both gait phases. The filter doesn't know the commanded velocity, only that it's roughly constant between ticks:
+A constant-velocity model, with **state-transition matrix** $`\Phi`$, is identical for all variants and both gait phases. The filter doesn't know the commanded velocity, only that it's roughly constant between ticks:
 
 ```math
 \Phi = \begin{bmatrix} 1 & \Delta t \\ 0 & 1 \end{bmatrix}, \qquad
