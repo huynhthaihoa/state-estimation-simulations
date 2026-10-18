@@ -321,6 +321,7 @@ Accuracy and covariance calibration are separate properties, and NEES measures t
 | `saltation_matrix_ekf.py` | Back-end, filtering | Hybrid resets | [hybrid_saltation_ekf.md](filtering/hybrid_saltation_ekf.md) |
 | `invariant_saltation_ekf.py` | Back-end, filtering | Hybrid resets on $`SE_2(3)`$ (right-invariant EKF) | [invariant_saltation_ekf.md](filtering/invariant_saltation_ekf.md) |
 | `inchworm_zupt_ekf.py` | Back-end, filtering | Phase-gated ZUPT | [inchworm_zupt_ekf.md](filtering/inchworm_zupt_ekf.md) |
+| `inchworm_zupt_zaru_ekf.py` | Back-end, filtering | Phase-gated ZUPT + ZARU with heading | [inchworm_zupt_ekf.md §5](filtering/inchworm_zupt_ekf.md#5-side-extension-heading-and-zaru) |
 | `friction_anisotropic_ekf.py` | Back-end, filtering | Heading-dependent $Q$ | [friction_anisotropic_ekf.md](filtering/friction_anisotropic_ekf.md) |
 | `hexapod_gait_ekf.py` | Back-end, filtering | Multi-leg odometry, gait comparison, per-foot gating | [hexapod_gait_ekf.md](filtering/hexapod_gait_ekf.md) |
 | `hexapod_contact_inekf.py` | Back-end, filtering | Contact-aided IEKF on $`SE_{K+2}(3)`$ vs. world-frame EKF, yaw consistency | [hexapod_contact_inekf.md](filtering/hexapod_contact_inekf.md) |

@@ -41,7 +41,7 @@ We work through the simplest concrete version using [`inchworm_zupt_ekf.py`](../
 ### Scope
 This is deliberately a small slice of the real idea.
 
-- It models translation only: ZUPT, not ZARU, which needs gyro-bias ([glossary](../glossary.md#bias)) and orientation states this toy doesn't carry.
+- It models translation only: ZUPT, not ZARU, which needs gyro-bias ([glossary](../glossary.md#bias)) and orientation states this toy doesn't carry. §5 adds a heading and ZARU in a planar side extension (still without gyro bias).
 - It assumes the gait schedule (when anchor/extend happen) is *known*, not detected. What happens once the schedule itself is uncertain is the subject of [`hybrid_saltation_ekf.md` §8](hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter), which we lean on rather than repeat.
 
 ---
@@ -175,7 +175,7 @@ One might expect `always` to match `phase_conditional` during genuine anchor tic
 
 *Figure: `use_numpy/inchworm_zupt_ekf.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py inchworm_zupt_ekf`.*
 
-The same run, animated over five anchor/extend cycles. The top strip shows the point mass crawling along its track, gold while anchored and green while extending, with a gray footprint at each anchor point and each policy's position estimate below it; `always` falls several centimetres behind (position **RMSE** 0.060 m vs 0.015-0.016 m). The middle panel shows each policy's velocity estimate with its ±2σ band: `always` collapses its band during motion, and `phase_conditional` tightens only on anchor ticks. The bottom panel shows the Monte Carlo NEES building up cycle by cycle; `always` climbs to a per-tick peak of about 940, and none of the three is consistent at these defaults.
+The same run, animated over five anchor/extend cycles. The top strip shows the point mass crawling along its track, gold while anchored and green while extending, with a gray footprint at each anchor point and each policy's position estimate below it; `always` falls several centimetres behind (position **RMSE** 0.060 m vs 0.015-0.016 m). The middle panel shows each policy's velocity estimate with its ±2σ band: `always` collapses its band during motion, and `phase_conditional` tightens only on anchor ticks. The bottom panel shows the Monte Carlo NEES (averaged over many randomized runs, [glossary](../glossary.md#monte-carlo-trials)) building up cycle by cycle; `always` climbs to a per-tick peak of about 940, and none of the three is consistent at these defaults.
 
 ![Animation of the inchworm gait over five cycles: top, the point mass crawling along its track with its anchor footprints and the three position estimates; middle, true velocity and the never, always and phase_conditional estimates with their ±2-sigma bands, anchor phases shaded; bottom, each policy's Monte Carlo averaged NEES on a log scale against the expected value 2](../../assets/inchworm_zupt_ekf.gif)
 
@@ -223,7 +223,73 @@ This toy's `never`/`always`/`phase_conditional` split is a minimal stand-in for 
 
 ---
 
-## 5. References
+## 5. Side extension: heading and ZARU
+
+The 1D toy cannot carry ZARU, since it has no orientation state (Scope). [`inchworm_zupt_zaru_ekf.py`](../../use_numpy/inchworm_zupt_zaru_ekf.py) adds one. A plain 2D copy of §1 would show nothing new: with **isotropic** noise (the same in every direction, [glossary](../glossary.md#isotropic-and-anisotropic)) it splits into two independent 1D filters. A heading is what couples the axes.
+
+### Model
+- **State:** $`x = [p_x, p_y, \theta, v, \omega]`$ (position, heading, forward speed, turn rate), a **unicycle**: $`p_x \mathrel{+}= v\cos\theta\,\Delta t`$, $`p_y \mathrel{+}= v\sin\theta\,\Delta t`$, $`\theta \mathrel{+}= \omega\,\Delta t`$, with $`v`$ and $`\omega`$ constant between ticks. The motion is nonlinear in $`\theta`$, so unlike §1.1 this is a real EKF, with $`\Phi`$ the Jacobian of that model.
+- **Process noise:** a random linear acceleration (std $`\sigma_a`$) along the heading and a random angular acceleration (std $`\sigma_\alpha`$), mapped to the state with $`\tfrac{1}{2}\Delta t^2`$ to position (along the heading only) or heading and $`\Delta t`$ to the rate. Unlike §1.1's diagonal heuristic, this keeps the correlation between each quantity and its rate.
+- **Measurements:** noisy position only (σ = 0.02 m per axis), with no heading sensor. So $`\theta`$ is **observable** (determinable from the measurements, [glossary](../glossary.md#observability)) only through the direction of travel, and not at all while anchored.
+- **Pseudo-measurements:** ZUPT ($`v = 0`$, σ = 0.01 m/s) and **ZARU** ($`\omega = 0`$, σ = 0.02 rad/s).
+- **Truth:** $`v`$ and $`\omega`$ follow the §2 trapezoid, with cruise values 0.1 m/s and 0.3 rad/s. The body turns 0.24 rad in each extend and is exactly still while anchored, so an unconditional ZARU is as false during motion as an unconditional ZUPT.
+- **Policies:** `never` (neither), `always` (both on every tick) and `phase_conditional` (both on anchor ticks) treat ZUPT and ZARU together. `phase_conditional_zupt_only` is a control variant: ZUPT on anchor ticks and no ZARU, which isolates what ZARU adds.
+
+### Results
+Seed 0, 500 trials. A consistent 5-DoF filter averages NEES 5, with a 95% interval of $`[4.73, 5.28]`$. "Defaults" assumes $`\sigma_a = 0.15\,\text{m/s}^2`$ and $`\sigma_\alpha = 0.45\,\text{rad/s}^2`$, 0.3 times the true ramp accelerations ($`0.5\,\text{m/s}^2`$ and $`1.5\,\text{rad/s}^2`$), as in §3. "Matched" assumes the true ramp values. That matches their size, not their effect, as shown below.
+
+| Policy | Defaults NEES anchor/cruise | Matched NEES anchor/cruise | Matched heading RMSE (single run) |
+| --- | --- | --- | --- |
+| `never` | 12.80/22.32 | 16.42/18.66 | 0.401 rad |
+| `always` | 1003.50/1723.66 | 1217.38/2023.85 | 0.651 rad |
+| `phase_conditional` | 22.43/50.65 | 5.33/7.85 | 0.221 rad |
+| `phase_conditional_zupt_only` | 21.83/41.92 | 8.07/14.74 | 0.360 rad |
+
+![Four panels from inchworm_zupt_zaru_ekf.py: heading over the gait with the estimates of the four policies, and their Monte Carlo NEES against the consistent value of 5, at the script defaults (top) and at matched process noise (bottom)](../../assets/inchworm_zupt_zaru_ekf.png)
+
+*Figure: `use_numpy/inchworm_zupt_zaru_ekf.py` at its defaults (top) and with `--process-noise-std 0.5 --process-noise-ang-std 1.5` (bottom), seed 0, plotted by `uv run python assets/make_figures.py inchworm_zupt_zaru_ekf`.*
+
+#### With matched noise, ZARU keeps the heading honest
+Across seeds 0-3, `phase_conditional` has the lowest overall NEES (6.22-6.38) and the lowest heading RMSE (0.159-0.221 rad) of the four policies in every seed. Dropping ZARU (`phase_conditional_zupt_only`) gives NEES 10.19-11.34, and `never` gives 16.79-19.96. Even `phase_conditional` sits slightly above the interval; the next subsection explains why.
+
+The mechanism shows in $`\sigma_\theta`$, the heading's standard deviation. While anchored, the body does not move, so position says nothing about $`\theta`$, and $`\theta`$ drifts on $`\omega`$'s uncertainty unless ZARU pins it. Seed 0, first to last tick of anchor phases 2-4:
+
+- Without ZARU (`phase_conditional_zupt_only`), $`\sigma_\theta`$ grows: 0.21 → 0.44, 0.28 → 0.49 and 0.28 → 0.51 rad.
+- With ZARU (`phase_conditional`), it shrinks: 0.11 → 0.08 rad in each of the three phases.
+
+#### Why even `phase_conditional` is slightly overconfident
+Checking each quantity on its own, as error² divided by its variance (1 = honest), shows where the excess is. Position is split along and across the true direction of travel. These ratios do not add up to NEES, which also counts correlations. Seed 0, 300 trials, after the first second:
+
+| Along-track | Cross-track | $`\theta`$ | $`v`$ | $`\omega`$ |
+| --- | --- | --- | --- | --- |
+| 1.39 | 1.75 | 2.92 | 0.53 | 0.69 |
+
+The heading carries most of the excess, and position follows it, more across the track than along it: a wrong heading pushes the path sideways. Speed and turn rate are conservative. Changing one thing at a time (overall NEES; baseline 6.29 with these 300 trials, 6.38 with the table's 500):
+
+- **No motion:** 2.50. **Moving but never turning:** 3.38. So the turning causes it.
+- **Initial error 10 times smaller:** 6.35, so it is not the EKF's linearization at a poor first guess.
+- **Assumed accelerations doubled:** 3.49, so "matched" noise is still too small for the turns.
+
+The likely reason is that the filter models the disturbance as independent kicks, one per tick, while the ramp pushes the same way on every ramp tick. Over the 4 ramp ticks the filter allows a turn-rate change of about $`1.5 \times 0.05 \times \sqrt{4} = 0.15`$ rad/s (one standard deviation), but each ramp changes $`\omega`$ by 0.3 rad/s, a 2σ event twice per cycle (ramp up and ramp down), and the heading integrates the difference. If that is the cause, longer and gentler ramps with the noise scaled to match should be worse, since the gap grows like $`\sqrt{n}`$ over $`n`$ ramp ticks. They are: ramp length 0.2 / 0.3 / 0.4 s gives NEES 6.29 / 9.69 / 11.86. This fits the explanation but does not prove it.
+
+#### `always` pins the heading where it started
+`always` applies ZUPT and ZARU on every tick, so the filter believes the body never moves or turns. Its $`\sigma_\theta`$ stays at the initial 0.10 rad (0.099-0.101) for the whole run, while the true heading turns through 1.2 rad. Its NEES grows cycle after cycle, and its average is over 1000 in both windows at both noise levels.
+
+#### At the defaults, ZARU does not rescue an under-sized model
+The defaults repeat §3's finding. `never` has the lowest NEES in all 4 seeds (15.79-16.14 overall, against 33.68-33.98 for `phase_conditional`). Adding ZARU does not help there: `phase_conditional` is slightly worse than `phase_conditional_zupt_only` in 3 of 4 seeds (by at most 3.2). Both gated filters, made confident by their pseudo-measurements, are hit harder than `never` by ramps their process model doesn't allow for, the lesson of §3.
+
+#### What no policy does: estimate the turn rate
+A 1 s extend at 0.1 m/s covers about 8 cm, against 2 cm of position noise. That is likely too little path to see the curvature. Across all four policies, seeds 0-3 and both noise levels, the $`\omega`$ RMSE is 0.14-0.36 rad/s. A constant estimate of 0 would give 0.18 rad/s, the RMS of the true $`\omega`$. ZARU's benefit here is keeping the heading from drifting at rest, not measuring the turn.
+
+The same matched run, animated. The left panel shows the top view, with the true path and heading arrow (gold while anchored, green while extending) and each policy's position and heading. The right panels show the heading with ±2σ bands and the Monte Carlo NEES.
+
+![Animation of the planar inchworm over five cycles: left, top view of the true path and each policy's position and heading arrow; right, true heading and the four estimates with their ±2-sigma bands, anchor phases shaded, and each policy's Monte Carlo averaged NEES on a log scale against the expected value 5](../../assets/inchworm_zupt_zaru_ekf.gif)
+
+*Animation: `use_numpy/animate_inchworm_zupt_zaru_ekf.py` at its defaults (matched noise, seed 0, 500 trials), rendered by `uv run python use_numpy/animate_inchworm_zupt_zaru_ekf.py --out assets/inchworm_zupt_zaru_ekf.gif`.*
+
+---
+
+## 6. References
 
 1. Foxlin, E. (2005). *Pedestrian Tracking with Shoe-Mounted Inertial Sensors*. IEEE Computer Graphics and Applications, 25(6), 38-46. https://doi.org/10.1109/MCG.2005.140 - foot-mounted inertial navigation with zero-velocity updates; the basis of this doc's `never`/`always`/`phase_conditional` split, there gated by a stance-phase detector rather than this toy's known anchor/extend schedule.
 2. Lubbe, E., Withey, D., & Uren, K. R. (2015). *State Estimation for a Hexapod Robot*. 2015 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 6286-6291. https://doi.org/10.1109/IROS.2015.7354274 - state estimation for a physical hexapod robot, a larger-scale setting related to the one §4 discusses; its method is not reproduced here.

@@ -482,6 +482,66 @@ def fig_inchworm_zupt_ekf():
            "same predict step and position measurements; seed 0, script defaults", bottom=0.02)
 
 
+def fig_inchworm_zupt_zaru_ekf():
+    """inchworm_zupt_zaru_ekf.py: heading and NEES under ZUPT + ZARU gating, at the script defaults
+    (assumed accelerations under-sized) and at the matched noise level (0.5 m/s^2, 1.5 rad/s^2)."""
+    import inchworm_zupt_zaru_ekf as m
+
+    dt, t_a, t_e, t_r, v_e, om_e = 0.05, 1.0, 1.0, 0.2, 0.1, 0.3
+    pos_std, zupt_std, zaru_std, n_mc = 0.02, 0.01, 0.02, 500
+    init_std = np.array([0.05, 0.05, 0.1, 0.05, 0.05])
+    cols = {"never": PRIOR, "always": C["red"], "phase_conditional": C["blue"],
+            "phase_conditional_zupt_only": C["orange"]}
+    labels = {"never": "never", "always": "ZUPT + ZARU every tick",
+              "phase_conditional": "ZUPT + ZARU on anchor ticks",
+              "phase_conditional_zupt_only": "ZUPT only on anchor ticks (no ZARU)"}
+    regimes = [("script defaults", 0.15, 0.45), ("matched noise", 0.5, 1.5)]
+
+    fig, axes = plt.subplots(2, 2, figsize=(12.5, 8.6))
+    for row, (name, sa, sal) in enumerate(regimes):
+        rng = np.random.default_rng(SEED)
+        x_true, z, is_anchor, is_cruise = m.generate_ground_truth_and_data(
+            10.0, dt, t_a, t_e, t_r, v_e, om_e, pos_std, rng)
+        n = len(x_true) - 1
+        x_init = x_true[0] + rng.normal(0.0, 1.0, 5) * init_std
+        P_init = np.diag(init_std ** 2)
+        R = (pos_std ** 2, zupt_std ** 2, zaru_std ** 2)
+        ests = {k: m.run_ekf(x_init, P_init, z, dt, n, sa, sal, *R, is_anchor, k)[0] for k in m.GATING_MODES}
+        nees = m.run_monte_carlo_consistency(x_true, dt, sa, sal, *R, is_anchor, init_std, n_mc, rng)
+        for k in ests:
+            print(f"    [{row}] {k:<28s} NEES anchor {np.mean(nees[k][is_anchor]):.2f}, "
+                  f"cruise {np.mean(nees[k][is_cruise]):.2f}")
+        t = np.arange(len(x_true)) * dt
+        ax_h, ax_n = axes[row]
+        for ax in (ax_h, ax_n):
+            start = None
+            for k in range(len(t) + 1):
+                on = k < len(t) and is_anchor[k]
+                if on and start is None:
+                    start = t[k]
+                elif not on and start is not None:
+                    ax.axvspan(start, t[k - 1] + dt, color=C["green"], alpha=0.10, lw=0)
+                    start = None
+        ax_h.plot(t, x_true[:, 2], color=TRUTH, lw=2.4, label="true heading")
+        for k, x in ests.items():
+            ax_h.plot(t, x[:, 2], color=cols[k], lw=1.3, label=labels[k])
+        ax_h.set(title=f"Heading (one run), {name}", xlabel="time (s)", ylabel="theta (rad)")
+        for k in ests:
+            ax_n.plot(t, nees[k], color=cols[k], lw=1.3,
+                      label=f"{labels[k]} (anchor {np.mean(nees[k][is_anchor]):.1f}, "
+                            f"cruise {np.mean(nees[k][is_cruise]):.1f})")
+        ax_n.axhline(5.0, color=TRUTH, lw=1, label="consistent filter: 5 (state dimension)")
+        ax_n.set(yscale="log", title=f"NEES, {n_mc} runs; assumed {sa} m/s^2, {sal} rad/s^2", xlabel="time (s)",
+                 ylabel="NEES")
+        plain_log_ticks(ax_n)
+        if row == 0:
+            legend_below(ax_h, ncol=2)
+            legend_below(ax_n, ncol=1)
+    finish(fig, "inchworm_zupt_zaru_ekf", "Heading and ZARU on a known anchor/extend schedule",
+           "planar crawler [px, py, theta, v, omega], position-only measurements, turns 0.3 rad/s on extend; "
+           "matched = assumed accelerations equal the true ramps; seed 0", bottom=0.02)
+
+
 def fig_friction_anisotropic_ekf():
     """friction_anisotropic_ekf.py: isotropic / fixed-anisotropic / heading-aware process noise."""
     import friction_anisotropic_ekf as m
@@ -1958,6 +2018,7 @@ FIGURES = {
     "bundle_adjustment_advanced": fig_bundle_adjustment_advanced,
     "saltation_matrix_ekf": fig_saltation_matrix_ekf,
     "inchworm_zupt_ekf": fig_inchworm_zupt_ekf,
+    "inchworm_zupt_zaru_ekf": fig_inchworm_zupt_zaru_ekf,
     "friction_anisotropic_ekf": fig_friction_anisotropic_ekf,
     "imu_integration_comparison": fig_imu_integration_comparison,
     "pose_graph_incremental": fig_pose_graph_incremental,
