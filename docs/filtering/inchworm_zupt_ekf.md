@@ -84,13 +84,13 @@ Superscripts mark the step: $x^-$, $P^-$ are predicted (before the update) and $
 $`\sigma_{\text{process}}`$ is the assumed acceleration-disturbance standard deviation (§2), and $Q$ (the **process-noise covariance**, [glossary](../glossary.md#predict-and-update-steps)) is a simple diagonal heuristic (the same formula as in `saltation_matrix_ekf.py`), not the textbook continuous white-noise-acceleration $Q$, which also has off-diagonal terms.
 
 #### Measurement updates (`_kf_update`)
-Both updates go through the same standard linear-Gaussian update and differ only in $z$, $H$ and $R$ (the measurement, the **measurement Jacobian** and the **measurement-noise covariance**, [glossary](../glossary.md#ekf-extended-kalman-filter)):
+Both updates go through the same standard linear-Gaussian update and differ only in $z$, $H$, and $R$ (the measurement, the **measurement Jacobian**, and the **measurement-noise covariance**, [glossary](../glossary.md#ekf-extended-kalman-filter)):
 
 ```math
 r = z - H x^{-}, \qquad S = H P^{-} H^\top + R, \qquad K = P^{-} H^\top S^{-1}
 ```
 
-Here $`r`$ is the **innovation**, $`S`$ its **covariance** and $`K`$ the **Kalman gain** ([glossary](../glossary.md#innovation-and-kalman-gain)).
+Here $`r`$ is the **innovation**, $`S`$ is its **covariance**, and $`K`$ is the **Kalman gain** ([glossary](../glossary.md#innovation-and-kalman-gain)).
 
 ```math
 x^{+} = x^{-} + K r, \qquad P^{+} = (I - K H)\,P^{-}
