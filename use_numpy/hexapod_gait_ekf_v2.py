@@ -408,6 +408,11 @@ class GaitEKF:
         I_KH = np.eye(6) - K @ H
         self.P = I_KH @ self.P @ I_KH.T + self.R_meas * K @ K.T  # Joseph form
         return accepted
+    
+    def step(self, z_feet, r_feet):
+        """One EKF step: predict, then update with the feet in stance."""
+        self.predict()
+        return self.update(z_feet, r_feet)
 
     def get_state(self):
         """Copies of the current estimate: x (6,), P (6,6)."""
@@ -437,9 +442,8 @@ def run_ekf(x_init, P_init, z, r, stance, dt, Q, R_meas, gating=False):
     x_list, P_list = [x], [P]
     accepted = np.zeros((n_pts, 6), dtype=bool)
     for k in range(1, n_pts):
-        ekf.predict()
         idx = np.flatnonzero(stance[k])
-        acc = ekf.update(z[k, idx], r[k, idx])
+        acc = ekf.step(z[k, idx], r[k, idx])
         x, P = ekf.get_state()
         accepted[k, idx] = acc
         x_list.append(x)

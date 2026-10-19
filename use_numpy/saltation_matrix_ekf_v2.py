@@ -603,9 +603,7 @@ def run_ekf(x_init, P_init, z, dt, n_steps, e, g, accel_noise_std, impact_noise_
     x, P = ekf.get_state()
     x_list, P_list = [x], [P]
     for k in range(n_steps):
-        ekf.predict()
-        ekf.update(z[k + 1])
-        # ekf.step(z[k + 1])
+        ekf.step(z[k + 1])
         x, P = ekf.get_state()
         x_list.append(x)
         P_list.append(P)

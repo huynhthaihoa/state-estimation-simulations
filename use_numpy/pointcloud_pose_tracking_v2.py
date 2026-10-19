@@ -282,9 +282,7 @@ def run_ekf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_s
     T, _ = kf.get_state()
     T_list = [T]
     for k in range(len(u_meas)):
-        kf.predict(u_meas[k])
-        kf.update(z[k + 1])
-        # kf.step(u_meas[k], z[k + 1])
+        kf.step(u_meas[k], z[k + 1])
         T, _ = kf.get_state()
         T_list.append(T)
     return T_list
@@ -348,8 +346,7 @@ def run_iekf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_
     T, _ = kf.get_state()
     T_list = [T]
     for k in range(len(u_meas)):
-        kf.predict(u_meas[k])
-        kf.update(z[k + 1])
+        kf.step(u_meas[k], z[k + 1])
         T, _ = kf.get_state()
         T_list.append(T)
     return T_list
@@ -482,8 +479,7 @@ def run_ukf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_s
     T, _ = kf.get_state()
     T_list = [T]
     for k in range(len(u_meas)):
-        kf.predict(u_meas[k])
-        kf.update(z[k + 1])
+        kf.step(u_meas[k], z[k + 1])
         T, _ = kf.get_state()
         T_list.append(T)
     return T_list
@@ -655,9 +651,7 @@ def run_vanilla_kf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_
     T, _ = kf.get_state()
     T_list = [T]
     for k in range(len(u_meas)):
-        kf.predict(u_meas[k])
-        kf.update(z[k + 1])
-        # kf.step(u_meas[k], z[k + 1])
+        kf.step(u_meas[k], z[k + 1])
         T, _ = kf.get_state()
         T_list.append(T)
     return T_list

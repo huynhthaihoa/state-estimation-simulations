@@ -246,7 +246,7 @@ class InchwormEKF:
         Arguments:
             z: position measurement (scalar)
         """
-        self._update(np.array([z]), np.array([[1.0, 0.0]]), np.array([[self.R_pos]]))
+        self._kf_update(np.array([z]), np.array([[1.0, 0.0]]), np.array([[self.R_pos]]))
 
     def measurement_update_zupt(self):
         """Zero-velocity pseudo-measurement update: z = 0 = v + noise (H = [0, 1]).
@@ -255,9 +255,9 @@ class InchwormEKF:
         schedule-unaware real implementation's) tells the filter, with high
         confidence, something false.
         """
-        self._update(np.array([0.0]), np.array([[0.0, 1.0]]), np.array([[self.R_zupt]]))
+        self._kf_update(np.array([0.0]), np.array([[0.0, 1.0]]), np.array([[self.R_zupt]]))
 
-    def _update(self, z, H, R):
+    def _kf_update(self, z, H, R):
         """Shared linear-Gaussian KF update math for both measurement methods
         above -- kept private since their fixed H/z are the actual interface
         this script's callers reason about.
@@ -267,7 +267,20 @@ class InchwormEKF:
         K = self.P @ H.T @ np.linalg.inv(S)
         self.x = self.x + K @ r
         self.P = (np.eye(2) - K @ H) @ self.P
-
+        
+    def update(self, z, is_anchor_tick):
+        """Position update, then a ZUPT update if zupt_mode calls for one.
+        Arguments:
+            z: position measurement for this tick (scalar)
+            is_anchor_tick: whether the known schedule marks this tick as anchor
+                (only consulted when zupt_mode == "phase_conditional")
+        """
+        self.measurement_update_position(z)
+        apply_zupt = (self.zupt_mode == "always"
+                      or (self.zupt_mode == "phase_conditional" and is_anchor_tick))
+        if apply_zupt:
+            self.measurement_update_zupt()
+            
     def step(self, z, is_anchor_tick):
         """One filter tick: predict, position update, then a ZUPT update if
         zupt_mode calls for one on this tick.
@@ -277,11 +290,7 @@ class InchwormEKF:
                 (only consulted when zupt_mode == "phase_conditional")
         """
         self.predict()
-        self.measurement_update_position(z)
-        apply_zupt = (self.zupt_mode == "always"
-                      or (self.zupt_mode == "phase_conditional" and is_anchor_tick))
-        if apply_zupt:
-            self.measurement_update_zupt()
+        self.update(z, is_anchor_tick)
 
     def get_state(self):
         """Returns copies of (x, P), safe to store as history."""

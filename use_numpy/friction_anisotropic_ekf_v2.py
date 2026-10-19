@@ -329,9 +329,7 @@ def run_ekf(x_init, P_init, z, dt, n_steps, v_cmd, omega_cmd, sigma_grip, sigma_
     x, P = ekf.get_state()
     x_list, P_list = [x], [P]
     for k in range(n_steps):
-        ekf.predict()
-        ekf.update(z[k + 1])
-        # ekf.step(z[k + 1])
+        ekf.step(z[k + 1])
         x, P = ekf.get_state()
         x_list.append(x)
         P_list.append(P)

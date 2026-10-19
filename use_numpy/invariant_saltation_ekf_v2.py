@@ -693,7 +693,7 @@ class Filter:
             self.X, self.P = update_world(self.X, self.P, y, self.landmarks, self.meas_noise_std)
         else:
             self.X, self.P = update_ri(self.X, self.P, y, self.landmarks, self.meas_noise_std)
-
+    
     def get_state(self):
         """Returns:
             copies of X (5,5) and P (9,9), and the cumulative number of bounces resolved
