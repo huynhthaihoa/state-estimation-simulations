@@ -482,6 +482,100 @@ def fig_inchworm_zupt_ekf():
            "same predict step and position measurements; seed 0, script defaults", bottom=0.02)
 
 
+def fig_inchworm_slip_gate_ekf():
+    """inchworm_slip_gate_ekf.py: anchor slip, the pad sensor, velocity estimates and NEES per policy, at the
+    matched process noise (0.5 m/s^2), plus a gate-threshold sweep of the slip-window and cruise-window NEES."""
+    import inchworm_slip_gate_ekf as m
+
+    dt, t_a, t_e, t_r, v_e, dur = 0.05, 1.0, 1.0, 0.2, 0.1, 20.0
+    pos_std, zupt_std, sens_std, n_mc = 0.02, 0.01, 0.0005, 500
+    p_slip, v_slip, t_slip, accel = 0.5, 0.08, 0.6, 0.5
+    init_std = np.array([0.05, 0.05])
+    d_thr = 3.0 * sens_std
+    R = (pos_std ** 2, zupt_std ** 2, (sens_std / dt) ** 2)
+    cols = {"never": PRIOR, "schedule": C["blue"], "sensor_gate": C["red"], "schedule_and_sensor": C["purple"],
+            "sensor_fused": C["green"]}
+    labels = {"never": "never", "schedule": "ZUPT on schedule", "sensor_gate": "ZUPT if |d| <= threshold",
+              "schedule_and_sensor": "ZUPT if scheduled and |d| <= threshold",
+              "sensor_fused": "d / dt as a velocity measurement"}
+
+    rng = np.random.default_rng(SEED)
+    x_true, z, d, is_anchor, is_cruise, is_slip, is_clean = m.generate_ground_truth_and_data(
+        dur, dt, t_a, t_e, t_r, v_e, pos_std, sens_std, p_slip, v_slip, t_slip, rng)
+    n = len(x_true) - 1
+    x_init = x_true[0] + rng.normal(0.0, 1.0, 2) * init_std
+    P_init = np.diag(init_std ** 2)
+    ests = {k: m.run_ekf(x_init, P_init, z, d, dt, n, accel, *R, d_thr, is_anchor, k)[0] for k in m.GATING_MODES}
+    nees = m.run_monte_carlo_consistency(x_true, dt, accel, *R, d_thr, is_anchor, 0.05, 0.05, sens_std, n_mc, rng)
+    for k in nees:
+        print(f"    {k:<20s} NEES clean {np.mean(nees[k][is_clean]):.2f}, slip {np.mean(nees[k][is_slip]):.2f}, "
+              f"cruise {np.mean(nees[k][is_cruise]):.2f}")
+    t = np.arange(len(x_true)) * dt
+    from utils import averaged_nees_bounds
+    lo, hi = averaged_nees_bounds(2, n_mc)
+
+    def below(ax):
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.2), fontsize=8.5)
+
+    def shade_slip(ax):
+        edges = np.diff(np.concatenate([[False], is_slip, [False]]).astype(int))
+        for a, b in zip(np.where(edges == 1)[0], np.where(edges == -1)[0]):
+            ax.axvspan(t[a], t[b - 1] + dt, color=C["orange"], alpha=0.22, lw=0)
+
+    fig, axes = plt.subplots(2, 2, figsize=(12.5, 10.5))
+    ax_d, ax_v, ax_n, ax_s = axes.ravel()
+
+    ax_d.plot(t, d * 1e3, color=C["orange"], lw=1.1, label="pad sensor reading d")
+    ax_d.axhspan(-d_thr * 1e3, d_thr * 1e3, color=C["red"], alpha=0.14, label="quiet band: |d| <= threshold")
+    shade_slip(ax_d)
+    ax_d.set(title="Pad sensor (shaded = slip pulses)", xlabel="time (s)", ylabel="displacement per tick (mm)")
+    below(ax_d)
+
+    ax_v.plot(t, x_true[:, 1], color=TRUTH, lw=2.4, label="true velocity")
+    for k in ("schedule", "sensor_gate", "schedule_and_sensor"):
+        ax_v.plot(t, ests[k][:, 1], color=cols[k], lw=1.2, label=labels[k])
+    shade_slip(ax_v)
+    ax_v.set(title="Velocity estimate (one run)", xlabel="time (s)", ylabel="v (m/s)")
+    below(ax_v)
+
+    for k in m.GATING_MODES:
+        ax_n.plot(t, nees[k], color=cols[k], lw=1.3,
+                  label=f"{labels[k]} (slip {np.mean(nees[k][is_slip]):.1f})")
+    ax_n.axhspan(lo, hi, color=TRUTH, alpha=0.10, lw=0)
+    ax_n.axhline(2.0, color=TRUTH, lw=1, label="consistent filter: 2 (state dimension)")
+    shade_slip(ax_n)
+    ax_n.set(yscale="log", title=f"NEES, {n_mc} runs, assumed {accel} m/s^2", xlabel="time (s)", ylabel="NEES")
+    plain_log_ticks(ax_n)
+    below(ax_n)
+
+    sigmas = [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 10.0]
+    sweep = {k: {"slip": [], "cruise": []} for k in ("sensor_gate", "schedule_and_sensor")}
+    for g in sigmas:
+        res = m.run_monte_carlo_consistency(x_true, dt, accel, *R, g * sens_std, is_anchor, 0.05, 0.05, sens_std,
+                                            200, np.random.default_rng(SEED + 1), modes=tuple(sweep))
+        for k in sweep:
+            sweep[k]["slip"].append(np.mean(res[k][is_slip]))
+            sweep[k]["cruise"].append(np.mean(res[k][is_cruise]))
+    speeds = [g * sens_std / dt for g in sigmas]
+    for k in sweep:
+        ax_s.plot(speeds, sweep[k]["slip"], "o-", color=cols[k], lw=1.4, label=f"{labels[k]}: slip window")
+        ax_s.plot(speeds, sweep[k]["cruise"], "s--", color=cols[k], lw=1.1, alpha=0.8,
+                  label=f"{labels[k]}: cruise window")
+    ax_s.axhline(2.0, color=TRUTH, lw=1)
+    ax_s.axvline(v_e, color=C["orange"], lw=1, ls=":")
+    ax_s.text(v_e * 0.93, 3.0, "cruise speed ", color=C["orange"], va="bottom", ha="right", fontsize=8.5, rotation=90)
+    ax_s.set(xscale="log", yscale="log", title="Threshold sweep (200 runs per point)",
+             xlabel="gate threshold as a speed: |d| / dt (m/s)", ylabel="NEES")
+    plain_log_ticks(ax_s)
+    ax_s.set_xticks([0.005, 0.01, 0.02, 0.05, 0.1])
+    ax_s.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
+    ax_s.xaxis.set_minor_formatter(FuncFormatter(lambda v, _: ""))
+    below(ax_s)
+    finish(fig, "inchworm_slip_gate_ekf", "Anchor slip: gating ZUPT by schedule vs. by a pad sensor",
+           "1D crawler [p, v], slip pulses in half the anchor phases, sensor noise 0.5 mm per tick, "
+           "matched process noise; seed 0", bottom=0.02)
+
+
 def fig_inchworm_zupt_zaru_ekf():
     """inchworm_zupt_zaru_ekf.py: heading and NEES under ZUPT + ZARU gating, at the script defaults
     (assumed accelerations under-sized) and at the matched noise level (0.5 m/s^2, 1.5 rad/s^2)."""
@@ -2019,6 +2113,7 @@ FIGURES = {
     "saltation_matrix_ekf": fig_saltation_matrix_ekf,
     "inchworm_zupt_ekf": fig_inchworm_zupt_ekf,
     "inchworm_zupt_zaru_ekf": fig_inchworm_zupt_zaru_ekf,
+    "inchworm_slip_gate_ekf": fig_inchworm_slip_gate_ekf,
     "friction_anisotropic_ekf": fig_friction_anisotropic_ekf,
     "imu_integration_comparison": fig_imu_integration_comparison,
     "pose_graph_incremental": fig_pose_graph_incremental,

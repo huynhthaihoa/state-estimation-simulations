@@ -41,7 +41,7 @@ We work through the simplest concrete version using [`inchworm_zupt_ekf.py`](../
 ### Scope
 This is deliberately a small slice of the real idea.
 
-- It models translation only: ZUPT, not ZARU, which needs gyro-bias ([glossary](../glossary.md#bias)) and orientation states this toy doesn't carry. §5 adds a heading and ZARU in a planar side extension (still without gyro bias).
+- It models translation only: ZUPT, not ZARU, which needs gyro-bias ([glossary](../glossary.md#bias)) and orientation states this toy doesn't carry. §5 adds a heading and ZARU in a planar side extension (still without gyro bias). §6 adds anchor slip and a pad displacement sensor in a second side extension.
 - It assumes the gait schedule (when anchor/extend happen) is *known*, not detected. What happens once the schedule itself is uncertain is the subject of [`hybrid_saltation_ekf.md` §8](hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter), which we lean on rather than repeat.
 
 ---
@@ -289,9 +289,104 @@ The same matched run, animated. The left panel shows the top view, with the true
 
 ---
 
-## 6. References
+## 6. Side extension: anchor slip and a measured gate
+
+§1-§5 assume the anchor phase is exactly still and the schedule is known. A real anchor can slip, and a robot with a displacement sensor in its pad can notice. [`inchworm_slip_gate_ekf.py`](../../use_numpy/inchworm_slip_gate_ekf.py) adds both to the 1D toy and asks when to trust $`v = 0`$. It is a toy, not a model of any robot. A real inchworm with such a pad sensor is the motivation (Kubík & Faigl, reference 5); its authors list Kalman fusion of the sensor with motor and inertial data as future work.
+
+### Model
+- **Slip:** each anchor phase contains, with probability 0.5, one backward slip pulse: a trapezoid with peak speed 0.08 m/s and duration 0.6 s, including 0.2 s ramps (a step would be an unmodeled acceleration, §2). The pulses are drawn once per seed and held fixed over the Monte Carlo trials, so a "slip tick" is the same tick in every trial. Seed 0 has pulses in 2 of the 10 anchor phases (24 slip ticks); seeds 1-3 have 6 each (72 ticks).
+- **Pad sensor:** each tick it reads $`d_k = \Delta t\, v_k + \epsilon_k`$, the current velocity times the tick length (the displacement over the tick if the velocity were constant), with $`\epsilon_k`$ independent noise of std $`\sigma_d = 0.5`$ mm. Divided by $`\Delta t`$ it is a velocity measurement with std $`0.5\,\text{mm} / 0.05\,\text{s} = 0.01`$ m/s, the same as the ZUPT noise. This is a simplification: a sensor mounted in a pad sees the pad's displacement, and only while that pad is on the ground. Here the sensor reads the body's displacement in every phase, as a ground-facing sensor on the body would.
+- **Gate:** the sensor is **quiet** on a tick when $`|d_k| \le d_{\text{thr}} = 3\sigma_d = 1.5`$ mm, a speed of $`d_{\text{thr}} / \Delta t = 0.03`$ m/s.
+- **Policies:** all five share §1.1's predict step and the position update, and differ only in the extra velocity information.
+
+| Policy | Extra velocity information |
+| --- | --- |
+| `never` | None. |
+| `schedule` | ZUPT on scheduled anchor ticks. This is §1's `phase_conditional`, blind to slip. |
+| `sensor_gate` | ZUPT on ticks where the sensor is quiet, with no schedule. |
+| `schedule_and_sensor` | ZUPT on ticks that are both scheduled anchor and quiet. |
+| `sensor_fused` | No ZUPT. The reading $`d_k / \Delta t`$ is applied on every tick as a velocity measurement. |
+
+- **Process noise:** the matched 0.5 m/s², as in §5, because at the 1D script's 0.15 m/s² every policy's NEES is dominated by the ramps (§3).
+- **Windows:** **clean anchor** is the anchor ticks of phases with no slip pulse, **slip** is the ticks inside a pulse, and **cruise** is as in §3. Ramp ticks, and the anchor ticks of slip phases outside the pulse, count only in the overall average.
+
+### Results
+Seed 0, 500 trials, NEES by window. A consistent 2-DoF filter averages NEES 2, with a 95% interval of $`[1.83, 2.18]`$.
+
+| Policy | Clean anchor | Slip | Cruise | Overall |
+| --- | --- | --- | --- | --- |
+| `never` | 1.42 | 2.58 | 1.64 | 1.66 |
+| `schedule` | 0.94 | 47.27 | 1.85 | 4.60 |
+| `sensor_gate` | 1.05 | 3.57 | 2.67 | 2.20 |
+| `schedule_and_sensor` | 0.94 | 3.56 | 1.70 | 1.54 |
+| `sensor_fused` | 1.69 | 1.95 | 1.77 | 1.74 |
+
+![Four panels from inchworm_slip_gate_ekf.py: the pad sensor reading with its quiet band, the velocity estimates of three policies, the Monte Carlo NEES of all five policies, and a sweep of the gate threshold](../../assets/inchworm_slip_gate_ekf.png)
+
+*Figure: `use_numpy/inchworm_slip_gate_ekf.py` at its defaults, seed 0, plotted by `uv run python assets/make_figures.py inchworm_slip_gate_ekf`. Shaded = slip pulses. The threshold-sweep panel uses 200 runs per point and its own Monte Carlo seed (the threshold table below uses 500 runs and seed 0).*
+
+#### The schedule is blind to slip
+During a pulse `schedule` keeps telling the filter the body is still, with std 0.01 m/s, while it slides back at up to 0.08 m/s. Its slip-window NEES is 47.3-48.3 across seeds 0-3, against 2.0-2.6 for `never`. The excess lingers: across seeds 0-3 its cruise NEES is 1.85-2.46, against 1.70-1.83 for `schedule_and_sensor`. Its overall NEES rises from 4.60 (seed 0, 24 slip ticks) to 11.16-11.37 (seeds 1-3, 72 slip ticks), so how bad it looks depends on how often the anchor slips. On clean anchors it matches `schedule_and_sensor` (0.93-0.97 vs 0.92-0.95) and beats `sensor_gate` (1.04-1.10). Slip also costs it its position advantage over `never` in seeds 1 and 3 (single-run RMSE 0.0102 vs 0.0096 m and 0.0125 vs 0.0120 m), though not in seeds 0 and 2.
+
+#### Letting the sensor veto the schedule
+`schedule_and_sensor` applies the ZUPT only when the schedule and the sensor agree. Across seeds 0-3 it cuts the slip-window NEES from 47.3-48.3 to 3.55-3.56 and the overall NEES from 4.60-11.37 to 1.54-1.98, with clean-anchor NEES no worse (0.92-0.95 vs 0.93-0.97). With `--p-slip 0` it matches `schedule` (both: overall 1.32, clean anchor 0.93, cruise 1.66), so at the default threshold the veto costs nothing when nothing slips.
+
+The slip window is still above the interval (3.56 vs 2.18 at seed 0). The gate admits the ZUPT on 6 of the 24 slip ticks, at the ends of each pulse, where the true speed (0.003-0.037 m/s) is near or below the 0.03 m/s threshold. Lowering the threshold reduces it (3.56 at 3σ to 2.36 at 1σ; see [Choosing the threshold](#choosing-the-threshold)), though at this noise level it never gets back inside the interval.
+
+#### A gate without the schedule leaks at both ends of the extend phase
+`sensor_gate` drops the schedule and applies the ZUPT whenever the sensor is quiet. Its cruise-window NEES is 2.51-2.67 across seeds 0-3, against 1.70-1.83 for `schedule_and_sensor`. In every seed it admits the ZUPT on 23-29 of the 200 extend ticks, all within 0.1 s of either end of the extend phase. 10 of them are the first extend tick of each cycle, where the true speed is still exactly 0, so the ZUPT is correct. The other 13-19 are leaks: the ramp speed is 0.025 m/s (or, in two seeds, 0.05 m/s), below or near the 0.03 m/s threshold. The schedule says "extending" on those ticks, so `schedule_and_sensor` skips them.
+
+#### Choosing the threshold
+Seed 0, 500 trials, varying only the threshold (in units of $`\sigma_d`$, and as the speed $`d_{\text{thr}} / \Delta t`$):
+
+| Threshold | As a speed | `schedule_and_sensor` slip NEES | `sensor_gate` cruise NEES |
+| --- | --- | --- | --- |
+| 0.25σ | 0.0025 m/s | 2.44 | 1.71 |
+| 0.5σ | 0.005 m/s | 2.37 | 1.80 |
+| 1σ | 0.01 m/s | 2.36 | 1.97 |
+| 2σ | 0.02 m/s | 2.70 | 2.29 |
+| 3σ (default) | 0.03 m/s | 3.56 | 2.67 |
+| 5σ | 0.05 m/s | 7.59 | 3.79 |
+| 10σ | 0.10 m/s | 46.70 | 126.52 |
+
+- **High threshold:** a threshold at the cruise speed (10σ) lets the gate pass "$`v = 0`$" during cruise. `sensor_gate` then fails the way §3's `always` does, with a confidently wrong ZUPT during motion (cruise NEES 126.5; §3's numbers are at 0.15 m/s², so the comparison is qualitative). `schedule_and_sensor` becomes `schedule` (slip NEES 46.7 vs 47.3).
+- **Low threshold:** noise vetoes more anchor ticks, since only about 20% of readings on still ticks fall inside the band at 0.25σ. The tested range shows little cost: clean-anchor NEES rises from 0.94 to 1.08, likely because the position fixes still bound the error. A real cost from losing ZUPT ticks may need a lower threshold, a coarser position sensor or a longer anchor phase to show.
+- **Noise-free sensor:** with $`\sigma_d \approx 0`$ (`--sensor-noise-std 1e-6`, threshold 3σ), the slip-window NEES of `schedule_and_sensor` is 2.13, so the excess above comes from the gate's finite resolution (threshold and noise together), mostly the threshold (3.56 to 2.36 at 1σ in the table).
+
+#### Slip slower than the gate
+A slip whose peak speed is below the threshold is mostly invisible to the gate. Seed 0, slip-window NEES:
+
+| Peak slip speed | `never` | `schedule` | `schedule_and_sensor` | `sensor_fused` |
+| --- | --- | --- | --- | --- |
+| 0.02 m/s | 1.52 | 3.60 | 3.29 | 1.72 |
+| 0.04 m/s | 1.79 | 12.22 | 4.66 | 1.78 |
+| 0.08 m/s (default) | 2.58 | 47.27 | 3.56 | 1.95 |
+
+At 0.02 m/s the gate gives almost nothing over the schedule (3.29 vs 3.60). The harm is also small, and in the slip window `never` beats every ZUPT policy. The gate's benefit appears once the peak slip exceeds the threshold (0.04 m/s: 12.22 → 4.66; 0.08 m/s: 47.27 → 3.56), though at 0.04 m/s it still trails `never` (4.66 vs 1.79).
+
+#### Fusing the reading instead of gating it
+`sensor_fused` uses $`d_k / \Delta t`$ as an ordinary velocity measurement and has no gate and no schedule. At seed 0 its NEES is 1.69, 1.95 and 1.77 in the clean-anchor, slip and cruise windows, and its single-run velocity RMSE is 0.009 m/s against 0.039-0.050 for the others. It is also the closest to consistent at the script's under-sized 0.15 m/s² (overall NEES 3.40, against 9.40-17.11 for the other four; slip window 5.33). The comparison is not like for like: the gated policies use the reading only as a yes/no flag, while this one uses its value on every tick, and the toy gives it a velocity sensor in every phase. How much of that a real pad sensor offers is the question the simplification above hides.
+
+#### What this toy does not show
+- It does not model a pad sensor that reads only while its pad is on the ground. The reading would then mean something only on scheduled anchor ticks, which is how `schedule_and_sensor` uses it. This is an inference about how such a sensor would be used, not a statement about a specific robot. `sensor_gate` and `sensor_fused` need the body-mounted sensor of the model above.
+- The slip is a single pulse shape with one peak speed per run. The sensor has no dropout or quantization, and the thresholds and noise levels are not any robot's.
+- The slip pattern is one draw per seed. The sweeps use seed 0 only (2 pulses), and the seed comparison above covers seeds 0-3.
+
+The same default run, animated. The panels share the time axis and show the velocity estimates, the pad reading with its quiet band, the ticks on which each gated policy applies the ZUPT, and the Monte Carlo NEES. Slip pulses are shaded.
+
+![Animation of the 1D inchworm over ten cycles with two slip pulses: velocity estimates of four policies, the pad sensor reading with its quiet band, bars marking the ticks on which the three gated policies apply ZUPT, and the Monte Carlo NEES of all five policies on a log scale against the expected value 2](../../assets/inchworm_slip_gate_ekf.gif)
+
+*Animation: `use_numpy/animate_inchworm_slip_gate_ekf.py` at its defaults (seed 0, 500 trials), rendered by `uv run python use_numpy/animate_inchworm_slip_gate_ekf.py --out assets/inchworm_slip_gate_ekf.gif`.*
+
+#### Takeaway
+When the anchor can slip, "the schedule says anchor" is no longer enough to justify $`v = 0`$. A sensor that can vote against the schedule removes most of the damage (slip-window NEES from about 47 to 3.5). The threshold has to sit well below the cruise speed, or the gate becomes `always`. A gate that replaces the schedule instead of checking it admits the ZUPT at the ends of the extend phase.
+
+---
+
+## 7. References
 
 1. Foxlin, E. (2005). *Pedestrian Tracking with Shoe-Mounted Inertial Sensors*. IEEE Computer Graphics and Applications, 25(6), 38-46. https://doi.org/10.1109/MCG.2005.140 - foot-mounted inertial navigation with zero-velocity updates; the basis of this doc's `never`/`always`/`phase_conditional` split, there gated by a stance-phase detector rather than this toy's known anchor/extend schedule.
 2. Lubbe, E., Withey, D., & Uren, K. R. (2015). *State Estimation for a Hexapod Robot*. 2015 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 6286-6291. https://doi.org/10.1109/IROS.2015.7354274 - state estimation for a physical hexapod robot, a larger-scale setting related to the one §4 discusses; its method is not reproduced here.
 3. Liu, Y., Gao, H., Ding, L., Liu, G., Deng, Z., & Li, N. (2018). *State Estimation of a Heavy-Duty Hexapod Robot with Passive Compliant Ankles Based on the Leg Kinematics and IMU Data Fusion*. Journal of Mechanical Science and Technology, 32(8), 3885-3897. https://doi.org/10.1007/s12206-018-0741-4 - leg-kinematics and IMU fusion on a heavy-duty hexapod with passive compliant ankles, a much less idealized contact setting than this toy's stationary anchor phase.
 4. Khalili, H. H., Cheah, W., Garcia-Nathan, T. B., Carrasco, J., Watson, S., & Lennox, B. (2020). *Tuning and Sensitivity Analysis of a Hexapod State Estimator*. Robotics and Autonomous Systems, 129, 103509. https://doi.org/10.1016/j.robot.2020.103509 - tuning and sensitivity analysis of a hexapod state estimator; related in spirit to §3's lesson that the process noise has to be sized honestly before the gating comparison means anything.
+5. Kubík, J. & Faigl, J. *Adaptive Friction-based Inchworm-like Locomotion*. CTU Computational Robotics Laboratory. https://comrob.fel.cvut.cz/papers/icra26looper.pdf - an inchworm robot with a laser-mouse displacement sensor in each pad and a fixed slip threshold of 0.42 mm; the motivation for §6. §6 is a 1D toy, not a model of that robot. The venue is not verified.
