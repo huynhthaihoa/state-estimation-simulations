@@ -24,21 +24,16 @@ We keep the three claims separate and explain the mechanism behind each.
 - **Observation model** (`observation_model` in code; also called the measurement model): where the object's points should appear in the world if its pose were $T$. The object is a rigid set of $M$ points $p_i$, known in advance in its body frame. The sensor sees them in the world frame as $z_i = T\cdot p_i + \text{noise}$ ($`T\cdot p_i = R\,p_i + t`$ is the pose applied to a point, `T.act(p_i)` in code), with [isotropic](../glossary.md#isotropic-and-anisotropic) Gaussian noise ($`R_{\text{diag}} = \sigma^2 I`$).
   - Example: a point $p = [0.5, 0, 0]$ on an object at $t = [2, 0, 0]$ with no rotation should appear at $[2.5, 0, 0]$. The sensor reports that plus about 3 cm of noise. The difference between the predicted and the measured points is what the update corrects.
 
-All four filters run the same two-step loop at every time step ([predict and update](../glossary.md#predict-and-update-steps)): **predict** the pose with the motion model, then **update** it by comparing the measured points with the observation model's prediction. They differ in *which* step they change and *how*, so we compare them one step at a time. The grey notes mark where each filter departs from the shared loop:
+All four filters run the same **two-step loop** at every **time step** ([predict and update](../glossary.md#predict-and-update-steps)): **predict** the pose with the motion model, then **update** it by comparing the measured points with the observation model's prediction. They differ in *which* step they change and *how*, so we compare them one step at a time. In each box, the text below the dashed line says where a filter departs from the shared loop:
 
 ```mermaid
 flowchart LR
-    A["Estimate at step k<br/>pose T, covariance P"] -->|"twist u"| B["PREDICT<br/>motion model<br/>T_pred = T · Exp(u Δt)"]
-    B --> C["observation model<br/>predicted points T_pred · p_i"]
+    A["Estimate at step k<br/>pose T, covariance P"] -->|"twist u"| B["1 · PREDICT<br/>motion model<br/>T_pred = T · Exp(u Δt)<br/>- - - - -<br/>vanilla KF: first-order<br/>linear step on 12 numbers"]
+    B --> C["2 · PREDICT POINTS<br/>observation model<br/>T_pred · p_i<br/>- - - - -<br/>UKF: sigma points instead<br/>of Jacobians (also in step 1)"]
+    C --> D["3 · RESIDUAL r<br/>measured − predicted<br/>- - - - -<br/>EKF: world frame<br/>IEKF: body frame"]
     Z["measured points z_i<br/>(step k+1)"] --> D
-    C --> D["residual r<br/>(measured vs. predicted)"]
-    D --> E["UPDATE<br/>Kalman gain K<br/>T⁺ = T_pred · Exp(K r)"]
-    E -->|"next step"| A
-    nV["vanilla KF: 12-number state,<br/>first-order linear predict"] -.- B
-    nU["UKF: sigma points instead<br/>of Jacobians, in both steps"] -.- C
-    nI["EKF: world frame<br/>IEKF: body frame"] -.- D
-    classDef note fill:#eeeeee,stroke:#999999,color:#333333
-    class nV,nU,nI note
+    D --> E["4 · UPDATE<br/>Kalman gain K<br/>T⁺ = T_pred · Exp(K r)<br/>- - - - -<br/>vanilla KF: x⁺ = x⁻ + K r,<br/>then SVD back onto SO(3)"]
+    E --> F["Estimate at step k+1<br/>T⁺, P⁺<br/>(start of the next step)"]
 ```
 
 ### Predict - where the pose is propagated forward
