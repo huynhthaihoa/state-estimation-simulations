@@ -12,7 +12,7 @@ A hexapod has six legs, and its **gait** decides which ones are down on each **t
             L3 ●  ● R3          wave     duty 5/6   5 feet down   one leg swings at a time
 ```
 
-A foot on the ground is in **stance**; for the rest of the cycle it is in **swing**, moving through the air from **liftoff** to **touchdown** at its next foothold. The **duty factor** is the fraction of a cycle each foot spends in stance. More feet down means more velocity readings per tick, but a slower walk on a real robot.
+A foot on the ground is in **stance**; for the rest of the cycle it is in **swing**, moving through the air from **liftoff** to **touchdown** at its next **foothold** (the ground point where it lands). The **duty factor** is the fraction of a cycle each foot spends in stance. More feet down means more velocity readings per tick, but a slower walk on a real robot.
 
 ![Three panels from hexapod_gait_ekf.py: gait diagrams of stance and swing per leg for the tripod, ripple and wave gaits over two cycles; the hexapod body turning left with an arrow on each foot showing its measured velocity relative to the body, six different readings; and two three-foot stance layouts, a tripod triangle and three feet on one side, with their one-tick standard deviations of forward speed and turn rate](../../assets/hexapod_gait_ekf_concept.png)
 
@@ -33,11 +33,11 @@ Planar body, perfect kinematics (the filter knows where each stance foot is; onl
 ## 1. Model
 
 ### Why planar, not 1D
-In 1D every stance foot measures the same scalar velocity, so six legs only average noise: variance $`\sigma^2/n`$, with $n$ the number of stance feet and $\sigma$ the noise std of one reading. In the plane, a foot at body-frame offset $`r_i`$ (its position relative to the body centre) sees the body's velocity *plus* the turn: when the body turns in place at $`\omega = 0.2`$ rad/s, a foot 0.15 m to the left moves at 0.03 m/s and its mirror foot at −0.03 m/s. Feet in different places therefore separate forward speed from turn rate.
+In 1D every stance foot measures the same scalar velocity, so six legs only average noise: variance $`\sigma^2/n`$, with $n$ the number of stance feet and $\sigma$ the noise standard deviation (std) of one reading. In the plane, a foot at body-frame offset $`r_i`$ (its position relative to the body centre) sees the body's velocity *plus* the turn: when the body turns in place at $`\omega = 0.2`$ rad/s, a foot 0.15 m to the left moves at 0.03 m/s and its mirror foot at −0.03 m/s. Feet in different places therefore separate forward speed from turn rate.
 
 ### State
 $`x = [p_x, p_y, \theta, u, v, \omega]`$ includes world position $`p = [p_x, p_y]`$, heading $`\theta`$, body-frame velocity $`b = [u, v]`$ (forward, left), and turn rate $`\omega`$:
-- **Heading** $`\theta`$ (also called **yaw**) is the body's orientation in the plane: the angle from the world x-axis to the body's forward axis. It is not the direction of travel $`\mathrm{atan2}`$ of the world velocity. The two differ whenever the robot doesn't move straight forward, e.g. when it steps sideways ($`v \neq 0`$), which a hexapod can do.
+- **Heading** $`\theta`$ (also called **yaw**) is the body's orientation in the plane: the angle from the world x-axis to the body's forward axis. It is not the direction of travel (the $`\mathrm{atan2}`$ of the world velocity); the two differ whenever the robot doesn't move straight forward, e.g. when it steps sideways ($`v \neq 0`$), which a hexapod can do.
 - **Turn rate** $`\omega = \dot\theta`$ (yaw rate, rad/s, positive counter-clockwise, i.e. turning left) is how fast the body rotates, not how sharply its path curves: turning in place has $`\omega \neq 0`$ at zero speed.
 - **Velocity** and **turn rate** together are the body's **twist** ([glossary](../glossary.md#twist)). 
 
@@ -49,8 +49,8 @@ p_{k+1} = p_k + R(\theta_k)\, b_k\, \Delta t, \qquad \theta_{k+1} = \theta_k + \
 ```
 
 - $`R(\theta)`$ is the **2D rotation** by $\theta$, taking body-frame vectors to the world frame. 
-- $`w_k`$ is the **process noise** on the twist: each tick adds an independent Gaussian step, so the twist does a **random walk**, with step std $`\sigma_a \Delta t`$ for $`u, v`$ ($`\sigma_a = 0.05\ \text{m/s}^2`$) and $`\sigma_\alpha \Delta t`$ for $`\omega`$ ($`\sigma_\alpha = 0.1\ \text{rad/s}^2`$). Here $`\sigma_a`$ and $`\sigma_\alpha`$ are the stds of a random linear and angular acceleration: the twist wanders because random accelerations push it.
-- The **truth twist** is drawn from exactly this random walk, and the true pose is integrated with the filter's own discrete model (`propagate`). So the motion model is exact and $Q$, the **covariance** of $`w_k`$ ([glossary](../glossary.md#predict-and-update-steps)), is matched: NEES is a fair test ([glossary](../glossary.md#consistency-and-nees)).
+- $`w_k`$ is the **process noise** on the twist: each tick adds an independent [Gaussian](../glossary.md#gaussian-noise) step, so the twist does a **random walk**, with step std $`\sigma_a \Delta t`$ for $`u, v`$ ($`\sigma_a = 0.05\ \text{m/s}^2`$) and $`\sigma_\alpha \Delta t`$ for $`\omega`$ ($`\sigma_\alpha = 0.1\ \text{rad/s}^2`$). Here $`\sigma_a`$ and $`\sigma_\alpha`$ are the stds of a random linear and angular acceleration: the twist wanders because random accelerations push it.
+- The **truth twist** is drawn from exactly this random walk, and the true pose is integrated with the filter's own discrete model (`propagate`). So the motion model is exact and $Q$, the **covariance** of $`w_k`$ ([glossary](../glossary.md#predict-and-update-steps)), is matched: the normalized estimation error squared (NEES) is a fair test ([glossary](../glossary.md#consistency-and-nees)).
 
 ### Measure (`measurement_update_feet`)
 Each stance foot $i$ reports its velocity relative to the body, in the body frame:
@@ -86,9 +86,9 @@ A touchdown here only changes *which feet are measured*. The legs have no mass a
 
 - the body state does not jump: $`DR = I`$;
 - the body moves the same way before and after: $`f^{+} = f^{-}`$;
-- the timing term exists because a perturbed state reaches the guard at a different moment; here the clock sets the touchdown time, so a perturbed body lands at the same moment (and the term's numerator, $`f^{+} - DR\, f^{-}`$, is 0 anyway).
+- the timing term exists because a perturbed state reaches the guard at a different moment; here the clock sets the touchdown time, so a perturbed body lands at the same moment. The clock-triggered guard has no state gradient, so $Dg$ gives the timing term nothing to act on and $`\Xi = DR = I`$ follows directly (the numerator $`\delta f = f^{+} - DR\, f^{-}`$ is 0 anyway).
 
-So $`\Xi = DR = I`$ exactly, and the timing-noise term of [`invariant_saltation_ekf.md` §7](invariant_saltation_ekf.md#7-contact-detection-jitter), $`\sigma_{\text{detect}}^2\, w w^\top`$ with $`w = f^{+} - DR\, f^{-}`$ and $`\sigma_{\text{detect}}`$ the timing-error std, is exactly 0. A wrong touchdown time shows up in the *readings* instead (§5). A saltation matrix would matter only if touchdown changed the body state, e.g. an impact with height and pitch in the state, as in the bouncing-body docs ([`hybrid_saltation_ekf.md`](hybrid_saltation_ekf.md), [`invariant_saltation_ekf.md`](invariant_saltation_ekf.md)).
+So $`\Xi = DR = I`$ exactly, and the timing-noise term of [`invariant_saltation_ekf.md` §7](invariant_saltation_ekf.md#7-contact-detection-jitter), $`\sigma_{\text{detect}}^2\, \delta f\, \delta f^\top`$ with $`\delta f`$ as above and $`\sigma_{\text{detect}}`$ the timing-error std, is exactly 0. A wrong touchdown time shows up in the *readings* instead (§5). A saltation matrix would matter only if touchdown changed the body state, e.g. an impact with height and pitch in the state, as in the bouncing-body docs ([`hybrid_saltation_ekf.md`](hybrid_saltation_ekf.md), [`invariant_saltation_ekf.md`](invariant_saltation_ekf.md)).
 
 ---
 
@@ -141,7 +141,7 @@ One tick's readings pin down the body velocity to about $`\sigma/\sqrt{n}`$; tur
 L2 slips outward at 0.1 m/s for $`t \in [4, 8)`$ s whenever it is down. Its reading is then biased by 0.1 m/s, and the filter's model says it is zero.
 
 ### Intuition
-In the joint update, one bad foot out of $n$ pulls the estimate by about $`1/n`$ of its bias: $`0.1/3 = 0.033`$ m/s with a tripod, $`0.1/5 = 0.020`$ m/s with a wave gait. The peaks of the sideways velocity RMSE match (seed 2, 100 trials): 0.0316 (tripod), 0.0254 (ripple), 0.0206 m/s (wave). But the slipping foot is down for 1/2 of the cycle in a tripod and 5/6 in a wave gait, so the wave gait's smaller error lasts longer. Over the window the two largely cancel.
+In the joint update, one bad foot out of $n$ pulls the estimate by about $`1/n`$ of its bias: $`0.1/3 = 0.033`$ m/s with a tripod, $`0.1/5 = 0.020`$ m/s with a wave gait. The peaks of the sideways velocity RMSE match (seed 0, 100 trials): 0.0316 (tripod), 0.0254 (ripple), 0.0206 m/s (wave). But the slipping foot is down for 1/2 of the cycle in a tripod and 5/6 in a wave gait, so the wave gait's smaller error lasts longer. Over the window the two largely cancel.
 
 ### Per-foot gating (`gating=True`)
 Before the joint update, test each stance foot's **innovation** $`\nu_i = z_i - H_i \hat{x}^-`$ against the predicted state $`\hat{x}^-`$ and covariance $`P^-`$ ([glossary](../glossary.md#innovation-and-kalman-gain), [predict step](../glossary.md#predict-and-update-steps)):
@@ -150,7 +150,7 @@ Before the joint update, test each stance foot's **innovation** $`\nu_i = z_i - 
 \nu_i^\top \left(H_i P^- H_i^\top + \sigma^2 I\right)^{-1} \nu_i \le 9.21
 ```
 
-9.21 is the 99% point of a $`\chi^2`$ with 2 DoF ([glossary](../glossary.md#chi-square-distribution)), so a good foot is wrongly dropped 1% of the time. Feet that fail are left out ([glossary](../glossary.md#outlier-and-robust-kernel)). Testing each foot against the prediction, not after other feet's updates, makes the result independent of foot order.
+9.21 is the 99% point of a $`\chi^2`$ with 2 [degrees of freedom](../glossary.md#degrees-of-freedom-dof) (DoF; [chi-square](../glossary.md#chi-square-distribution)), so a good foot is wrongly dropped 1% of the time. Feet that fail are left out ([glossary](../glossary.md#outlier-and-robust-kernel)). Testing each foot against the prediction, not after other feet's updates, makes the result independent of foot order.
 
 Results (100 trials, seeds 0-2; **naive** = trusts every stance foot, **gated** = per-foot gate; "in window" = $`t \in [4, 8)`$ s):
 
@@ -222,7 +222,7 @@ Three filters, same draws: **trust** the detected flags; the **per-foot gate** o
 
 - **Trusting the flags is fine for the tripod at 1 tick, never for the wave gait.** At 0.05 s the wave gait's twist NEES is 108-123 and its position error about 10× the gated value.
 - **The gate handles both gaits at every level.** A wave foot read mid-swing is off by many reading stds, so the gate drops it: 0.1-0.4 such readings get through per run. Tripod swing readings near the ends are slow enough to pass (36-81 per run), and cost little; only at 0.1 s does the tripod reach the 3.50 bound (3.47-3.65).
-- **Trimming works for the tripod, not the wave gait.** It only covers timing errors up to $`2\sigma_{\text{detect}}`$; the remaining ~5% of events still read a moving foot, harmless for the tripod's slow feet, costly for the wave's fast ones. At 0.1 s, a late liftoff and an early touchdown also add up to more than a 10-tick swing for 11.7% of wave swings: the swing vanishes from the detected flags, leaving no edge to trim around. Trimming also throws away good readings: at 0.1 s the trimmed tripod filter ends 0.034-0.037 m off, against 0.027-0.028 m with the gate.
+- **Trimming works for the tripod, not the wave gait.** It only covers timing errors up to $`2\sigma_{\text{detect}}`$; the remaining events (about 2-3%) still read a moving foot, because only an early touchdown or a late liftoff beyond $`2\sigma_{\text{detect}}`$ does so; harmless for the tripod's slow feet, costly for the wave's fast ones. At 0.1 s, a late liftoff and an early touchdown also add up to more than a 10-tick swing for about 10% of wave swings (9.7-10.5% over seeds 0-2): the swing vanishes from the detected flags, leaving no edge to trim around. Trimming also throws away good readings: at 0.1 s the trimmed tripod filter ends 0.034-0.037 m off, against 0.027-0.028 m with the gate.
 - **No $`\Xi`$ or timing-noise term would fix this:** both are trivial here (§1). The fix belongs on the measurement side.
 
 ![Three panels from hexapod_gait_ekf.py: twist NEES bars for the tripod and wave gaits when every foot drifts, ignoring versus modeling the drift, against the consistent value 3; foot speed over one swing for the tripod (30 ticks, peak 0.30 m/s) and wave (10 ticks, peak 0.85 m/s) gaits, with the readings one and two ticks before touchdown marked; and twist NEES on log axes against contact-detection jitter from 0.02 to 0.1 s for trusting the detected times, the per-foot chi-squared gate and trimming, for both gaits](../../assets/hexapod_gait_ekf_extensions.png)
@@ -245,6 +245,8 @@ The next step up is a 3D filter that keeps each stance foot's position in the st
 ---
 
 ## 7. References
+
+References 1-3 are cited above; reference 4 is further reading.
 
 1. Bloesch, M., Hutter, M., Hoepflinger, M., Leutenegger, S., Gehring, C., Remy, C. D., & Siegwart, R. (2012). *State Estimation for Legged Robots - Consistent Fusion of Leg Kinematics and IMU*. Robotics: Science and Systems VIII. https://doi.org/10.15607/RSS.2012.VIII.003 - an EKF that fuses leg kinematics with an IMU and keeps the footholds' absolute positions in the state; the 3D, IMU-driven version of this toy's stance-foot measurement.
 2. Hartley, R., Ghaffari, M., Eustice, R. M., & Grizzle, J. W. (2020). *Contact-Aided Invariant Extended Kalman Filtering for Robot State Estimation*. The International Journal of Robotics Research, 39(4), 402-430. https://doi.org/10.1177/0278364919894385 - an invariant EKF ([glossary](../glossary.md#iekf-invariant-ekf)) with the current contact points in the state, including how to add and remove contacts as feet land and lift.

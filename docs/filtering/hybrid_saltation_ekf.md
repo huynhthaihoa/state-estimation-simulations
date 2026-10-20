@@ -2,12 +2,12 @@
 
 ## Intuition
 
-A hybrid system alternates **ordinary smooth motion** (falling) with **sudden, instantaneous jumps** (bouncing), triggered the instant some condition is hit (touching the ground). The tricky part is not the jump itself: two nearby trajectories do not hit that condition at the same moment.
+A [hybrid system](../glossary.md#hybrid-system-guard-and-reset-map) alternates **ordinary smooth motion** (falling) with **sudden, instantaneous jumps** (bouncing), triggered the instant some condition is hit (touching the ground). The tricky part is not the jump itself: two nearby trajectories do not hit that condition at the same moment.
 
 Ball A (nominal) and ball B (starts 5 cm higher) fall together. B has farther to fall, so it lands a fraction of a second *later* than A and has picked up extra speed by then:
 
 ```text
- at the instant A touches down (schematic, not to scale; the real delay is 4.9 ms):
+ at the instant A touches down (schematic, not to scale; the real delay is 4.94 ms):
 
       B ●                  <- still above the ground, still falling
         │
@@ -17,20 +17,20 @@ Ball A (nominal) and ball B (starts 5 cm higher) fall together. B has farther to
 
 So B's bounce isn't "the same bounce rule applied to a slightly different starting state" - it's applied to a state that has had a bit more time to accelerate first.
 
-- **Ordinary Jacobian of the bounce** ($DR$, the reset map's own derivative): sees only how the bounce transforms a state already sitting at the ground. It implicitly assumes both balls land at the same instant, so it misses B's extra falling time.
-- **Saltation matrix** ($\Xi$): adds exactly that - **how much *extra time* a perturbed trajectory needs to reach the ground, and what that delay does to the state before the bounce (B falls longer) and after it (B rebounds later)**.
+- **Ordinary [Jacobian](../glossary.md#jacobian) of the bounce** ($DR$, the reset map's own derivative): sees only how the bounce transforms a state already sitting at the ground. It implicitly assumes both balls land at the same instant, so it misses B's extra falling time.
+- **[Saltation matrix](../glossary.md#saltation-matrix)** ($\Xi$): adds exactly that - **how much *extra time* a perturbed trajectory needs to reach the ground, and what that delay does to the state before the bounce (B falls longer) and after it (B rebounds later)**.
 - **It is not a rounding error:** §3 works a case where **the naive approach predicts a position offset has *zero* effect on the post-bounce velocity, when the timing shift is in fact the *entire* effect**.
 
 Every filter in [kf_ekf_iekf.md](kf_ekf_iekf.md) and [extra_kf_variants.md](extra_kf_variants.md) assumes the state evolves *continuously* between measurements. Bio-inspired locomotion (a footstep, an inchworm anchor/release cycle, a friction-anisotropic grip-then-slip transition) breaks that assumption on purpose: the platforms move in **discrete, hybrid bursts**.
 
-This doc works through the tool that lets an EKF cross such a discontinuity without either:
+This doc works through the tool that lets an [EKF](../glossary.md#ekf-extended-kalman-filter) (extended Kalman filter) cross such a discontinuity without either:
 
 - (a) silently pretending nothing happened, or
 - (b) discarding all uncertainty information at the jump.
 
 The concrete example is the bouncing-point-mass toy problem in [`saltation_matrix_ekf.py`](../../use_numpy/saltation_matrix_ekf.py).
 
-![Three panels from saltation_matrix_ekf.py: height and vertical velocity of the default bouncing run with the guard crossings and velocity resets marked; two balls from the §3 worked example, the second starting 5 cm higher and landing 4.9 ms later; and the change each approach predicts at T = 1 s, where the naive reset Jacobian predicts no velocity change and the saltation matrix matches the re-simulated answer](../../assets/saltation_matrix_ekf_concept.png)
+![Three panels from saltation_matrix_ekf.py: height and vertical velocity of the default bouncing run with the guard crossings and velocity resets marked; two balls from the §3 worked example, the second starting 5 cm higher and landing 4.94 ms later; and the change each approach predicts at T = 1 s, where the naive reset Jacobian predicts no velocity change and the saltation matrix matches the re-simulated answer](../../assets/saltation_matrix_ekf_concept.png)
 
 *Figure: the default run of `use_numpy/saltation_matrix_ekf.py` and the [§3](#3-a-worked-example-naive-vs-saltation-in-numbers) worked example, plotted by `uv run python assets/make_figures.py saltation_matrix_ekf_concept`.*
 
@@ -50,9 +50,9 @@ A **hybrid dynamical system** alternates **continuous flow** with **instantaneou
 - **Flow:** $`\dot x = f(x) = \begin{bmatrix} v \\ (0,0,-g) \end{bmatrix}`$ - ordinary free-fall, affine in $x$ (linear plus a constant gravity term), so it can be integrated exactly.
 - **Guard:** $g(x) = p_z$. The system jumps whenever a falling trajectory reaches $g(x) = 0$ (touches the ground). Its gradient $Dg = \partial g/\partial x$ appears throughout this doc, starting in §2. Here it is the constant row vector $(0,0,1,0,0,0)$, which picks out the $p_z$ component.
   - The letter $g$ does double duty, following the saltation-matrix literature: $g(x)$ and $Dg$ are the guard, while a bare $g$ in the dynamics, as in $\tfrac12 g t^2$, is gravity, $9.81\ \text{m/s}^2$.
-- **Reset map:** $R(x)$, applied at the guard - here, $`v_z \mapsto -e\,v_z`$ (an inelastic bounce with restitution $e$), position and horizontal velocity untouched. A superscript $-$/$`+`$ on a state, vector field or covariance (e.g. $x^{-}$, $f^{+}$, $P^{-}$, $P^{+}$) means "evaluated just before/after the reset" (see the notation table below).
+- **Reset map:** $R(x)$, applied at the guard - here, $`v_z \mapsto -e\,v_z`$ (an inelastic bounce with restitution $e$, the fraction of the impact speed kept: $e=1$ is fully elastic), position and horizontal velocity untouched. A superscript $-$/$`+`$ on a state, vector field or covariance (e.g. $x^{-}$, $f^{+}$, $P^{-}$, $P^{+}$) means "evaluated just before/after the reset" (see the notation table below).
 
-This is the canonical example (the word "saltation" is Latin for "leaping"). It is the simplest analog of a foot-strike impact, a discrete velocity reset at a discrete contact event, without the rotational complexity of $SE(3)$. The glossary defines [hybrid system, guard, reset map and saltation matrix](../glossary.md#hybrid-system-guard-and-reset-map).
+This is the canonical example (the word "saltation" is Latin for "leaping"). It is the simplest analog of a foot-strike impact, a discrete velocity reset at a discrete contact event, without the rotational complexity of [SE(3)](../glossary.md#so3-and-se3). The glossary defines [hybrid system, guard, reset map and saltation matrix](../glossary.md#hybrid-system-guard-and-reset-map).
 
 ### Notation used throughout this doc
 Several letters mean something different here than in the rest of the repo, or mean two things within this doc; the table settles each one.
@@ -68,13 +68,13 @@ Several letters mean something different here than in the rest of the repo, or m
 | $f^{-}$, $f^{+}$ | The flow evaluated at $x^{-}$ and at $x^{+}$. |
 | $P^{-}$, $P^{+}$ | The covariance just before and just after the bounce. |
 | $`t^{*}`$, $\delta t$ | The nominal trajectory's crossing time, and how much later (or earlier) a perturbed trajectory crosses. |
-| $\tau$, $`\tau_{\text{detect}}`$ | The crossing time `crossing_time` finds within a tick, and the time the bounce is applied once §8's detection error is added. |
+| $\tau$, $`\tau_{\text{detect}}`$ | The crossing time `crossing_time` finds within a tick (one filter time step $\Delta t$), and the time the bounce is applied once §8's detection error is added. |
 | $\Phi$ | A flow Jacobian $\partial x'/\partial x$: $\Phi(h)$ over an interval $h$ (§1.1), $`\Phi_{\text{before}}`$/$`\Phi_{\text{after}}`$ on either side of a bounce (§3-§4). In §4, $\Phi(x, s)$ is the flow map itself and $D_1\Phi$ its Jacobian. |
 | $\Xi$ | The saltation matrix (§4's boxed formula). |
 | $`\Xi_{\text{own-time}}`$ | §4's event-to-event variant, correct for a different question. |
 | $a \otimes b$ | Outer product: a column vector times a row vector, giving a matrix. |
 | $Q(h)$, $`\sigma_{\text{imp}}`$ | Process noise over an interval $h$, and the impact-noise floor added at each bounce. |
-| $z$, $H$, $R_z$, $S$, $K$ | Position measurement, its Jacobian, its noise covariance, the innovation covariance, and the Kalman gain (§1.1). |
+| $z$, $H$, $R_z$, $S$, $K$ | Position measurement, its Jacobian, its noise covariance, the [innovation covariance and the Kalman gain](../glossary.md#innovation-and-kalman-gain) (§1.1). |
 | $`x_{k\|k-1}`$, $`P_{k\|k-1}`$ / $`x_{k\|k}`$, $`P_{k\|k}`$ | The estimate before and after tick $k$'s measurement update. |
 | $p$, $S(t)$ in §4 | A perturbation parameter (not position) and the trajectory's sensitivity to it (not the innovation covariance). |
 
@@ -105,7 +105,7 @@ This is a simple diagonal heuristic, not the textbook continuous white-noise-acc
 
 1. Compute $\tau$ with `crossing_time`. If there is none, or $\tau \ge$ `remaining`, flow the rest of the tick, set $P \leftarrow \Phi P \Phi^\top + Q(\text{remaining})$, and stop.
 2. Otherwise flow to the detected crossing time $\tau_{\text{detect}}$ (equal to $\tau$ unless the §8 detection parameters are set), and set $P \leftarrow \Phi P \Phi^\top + Q(\tau_{\text{detect}})$.
-3. If the vertical speed there is below `min_bounce_speed` $= 10^{-3}$ m/s, set $v_z = 0$, and use `flow_resting` (below) for the rest of this tick.
+3. If the vertical speed there is below `min_bounce_speed` $= 10^{-3}$ m/s, set $v_z = 0$, and use `flow_resting` (below) for the rest of this tick only.
 4. Otherwise apply the bounce (equations below) and go back to step 1 with the time that is left.
 
 At each bounce, with $M = \Xi(x^{-})$ (`saltation_matrix`, §4) if `use_saltation` is true and $M = DR$ (`reset_jacobian`) if not:
@@ -119,7 +119,7 @@ Two things are easy to miss:
 - $Q$ is added once per sub-interval, not once per tick. Because $Q(h)$ grows like $h^2$ and $h^4$, a tick split at a bounce gets less total process noise than an unsplit tick.
 - The impact floor $\sigma_{\text{imp}}^2 I_6$ (`--impact-noise-std`, default $0.005$) is added to all six diagonal entries, velocity included, in both variants. §5 and §7 explain why it is a modeling choice rather than a numerical necessity.
 
-**Resting fallback** (`flow_resting`). Once the mass is treated as at rest, only horizontal position moves: $`p_{x,y} \leftarrow p_{x,y} + v_{x,y}\,h`$, with $p_z$, $v_z$ and the rest of the state held fixed. Its $\Phi$ is the identity plus $h$ at the $(p_x, v_x)$ and $(p_y, v_y)$ entries. This is a deliberately simple guard against the Zeno pathology (§7), not a contact model.
+**Resting fallback** (`flow_resting`). Once the mass is treated as at rest, only horizontal position moves: $`p_{x,y} \leftarrow p_{x,y} + v_{x,y}\,h`$, with $p_z$, $v_z$ and the rest of the state held fixed. Its $\Phi$ is the identity plus $h$ at the $(p_x, v_x)$ and $(p_y, v_y)$ entries. This is a deliberately simple guard against the [Zeno](../glossary.md#zeno-behavior) pathology (§7), not a contact model. It lasts only for the rest of the tick in which the bounce was skipped: the next tick starts with the ordinary `flow` again, so a mass left at $p_z = v_z = 0$ free-falls below the ground (`crossing_time` finds no descending root there).
 
 **Position update** (`measurement_update`). A direct noisy position reading, $z = p + n$:
 
@@ -139,14 +139,14 @@ The covariance uses the plain $`(I - KH)P_{k|k-1}`$ form, not the **Joseph form*
 #### Ground truth and Monte Carlo setup
 
 - **True trajectory** (`generate_ground_truth_and_data`): `step_hybrid` itself with zero process noise and zero covariance, so it follows the same bounce and resting rules as the filters.
-- **Dead reckoning** (`run_dead_reckoning`): the same noise-free propagation from the perturbed initial guess, with no updates.
-- **Monte Carlo** (`run_monte_carlo_consistency`): each trial draws a fresh initial guess $`x_0 = x_{\text{true},0} + \text{diag}(\sigma_0)\,n`$ (where $`\sigma_0`$ stacks the position and velocity initial standard deviations $`\sigma_{p0}, \sigma_{v0}`$ given below) with $n \sim \mathcal{N}(0, I_6)$ and fresh measurement noise, starts both filters from
+- **[Dead reckoning](../glossary.md#dead-reckoning)** (`run_dead_reckoning`): the same noise-free propagation from the perturbed initial guess, with no updates.
+- **[Monte Carlo](../glossary.md#monte-carlo-trials)** (`run_monte_carlo_consistency`): each trial draws a fresh initial guess $`x_0 = x_{\text{true},0} + \text{diag}(\sigma_0)\,n`$ (where $`\sigma_0`$ stacks the position and velocity initial standard deviations $`\sigma_{p0}, \sigma_{v0}`$ given below) with $n \sim \mathcal{N}(0, I_6)$ and fresh measurement noise, starts both filters from
 
 $$
 P_0 = \text{diag}\big(\sigma_{p0}^2 I_3,\ \sigma_{v0}^2 I_3\big), \qquad \sigma_{p0} = 0.1\ \text{m}, \quad \sigma_{v0} = 0.2\ \text{m/s}
 $$
 
-- **NEES averaging:** per tick over 500 trials. §6's post-bounce window finds each bounce tick with `detect_bounce_ticks` (a local minimum of true height below $0.2$ m), then averages the next 5 ticks, excluding the bounce tick itself.
+- **[NEES](../glossary.md#consistency-and-nees) (normalized estimation error squared) averaging:** per tick over 500 trials. §6's post-bounce window finds each bounce tick with `detect_bounce_ticks` (a local minimum of true height below $0.2$ m), then averages the next 5 ticks, excluding the bounce tick itself.
 - **Other defaults:** $\Delta t = 0.02$ s, $e = 0.85$, $g = 9.81$, a $5$ m drop, initial horizontal velocity $(1.0, 0.5)$ m/s, and a $5$ s duration.
 
 ---
@@ -165,7 +165,7 @@ The problem is timing, not the reset map: $DR$ is the Jacobian of "apply the res
 - $DR$ is evaluated at the fixed instant $`t^{*}`$, so it cannot see this.
 - Near grazing (small $Dg\cdot f^{-}$, a shallow crossing), $\delta t \propto 1/(Dg\cdot f^{-})$ grows, so the timing effect can dominate the reset map's own contribution.
 
-**Grazing, in numbers:** the same 5 cm offset costs $`0.05/10.1 \approx 4.9`$ ms at a 10.1 m/s impact, but $`0.05/1 = 50`$ ms at a 1 m/s (shallow) impact. Slower crossing, bigger timing shift.
+**Grazing, in numbers:** the same 5 cm offset costs $`0.05/10.1 \approx 4.95`$ ms at a 10.1 m/s impact, but $`0.05/1 = 50`$ ms at a 1 m/s (shallow) impact. Slower crossing, bigger timing shift.
 
 The correct sensitivity has to account for that time-shift, for comparison at a shared later time. That is the **saltation matrix**, $\Xi$: the reset Jacobian $DR$ plus a **timing correction** for the event-timing sensitivity. §4 builds it in **two stages**:
 
@@ -191,16 +191,16 @@ Here the two approaches disagree on an actual number. The comparison time matter
 **Setup:** two point masses, both falling with downward velocity $`-2\,\text{m/s}`$ from $`5\,\text{m}`$, except the second starts $5\text{cm}$ higher ($\delta p_z = 0.05$, no velocity perturbation), with restitution $e=0.5$. Both bounce once and are compared at $`T=1.0\,\text{s}`$ (the nominal bounce is at $`t^{*}\approx0.826\,\text{s}`$, leaving $`\approx\!0.174\,\text{s}`$ of post-bounce flow for the timing difference to matter):
 
 - **Naive prediction** ($DR$ alone, composed with the free-fall flow Jacobian before and after the bounce - exactly what `step_hybrid`'s `use_saltation=False` branch computes): change in $v_z(T)$: **exactly $0$**; change in $p_z(T)$: **$`+0.05\,\text{m}`$**. $DR$'s position rows are the identity, so the offset is carried forward unchanged - in effect the perturbed ball bounces at the nominal instant while still hovering $5\text{cm}$ above the ground.
-- **True answer** (re-simulated: let the second ball reach its own crossing time, apply the reset there, then flow both forward to $T$ and compare): starting $5\text{cm}$ higher means falling for an extra $`\sim\!4.9\text{ms}`$, so it lands faster ($`10.153`$ vs. $`10.104\,\text{m/s}`$) and bounces back faster - but also later, so it has *less* time flowing back up before $T$. True change in $v_z(T)$: **$+0.0726\ \text{m/s}$**; true change in $p_z(T)$: **$`-0.0126\,\text{m}`$** (lower than nominal, the opposite sign from the naive guess).
+- **True answer** (re-simulated: let the second ball reach its own crossing time, apply the reset there, then flow both forward to $T$ and compare): starting $5\text{cm}$ higher means falling for an extra $`\sim\!4.94\text{ms}`$, so it lands faster ($`10.153`$ vs. $`10.104\,\text{m/s}`$) and bounces back faster - but also later, so it has *less* time flowing back up before $T$. True change in $v_z(T)$: **$+0.0726\ \text{m/s}$**; true change in $p_z(T)$: **$`-0.0126\,\text{m}`$** (lower than nominal, the opposite sign from the naive guess).
 - **Saltation-corrected prediction** ($\Xi$, composed as $`\Phi_{\text{after}}\,\Xi\,\Phi_{\text{before}}`$ - exactly what `saltation_matrix` plus `step_hybrid`'s surrounding `flow` calls compute): change in $v_z(T)$: **$+0.0728\ \text{m/s}$**; change in $p_z(T)$: **$`-0.0123\,\text{m}`$** - both within second-order error of the true answer.
 
-The naive approach is qualitatively wrong on both components. Physically a ball only bounces on contact, so the extra height becomes a *timing* difference: the perturbed ball reaches the ground $`\approx 4.9\,\text{ms}`$ later, and that shift produces both true changes:
+The naive approach is qualitatively wrong on both components. Physically a ball only bounces on contact, so the extra height becomes a *timing* difference: the perturbed ball reaches the ground $`4.94\,\text{ms}`$ later (the exact delay; the first-order estimate $0.05/10.10$ that §4 uses is $4.95\,\text{ms}$), and that shift produces both true changes:
 
 - **Velocity** ($`+0.0726\,\text{m/s}`$, naive: $0$):
   - $`+0.0242\,\text{m/s}`$ because it hit faster and so bounced back faster ($`0.0484\,\text{m/s}`$ extra impact speed, times $e=0.5$).
-  - $`+0.0484\,\text{m/s}`$ because it bounced later, so gravity has had $`\approx 4.9\,\text{ms}`$ less time to slow its climb by $T$.
+  - $`+0.0484\,\text{m/s}`$ because it bounced later, so gravity has had $`\approx 4.94\,\text{ms}`$ less time to slow its climb by $T$.
   - Both parts come from the bounce timing: a pure position perturbation changes the post-bounce velocity *only* through timing, so timing is the entire effect.
-- **Position** ($`-0.0126\,\text{m}`$, naive: $`+0.05\,\text{m}`$): the $5\text{cm}$ head start is used up on the way down. Starting the climb $`\approx 4.9\,\text{ms}`$ late costs about $16.6$ mm, and climbing slightly faster wins back only about $4.1$ mm, for a net $-12.55$ mm.
+- **Position** ($`-0.0126\,\text{m}`$, naive: $`+0.05\,\text{m}`$): the $5\text{cm}$ head start is used up on the way down. Starting the climb $`\approx 4.94\,\text{ms}`$ late costs about $16.6$ mm, and climbing slightly faster wins back only about $4.1$ mm, for a net $-12.55$ mm.
 
 $DR$ has no notion of time: it only transforms a state already on the guard, and composing it with the flow Jacobians on either side doesn't fix that. $\Xi$ adds the missing piece: its correction term accounts for how much the perturbation shifts the crossing time, and for what that shift does to the state both before *and* after the bounce.
 
@@ -212,7 +212,7 @@ $DR$ has no notion of time: it only transforms a state already on the guard, and
 
 ### Intuition (tiny example, §3's setup)
 Ball A is nominal; ball B starts 5 cm higher.
-- At impact speed 10.10 m/s, B needs $`0.05/10.10 \approx 4.95`$ ms more to reach the ground. So B bounces 4.95 ms late.
+- At impact speed 10.10 m/s, B needs $`0.05/10.10 \approx 4.95`$ ms more to reach the ground (a first-order estimate; the exact delay is 4.94 ms, §3). So B bounces about 4.95 ms late.
 - At the shared clock time, A has already bounced and B has not. The two states are in different "phases".
 - The correction term below fixes exactly this: $`\Delta t \times`$ (how the state moves after the bounce minus how the mapped pre-bounce state was moving).
 - In the height slot that gap is $`+5.05 - (-10.10) = 15.15`$ m/s, so the term is about $`15.15 \times 0.00495 \approx 0.075`$ m. It subtracts: the height offset becomes $`0.05 - 0.075 = -0.025`$ m (see §5).
@@ -250,7 +250,7 @@ Here $`\Phi_{\text{after}} = D_1\Phi(x^{+}, T-t^{*})`$ is the ordinary flow Jaco
 1. Expand $`\frac{dx^{+}}{dp} = DR\big[f^{-}(x^{-})\frac{dt^{*}}{dp} + S(t^{*})\big]`$ (same reasoning as $\Xi_{\text{own-time}}$'s derivation).
 2. Use the flow identity $D_1\Phi(x,s)\cdot f(x) = f\big(\Phi(x,s)\big)$ (for an **autonomous** flow, one whose vector field does not depend on time, the linearization carries the vector field forward), so $\Phi_{\text{after}}\cdot f^{+}(x^{+}) = f_T$.
    - **Intuition:** nudging a state forward along its own path is the same as starting a tiny bit later or earlier.
-   - **Tiny example (toy case: free fall, state $`(h, v)`$):** after time $`s`$ the flow gives $`h' = h + vs - gs^2/2`$ and $`v' = v - gs`$. Nudge the start along its path, by $`\epsilon f = \epsilon(v, -g)`$. The end state moves by $`\epsilon(v - gs,\, -g)`$, which is $`\epsilon f`$ evaluated at the end state. So $`D_1\Phi\cdot f(x) = f(\Phi(x,s))`$.
+   - **Tiny example (toy case: free fall, state $`(p_z, v_z)`$):** after time $`s`$ the flow gives $`p_z' = p_z + v_z s - gs^2/2`$ and $`v_z' = v_z - gs`$. Nudge the start along its path, by $`\epsilon f = \epsilon(v_z, -g)`$. The end state moves by $`\epsilon(v_z - gs,\, -g)`$, which is $`\epsilon f`$ evaluated at the end state. So $`D_1\Phi\cdot f(x) = f(\Phi(x,s))`$.
 3. Pull the term $`-f_T\,dt^{*}/dp`$ inside $\Phi_{\text{after}}$ using step 2.
 4. The $DR$ terms reproduce $\Xi_{\text{own-time}}$ exactly, and the pulled-in term adds exactly one new term on top of it:
 
@@ -278,7 +278,7 @@ where $`\Phi_{\text{before}} = D_1\Phi(x_0, t^{*})`$ (so $`S(t^{*})=\Phi_{\text{
 - That is $`e \times 0.05`$ m. The 5 cm offset has shrunk to 2.5 cm, with the sign flipped (B is now the one below A).
 - So the height offset is scaled by $-e$ at every bounce. The same logic gives $e^2$ for the variance in §6.
 
-For this guard ($g(x) = p_z$), $\Xi$'s output row for $p_z$ scales by exactly $-e$, for any $x^{-}$, $e$, $g$ with $Dg\cdot f^{-} \neq 0$ (i.e. $v_z^{-} \neq 0$, so the crossing is transversal):
+For this guard ($g(x) = p_z$), $\Xi$'s output row for $p_z$ scales by exactly $-e$, for any $x^{-}$, $e$, $g$ with $Dg\cdot f^{-} \neq 0$ (i.e. $v_z^{-} \neq 0$, so the crossing is transversal, i.e. the trajectory crosses the guard rather than skimming along it):
 
 ```math
 Dg\,\Xi(x^{-}) = -e\,Dg
@@ -295,7 +295,7 @@ Dg\,\Xi(x^{-}) = -e\,Dg
 
 ## 6. The empirical finding: a modest, real gap, not a dramatic one
 
-The intuitive story going in was that the naive $`P^{+} = DR\,P^{-}\,DR^\top`$ update would be measurably overconfident (too-small reported uncertainty) right after each bounce compared to the saltation-corrected one, and a Monte Carlo NEES consistency check would show it (see [NEES](../glossary.md#consistency-and-nees): a consistent 6-DoF filter averages $\approx 6$, higher means overconfident, lower underconfident). The data does not bear that out.
+The intuitive story going in was that the naive $`P^{+} = DR\,P^{-}\,DR^\top`$ update would be measurably overconfident (too-small reported uncertainty) right after each bounce compared to the saltation-corrected one, and a Monte Carlo NEES consistency check would show it (a consistent 6-[DoF](../glossary.md#degrees-of-freedom-dof) (degrees of freedom) filter averages $\approx 6$, higher means overconfident, lower underconfident). The data does not bear that out.
 
 Running `saltation_matrix_ekf.py` at its defaults (500 Monte Carlo trials, 3 well-separated bounces from a 5m drop at $e = 0.85$) and looking at NEES in the few ticks immediately following each bounce (excluding the shared spike at the bounce tick itself, which both filters exhibit for the mundane reason that the true trajectory is also close to its own crossing at that tick):
 
@@ -308,9 +308,9 @@ Mean NEES, 5 ticks after each of 3 bounces (seed 0):
 ### Both filters are *under*confident after a bounce, and the saltation-corrected one slightly less so
 
 - **Reproducible:** across seeds 0-3, naive gives 2.35-2.38 and saltation 2.49-2.50.
-- **Clearly below 6:** for a 500-trial mean, the 95% band around a consistent $6$ is only $`6 \pm 1.96\sqrt{2\cdot 6/500} \approx 6 \pm 0.30`$ (the familiar $12.59$ bound is the 95% point of a chi-squared distribution with 6 degrees of freedom, which applies to a *single* NEES sample, not a 500-trial mean). So both report a clearly larger $P$ than their actual errors.
+- **Clearly below 6:** for a 500-trial mean, the 95% band around a consistent $6$ is only $`6 \pm 1.96\sqrt{2\cdot 6/500} \approx 6 \pm 0.30`$ (the familiar $12.59$ bound is the 95% point of a [chi-squared distribution](../glossary.md#chi-square-distribution) with 6 degrees of freedom, which applies to a *single* NEES sample, not a 500-trial mean). So both report a clearly larger $P$ than their actual errors.
 - **Not bounce-specific:** the whole-run mean NEES is $\approx 3.3$ for both. Part of that is process noise the truth doesn't have (the true trajectory has none, yet both filters add $Q$ every sub-interval and the impact floor at every bounce). Only part, though: cutting `--process-noise-std` from $0.3$ to $0.01$ raises the whole-run mean only to about 4.0-4.4 (seed 0).
-- **So saltation's 5-6% higher NEES means slightly *closer* to consistent**, not worse. It is also nowhere near the order-of-magnitude effect an incorrect formula (one missing §4's $f^{+}$ term) would produce.
+- **So saltation's 5-6% higher NEES means slightly *closer* to consistent**, not worse. An incorrect formula is a different story: swapping in $`\Xi_{\text{own-time}}`$ (§4's formula missing the $f^{+}$ term) gives post-bounce NEES 3.66 at the default impact-noise floor (vs. 2.49 for $\Xi$ and 2.35 naive), but 1954 with the floor disabled (vs. 3.05 and 2.94; seed 0, 500 trials). The floor masks the missing term; without it, the filter becomes grossly overconfident (about 640× the correct filter's NEES, §7).
 
 ### What differs, and how robust the ordering is
 
@@ -330,7 +330,7 @@ So with exact detection there is no case for the naive update:
 
 *Figure: `use_numpy/saltation_matrix_ekf.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py saltation_matrix_ekf`.*
 
-The same run, animated. The two estimates stay close; what differs is the uncertainty each filter reports after a bounce. In the bottom-right panel, the vertical-velocity standard deviation drops at every bounce from about 0.030 m/s to about 0.025 m/s (naive) and 0.018 m/s (saltation). Both then recover to about 0.028 m/s before the next bounce.
+The same run, animated. The two estimates stay close; what differs is the uncertainty each filter reports after a bounce. In the bottom-right panel, the vertical-velocity standard deviation drops at every bounce from about 0.029 m/s to about 0.025 m/s (naive) and 0.018-0.019 m/s (saltation). Both then recover to about 0.028-0.029 m/s before the next bounce.
 
 ![Animation of the default run: top, the bouncing point mass with measurements and both EKF estimates; bottom left, each filter's height and vertical-velocity error with its 2-sigma ellipse; bottom right, each filter's reported vertical-velocity standard deviation over time, which drops further at every bounce for the saltation update than for the naive one](../../assets/saltation_matrix_ekf.gif)
 
@@ -342,7 +342,7 @@ The same run, animated. The two estimates stay close; what differs is the uncert
 
 - **The regularizing floor is not numerically load-bearing here, but still worth tuning.** Sweeping `--impact-noise-std` (post-bounce NEES, naive vs. saltation):
   - `0` (disabled): 2.94 vs. 3.05; `0.0005`: 2.93 vs. 3.04; `0.005` (default): 2.35 vs. 2.49; `0.02`: 2.28 vs. 2.32.
-  - The two move together and never swap order, and all stay below $6$ even with the floor disabled. This is consistent with §5: $`Dg\,\Xi = -e\,Dg`$ keeps the guard-normal row non-degenerate, where $`Dg\,\Xi_{\text{own-time}} = 0`$ would zero it at every bounce. We did not re-run the older formula, so we have not shown that it needed the floor, or that the order would swap under it.
+  - The two move together and never swap order, and all stay below $6$ even with the floor disabled. This is consistent with §5: $`Dg\,\Xi = -e\,Dg`$ keeps the guard-normal row non-degenerate, where $`Dg\,\Xi_{\text{own-time}} = 0`$ would zero it at every bounce. Re-running with $`\Xi_{\text{own-time}}`$ in place of $\Xi$ (seed 0, 500 trials) gives post-bounce NEES 3.66 at the default floor and 1954 with the floor disabled (vs. 2.49 and 3.05 for $\Xi$): the older formula depends on the floor, which hides its error (3.66 is even nearer 6 than 2.49), while the correct $\Xi$ does not need it.
   - The floor still shifts both filters' absolute NEES together as it grows, so it remains a real modeling choice, just not one that can flip the comparison.
 - **Stay well clear of the Zeno regime.** A lossy bounce ($e<1$) produces infinitely many, ever more frequent bounces approaching a finite settling time: $`t_1 + \frac{2 e v_1}{g(1-e)} \approx 12.45\,\text{s}`$ at the defaults (first impact at $t_1 \approx 1.01$ s, speed $v_1 \approx 9.90$ m/s).
   - The $n$-th interval between bounces is $`2 v_1 e^{n}/g \approx 2.02\cdot 0.85^{n}`$ s. It reaches the fixed step $\Delta t = 0.02$ s only at $n \approx 28$, about $0.14$ s before $12.45$ s (around $t \approx 12.3$ s), and is still about $3\Delta t$ at $n \approx 22$, the last $\approx 0.4$ s. So intervals fall to a few $\Delta t$ only in the final fraction of a second.
@@ -359,7 +359,7 @@ The same run, animated. The two estimates stay close; what differs is the uncert
 ```math
 \tau_{\text{detect}} = \text{clip}\big(\tau + b_{\text{detect}} + \mathcal{N}(0,\,\sigma_{\text{detect}}^2)\,,\ 0,\ \tau_{\text{remain}}\big)
 ```
-instead of the true geometric $\tau$ (here $`\tau_{\text{remain}}`$ is the time left in the tick, `remaining` in `step_hybrid`, and $`b_{\text{detect}}, \sigma_{\text{detect}}`$ are the bias and noise std above), so early detection resets the mean while still above ground and late detection resets it after the free-fall model has carried it slightly below $p_z = 0$ - both real artifacts of a delayed or jittery contact detector (e.g. an accelerometer spike, as in the IMU-based foot-strike detector of [Čížek et al., 2018](#11-references), or a force threshold), not numerical noise.
+instead of the true geometric $\tau$ (here $`\tau_{\text{remain}}`$ is the time left in the tick, `remaining` in `step_hybrid`, and $`b_{\text{detect}}, \sigma_{\text{detect}}`$ are the bias and noise std above), so early detection resets the mean while still above ground and late detection resets it after the free-fall model has carried it slightly below $p_z = 0$ - both real artifacts of a delayed or jittery contact detector (e.g. an accelerometer spike, as in the foot-strike detector, based on an [inertial measurement unit (IMU)](../glossary.md#imu-inertial-measurement-unit), of [Čížek et al., 2018](#11-references), or a force threshold), not numerical noise.
 
 Under detection jitter, `saltation_matrix` is evaluated at an $x^{-}$ that is off the guard ($p_z \neq 0$), outside its own stated assumption (its docstring says $x^{-}$ already satisfies $p_z = 0$). The code does not correct for this; it uses the current $v_z$, since nothing in the formula depends on $p_z$.
 
@@ -368,7 +368,7 @@ Under detection jitter, `saltation_matrix` is evaluated at an $x^{-}$ that is of
 - With exact detection every crossing is descending by construction, so the rule changes no result above.
 - Without it, any detection jitter produces nonsense. Measured by temporarily using the alternative rule (smallest positive root, ascending or not) and rerunning this section's sweep (seed 0, 500 trials):
 
-| $\sigma_{\text{detect}}$ | Post-bounce NEES, descending-only (naive/saltation) | Post-bounce NEES, any positive root (naive/saltation) | Position RMSE, descending-only (naive/saltation) | Position RMSE, any positive root (naive/saltation) |
+| $\sigma_{\text{detect}}$ | Post-bounce NEES, descending-only (naive/saltation) | Post-bounce NEES, any positive root (naive/saltation) | Position [RMSE](../glossary.md#rmse-root-mean-square-error) (root-mean-square error), descending-only (naive/saltation) | Position RMSE, any positive root (naive/saltation) |
 | --- | --- | --- | --- | --- |
 | $`0.001\,\text{s}`$ | 4.16/5.32 | $`1.32\times10^{5}`$/$`1.17\times10^{5}`$ | 0.023/0.024 m | 0.155/0.565 m |
 | $`0.01\,\text{s}`$ | 89.77/144.15 | $`1.17\times10^{5}`$/$`1.06\times10^{5}`$ | 0.046/0.037 m | 0.156/0.531 m |
@@ -385,7 +385,7 @@ With the descending-only rule, sweeping $\sigma_{\text{detect}}$ (with $b_{\text
 | $`0.005\,\text{s}`$ (25%) | 39.51 | 60.04 | $1.52\times$ |
 | $`0.01\,\text{s}`$ (50%) | 88.78 | 140.87 | $1.59\times$ |
 
-**The finding:** both filters' post-bounce NEES rises monotonically with detection jitter. That's expected, since neither $P$ accounts for this error source. Against the consistent value $6$, the ordering flips:
+**The finding:** both filters' post-bounce NEES rises monotonically with detection jitter. That's expected, since neither $P$ accounts for this error source. Against the consistent value $6$, the verdict flips (the order of the two columns never changes):
 
 - **At $`0.001\,\text{s}`$:** both are still below $6$, and saltation (5.21) is the closer of the two.
 - **From $`0.002\,\text{s}`$ on:** both are overconfident (NEES $> 6$), and saltation is the *more* overconfident, by a ratio growing from $1.41\times$ to $1.59\times$ once jitter reaches half the tick interval.
@@ -409,7 +409,9 @@ The standard tool for this is the **monodromy matrix**: flow Jacobians and salta
 - Its $\Xi_i$ is the *full* saltation matrix, §4's boxed formula with the $f^{+}$ term, not $\Xi_{\text{own-time}}$.
 - It carries the same stability information as the Poincaré-map Jacobian $`D\Pi`$: for an autonomous system and a cycle starting and ending at the orbit's fixed point $x^{*}$, it has $`D\Pi`$'s eigenvalues plus one extra eigenvalue $1$, the direction along the flow (Kong et al. 2024, §III-C).
 
-This script doesn't build or verify that composition: it propagates one covariance through one fixed-$`\Delta t`$ tick at a time, the different setting §3-§4 work out. So this section is a pointer to where saltation matrices show up next, not a second derivation. If we extend this toy into a periodic-orbit-stability tool, we should start from the full $\Xi$ and verify the composed monodromy matrix numerically (the same finite-difference discipline §4 uses) before trusting it.
+This script doesn't build or verify that composition: it propagates one covariance through one fixed-$`\Delta t`$ tick at a time, the single-event, fixed-$`\Delta t`$ sandwich $`\Phi_{\text{after}}\,\Xi\,\Phi_{\text{before}}`$ that §3-§4 work out (cf. Kong et al. 2024, Eq. 33 and §III-D). So this section is a pointer to where saltation matrices show up next, not a second derivation. If we extend this toy into a periodic-orbit-stability tool, we should start from the full $\Xi$ and verify the composed monodromy matrix numerically (the same finite-difference discipline §4 uses) before trusting it.
+
+**Follow-up on a Lie group.** [invariant_saltation_ekf.md](invariant_saltation_ekf.md) lifts this bounce to a tumbling rigid body with an IMU on $`SE_2(3)`$, tracked by a right-invariant EKF; there the reset is also not a group automorphism, which adds a state-dependent part to the bounce Jacobian on top of the timing correction derived here.
 
 ---
 
@@ -448,7 +450,7 @@ $$\text{True change} = 5.0764-5.0522 \approx +0.02421\ \text{m/s}$$
 ### $`\Xi_{\text{own-time}}`$ prediction ($`+0.0243`$)
 From §4's formula $\Xi_{\text{own-time}} = DR\left[I - \dfrac{f(x^{-})\otimes Dg}{Dg\cdot f(x^{-})}\right]$, the scalar $\dfrac{Dg\cdot\delta x_0}{Dg\cdot f(x^{-})} = \dfrac{0.05}{-10.1045}\approx -0.004948$ is the *negative* of §4's linearized crossing-time shift: $`dt^{*}/dp = -\dfrac{Dg\cdot\delta x_0}{Dg\cdot f(x^{-})} \approx +0.004948\ \text{s}`$. Compare it to the true $\delta t \approx +0.004936$ s just above: close but not identical, since it's only a first-order estimate of the shift.
 
-Write $B(x^{-}) = I - \dfrac{f(x^{-})\otimes Dg}{Dg\cdot f(x^{-})}$ for the rank-one projector in brackets above (so $`\Xi_{\text{own-time}} = DR\,B`$) - the $B$-projector step turns that position offset into an *equivalent velocity offset*, using $f_5=-g$ (the $v_z$-component of $f$, i.e. gravity, is constant):
+Write $B(x^{-}) = I - \dfrac{f(x^{-})\otimes Dg}{Dg\cdot f(x^{-})}$ for the rank-one projector in brackets above (so $`\Xi_{\text{own-time}} = DR\,B`$) - the $B$-projector step turns that position offset into an *equivalent velocity offset*, using that the $v_z$ component of $f$ is $-g$ (gravity, constant):
 
 ```math
 (B\,\delta x_0)_{v_z} = 0-(-9.81)(-0.004948) \approx -0.04854\ \text{m/s}
@@ -462,12 +464,11 @@ matching the true (own-crossing-time) answer to within second-order error. This 
 
 ---
 
-### Follow-up on a Lie group
-[invariant_saltation_ekf.md](invariant_saltation_ekf.md) lifts this bounce to a tumbling rigid body with an IMU on $`SE_2(3)`$, tracked by a right-invariant EKF; there the reset is also not a group automorphism, which adds a state-dependent part to the bounce Jacobian on top of the timing correction derived here.
-
 ## 11. References
 
-1. Kong, N. J., Payne, J. J., Zhu, J., & Johnson, A. M. (2024). *Saltation Matrices: The Essential Tool for Linearizing Hybrid Dynamical Systems*. Proceedings of the IEEE, 112(6), 585–608. https://doi.org/10.1109/JPROC.2024.3440211 (preprint: arXiv:2306.06862) - a modern tutorial/survey on saltation matrices - its Definition 2 (Eq. 9) is exactly the boxed $\Xi(x^-)$ derived in §4, $f^{+}$ term included, and its Eq. 34 composes it with flow Jacobians into the monodromy matrix discussed in §9.
+Reference 2 is further reading: it is the direct precedent for this doc's exercise but is not cited in a section above.
+
+1. Kong, N. J., Payne, J. J., Zhu, J., & Johnson, A. M. (2024). *Saltation Matrices: The Essential Tool for Linearizing Hybrid Dynamical Systems*. Proceedings of the IEEE, 112(6), 585–608. https://doi.org/10.1109/JPROC.2024.3440211 (preprint: arXiv:2306.06862) - a modern tutorial/survey on saltation matrices - its Definition 2 (Eq. 9) is exactly the boxed $\Xi(x^-)$ derived in §4, $f^{+}$ term included, and its Eq. 33 is the fixed-$`\Delta`$ one-tick sandwich $`\Phi_{\text{after}}\,\Xi\,\Phi_{\text{before}}`$ used in §3-§4 (see also its §III-D), and its Eq. 34 composes it with flow Jacobians into the monodromy matrix discussed in §9.
 2. Kong, N. J., Payne, J. J., Council, G., & Johnson, A. M. (2021). *The Salted Kalman Filter: Kalman Filtering on Hybrid Dynamical Systems*. Automatica, 131, 109752. https://doi.org/10.1016/j.automatica.2021.109752 - the direct precedent for this doc's exercise: propagating a Kalman filter's covariance through a hybrid guard-crossing event via the saltation matrix. `saltation_matrix_ekf.py` uses the same idea, for up to 20 bounces per tick and without the Salted KF's mean-update machinery.
 3. Čížek, P., Kubík, J., & Faigl, J. (2018). *Online Foot-Strike Detection Using Inertial Measurements for Multi-Legged Walking Robots*. 2018 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 7622–7627. https://doi.org/10.1109/IROS.2018.8594010 - an example of the real contact detector §8 has in mind: foot-strikes detected online from accelerometer data on a hexapod walking robot, whose detection latency/jitter is exactly what §8's $\sigma_{\text{detect}}$ models.
 

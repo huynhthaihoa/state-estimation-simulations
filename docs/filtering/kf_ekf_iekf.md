@@ -37,7 +37,7 @@ where:
 - $v$: measurement noise (GPS jitter, camera pixel noise, IMU noise, etc.)
 - $`R`$: covariance of measurement noise, $`R = \mathrm{Cov}(v)`$
 
-The filter needs $`Q`$ and $`R`$, not $w$ and $v$ themselves: the individual noise values are unknown at each step, so it works with their statistics (how large and correlated the noise typically is). This is the same $`Q`$/$`R`$ notation [extra_kf_variants.md §8](extra_kf_variants.md#8-adaptive-kalman-filter) (Adaptive KF) and [§12](extra_kf_variants.md#12-which-ones-should-you-prioritize-learning)'s checklist refer to.
+The filter needs $`Q`$ and $`R`$, not $w$ and $v$ themselves: the individual noise values are unknown at each step, so it works with their statistics (how large and correlated the noise typically is). This is the same $`Q`$/$`R`$ notation [extra_kf_variants.md §7](extra_kf_variants.md#7-adaptive-kalman-filter) (Adaptive KF) and [§11](extra_kf_variants.md#11-which-ones-should-you-prioritize-learning)'s checklist refer to.
 
 Every KF cycle alternates two steps and carries the filter's uncertainty in a **covariance matrix**, $P$. Unlike $`Q`$ and $`R`$, which describe the noise, $P$ is the covariance of the filter's own **estimation error** $x - \hat x$: how spread out and correlated its belief about $x$ currently is.
 

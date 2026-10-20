@@ -20,7 +20,7 @@ So a filter that fixes the ellipse orientation once (say at $t = 0$) is right on
 - `isotropic`: no directional claim at all, the safe fallback.
 
 ### Where the question comes from
-Hybrid-systems filtering usually models friction as discrete contact modes (stuck or sliding), each switch with its own saltation matrix ([glossary](../glossary.md#saltation-matrix)). Kong et al. (2024, §V-F) derive that matrix for stick-slip under **Coulomb friction** (the textbook law: friction can reach a fixed coefficient times the normal force, and equals that bound while sliding), whose single coefficient $\mu$ has no preferred direction. For an anisotropic pad that is not enough: slip variance depends on the heading relative to the pad's own friction axes, not only on the active mode. A filter that switches modes correctly but keeps an isotropic process-noise covariance $`Q`$ (defined in §1) treats slip along the low-friction axis like slip along the high-friction one.
+Hybrid-systems filtering usually models friction as discrete contact modes (stuck or sliding), each switch with its own saltation matrix ([glossary](../glossary.md#saltation-matrix)). Kong et al. (2024, §V-F) derive that matrix for stick-slip under **Coulomb friction** (the textbook law: friction can reach a fixed coefficient times the normal force, and equals that bound while sliding), whose two coefficients (static and kinetic) have no preferred direction. For an anisotropic pad that is not enough: slip variance depends on the heading relative to the pad's own friction axes, not only on the active mode. A filter that switches modes correctly but keeps an isotropic process-noise [covariance](../glossary.md#covariance) $`Q`$ (defined in §1.1) treats slip along the low-friction axis like slip along the high-friction one.
 
 We work through the simplest concrete version, using [`friction_anisotropic_ekf.py`](../../use_numpy/friction_anisotropic_ekf.py)'s crawling unicycle.
 
@@ -30,7 +30,7 @@ We work through the simplest concrete version, using [`friction_anisotropic_ekf.
 
 ### Relation to the point-cloud note
 This applies an argument the repo already made, on the other side of the filter:
-- [`pointcloud_pose_tracking_empirical_note.md`](pointcloud_pose_tracking_empirical_note.md) §2/§5 (terms in the [glossary](../glossary.md#isotropic-and-anisotropic)) showed that a noise ellipsoid fixed in an object's own frame looks anisotropic-and-rotating in the world frame, and that what matters is whether the filter's noise model tracks that rotation, not "rigid vs. non-rigid." That note was about *measurement* noise in a point-cloud registration EKF/IEKF.
+- [`pointcloud_pose_tracking_empirical_note.md`](pointcloud_pose_tracking_empirical_note.md) §2/§5 (terms in the [glossary](../glossary.md#isotropic-and-anisotropic)) showed that a noise ellipsoid fixed in an object's own frame looks anisotropic-and-rotating in the world frame, and that what matters is whether the filter's noise model tracks that rotation, not "rigid vs. non-rigid." That note was about *measurement* noise in a point-cloud registration extended Kalman filter ([EKF](../glossary.md#ekf-extended-kalman-filter)) or invariant EKF ([IEKF](../glossary.md#iekf-invariant-ekf)).
 - Here we apply the same argument to *process* noise, for a robot that is actually moving and turning.
 - We stay with an ordinary EKF throughout: no new IEKF/Lie-group derivation, since the question is purely "does $Q$'s shape track heading," not a linearization-frame question.
 
@@ -41,7 +41,7 @@ Heading is exact and noise-free, driven only by a known, constant commanded turn
 
 ## 1. The setup
 
-A unicycle robot drives at a *known* constant commanded forward speed $v_{\text{cmd}}$ and turn rate $\omega_{\text{cmd}}$, so its true path is an exact circular arc (`exact_arc_step`: closed-form and exact for any $dt$, the same "exact propagation, not a linearization" convention as `saltation_matrix_ekf.flow`; §1.1 gives the formulas and the Jacobian). $\omega_{\text{cmd}}$ defaults to $\dfrac{2\pi}{T}$ (where $T$ is the run duration), i.e. exactly one full loop over the run, so the heading sweeps through every orientation relative to a fixed reference.
+A unicycle robot drives at a *known* constant commanded forward speed $v_{\text{cmd}}$ and turn rate $\omega_{\text{cmd}}$, so its true path is an exact circular arc (`exact_arc_step`: closed-form and exact for any $dt$, the same "exact propagation, not a linearization" convention as `saltation_matrix_ekf.flow`; §1.1 gives the formulas and the [Jacobian](../glossary.md#jacobian)). $\omega_{\text{cmd}}$ defaults to $\dfrac{2\pi}{T}$ (where $T$ is the run duration), i.e. exactly one full loop over the run, so the heading sweeps through every orientation relative to a fixed reference.
 
 On top of that exact commanded arc, true position picks up a random slip disturbance each **tick** (one filter time step), drawn in the **pad's own body frame** (low variance along the grip/forward axis, high variance along the slip/lateral axis) and then rotated into world coordinates by the **true** heading at that instant.
 
@@ -52,20 +52,13 @@ We compare three ways of building the position block of the filter's process-noi
 All three variants run the same EKF over $x = [p_x, p_y, \theta]^\top$. Each tick is one **predict step** followed by one **position update** (`run_ekf`). The only difference between the variants is how the position block of $Q$ is built inside the **predict step**. Superscripts mark the step: $x^-$, $P^-$ are predicted (before the update) and $x^+$, $P^+$ are updated ([kf_ekf_iekf.md §1](kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear)).
 
 #### Predict, mean and Jacobian (`exact_arc_step`)
-With constant commanded speed $v$ and turn rate $\omega$, the robot moves along an exact circular arc of radius $r = v/\omega$:
+With constant commanded speed $v$ ($= v_{\text{cmd}}$) and turn rate $\omega$ ($= \omega_{\text{cmd}}$), the robot moves along an exact circular arc of radius $r = v/\omega$:
 
 ```math
 \theta^{-} = \theta + \omega\,\Delta t, \qquad
 p_x^{-} = p_x + r\left(\sin\theta^{-} - \sin\theta\right), \qquad
 p_y^{-} = p_y - r\left(\cos\theta^{-} - \cos\theta\right)
 ```
-
-#### Intuition for $F$'s third column (heading as a lever arm)
-A heading error pushes the robot sideways a little on every step.
-- At the defaults ($0.2$ m/s, $\Delta t = 0.05$ s) one step is $`0.2 \times 0.05 = 0.01`$ m long.
-- A $1^\circ$ heading error ($`0.0175`$ rad) turns that step into a $`0.01 \times 0.0175 \approx 1.7\times10^{-4}`$ m sideways error.
-- Tiny per step, but it repeats every step, so it adds up.
-- Heading enters the position this way and no other way. So the position updates can correct heading only through this column.
 
 ```math
 F = \frac{\partial x^{-}}{\partial x} =
@@ -77,6 +70,13 @@ F = \frac{\partial x^{-}}{\partial x} =
 ```
 
 The mean is propagated exactly, with no linearization. $F$ is still needed for the covariance, because heading enters the predicted position nonlinearly (through $\sin$ and $\cos$): its third column says how an error in $\theta$ turns into a position error over one step. When $|\omega| < 10^{-9}$ the code switches to the straight-line limit, $`p^{-} = p + v\,\Delta t\,(\cos\theta, \sin\theta)`$, to avoid dividing by $\omega$.
+
+#### Intuition for $F$'s third column (heading as a lever arm)
+A heading error pushes the robot sideways a little on every step.
+- At the defaults ($0.2$ m/s, $\Delta t = 0.05$ s) one step is $`0.2 \times 0.05 = 0.01`$ m long.
+- A $1^\circ$ heading error ($`0.0175`$ rad) turns that step into a $`0.01 \times 0.0175 \approx 1.7\times10^{-4}`$ m sideways error.
+- Tiny per step, but it repeats every step, so it adds up.
+- Heading enters the position this way and no other way. So the position updates can correct heading only through this column.
 
 #### Predict, covariance (`predict`)
 
@@ -162,14 +162,14 @@ Script defaults: $\sigma_{\text{grip}} = 0.02$ m/s, $\sigma_{\text{slip}} = 0.1$
 
 Two consequences follow directly from these formulas:
 
-- **The off-diagonal term is what points the ellipse.** It is zero only when $\theta_Q$ is a multiple of 90°. With the defaults, slip variance is 25 times grip variance (5:1 in standard deviation), so a wrong direction matters a lot. A misaligned `fixed_anisotropic` ellipse assumes little noise where the real slip is large, so it is overconfident in exactly that direction. That drives the NEES gap in §2: even at 0-45° it is about 3× worse than `isotropic` (11.1 vs 3.5).
+- **The off-diagonal term is what points the ellipse.** It is zero only when $\theta_Q$ is a multiple of 90°. With the defaults, slip variance is 25 times grip variance (5:1 in standard deviation), so a wrong direction matters a lot. A misaligned `fixed_anisotropic` ellipse assumes little noise where the real slip is large, so it is overconfident in exactly that direction. That drives the **NEES** (normalized estimation error squared, [glossary](../glossary.md#consistency-and-nees)) gap in §2: even at 0-45° it is about 3× worse than `isotropic` (11.1 vs 3.5).
 - **A 180° error costs nothing.** Replacing $\theta_Q$ with $\theta_Q + \pi$ flips the sign of both $c$ and $s$, leaving $c^2$, $s^2$ and $cs$ unchanged. So $Q_{\text{pos}}^{\text{aniso}}$ repeats every 180°, the periodicity §3 builds on. (That holds for $Q$ itself; §3 shows the error a mismatch leaves in the heading estimate does not disappear when the ellipse realigns.)
 
 ---
 
 ## 2. The dominant finding: `fixed_anisotropic` is dramatically worse, everywhere
 
-Monte Carlo **NEES** ([glossary](../glossary.md#consistency-and-nees)) over 500 trials (seed 0, $`dt = 0.05\,\text{s}`$, one full loop over $`20\,\text{s}`$, all script defaults), binned by how far the true heading has rotated away from `fixed_anisotropic`'s fixed reference heading. Each trial draws a fresh slip realization, initial error and measurement noise. Redrawing the slip matters because slip is the process noise whose model $Q$ is being tested.
+[Monte Carlo](../glossary.md#monte-carlo-trials) NEES over 500 trials (seed 0, $`dt = 0.05\,\text{s}`$, one full loop over $`20\,\text{s}`$, all script defaults), binned by how far the true heading has rotated away from `fixed_anisotropic`'s fixed reference heading. Each trial draws a fresh slip realization, initial error and measurement noise. Redrawing the slip matters because slip is the process noise whose model $Q$ is being tested.
 
 ![Two panels from friction_anisotropic_ekf.py: the circular path with the per-step slip covariance ellipse turning with the heading, and Monte Carlo NEES over one full turn for isotropic, frozen anisotropic and heading-aware process noise](../../assets/friction_anisotropic_ekf.png)
 
@@ -193,31 +193,31 @@ The right panel shows the Monte Carlo NEES. `fixed_anisotropic` climbs to a per-
 | 90-135° | 3.7 | 23.8 | 3.0 |
 | 135-180° | 3.6 | 18.2 | 3.1 |
 
-A consistent 3-DoF filter averages $\text{NEES} = 3$. For an average over 500 independent trials, the 95% acceptance interval is $[2.79, 3.22]$ (the single-run bound of 7.81 doesn't apply to an average).
+A consistent 3-degree-of-freedom ([DoF](../glossary.md#degrees-of-freedom-dof)) filter averages $\text{NEES} = 3$. For an average over 500 independent trials, the 95% acceptance interval is $[2.79, 3.22]$ (the single-run bound of 7.81 doesn't apply to an average).
 
 - `heading_aware` stays inside that interval in every bin: it is consistent.
-- `isotropic` sits just above it, 3.5-3.7 (3.4-3.8 across seeds 0-3), in every bin: mildly overconfident. Its circle assumes half the true variance along the slip axis (5.2e-3 vs 1e-2) and also about 13× too much along the grip axis (5.2e-3 vs 4e-4).
+- `isotropic` sits just above it, 3.5-3.7 (3.4-3.8 across seeds 0-3), in every bin: mildly overconfident. Its circle assumes half the true variance along the slip axis (5.2e-3 vs 1e-2 (m/s)²) and also about 13× too much along the grip axis (5.2e-3 vs 4e-4 (m/s)²).
 - `fixed_anisotropic` is 3.7-8× too high: badly overconfident.
 
-This is robust. Across seeds 0-3, `isotropic`'s and `heading_aware`'s bins move by at most 0.15 and `fixed_anisotropic`'s by at most 1.4, and `fixed_anisotropic` is worse than *both* alternatives in every bin of every seed.
+This is robust. Across seeds 0-3, `isotropic`'s and `heading_aware`'s bins move by at most 0.15 and `fixed_anisotropic`'s by at most 1.7, and `fixed_anisotropic` is worse than *both* alternatives in every bin of every seed.
 
-Position RMSE from the script's single run (one trajectory, not the Monte Carlo) tells a smaller but consistent story: at seed 0, $`\text{heading\_aware}\ (0.0108\,\text{m}) < \text{isotropic}\ (0.0118\,\text{m}) < \text{fixed\_anisotropic}\ (0.0131\,\text{m})`$, and the same ordering holds in seeds 1-3. The right shape pointed the right way is both more accurate and, as the table shows, better calibrated.
+Position root-mean-square error ([RMSE](../glossary.md#rmse-root-mean-square-error)) from the script's single run (one trajectory, not the Monte Carlo) tells a smaller but consistent story: at seed 0, $`\text{heading\_aware}\ (0.0108\,\text{m}) < \text{isotropic}\ (0.0118\,\text{m}) < \text{fixed\_anisotropic}\ (0.0131\,\text{m})`$, and the same ordering holds in seeds 1-3. The right shape pointed the right way is both more accurate and, as the table shows, better calibrated.
 
 ---
 
 ## 3. A secondary finding: the worst mismatch is 90°, not 180°
 
-The *worst* of `fixed_anisotropic`'s four bins is 90-135° in all four seeds, not the largest possible mismatch (135-180°). The reason: a covariance ellipse $`R(\theta)\,\mathrm{diag}(a,b)\,R(\theta)^\top`$ has period $\pi$ in $\theta$, not $2\pi$, since rotating it by 180° gives back the identical ellipse. For the *orientation of the noise ellipse*, a 180° heading difference is no mismatch at all, so the worst possible mismatch is 90°. (The binned peak lands in 90-135° rather than 45-90° because the filter's error takes about a second to build up, so its NEES trails the mismatch slightly.)
+The *worst* of `fixed_anisotropic`'s four bins is 90-135° in all four seeds, not the largest possible mismatch (135-180°). The reason is the 180° periodicity of the ellipse (§1.1): a 180° heading difference is no mismatch at all, so the worst possible mismatch is 90°. (The binned peak lands in 90-135° rather than 45-90° because the filter's error takes about a second to build up, so its NEES trails the mismatch slightly.)
 
-Past the peak, NEES recovers only partly: 18.2 in the 135-180° bin, still about 6× the consistent value, although the ellipse is realigned at 180°. Splitting the NEES into position and heading parts shows why. The split below is approximate: it comes from one 200-trial check the script doesn't print, and heading NEES is heavy-tailed, so values vary between runs (a second 200-trial run differed by up to ~20%, with the same pattern).
+Past the peak, NEES recovers only partly: 18.2 in the 135-180° bin, still about 6× the consistent value, although the ellipse is realigned at 180°. Splitting the NEES into position and heading parts shows why. The table below is an approximate one-off diagnostic (a single 200-trial run, rounded to whole numbers). The script doesn't print it, and heading NEES is heavy-tailed, so values scatter by about ±20% between runs (the pattern stays the same).
 
 | Time (heading) | Position NEES (2 DoF, consistent = 2) | Heading NEES (1 DoF, consistent = 1) |
 | --- | --- | --- |
-| 0 s (0°) | 2.0 | 0.9 |
-| 5 s (90°) | 6.9 | 8.8 |
-| 10 s (180°) | 2.6 | 14.1 |
-| 15 s (270°) | 9.9 | 11.1 |
-| 20 s (360°) | 2.2 | 10.5 |
+| 0 s (0°) | 2 | 1 |
+| 5 s (90°) | 7 | 9 |
+| 10 s (180°) | 3 | 14 |
+| 15 s (270°) | 10 | 11 |
+| 20 s (360°) | 2 | 10 |
 
 The position part follows the ellipse mismatch: it peaks at 90° and 270° and returns to nearly consistent at 180° and 360°. The heading part doesn't come back.
 
@@ -236,6 +236,8 @@ Both findings point the same way for modeling a friction-anisotropic pad's slip 
 
 ## 5. References
 
+References 1 and 2 are cited above; reference 3 is further reading.
+
 1. Hu, D. L., Nirody, J., Scott, T., & Shelley, M. J. (2009). *The Mechanics of Slithering Locomotion*. Proceedings of the National Academy of Sciences, 106(25), 10081-10085. https://doi.org/10.1073/pnas.0812533106 - the source of the opening image (a snake's belly scales) and the phenomenon modeled: friction fixed to the body frame, lower along the body than across it for snakes. The paper's friction model is deterministic; translating it into an EKF process-noise ellipse is this doc's own extension, applying the world-frame-rotation argument from [`pointcloud_pose_tracking_empirical_note.md`](pointcloud_pose_tracking_empirical_note.md) (see §Intuition above) to process rather than measurement noise.
-2. Kong, N. J., Payne, J. J., Zhu, J., & Johnson, A. M. (2024). *Saltation Matrices: The Essential Tool for Linearizing Hybrid Dynamical Systems*. Proceedings of the IEEE, 112(6), 585-608. https://doi.org/10.1109/JPROC.2024.3440211 (preprint: arXiv:2306.06862) - §V-F derives the saltation matrix for the stick-slip friction transition under Coulomb friction with a single, direction-free coefficient; this doc's direction-dependent process noise is the part that model leaves out. Also reference 1 of [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md#11-references).
+2. Kong, N. J., Payne, J. J., Zhu, J., & Johnson, A. M. (2024). *Saltation Matrices: The Essential Tool for Linearizing Hybrid Dynamical Systems*. Proceedings of the IEEE, 112(6), 585-608. https://doi.org/10.1109/JPROC.2024.3440211 (preprint: arXiv:2306.06862) - §V-F derives the saltation matrix for the stick-slip friction transition under Coulomb friction with static and kinetic coefficients that have no direction dependence; this doc's direction-dependent process noise is the part that model leaves out. Also reference 1 of [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md#11-references).
 3. Khalili, H. H., Cheah, W., Garcia-Nathan, T. B., Carrasco, J., Watson, S., & Lennox, B. (2020). *Tuning and Sensitivity Analysis of a Hexapod State Estimator*. Robotics and Autonomous Systems, 129, 103509. https://doi.org/10.1016/j.robot.2020.103509 - a real-hardware study (an IMU + leg-kinematics EKF on the Corin hexapod) of how an EKF's accuracy depends on its noise parameters, tuned there by particle-swarm optimization; this doc's fixed-vs-heading-aware $Q$ comparison is one instance of that broader question. Also reference 4 of [inchworm_zupt_ekf.md](inchworm_zupt_ekf.md#7-references).

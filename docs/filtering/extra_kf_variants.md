@@ -1,11 +1,11 @@
 # An overview of other prominent Kalman Filter variants
 
-For **robotics, SLAM, visual-inertial estimation, and embedded systems**, several Kalman filter variants are worth knowing. We focus on **why each one exists**.
+For **robotics, [SLAM](../glossary.md#slam-simultaneous-localization-and-mapping) (simultaneous localization and mapping), visual-inertial estimation, and embedded systems**, several Kalman filter variants are worth knowing. We focus on **why each one exists**.
 
 This builds directly on:
-- The **standard KF, EKF, and IEKF** foundations from [kf_ekf_iekf.md](kf_ekf_iekf.md) - this doc surveys the wider family those three sit inside.
-- **Lie groups and $`SO(3)`$/$`SE(3)`$** from [lie_algebra.md §5, §11](../foundations/lie_algebra.md#5-lie-group-the-space-of-valid-transformations) - the structure §2's ESKF and §4's IEKF sections both lean on.
-- **Robust loss functions (Huber, etc.)** from [pose_graph_optimization.md §16](../optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures) - referenced directly in §9's Robust KF discussion.
+- The **standard [Kalman filter (KF)](../glossary.md#kalman-filter-kf), [Extended KF (EKF)](../glossary.md#ekf-extended-kalman-filter), and [Invariant EKF (IEKF)](../glossary.md#iekf-invariant-ekf)** foundations from [kf_ekf_iekf.md](kf_ekf_iekf.md) - this doc surveys the wider family those three sit inside.
+- **Lie groups and $`SO(3)`$/$`SE(3)`$** ([glossary](../glossary.md#so3-and-se3)) from [lie_algebra.md §5, §11](../foundations/lie_algebra.md#5-lie-group-the-space-of-valid-transformations) - the structure §2's ESKF and §3's IEKF sections both lean on.
+- **Robust loss functions (Huber, etc.)** from [pose_graph_optimization.md §16](../optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures) - referenced directly in §8's Robust KF discussion.
 
 A good mental map is:
 
@@ -80,11 +80,23 @@ The cost: it evaluates the model $2n+1$ times per step instead of once, which ad
 
 See `run_ukf` in [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/pointcloud_pose_tracking.py)/[`use_manif/pointcloud_pose_tracking.py`](../../use_manif/pointcloud_pose_tracking.py) for a runnable manifold-UKF implementation of this idea.
 
+### Unscented vs. Extended
+
+| | EKF | UKF |
+| --- | --- | --- |
+| Handles the nonlinearity by | linearizing with a Jacobian (the tangent line) | pushing sigma points through the exact function (statistical linearization) |
+| Jacobians | required | not needed |
+| Computational cost | lower | higher |
+| Easy for complicated models | sometimes difficult | often easier |
+| Common in robotics | very common | less dominant than EKF/ESKF |
+
+For robotics we usually learn KF, EKF, ESKF and IEKF before spending much time on the UKF (see §11).
+
 ---
 
 ## 2. Error-State Kalman Filter (ESKF)
 
-Widely used in SLAM and VIO.
+Widely used in SLAM and VIO (visual-inertial [odometry](../glossary.md#odometry)).
 
 An ESKF doesn't estimate the entire state directly. It separates a **nominal state** from a **small error state**. For example, the true rotation is the nominal one times a small correction ($`\delta\theta`$ is a small rotation vector, and $`^\wedge`$ turns a 3-vector into its skew-symmetric matrix, see [glossary](../glossary.md#hat-operator)):
 
@@ -95,7 +107,7 @@ $$R = \hat R \exp(\delta\theta^\wedge)$$
 
 Each cycle has three steps:
 
-1. **Predict:** integrate the nominal state with the full nonlinear model (for example raw IMU samples), and propagate the error covariance $P$ with the linearized error dynamics.
+1. **Predict:** integrate the nominal state with the full nonlinear model (for example raw [IMU](../glossary.md#imu-inertial-measurement-unit) (inertial measurement unit) samples), and propagate the error covariance $P$ with the linearized error dynamics.
 2. **Update:** a measurement produces an estimate of $\delta x$ through a normal EKF update.
 3. **Inject and reset:** fold $\delta x$ into the nominal state (for rotation, $`\hat R \leftarrow \hat R\exp(\delta\theta^\wedge)`$), then set $\delta x = 0$.
 
@@ -104,41 +116,25 @@ Each cycle has three steps:
 - Predict: redraw the map using the full model. Update: only the sticky note is corrected.
 - Inject and reset: copy the note onto the map, then use a blank note.
 
-Why it helps: some states, especially **rotation**, live on manifolds rather than ordinary Euclidean vector spaces. The error state stays small and near zero, so its linearization is accurate, and $\delta\theta$ is a minimal 3-vector with no unit-norm constraint and no singularities near zero error, unlike a quaternion or Euler angles stored directly in the state.
+Why it helps: some states, especially **rotation**, live on [manifolds](../glossary.md#manifold) rather than ordinary Euclidean vector spaces. The error state stays small and near zero, so its linearization is accurate, and $\delta\theta$ is a minimal 3-vector with no unit-norm constraint and no singularities near zero error, unlike a [quaternion](../glossary.md#quaternion) or Euler angles stored directly in the state.
 
 The same filter goes by several names in visual-inertial odometry and inertial navigation: ESKF, error-state EKF, or indirect EKF.
 
 - The **Multiplicative EKF (MEKF)** is the attitude-only version.
-- **Right/left-invariant error-state filters** are §4's IEKF.
+- **Right/left-invariant error-state filters** are §3's IEKF.
 
-The **MSCKF** (Mourikis & Roumeliotis 2007), a classic VIO filter, is an ESKF whose state also holds a sliding window of past camera poses, with landmarks kept out of the state entirely. [kf_ekf_iekf.md §9](kf_ekf_iekf.md#9-other-prominent-variants-worth-keeping-in-mind) explains how it works.
+The **MSCKF** (Multi-State Constraint Kalman Filter; Mourikis & Roumeliotis 2007), a classic VIO filter, is an ESKF whose state also holds a [sliding window](../glossary.md#sliding-window-and-fixed-lag-smoothing) of past camera poses, with landmarks kept out of the state entirely. [kf_ekf_iekf.md §9](kf_ekf_iekf.md#9-other-prominent-variants-worth-keeping-in-mind) explains how it works.
 
 ### ESKF vs IEKF
 
-They aren't competing alternatives: the IEKF *is* an error-state filter. In fact the ESKF rotation error above, $`\delta\theta = \log(\hat R^{-1}R)`$, already *is* the left-invariant error ($`\eta = \hat X^{-1}X`$; the right-invariant one is $`X\hat X^{-1}`$). What the IEKF adds is:
+They aren't competing alternatives: the IEKF *is* an error-state filter. In fact the ESKF rotation error above, $`\delta\theta = \log(\hat R^{-1}R)`$, already *is* the left-invariant error (for the rotation only; position, velocity and biases stay additive, and that is where the estimate-dependence enters). With $`X`$ and $`\hat X`$ the true and estimated states as group elements, the left-invariant error is $`\eta = \hat X^{-1}X`$ and the right-invariant one is $`X\hat X^{-1}`$. What the IEKF adds is:
 
-- **Estimate-independent error dynamics.** For **group-affine** dynamics ([lie_algebra.md §11.1](../foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity)) and suitable invariant measurements, the error dynamics and their Jacobians don't depend on the current estimate. This can fail, for example with IMU biases in the state.
+- **Estimate-independent error dynamics.** For **group-affine** dynamics ([glossary](../glossary.md#group-affine-dynamics-trajectory-independence), [lie_algebra.md §11.1](../foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity)) and suitable invariant measurements, the error dynamics and their Jacobians don't depend on the current estimate. This can fail, for example with IMU biases in the state.
 - **Left vs right choice.** We pick the invariant error that matches the measurement.
 
 ---
 
-## 3. Unscented vs Extended
-
-|                             | EKF                 | UKF                                                                 |
-| --------------------------- | ------------------- | ------------------------------------------------------------------- |
-| Nonlinear system            | ✓                   | ✓                                                                   |
-| Jacobians                   | Required            | No explicit Jacobian                                                |
-| Linearizes function         | ✓                   | No explicit Jacobian (statistical linearization through sigma points) |
-| Sigma points                | No                  | ✓                                                                   |
-| Computational cost          | Lower               | Higher                                                              |
-| Easy for complicated models | Sometimes difficult | Often easier                                                        |
-| Common in robotics          | Very common         | Less dominant than EKF/ESKF                                         |
-
-For robotics we usually learn KF, EKF, ESKF and IEKF before spending much time on the UKF (see §12).
-
----
-
-## 4. Invariant EKF (IEKF)
+## 3. Invariant EKF (IEKF)
 
 [kf_ekf_iekf.md](kf_ekf_iekf.md) covers this one in depth; here we place it in the broader family.
 
@@ -154,11 +150,11 @@ Particularly relevant to IMU navigation, VIO, SLAM, robotics and pose estimation
 
 ---
 
-## 5. Square-Root Kalman Filter (SR-KF)
+## 4. Square-Root Kalman Filter (SR-KF)
 
 This one is less about the **estimation philosophy** and more about **numerical stability**.
 
-The standard KF stores the covariance $P$. The square-root version stores a factor $L$ with $P = LL^\top$, often obtained through Cholesky decomposition.
+The standard KF stores the covariance $P$. The square-root version stores a factor $L$ with $P = LL^\top$, often obtained through [Cholesky decomposition](../glossary.md#cholesky-factorization).
 
 Why? A covariance matrix must be symmetric and **positive semi-definite** (never negative variance in any direction). In floating point, the standard update $`P \leftarrow (I - KH)P`$, where $`K`$ is the Kalman gain and $`H`$ the measurement Jacobian ([glossary](../glossary.md#innovation-and-kalman-gain)), subtracts nearly equal numbers, and rounding error can leave $P$ slightly asymmetric or with a negative eigenvalue. After that, the filter can diverge.
 
@@ -173,7 +169,7 @@ Carrying $L$ avoids this in two ways:
 
 A cheaper, common partial fix is the **Joseph form** of the update (an algebraically equivalent, rounding-robust rewrite), $`P \leftarrow (I-KH)P(I-KH)^\top + KRK^\top`$ ($`R`$ is the measurement noise covariance), which keeps $P$ symmetric positive semi-definite for any gain.
 
-The same idea appears on the optimization side: iSAM keeps and updates the square-root *information* matrix $R$ (with $R^\top R = H$) rather than $H$ itself ([isam_optimization.md](../optimization/isam_optimization.md)). Here $`R`$ is the square-root information factor and $`H`$ the information matrix, not the noise covariance $`R`$ and measurement Jacobian $`H`$ above.
+The same idea appears on the optimization side: iSAM (incremental smoothing and mapping) keeps and updates the square-root [information matrix](../glossary.md#information-matrix) $R$ (with $R^\top R = H$) rather than $H$ itself ([isam_optimization.md](../optimization/isam_optimization.md)). Here $`R`$ is the square-root information factor and $`H`$ the information matrix, not the noise covariance $`R`$ and measurement Jacobian $`H`$ above.
 
 ### Intuition
 
@@ -189,7 +185,7 @@ This matters most in long-running filters, single-precision or embedded arithmet
 
 ---
 
-## 6. Ensemble Kalman Filter (EnKF)
+## 5. Ensemble Kalman Filter (EnKF)
 
 Instead of storing the mean and covariance $\mu, P$ explicitly, we keep an **ensemble of possible states**, each one a possible realization of the system:
 
@@ -204,7 +200,7 @@ Instead of storing the mean and covariance $\mu, P$ explicitly, we keep an **ens
 
 We propagate the members through the nonlinear model, with no Jacobians, and read the mean and covariance off the ensemble whenever we need them.
 
-The update is still a **Kalman update**. The gain comes from the ensemble's sample covariance, and each member is shifted linearly toward the measurement. So the EnKF keeps the Kalman family's Gaussian, linear-update assumption. That is the key difference from the particle filter (§7), which reweights and resamples instead.
+The update is still a **Kalman update**. The gain comes from the ensemble's sample covariance, and each member is shifted linearly toward the measurement. So the EnKF keeps the Kalman family's Gaussian, linear-update assumption. That is the key difference from the particle filter (§6), which reweights and resamples instead.
 
 What it gets rid of is the $n \times n$ matrix $P$. When the state has $n \sim 10^6$ to $10^8$ entries (a gridded atmosphere or ocean), $P$ can't even be stored, but an ensemble of tens to ~100 members gives a usable low-rank approximation of it.
 
@@ -212,7 +208,7 @@ Especially popular in weather prediction, geophysical systems, ocean modeling an
 
 ---
 
-## 7. Particle Filter (PF)
+## 6. Particle Filter (PF)
 
 This one drops the Gaussian assumption that most other variants in this list rely on.
 
@@ -245,7 +241,7 @@ The notable exception is the **Rao-Blackwellized particle filter**. Given the ro
 
 ---
 
-## 8. Adaptive Kalman Filter
+## 7. Adaptive Kalman Filter
 
 Normally we assume the process noise covariance $Q$ and measurement noise covariance $R$ are known and fixed. In real life they change: an IMU, for example, behaves differently when the robot vibrates heavily.
 
@@ -259,7 +255,7 @@ An adaptive KF estimates or adjusts $Q$ and/or $R$ online. One family does this 
 
 ---
 
-## 9. Robust Kalman Filter
+## 8. Robust Kalman Filter
 
 The standard KF assumes:
 
@@ -278,20 +274,20 @@ measurements:
 
 A conventional KF may be pulled toward that outlier. Robust filtering reduces the influence of bad measurements. The two common approaches are:
 
-- **Innovation gating**, widely used. Before an update, compute the normalized innovation squared $`\nu^\top S^{-1}\nu`$ (the NIS from [linear_nonlinear.md §4.4](linear_nonlinear.md#44-after-the-fact-consistency-tests), with $`\nu`$ the innovation, measurement minus prediction). If it exceeds a chi-square threshold (for example the 99% bound for the measurement's dimension), reject the measurement outright.
+- **Innovation gating**, widely used. Before an update, compute the normalized innovation squared $`\nu^\top S^{-1}\nu`$ (the NIS from [linear_nonlinear.md §4.4](linear_nonlinear.md#44-after-the-fact-consistency-tests), with $`\nu`$ the innovation, measurement minus prediction). If it exceeds a [chi-square](../glossary.md#chi-square-distribution) threshold (for example the 99% bound for the measurement's dimension), reject the measurement outright.
 - **Down-weighting:** keep the measurement but inflate its $R$ in proportion to how surprising it is. This is the filter's version of the Huber-style robust losses in [pose_graph_optimization.md §16](../optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
 
 **Tiny example of gating** (1-D measurement, $S = 1$):
 - A 3σ surprise gives $`\nu^\top S^{-1}\nu = 9`$.
 - The 99% chi-square bound for 1 degree of freedom is 6.63, and $9 > 6.63$, so the measurement is rejected.
 
-Particularly relevant to visual SLAM, feature tracking, GNSS, LiDAR and multi-sensor fusion.
+Particularly relevant to visual SLAM, feature tracking, GNSS (satellite positioning, e.g. GPS), LiDAR and multi-sensor fusion.
 
 In robotics, robust losses such as the **Huber loss** are also commonly used inside optimization-based estimators rather than relying exclusively on a robust KF.
 
 ---
 
-## 10. Kalman Smoother
+## 9. Kalman Smoother
 
 Not exactly another KF variant, but worth knowing.
 
@@ -323,7 +319,7 @@ The classic example is the **Rauch–Tung–Striebel (RTS) smoother**, very usef
 
 ---
 
-## 11. Multi-rate/asynchronous Kalman filtering
+## 10. Multi-rate/asynchronous Kalman filtering
 
 Suppose we have:
 
@@ -355,7 +351,7 @@ This is the standard pattern in real-time sensor fusion.
 
 ---
 
-## 12. Which ones should you prioritize learning?
+## 11. Which ones should you prioritize learning?
 
 For robotics work spanning **computer vision, SLAM, embedded systems, and resource-constrained platforms**, we don't need to learn every Kalman variant equally. A reasonable prioritization:
 
@@ -448,13 +444,13 @@ Mostly useful for low-dimensional, multimodal problems like global/Monte Carlo l
 
 ---
 
-## 13. Filtering vs optimization for SLAM
+## 12. Filtering vs optimization for SLAM
 
 Modern robotics estimators fall into two big families ([filtering_smoothing.md](../filtering_smoothing.md) compares them in depth):
 
 ### Filtering
 
-We maintain a state estimate recursively (§10's filtering diagram):
+We maintain a state estimate recursively (§9's filtering diagram):
 
 ```text
 IMU → KF/EKF/ESKF/IEKF → current state
@@ -462,7 +458,7 @@ IMU → KF/EKF/ESKF/IEKF → current state
 
 ### Optimization/smoothing
 
-We optimize over the whole trajectory at once (§10's smoothing picture):
+We optimize over the whole trajectory at once (§9's smoothing picture):
 
 ```text
            ┌────── camera ───────┐
@@ -492,23 +488,23 @@ That sequence gives a solid conceptual foundation for modern **VIO/SLAM and stat
 
 ---
 
-## 14. One-sentence summary
+## 13. One-sentence summary
 
 > **Every variant in this list exists to relax one assumption of the standard KF - linearity (EKF/UKF), Euclidean state (ESKF/IEKF), Gaussian/unimodal belief (PF), an explicitly stored covariance (EnKF), known noise (Adaptive KF), clean measurements (Robust KF), numerical precision (SR-KF), causal-only information (RTS smoother), or synchronized sensors (multi-rate filtering) - and knowing which assumption a given problem violates is what tells you which variant to reach for.**
 
 ---
 
-## 15. References
+## 14. References
 
 1. Julier, S. J., & Uhlmann, J. K. (1997). *New extension of the Kalman filter to nonlinear systems*. Proc. SPIE 3068, Signal Processing, Sensor Fusion, and Target Recognition VI, 182-193. https://doi.org/10.1117/12.280797 - the original UKF paper behind §1; already cited in [kf_ekf_iekf.md §11](kf_ekf_iekf.md#11-references).
 2. Solà, J. (2017). *Quaternion kinematics for the error-state Kalman filter*. arXiv:1711.02508. https://arxiv.org/abs/1711.02508 - the standard ESKF reference behind §2; already cited in [kf_ekf_iekf.md §11](kf_ekf_iekf.md#11-references).
-3. Barrau, A., & Bonnabel, S. (2017). *The Invariant Extended Kalman Filter as a Stable Observer*. IEEE Transactions on Automatic Control, 62(4), 1797-1812. https://arxiv.org/abs/1410.1465 - the IEKF paper behind §4; already cited in [kf_ekf_iekf.md §11](kf_ekf_iekf.md#11-references).
-4. Bierman, G. J. (1977). *Factorization Methods for Discrete Sequential Estimation*. Academic Press. - the standard square-root/Cholesky-factor filtering reference behind §5.
-5. Evensen, G. (1994). *Sequential data assimilation with a nonlinear quasi-geostrophic model using Monte Carlo methods to forecast error statistics*. Journal of Geophysical Research, 99(C5), 10143-10162. https://doi.org/10.1029/94JC00572 - the original Ensemble Kalman Filter paper behind §6.
-6. Thrun, S., Burgard, W., & Fox, D. (2005). *Probabilistic Robotics*. MIT Press. - covers both the particle filter and Monte Carlo Localization behind §7; already cited in [filtering_smoothing.md §12](../filtering_smoothing.md#12-references).
-7. Mehra, R. K. (1970). *On the identification of variances and adaptive Kalman filtering*. IEEE Transactions on Automatic Control, 15(2), 175-184. https://doi.org/10.1109/TAC.1970.1099422 - the adaptive-noise-estimation reference behind §8.
-8. Huber, P. J. (1964). *Robust Estimation of a Location Parameter*. Annals of Mathematical Statistics, 35(1), 73-101. https://doi.org/10.1214/aoms/1177703732 - the robust-loss reference behind §9; already cited in [pose_graph_optimization.md §17](../optimization/pose_graph_optimization.md#17-references).
-9. Rauch, H. E., Tung, F., & Striebel, C. T. (1965). *Maximum likelihood estimates of linear dynamic systems*. AIAA Journal, 3(8), 1445-1450. https://doi.org/10.2514/3.3166 - the original RTS smoother paper behind §10.
+3. Barrau, A., & Bonnabel, S. (2017). *The Invariant Extended Kalman Filter as a Stable Observer*. IEEE Transactions on Automatic Control, 62(4), 1797-1812. https://arxiv.org/abs/1410.1465 - the IEKF paper behind §3; already cited in [kf_ekf_iekf.md §11](kf_ekf_iekf.md#11-references).
+4. Bierman, G. J. (1977). *Factorization Methods for Discrete Sequential Estimation*. Academic Press. - the standard square-root/Cholesky-factor filtering reference behind §4.
+5. Evensen, G. (1994). *Sequential data assimilation with a nonlinear quasi-geostrophic model using Monte Carlo methods to forecast error statistics*. Journal of Geophysical Research, 99(C5), 10143-10162. https://doi.org/10.1029/94JC00572 - the original Ensemble Kalman Filter paper behind §5.
+6. Thrun, S., Burgard, W., & Fox, D. (2005). *Probabilistic Robotics*. MIT Press. - covers both the particle filter and Monte Carlo Localization behind §6; already cited in [filtering_smoothing.md §12](../filtering_smoothing.md#12-references).
+7. Mehra, R. K. (1970). *On the identification of variances and adaptive Kalman filtering*. IEEE Transactions on Automatic Control, 15(2), 175-184. https://doi.org/10.1109/TAC.1970.1099422 - the adaptive-noise-estimation reference behind §7.
+8. Huber, P. J. (1964). *Robust Estimation of a Location Parameter*. Annals of Mathematical Statistics, 35(1), 73-101. https://doi.org/10.1214/aoms/1177703732 - the robust-loss reference behind §8; already cited in [pose_graph_optimization.md §17](../optimization/pose_graph_optimization.md#17-references).
+9. Rauch, H. E., Tung, F., & Striebel, C. T. (1965). *Maximum likelihood estimates of linear dynamic systems*. AIAA Journal, 3(8), 1445-1450. https://doi.org/10.2514/3.3166 - the original RTS smoother paper behind §9.
 10. Mourikis, A. I., & Roumeliotis, S. I. (2007). *A Multi-State Constraint Kalman Filter for Vision-aided Inertial Navigation*. ICRA 2007, 3565-3572. https://doi.org/10.1109/ROBOT.2007.364024 - the MSCKF mentioned in §2, an ESKF-based VIO filter; already cited in [kf_ekf_iekf.md §11](kf_ekf_iekf.md#11-references).
-11. Montemerlo, M., Thrun, S., Koller, D., & Wegbreit, B. (2002). *FastSLAM: A factored solution to the simultaneous localization and mapping problem*. Proc. AAAI-02, 593-598. - the Rao-Blackwellized particle-filter SLAM in §7.
-12. Grisetti, G., Stachniss, C., & Burgard, W. (2007). *Improved techniques for grid mapping with Rao-Blackwellized particle filters*. IEEE Transactions on Robotics, 23(1), 34-46. https://doi.org/10.1109/TRO.2006.889486 - GMapping, §7.
+11. Montemerlo, M., Thrun, S., Koller, D., & Wegbreit, B. (2002). *FastSLAM: A factored solution to the simultaneous localization and mapping problem*. Proc. AAAI-02, 593-598. - the Rao-Blackwellized particle-filter SLAM in §6.
+12. Grisetti, G., Stachniss, C., & Burgard, W. (2007). *Improved techniques for grid mapping with Rao-Blackwellized particle filters*. IEEE Transactions on Robotics, 23(1), 34-46. https://doi.org/10.1109/TRO.2006.889486 - GMapping, §6.

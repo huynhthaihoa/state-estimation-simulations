@@ -1,12 +1,12 @@
 # Left-invariant vs. Right-invariant errors in IEKF
 
-What "left-invariant" and "right-invariant" errors mean in the **Invariant EKF**. This builds on the IEKF treatment in [kf_ekf_iekf.md §3-§5](kf_ekf_iekf.md#3-invariant-ekf-lets-respect-the-geometry-of-the-problem) (short overview: [extra_kf_variants.md §4](extra_kf_variants.md#4-invariant-ekf-iekf)).
+What "left-invariant" and "right-invariant" errors mean in the **Invariant EKF** (**IEKF**, [glossary](../glossary.md#iekf-invariant-ekf)). This builds on the IEKF treatment in [kf_ekf_iekf.md §3-§5](kf_ekf_iekf.md#3-invariant-ekf-lets-respect-the-geometry-of-the-problem) (short overview: [extra_kf_variants.md §3](extra_kf_variants.md#3-invariant-ekf-iekf)).
 
 ---
 
 ## 1. The setup
 
-State lives on a Lie group, e.g. a pose $X \in SE(3)$ mapping body coordinates to world coordinates. We have the true pose $X$ and our estimate $\hat X$. An ordinary EKF defines the error as the subtraction $X - \hat X$, but subtracting two poses leaves the manifold. IEKF uses group composition instead, in two natural ways:
+State lives on a [Lie group](../glossary.md#lie-group), e.g. a [pose](../glossary.md#pose) $X \in SE(3)$ ([glossary](../glossary.md#so3-and-se3); written $T$ in the glossary and code) mapping body coordinates to world coordinates. We have the true pose $X$ and our estimate $\hat X$. An ordinary EKF defines the error as the subtraction $X - \hat X$, but subtracting two poses leaves the [manifold](../glossary.md#manifold). IEKF uses group composition instead, in two natural ways:
 
 $$\eta_L = \hat X^{-1} X \qquad \text{(left-invariant error)}$$
 $$\eta_R = X \hat X^{-1} \qquad \text{(right-invariant error)}$$
@@ -15,12 +15,12 @@ $$\eta_R = X \hat X^{-1} \qquad \text{(right-invariant error)}$$
 Barrau & Bonnabel (2017, Eqs. 18 and 25) define the inverses, $\eta^L = X^{-1}\hat X$ and $\eta^R = \hat X X^{-1}$. An inverted error ignores the same frame changes, so everything below holds for both. Only the sign of the small error vector $\xi$ flips.
 
 ### Naming trap
-The perturbation $`X = \hat X\,\mathrm{Exp}(\xi)`$ used in most of this repo is what Solà et al. and the `manif` library call "right-plus" ($\hat X \oplus \xi$), because $\mathrm{Exp}(\xi)$ multiplies on the right. It is the **left**-invariant error: $\eta_L = \hat X^{-1}X = \mathrm{Exp}(\xi)$.
+The perturbation $`X = \hat X\,\mathrm{Exp}(\xi)`$ used in most of this repo ($\mathrm{Exp}$ is the [exponential map](../glossary.md#exp-and-log-maps)) is what Solà et al. and the `manif` library (a Lie-group library, used through its Python bindings in this repo's `use_manif/` scripts) call "right-plus" ($\hat X \oplus \xi$), because $\mathrm{Exp}(\xi)$ multiplies on the right. It is the **left**-invariant error: $\eta_L = \hat X^{-1}X = \mathrm{Exp}(\xi)$.
 
 - "Right" in "right-plus" says where the increment is applied.
 - "Left" in "left-invariant" says which frame change the error ignores.
 
-This is why `run_iekf` in `pointcloud_pose_tracking.py` is a left-invariant filter. The exception, [invariant_saltation_ekf.md](invariant_saltation_ekf.md), perturbs on the left, $`X = \exp(-\xi)\,\hat X`$, and is a right-invariant filter.
+This is why `run_iekf` in `use_numpy/pointcloud_pose_tracking.py` is a left-invariant filter. The exception, [invariant_saltation_ekf.md](invariant_saltation_ekf.md), perturbs on the left, $`X = \exp(-\xi)\,\hat X`$, and is a right-invariant filter.
 
 ---
 
@@ -76,29 +76,27 @@ So $\hat\omega^b$ plays the same role as $\eta_L$ above (indifferent to how we l
 
 ## 4. Why it actually matters (not just bookkeeping)
 
-The whole point of IEKF is that with the *right* choice of error, the linearized error dynamics stop depending on the current state estimate. The Jacobians can still change over time with known inputs (for example the gyro and accelerometer readings), but not with the estimate, unlike an ordinary EKF's. Barrau & Bonnabel (2017) build its convergence guarantee in three steps:
+The whole point of IEKF is that with the *right* choice of error, the linearized, noise-free error dynamics stop depending on the current state estimate. The [Jacobians](../glossary.md#jacobian) can still change over time with known inputs (for example the gyro and accelerometer readings), but not with the estimate, unlike an ordinary EKF's. Barrau & Bonnabel (2017) build its convergence guarantee in three steps:
 
 - **Theorem 1:** for [group-affine](../glossary.md#group-affine-dynamics-trajectory-independence) dynamics, the error evolves independently of the trajectory.
 - **Theorem 2**, the **log-linear** property: the error's Log then obeys an exact linear equation, even for large errors.
-- **Theorem 4:** so the IEKF is a locally asymptotically stable observer around any trajectory, under the same conditions that make a linear Kalman filter stable.
+- **Theorem 4:** so the IEKF is a locally asymptotically stable observer around any trajectory (the estimate converges to the truth from any start close enough), under the same conditions that make a linear Kalman filter stable.
 
-The log-linear property also helps consistency.
+A related result: Barrau & Bonnabel (2015) showed that an invariant EKF-SLAM keeps the unobservable directions unobservable, which gives it better [consistency](../glossary.md#consistency-and-nees) properties than the standard EKF ([kf_ekf_iekf.md §2](kf_ekf_iekf.md#2-extended-kalman-filter-the-world-is-nonlinear-so-ill-approximate-it-locally)).
 
 Rule of thumb for picking one:
 
 | Situation | Natural choice |
 |---|---|
-| Propagation driven by body-mounted sensors (IMU gyro/accel, wheel odometry) | either, for **group-affine** dynamics (the invariant error evolves on its own, whatever the trajectory; see below) |
-| World-frame measurement of a point fixed on the body: $`h(X) = X b`$ for a known body-frame point $b$ (GPS antenna, or this repo's `pointcloud_pose_tracking.py`, where $b = p_i$) | **left**-invariant |
-| Body-mounted sensor measuring a landmark known in the world frame: $`h(X) = X^{-1} d`$ for a known world-frame point $d$ | **right**-invariant |
+| Propagation driven by body-mounted sensors ([IMU](../glossary.md#imu-inertial-measurement-unit) gyro/accel, wheel [odometry](../glossary.md#odometry)) | either, for **group-affine** dynamics (the invariant error evolves on its own, whatever the trajectory; see below) |
+| World-frame measurement of a point fixed on the body: $`h(X) = X b`$ for a known body-frame point $b$ (GPS antenna, or this repo's `use_numpy/pointcloud_pose_tracking.py`, where $b = p_i$) | **left**-invariant |
+| Body-mounted sensor measuring a [landmark](../glossary.md#landmark) known in the world frame: $`h(X) = X^{-1} d`$ for a known world-frame point $d$ | **right**-invariant |
 
-- **Propagation (row 1).** The two errors differ in how body-frame noise enters. With the **left** error it enters unchanged. With the **right** error it is multiplied by $`\mathrm{Ad}_{\hat X}`$ (the **adjoint** of $`\hat X`$, [glossary](../glossary.md#adjoint)), which depends on the estimate. Right-invariant filters such as Hartley et al.'s legged-robot IEKF accept that because their measurements are right-invariant.
-- **$X b$ with the left error (row 2).** Substitute $`X = \hat X \eta_L`$ and form the residual in the body frame: $`\hat X^{-1} z - b = \eta_L b - b`$ plus rotated noise, where $`z`$ is the measured world-frame point. With $`\eta_L = \exp(\xi)`$ the Jacobian is $`[\,I \;\; -b^\wedge\,]`$, which is constant. This is equivalent to `run_iekf`'s residual, `((z[k+1] - t_pred) @ R_pred - body_points)` in `pointcloud_pose_tracking.py`, which computes $`R_{\text{pred}}^\top(z - t_{\text{pred}}) - p_i`$ for all points at once, where $`R_{\text{pred}}`$ and $`t_{\text{pred}}`$ are the rotation and translation of the predicted pose.
-- **$X^{-1}d$ with the right error (row 3).** Substitute $`X = \eta_R \hat X`$ and form the residual in the world frame: $`\hat X z - d = \eta_R^{-1} d - d`$ plus rotated noise. The Jacobian $`-[\,I \;\; -d^\wedge\,]`$ is constant too. This is the dual of row 2.
+- **$X b$ with the left error (row 2).** Substitute $`X = \hat X \eta_L`$ and form the residual in the body frame: $`\hat X^{-1} z - b = \eta_L b - b`$ plus rotated noise, where $`z`$ is the measured world-frame point. With $`\eta_L = \mathrm{Exp}(\xi)`$ the Jacobian is $`[\,I \;\; -b^\wedge\,]`$, which is constant. This is equivalent to `run_iekf`'s residual, `((z[k+1] - t_pred) @ R_pred - body_points)` in `pointcloud_pose_tracking.py`, which computes $`R_{\text{pred}}^\top(z - t_{\text{pred}}) - p_i`$ for all points at once, where $`R_{\text{pred}}`$ and $`t_{\text{pred}}`$ are the rotation and translation of the predicted pose.
+- **$X^{-1}d$ with the right error (row 3).** Substitute $`X = \eta_R \hat X`$ and form the residual in the world frame: $`\hat X z - d = \eta_R^{-1} d - d`$ plus rotated noise, where $`z = X^{-1} d`$ plus noise is the measured body-frame landmark. The Jacobian $`-[\,I \;\; -d^\wedge\,]`$ is constant too. This is the dual of row 2.
 - **Why the pairing matters.** Rows 2 and 3 both involve a point and a world frame, but the measurement shapes differ ($X b$ vs. $X^{-1}d$) and pair with opposite errors (Barrau & Bonnabel call them left- and right-invariant observations). The wrong pairing does not give a constant Jacobian: $X b$ with $`X = \eta_R \hat X`$ gives $`h(X) = \eta_R \hat X b`$, whose Jacobian $`[\,I \;\; -(\hat X b)^\wedge\,]`$ contains the predicted point, hence the current estimate.
-- **Same contrast, side by side.** The EKF-vs-IEKF table in [kf_ekf_iekf.md, EKF vs. IEKF equations side by side](kf_ekf_iekf.md#ekf-vs-iekf-equations-side-by-side) shows it for $Xb$: the world-frame (EKF) $H$ contains $`R_{\text{pred}}`$, the body-frame (IEKF) $H$ does not.
-- **Repo check.** The point-cloud IEKF tests row 2. Its fixed $`H = [\,I \;\; -p_i^\wedge\,]`$ is in [pointcloud_pose_tracking_empirical_note.md §2](pointcloud_pose_tracking_empirical_note.md#2-ekf-vs-iekf-exact-by-construction), and [§1](pointcloud_pose_tracking_empirical_note.md#1-the-setup) of that note explains why the residual is left-invariant.
-- **Propagation rarely decides.** For group-affine dynamics, such as IMU [dead reckoning](../optimization/factor_graph.md#2-why-do-we-need-it) of pose and velocity, Barrau & Bonnabel (2017, Theorem 1) show that both errors then evolve independently of the trajectory: one does exactly when the other does. So the measurement shape usually picks the error: papers choose whichever makes *their* sensor model's Jacobian trajectory-independent. That is the design criterion, not a fixed rule.
+- **Propagation (row 1).** The two errors differ in how body-frame noise enters. With the **left** error it enters unchanged. With the **right** error it is multiplied by $`\mathrm{Ad}_{\hat X}`$ (the **adjoint** of $`\hat X`$, [glossary](../glossary.md#adjoint)), which depends on the estimate. Right-invariant filters such as Hartley et al.'s legged-robot IEKF accept that because their measurements are right-invariant. The noise-free error dynamics are a separate matter: for group-affine dynamics, such as IMU [dead reckoning](../glossary.md#dead-reckoning) of pose and velocity, Barrau & Bonnabel (2017, Theorem 1) show that both errors evolve independently of the trajectory: one does exactly when the other does. So propagation rarely decides, and the measurement shape usually picks the error: papers choose whichever makes *their* sensor model's Jacobian trajectory-independent. That is the design criterion, not a fixed rule.
+- **In the repo.** The EKF-vs-IEKF table in [kf_ekf_iekf.md, EKF vs. IEKF equations side by side](kf_ekf_iekf.md#ekf-vs-iekf-equations-side-by-side) shows the same contrast for $Xb$: the world-frame (EKF) $H$ contains $`R_{\text{pred}}`$, the body-frame (IEKF) $H$ does not. The point-cloud IEKF tests row 2. Its fixed $`H = [\,I \;\; -p_i^\wedge\,]`$ is in [pointcloud_pose_tracking_empirical_note.md §2](pointcloud_pose_tracking_empirical_note.md#2-ekf-vs-iekf-exact-by-construction), and [§1](pointcloud_pose_tracking_empirical_note.md#1-the-setup) of that note explains why the residual is left-invariant.
 
 ---
 
@@ -106,5 +104,5 @@ Rule of thumb for picking one:
 
 1. Barrau, A., & Bonnabel, S. (2017). *The Invariant Extended Kalman Filter as a Stable Observer*. IEEE Transactions on Automatic Control, 62(4), 1797-1812. https://doi.org/10.1109/TAC.2016.2594085 (arXiv: https://arxiv.org/abs/1410.1465) - the main reference. Numbering below follows arXiv v4. Eqs. 18 and 25 define the errors as inverses of this doc's (§1). §2.2 characterizes group-affine dynamics (condition (7), Theorem 1), §2.3 proves the log-linear property (Theorem 2), §3.1 pairs the two observation shapes with the left and right filters, and Theorem 4 (§3.4) is the convergence result.
 2. Bonnabel, S. (2007). *Left-invariant extended Kalman filter and attitude estimation*. 46th IEEE Conference on Decision and Control, 1027-1032. https://doi.org/10.1109/CDC.2007.4434662 - an early invariant-error formulation.
-3. Hartley, R., Ghaffari, M., Eustice, R. M., & Grizzle, J. W. (2020). *Contact-aided invariant extended Kalman filtering for robot state estimation*. International Journal of Robotics Research, 39(4), 402-430. https://doi.org/10.1177/0278364919894385 - the right-invariant legged-robot filter (§4, propagation bullet).
+3. Hartley, R., Ghaffari, M., Eustice, R. M., & Grizzle, J. W. (2020). *Contact-aided invariant extended Kalman filtering for robot state estimation*. International Journal of Robotics Research, 39(4), 402-430. https://doi.org/10.1177/0278364919894385 - the right-invariant legged-robot filter (see §4).
 4. Solà, J., Deray, J., & Atchuthan, D. (2018). *A micro Lie theory for state estimation in robotics*. arXiv:1812.01537. https://arxiv.org/abs/1812.01537 - the "right-plus" ($\oplus$) convention in §1, and the basis of `manif`.

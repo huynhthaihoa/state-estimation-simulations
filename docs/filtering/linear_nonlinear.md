@@ -6,18 +6,18 @@ We can tell by looking at the model equations, not the data. Write the two model
 x_{k+1} = f(x_k, u_k) + w_k \qquad z_k = h(x_k) + v_k
 ```
 
-The system is linear only if both $f$ and $h$ are linear in the state $x$, meaning they can be written as $f = F x + G u$ and $h = H x$, where $F$, $G$, $H$ don't depend on $x$. Here $`u_k`$ is the control input, $`w_k`$ the process noise and $`v_k`$ the measurement noise ([glossary](../glossary.md#ekf-extended-kalman-filter)), and $`G`$ maps the input into the state. If either $f$ or $h$ isn't linear, the system is nonlinear and the plain KF is no longer the exact answer.
+The system is linear only if both $f$ and $h$ are linear in the state $x$, meaning they can be written as $f = F x + G u$ and $h = H x$, where $F$, $G$, $H$ don't depend on $x$. Here $`u_k`$ is the control input, $`w_k`$ the process noise and $`v_k`$ the measurement noise ([glossary](../glossary.md#ekf-extended-kalman-filter)), and $`G`$ maps the input into the state. If either $f$ or $h$ isn't linear, the system is nonlinear and the plain Kalman filter (KF) is no longer the exact answer.
 
 ## 1. Three ways to tell
 
 1. **Superposition.** $f(a x_1 + b x_2) = a f(x_1) + b f(x_2)$ must hold for every $x_1, x_2, a, b$. A constant offset (making $f$ **affine**: linear plus a constant) fails this test but is still fine for a KF, since it just adds to the mean.
-2. **The Jacobian doesn't depend on $x$.** Differentiate: if $\partial f / \partial x$ or $\partial h / \partial x$ still contains $x$, the system is nonlinear. This is the most practical test, and it is why the EKF has to recompute $F_k$ and $H_k$ at every step ([kf_ekf_iekf.md §2](kf_ekf_iekf.md#2-extended-kalman-filter-the-world-is-nonlinear-so-ill-approximate-it-locally)): they change as the estimate changes.
+2. **The [Jacobian](../glossary.md#jacobian) doesn't depend on $x$.** Differentiate: if $\partial f / \partial x$ or $\partial h / \partial x$ still contains $x$, the system is nonlinear. This is the most practical test, and it is why the Extended Kalman Filter (EKF) has to recompute $F_k$ and $H_k$ at every step ([kf_ekf_iekf.md §2](kf_ekf_iekf.md#2-extended-kalman-filter-the-world-is-nonlinear-so-ill-approximate-it-locally)): they change as the estimate changes.
 3. **Look for these patterns.** Any of them makes a model nonlinear:
    - **Trig of a state:** $\cos\theta$, $\sin\theta$ where $\theta$ is estimated. This is the unicycle in [kf_ekf_iekf.md §2](kf_ekf_iekf.md#2-extended-kalman-filter-the-world-is-nonlinear-so-ill-approximate-it-locally).
    - **States multiplied together:** $v \cdot \cos\theta$ (here $`v`$ is a speed, not the measurement noise), or $`R\,p`$ when both $R$ and $p$ are estimated ($`R`$ the rotation, not the noise covariance; $`p`$ the position).
    - **Rotations or poses in minimal coordinates:** composing $T \cdot \mathrm{Exp}(\xi)$ (pose $`T`$, tangent-space error $`\xi`$, **exponential map** $`\mathrm{Exp}`$; [glossary](../glossary.md#exp-and-log-maps)), or a pose parameterized by angles. The point-cloud observation $R\,p_i + t$ is the counter-example: it is exactly linear in the state $[\mathrm{vec}(R), t]$ ([pointcloud_pose_tracking_empirical_note.md §4.1](pointcloud_pose_tracking_empirical_note.md#41-what-vanilla-buys-and-costs)). The nonlinearity enters through the rotation constraint and the minimal error coordinates.
    - **Division by a state:** camera projection $u = f_x X/Z$ (here $`u`$ is the pixel coordinate, not the control input; $`f_x`$ is the focal length in pixels, not the motion model $`f`$; $`X`$ and $`Z`$ are the lateral and depth coordinates of the point in the camera frame).
-   - **Norms and square roots:** range $\sqrt{(x-x_L)^2 + (y-y_L)^2}$ (robot position $`(x, y)`$, landmark position $`(x_L, y_L)`$).
+   - **Norms and square roots:** range $\sqrt{(x-x_L)^2 + (y-y_L)^2}$ (robot position $`(x, y)`$, [landmark](../glossary.md#landmark) position $`(x_L, y_L)`$).
    - **Switching or contact:** impacts, or stick/slip friction. These are non-smooth, which is what the saltation-matrix EKF in [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) handles.
 
 The first two tests are exact. The third is a heuristic for spotting what will fail them.
@@ -26,17 +26,17 @@ The first two tests are exact. The third is a heuristic for spotting what will f
 
 - **Linearity is about the state, not time or inputs.** $F_k$ may change with $k$, or depend on a known control or measured signal, and the model is still linear (linear time-varying), so the KF is still exact. Example: $`x_{k+1} = x_k + v\cos\theta\,\Delta t`$ is linear if $\theta$ comes from a trusted compass as an input, and nonlinear if $\theta$ is part of the state we estimate.
 - **Only one side needs to be nonlinear.** Linear motion with a range sensor (a nonlinear $h$) is already a nonlinear filtering problem.
-- **Linearity depends on the choice of state coordinates.** This is the IEKF's point ([kf_ekf_iekf.md §5](kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error)). Pose dynamics are nonlinear when:
-  - the state is a minimal parameterization (angles, tangent-space error) or must satisfy the $SO(3)$ constraint;
+- **Linearity depends on the choice of state coordinates.** This is the point of the **Invariant EKF** (**IEKF**, [glossary](../glossary.md#iekf-invariant-ekf); [kf_ekf_iekf.md §5](kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error)). Pose dynamics are nonlinear when:
+  - the state is a minimal parameterization (angles, tangent-space error) or must satisfy the $SO(3)$ constraint ([glossary](../glossary.md#so3-and-se3));
   - the angular velocity or a bias is itself a state, so it multiplies $R$.
 
-  With a known body twist, $R_{k+1} = R_k\,\mathrm{Exp}(\omega\,\Delta t)$ is linear in $\mathrm{vec}(R_k)$. The vanilla KF in [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) is inexact only for two reasons. It truncates the exponential, and it needs an **SVD** (singular value decomposition) re-projection onto $SO(3)$ (snapping the matrix back to the nearest rotation).
+  With a known body twist, $R_{k+1} = R_k\,\mathrm{Exp}(\omega\,\Delta t)$ is linear in $\mathrm{vec}(R_k)$. The vanilla KF in [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) is inexact for three reasons. It truncates the exponential, it carries a redundant 12-dimensional covariance that is not comparable to a minimal $6\times6$ tangent covariance, and it needs an **SVD** (singular value decomposition) re-projection onto $SO(3)$ (snapping the matrix back to the nearest rotation).
 
   For [group-affine dynamics](../glossary.md#group-affine-dynamics-trajectory-independence) ([lie_algebra.md §11.1](../foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity)), a well-chosen invariant error evolves independently of the state estimate (Barrau & Bonnabel 2017, [kf_ekf_iekf.md §11](kf_ekf_iekf.md#11-references)).
 
 ## 3. "How nonlinear" matters in practice
 
-Almost every real robot model is nonlinear. The useful question is whether it's nonlinear *over the region our uncertainty covers*. A quick numerical check: take a step $\delta$ about the size of our standard deviation and measure the linearization error, where $`J`$ is the Jacobian of $`f`$ at $`\hat x`$ ([glossary](../glossary.md#jacobian)):
+Almost every real robot model is nonlinear. The useful question is whether it's nonlinear *over the region our uncertainty covers*. A quick numerical check: take a step $\delta$ about the size of our standard deviation and measure the linearization error, where $`J`$ is the Jacobian of $`f`$ at $`\hat x`$:
 
 ```math
 \lVert f(\hat x + \delta) - f(\hat x) - J\delta \rVert
@@ -45,13 +45,13 @@ Almost every real robot model is nonlinear. The useful question is whether it's 
 Compare that to the process or measurement noise.
 
 - **Much smaller than the noise:** the EKF is fine.
-- **Comparable to the noise or larger:** the Jacobian changes a lot within our uncertainty (for example, a large heading uncertainty, or a landmark close to the camera). Consider the UKF, an **iterated update** (repeated [relinearization](../glossary.md#relinearization) within one measurement update), or an invariant or manifold formulation.
+- **Comparable to the noise or larger:** the Jacobian changes a lot within our uncertainty (for example, a large heading uncertainty, or a landmark close to the camera). Consider the [UKF](../glossary.md#ukf-unscented-kalman-filter) (Unscented Kalman Filter), an **iterated update** (repeated [relinearization](../glossary.md#relinearization) within one measurement update), or an invariant or manifold formulation.
 
 $P$ (the state covariance) changes over time, so the answer does too. Check at the worst moments:
 
 - right after initialization, when $P$ is large;
 - after long [dead reckoning](../glossary.md#dead-reckoning);
-- just before a loop closure;
+- just before a [loop closure](../glossary.md#loop-closure);
 - when landmarks are close to the camera.
 
 A filter can be effectively linear in steady state and badly nonlinear at startup, which is where iterated updates, the UKF and invariant formulations help.
@@ -75,7 +75,7 @@ The EKF keeps only the first two terms. With $\delta \sim \mathcal N(0, P)$ (and
 - a mean bias of $`\tfrac12\,\mathrm{tr}(\nabla^2 f_i\, P)`$;
 - an extra covariance of $`\tfrac12\,\mathrm{tr}(\nabla^2 f_i\, P\, \nabla^2 f_j\, P)`$ in entry $(i, j)$.
 
-Compare both with the noise the model already carries: $R$ for $h$, $Q$ for $f$.
+Compare both with the noise the model already carries: the measurement noise covariance $R$ for $h$ and the process noise covariance $Q$ for $f$ (not the rotation $R$).
 
 - **Small:** the bias and the extra spread $`\sqrt{\tfrac12\mathrm{tr}(\nabla^2 f_i\,P\,\nabla^2 f_i\,P)}`$ are both much smaller than $`\sqrt{R_{ii}}`$ (the sensor's own standard deviation), so the linearization is adequate.
 - **Comparable or larger**, in either: the model is effectively nonlinear at this uncertainty.
@@ -127,7 +127,7 @@ print(np.abs(res.mean(0)) / np.sqrt(np.diag(R)),  # mean bias, in sensor sigmas
 
 This prints a bias of about 2.7σ and an extra spread of about 3.9σ at 2 m: clearly nonlinear. The bias is a little above §4.1's 0.25 m estimate because terms beyond second order still matter when $\sigma_p / r = 0.5$. With `x_hat = [50, 0]` it prints about 0.1σ and 0.14σ: effectively linear.
 
-For a cheaper version, use $`2n+1`$ sigma points instead of 5000 samples. If the UKF's predicted mean and covariance differ noticeably from the EKF's, nonlinearity matters.
+For a cheaper version, use $`2n+1`$ [sigma points](../glossary.md#ukf-unscented-kalman-filter) instead of 5000 samples. If the UKF's predicted mean and covariance differ noticeably from the EKF's, nonlinearity matters.
 
 ### 4.3 Jacobian drift
 
@@ -138,10 +138,7 @@ Evaluate $J$ at $\hat x \pm \sigma$ along the main axes of $P$ (the eigenvectors
 Run the filter and check whether its reported uncertainty is believable (**consistency**, [glossary](../glossary.md#consistency-and-nees)):
 
 - **NIS**, the normalized innovation squared, $\nu^\top S^{-1}\nu$ (**innovation** $`\nu`$, the measurement minus its prediction, and **innovation covariance** $`S`$, [glossary](../glossary.md#innovation-and-kalman-gain)), needs no ground truth.
-- **NEES**, the normalized estimation error squared, needs simulated ground truth. This repo reports a Monte Carlo NEES in three scripts, which test different things:
-  - [`friction_anisotropic_ekf.py`](../../use_numpy/friction_anisotropic_ekf.py) ($n = 3$): a genuinely nonlinear motion model (heading enters through $\cos\theta$, $\sin\theta$);
-  - [`inchworm_zupt_ekf.py`](../../use_numpy/inchworm_zupt_ekf.py) ($n = 2$): exactly linear;
-  - [`saltation_matrix_ekf.py`](../../use_numpy/saltation_matrix_ekf.py) ($n = 6$): linear between bounces, with the nonlinearity concentrated in the bounce itself.
+- **NEES**, the normalized estimation error squared, needs simulated ground truth. This repo reports a [Monte Carlo](../glossary.md#monte-carlo-trials) NEES in several scripts; the three scripts in the table below test different things.
 
 **Intuition for NEES:**
 - Divide each error by its predicted spread. A consistent filter gives values around $\pm 1$.
@@ -153,13 +150,13 @@ A consistent filter's NEES averages the state dimension $n$ (NIS: the measuremen
 - **One run:** a single NEES value is **chi-square** ([glossary](../glossary.md#chi-square-distribution)) with $n$ degrees of freedom, so its 95% upper bound is wide (7.81 for $n = 3$).
 - **An average over $N$ Monte Carlo runs:** $N$ times the average is chi-square with $nN$ degrees of freedom, so the interval is much tighter, about $`n \pm 1.96\sqrt{2n/N}`$. The scripts compute it with `averaged_nees_bounds(n, N)`, which uses the **Wilson-Hilferty approximation** (a closed-form estimate of chi-square quantiles). For $N = 500$:
 
-| Script | $n$ | 95% band |
-| --- | --- | --- |
-| `inchworm_zupt_ekf.py` | 2 | [1.83, 2.18] |
-| `friction_anisotropic_ekf.py` | 3 | [2.79, 3.22] |
-| `saltation_matrix_ekf.py` | 6 | [5.70, 6.31] |
+| Script | $n$ | Motion model | 95% band |
+| --- | --- | --- | --- |
+| [`inchworm_zupt_ekf.py`](../../use_numpy/inchworm_zupt_ekf.py) | 2 | exactly linear | [1.83, 2.18] |
+| [`friction_anisotropic_ekf.py`](../../use_numpy/friction_anisotropic_ekf.py) | 3 | genuinely nonlinear (heading enters through $\cos\theta$, $\sin\theta$) | [2.79, 3.22] |
+| [`saltation_matrix_ekf.py`](../../use_numpy/saltation_matrix_ekf.py) | 6 | linear between bounces, with the nonlinearity concentrated in the bounce itself | [5.70, 6.31] |
 
-Above the upper bound, the filter is overconfident. Below the lower bound, it's underconfident, which is what `saltation_matrix_ekf.py` shows after a bounce (NEES about 2.4 against 6). A nonzero mean in the innovations is a second warning sign.
+Above the upper bound, the filter is overconfident. Below the lower bound, it's **underconfident** (its reported covariance is larger than its real errors), which is what `saltation_matrix_ekf.py` shows after a bounce (NEES about 2.4 against 6). A nonzero mean in the innovations is a second warning sign.
 
 These tests catch **any** mismatch between the filter's model and reality, not just linearization error:
 - A wrong $Q$ or $R$, or dynamics the model leaves out, fail them just as well.
