@@ -41,11 +41,11 @@ def run_filters(x_true, z, x_init, P_init, dt, e, g, accel_noise_std, impact_noi
     out = {}
     for use_saltation in (False, True):
         ekf = HybridEKF(x_init, P_init, dt, e, g, accel_noise_std, impact_noise_std, R, use_saltation)
-        x, P = ekf.state()
+        x, P = ekf.get_state()
         xs, Ps = [x], [P]
         for k in range(len(x_true) - 1):
             ekf.step(z[k + 1])
-            x, P = ekf.state()
+            x, P = ekf.get_state()
             xs.append(x)
             Ps.append(P)
         out[use_saltation] = (np.array(xs), np.array(Ps))
