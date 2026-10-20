@@ -1398,6 +1398,74 @@ def fig_pose_tracking_concept():
            "twist-only prediction (run_dead_reckoning from the perturbed initial pose) as T_pred", bottom=0.06)
 
 
+def fig_ekf_linearization_concept():
+    """kf_ekf_iekf.md §2: why the EKF's tangent-line stand-in works near the estimate and fails far from it.
+    Pure-math concept figure (no simulation): the unicycle's x-step f(θ) = v·Δt·cos θ with v·Δt = 1 m."""
+    th_hat = np.radians(30.0)
+    f0, slope = np.cos(th_hat), -np.sin(th_hat)  # slope in m per rad
+    deg = np.linspace(-30, 120, 600)
+    f = np.cos(np.radians(deg))
+    tang = f0 + slope * (np.radians(deg) - th_hat)
+    gap = {d: float(np.cos(th_hat + np.radians(d)) - (f0 + slope * np.radians(d))) for d in (5, 40)}
+
+    fig = plt.figure(figsize=(13.5, 6.0))
+    gs = fig.add_gridspec(2, 2, width_ratios=[1.15, 1])
+    ax = fig.add_subplot(gs[:, 0])
+    ax_s, ax_l = fig.add_subplot(gs[0, 1]), fig.add_subplot(gs[1, 1])
+
+    # left: the curve, its tangent at the estimate, and the two uncertainty bands
+    ax.axvspan(30 - 40, 30 + 40, color=C["orange"], alpha=0.14, lw=0, label="±40° (large uncertainty)")
+    ax.axvspan(30 - 5, 30 + 5, color=C["blue"], alpha=0.28, lw=0, label="±5° (small uncertainty)")
+    ax.plot(deg, f, color=TRUTH, lw=2.2, label="true f(θ) = cos θ")
+    ax.plot(deg, tang, color=C["red"], lw=1.8, ls="--", label="EKF tangent: cos θ̂ − sin θ̂·(θ − θ̂)")
+    ax.scatter([30], [f0], s=70, color=C["red"], zorder=4, label=f"estimate θ̂ = 30°, f = {f0:.3f} m")
+    for d, col, dx in [(5, C["blue"], -4), (40, C["orange"], 3)]:
+        x = 30 + d
+        ax.plot([x, x], [np.cos(np.radians(x)), np.cos(th_hat) + slope * np.radians(d)], color=col, lw=3, zorder=3,
+                solid_capstyle="butt")
+    ax.annotate(f"gap at θ̂+5°: {abs(gap[5]) * 100:.1f} cm\n(invisible at this scale)", xy=(35, np.cos(np.radians(35))),
+                xytext=(52, 1.0), fontsize=9, color="#2e5f9e", arrowprops=dict(arrowstyle="-", color="#2e5f9e", lw=0.9))
+    ax.annotate(f"gap at θ̂+40°: {abs(gap[40]) * 100:.1f} cm\n(tangent is above the curve)",
+                xy=(70, 0.5 * (np.cos(np.radians(70)) + f0 + slope * np.radians(40))), xytext=(82, 0.62), fontsize=9,
+                color="#b8672a", arrowprops=dict(arrowstyle="-", color="#b8672a", lw=0.9))
+    ax.axhline(0, color="#888888", lw=0.6)
+    ax.set(title="Linearize at the estimate", xlabel="heading θ (deg)", ylabel="x-step f(θ) (m)",
+           xlim=(-30, 120), ylim=(-0.65, 1.2))
+    ax.set_xticks(range(-30, 121, 30))
+    ax.legend(loc="lower left", fontsize=8.5)
+
+    # right: push N(θ̂, σ²) through f, true vs EKF's linearized Gaussian
+    rng = np.random.default_rng(SEED)
+    z = rng.standard_normal(200_000)
+    xs = np.linspace(-1.05, 1.05, 500)
+    stats = {}
+    for a, sd in [(ax_s, 5.0), (ax_l, 40.0)]:
+        sr = np.radians(sd)
+        samp = np.cos(th_hat + sr * z)
+        m_true, s_true = float(samp.mean()), float(samp.std())
+        m_ekf, s_ekf = float(f0), float(abs(slope) * sr)
+        stats[sd] = (m_true, s_true, m_ekf, s_ekf)
+        a.hist(samp, bins=np.linspace(-1.0, 1.0, 101), density=True, color=C["gold"], alpha=0.8,
+               label=f"true (Monte Carlo): mean {m_true:.3f} m, std {s_true:.3f} m")
+        a.plot(xs, np.exp(-0.5 * ((xs - m_ekf) / s_ekf) ** 2) / (s_ekf * np.sqrt(2 * np.pi)), color=C["red"], lw=2,
+               label=f"EKF Gaussian: mean {m_ekf:.3f} m, std {s_ekf:.3f} m")
+        a.axvline(m_true, color=TRUTH, lw=1.2, ls=":")
+        a.axvline(m_ekf, color=C["red"], lw=1.2, ls=":")
+        a.set(title=f"θ ~ N(30°, ({sd:.0f}°)²): output of f", ylabel="density", xlim=(-1.05, 1.05))
+        a.legend(loc="upper left", fontsize=8.5)
+        a.set_ylim(0, a.get_ylim()[1] * 1.45)
+    ax_l.set_xlabel("x-step f(θ) (m)")
+    ax_s.text(0.02, 0.5, "near-perfect match", transform=ax_s.transAxes, ha="left", fontsize=9, color="#555555")
+    ax_l.text(0.02, 0.5, "EKF mean is off, shape is wrong", transform=ax_l.transAxes, ha="left", fontsize=9,
+              color="#555555")
+    for sd, (mt, st, me, se) in stats.items():
+        print(f"    sigma={sd:.0f} deg: true mean {mt:.4f} std {st:.4f} | EKF mean {me:.4f} std {se:.4f}")
+    print(f"    gap +5 deg: {gap[5] * 100:.3f} cm, +40 deg: {gap[40] * 100:.3f} cm")
+
+    finish(fig, "ekf_linearization_concept", "EKF: linearize the nonlinear model at the current estimate",
+           "f(θ) = cos θ: the unicycle's x-step per metre travelled (§2), estimate θ̂ = 30°")
+
+
 def fig_bundle_adjustment_concept():
     """bundle_adjustment.py: one landmark's bundle of rays, before and after joint BA."""
     import bundle_adjustment as m
@@ -2182,6 +2250,7 @@ FIGURES = {
     "imu_preintegration_concept": fig_imu_preintegration_concept,
     "robot_imu_tracking_concept": fig_robot_imu_tracking_concept,
     "pose_tracking_concept": fig_pose_tracking_concept,
+    "ekf_linearization_concept": fig_ekf_linearization_concept,
     "pose_tracking_dt_sweep": fig_pose_tracking_dt_sweep,
     "bundle_adjustment_concept": fig_bundle_adjustment_concept,
     "bundle_adjustment_advanced_concept": fig_bundle_adjustment_advanced_concept,

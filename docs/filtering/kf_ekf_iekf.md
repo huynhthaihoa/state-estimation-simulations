@@ -32,7 +32,7 @@ where:
 - $z$: measurement
 - $F$: linear motion model
 - $H$: linear measurement model
-- $w$: process noise (everything $F$ doesn't capture: unmodeled dynamics, wind gusts, wheel slip, IMU bias drift, etc.)
+- $w$: process noise (everything $F$ doesn't capture: unmodeled dynamics, wind gusts, wheel slip, [IMU](../glossary.md#imu-inertial-measurement-unit) (inertial measurement unit: gyroscope + accelerometer) bias drift, etc.)
 - $`Q`$: covariance of process noise, $`Q = \mathrm{Cov}(w)`$
 - $v$: measurement noise (GPS jitter, camera pixel noise, IMU noise, etc.)
 - $`R`$: covariance of measurement noise, $`R = \mathrm{Cov}(v)`$
@@ -69,7 +69,7 @@ The 15 m prediction vs. 14 m GPS from the start of this doc.
 The standard KF is a straight ruler for a world that behaves like a straight line. It doesn't work directly for rotations, camera poses, or nonlinear robot dynamics.
 
 ### A concrete data point
-This repo's own `run_vanilla_kf` (same point-cloud pose-tracking benchmark referenced in [§7](#7-geometry-aware-is-not-the-same-as-more-accurate)) is exactly this: a standard linear KF applied directly to a pose, via a redundant **ambient** ([glossary](../glossary.md#minimal-vs-ambient-redundant-parameterization)) `[vec(R), t]` state (`vec` taken row-major, as `R.flatten()` does) rather than the minimal $SE(3)$ tangent every other method there uses. It works only by adding two patches: a first-order truncation of the motion model, and a post-hoc SVD re-projection (snapping the matrix back to the nearest valid rotation) to keep the rotation valid. See [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) for the measured cost of skipping the manifold structure.
+This repo's own `run_vanilla_kf` (same point-cloud pose-tracking benchmark referenced in [§7](#7-geometry-aware-is-not-the-same-as-more-accurate)) is exactly this: a standard linear KF applied directly to a pose, via a redundant **ambient** ([glossary](../glossary.md#minimal-vs-ambient-redundant-parameterization)) `[vec(R), t]` state (`vec` taken row-major, as `R.flatten()` does) rather than the minimal $SE(3)$ tangent every other method there uses. It pays three costs for that: a first-order truncation of the motion model, a 12-number covariance that isn't directly comparable to the 6×6 tangent one, and a post-hoc SVD re-projection (snapping the matrix back to the nearest valid rotation) after every update. See [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) for the measured cost of skipping the manifold structure.
 
 ---
 
@@ -83,29 +83,17 @@ p_{x,k+1} = p_{x,k} + v\cos\theta_k\,\Delta t \qquad p_{y,k+1} = p_{y,k} + v\sin
 
 This is **nonlinear** because of $\cos\theta$ and $\sin\theta$, so a standard KF can't handle it directly. (For how to tell linear from nonlinear in general, and whether the nonlinearity matters at your uncertainty level, see [linear_nonlinear.md](linear_nonlinear.md).)
 
-The EKF's idea: pretend the system is linear **around the current estimate**, using a **Jacobian** to approximate the function locally. For the unicycle, the Jacobian (evaluated at $\hat\theta_k$) is:
+The EKF's idea: pretend the system is linear **around the current estimate**, using a **[Jacobian](../glossary.md#jacobian)** (the matrix of first derivatives: how much each output moves when each input is nudged) to approximate the function locally. For the unicycle, the Jacobian (evaluated at $\hat\theta_k$) is:
 
 ```math
 F_k = \frac{\partial f}{\partial s} = \begin{bmatrix} 1 & 0 & -v\sin\hat\theta_k\,\Delta t \\ 0 & 1 & v\cos\hat\theta_k\,\Delta t \\ 0 & 0 & 1 \end{bmatrix}
 ```
 
-Think of a curved road: we don't need to understand the whole curve, only to approximate it around where we currently are.
+Think of a curved road: we don't need to understand the whole curve, only to approximate it around where we currently are. The figure takes one piece of the unicycle model, $\cos\theta$, and replaces it by its tangent at the estimate $\hat\theta = 30°$:
 
-```text
-                 actual nonlinear function
-                     /
-                    /
-                   /
-                __/
-             __/
-          __/
-       __/
+![Left: cos θ with its tangent at the estimate θ̂ = 30° and ±5° and ±40° bands; the tangent is 0.3 cm off at +5° and 17.5 cm off at +40°. Right: Monte Carlo distribution of cos θ versus the EKF's Gaussian, matching for σ = 5° and clearly different for σ = 40°](../../assets/ekf_linearization_concept.png)
 
-        EKF approximation
-       /
-      /
-     /
-```
+*Figure: the tangent is an excellent stand-in when the uncertainty is small (σ = 5°: 0.3 cm gap, means 0.863 vs. 0.866 m) and a poor one when it is large (σ = 40°: 17.5 cm gap, true mean 0.678 m vs. the EKF's 0.866 m). Plotted by `uv run python assets/make_figures.py ekf_linearization_concept`.*
 
 Concretely, the EKF plugs the Jacobian into §1's same two-step cycle, for $x_k = f(x_{k-1}, u_{k-1}) + w_{k-1}$ and $z_k = h(x_k) + v_k$, where $`f`$ is the nonlinear motion model driven by the control input $`u`$, and $`h`$ is the nonlinear measurement model ([glossary](../glossary.md#ekf-extended-kalman-filter)).
 
@@ -124,7 +112,7 @@ So the only two changes from §1 are: (a) the mean propagates through the true n
 
 ### But here's the problem with EKF
 
-This matters most in **robotics and SLAM**. Say our robot has a pose $X=(R,p)$, with $R$ the rotation and $p$ the position (here $`R`$ is the rotation, not the noise covariance $`R`$ of §1). Rotations are not ordinary vectors:
+This matters most in **robotics and SLAM** ([simultaneous localization and mapping](../glossary.md#slam-simultaneous-localization-and-mapping): building a map while locating the robot in it). Say our robot has a pose $X=(R,p)$, with $R$ the rotation and $p$ the position (here $`R`$ is the rotation, not the noise covariance $`R`$ of §1). Rotations are not ordinary vectors:
 
 - In 2D, composing rotations just adds the angles ($90^\circ + 90^\circ = 180^\circ$), and the order doesn't matter.
 - In 3D, rotating 90° about x then 90° about y gives a different orientation than the reverse order:
@@ -139,9 +127,9 @@ Representing rotations awkwardly isn't the deep problem, though. Plain EKF alrea
 
 The real problem is more subtle: **the EKF's Jacobians are evaluated at the current, drifting state estimate**, which differs every run and every step.
 - Each time the filter linearizes at a slightly different point, it linearizes the system's symmetries slightly differently too.
-- **Picture:** some things no sensor can see, such as global yaw (the heading angle; every measurement is relative). An honest filter keeps its uncertainty wide there.
+- **Picture:** some things no sensor can see, such as global yaw (the heading angle; every measurement is relative). Such a direction is **unobservable** ([observability](../glossary.md#observability)). An honest filter keeps its uncertainty wide there.
 - Each new linearization point acts like a slightly different ruler. Those small differences make the filter feel it measured yaw a little, so its covariance shrinks along a direction nobody observes. (Picture only, no number.)
-- **The result:** the EKF can inject spurious information into directions that should stay unobservable (for example, a global orientation offset no sensor can see). The filter is then overconfident (inconsistent) in exactly those directions. Huang, Mourikis, and Roumeliotis (2010) analyzed this consistency problem for EKF-SLAM.
+- **The result:** the EKF can inject spurious information into directions that should stay unobservable (for example, a global orientation offset no sensor can see). The filter is then overconfident in exactly those directions: its covariance claims less error than it really has, which makes it **inconsistent** ([consistency](../glossary.md#consistency-and-nees)). Huang, Mourikis, and Roumeliotis (2010) analyzed this consistency problem for EKF-SLAM.
 - The Invariant EKF goes back to Bonnabel (2007), and Barrau and Bonnabel (2017) proved its stability. Barrau and Bonnabel (2015) showed that an invariant EKF-SLAM keeps the unobservable directions unobservable, which gives it better consistency properties than the standard EKF.
 
 That is where the Invariant EKF becomes interesting.
@@ -166,11 +154,11 @@ If we change the global coordinate system, the physical situation doesn't change
 
 ## 4. KF vs. EKF vs. IEKF at a glance
 
-| Filter   | Mental model                                                                                   |
-| -------- | ---------------------------------------------------------------------------------------------- |
-| **KF**   | "The world is linear."                                                                         |
-| **EKF**  | "The world is nonlinear, so I'll linearize it."                                                |
-| **IEKF** | "The world is nonlinear, so I'll linearize it in a way that respects its geometry/symmetries." |
+| Filter | Assumes | Error (§5) | Mental model |
+| --- | --- | --- | --- |
+| **KF** | linear motion and measurement models (different mathematical assumptions, not a less accurate filter) | additive, $x - \hat x$ | "The world is linear." |
+| **EKF** | nonlinear models, linearized locally (a generic approximation) | additive, or multiplicative for rotations | "The world is nonlinear, so I'll linearize it." |
+| **IEKF** | nonlinear models with geometric structure (a Lie group) worth respecting (a geometry-aware approximation) | invariant, $`\eta = \hat X^{-1}X`$ | "The world is nonlinear, so I'll linearize it in a way that respects its geometry/symmetries." |
 
 The IEKF is **not simply "EKF but more accurate"** (§7). It is a different way of constructing the error and performing the linearization.
 
@@ -185,15 +173,22 @@ Say our **estimated orientation** is $\hat R$ and the **true orientation** is $R
 
 $$R = \hat R \exp(\delta\theta^\wedge)$$
 
-where $\delta\theta$ is a **small rotation error**. This is a much more natural geometric representation for robot motion.
+where $\delta\theta$ is a **small rotation error** and $`(\cdot)^\wedge`$ turns a 3-vector into its skew-symmetric matrix ([hat operator](../glossary.md#hat-operator)). This is a much more natural geometric representation for robot motion.
 
 ### Tiny example (toy case: planar, rotation about $`z`$ only)
 - Estimate 30°, truth 32°. The error is $`\delta\theta = (0,0,2^\circ)`$, one small 3-vector.
 - In this planar case, left and right errors coincide. They differ only for rotations about different axes.
 
 ### A caveat
-$R = \hat R \exp(\delta\theta^\wedge)$ instead of $R - \hat R$ is, by itself, just a **manifold** (**multiplicative**) error representation - it is not automatically "invariant."
-- Widely-used filters (ESKF, MEKF, the error-state formulations behind most VIO pipelines) already define their error this way without being IEKFs.
+$R = \hat R \exp(\delta\theta^\wedge)$ instead of $R - \hat R$ is, by itself, just a **manifold** (**multiplicative**) error representation - it is not automatically "invariant." The three ways to define the error:
+
+| Error | Formula | Used by | Do the linearized error dynamics depend on the estimate? |
+| --- | --- | --- | --- |
+| **Additive** | $`x - \hat x`$ | classic EKF, EKF-SLAM | yes: the Jacobians are evaluated at the estimate |
+| **Multiplicative** (manifold) | $`R = \hat R\exp(\delta\theta^\wedge)`$ | ESKF, MEKF | in general yes (e.g. the velocity error is driven through $`\hat R`$) |
+| **Invariant** | $`\eta = \hat X^{-1}X`$ (left) or $`X\hat X^{-1}`$ (right) | IEKF | **no**, for group-affine dynamics with invariant-form measurements |
+
+- Widely-used filters ([ESKF](../glossary.md#eskf-error-state-kalman-filter) (error-state KF), MEKF, the error-state formulations behind most VIO (visual-inertial odometry: camera + IMU) pipelines) already define their error this way without being IEKFs.
 - What earns the name **invariant** is a further choice: building the error from the group action itself (left- or right-invariant).
 - For [group-affine](../glossary.md#group-affine-dynamics-trajectory-independence) dynamics (IMU kinematics are the standard example) with invariant-form measurements, this makes the **linearized error dynamics** independent of the current state estimate. That property, not the exp/log notation, is what addresses the consistency problem from §2.
 
@@ -202,7 +197,9 @@ $R = \hat R \exp(\delta\theta^\wedge)$ instead of $R - \hat R$ is, by itself, ju
 §2 wrote the EKF's predict/update cycle for a vector state. Here we write both filters' equations on the concrete example §1 and §7 use: tracking a pose $T\in SE(3)$ against a known point cloud (`run_ekf`/`run_iekf` in [pointcloud_pose_tracking.py](../../use_numpy/pointcloud_pose_tracking.py)). The point is to see the *one* line where EKF and IEKF diverge, since every other line is identical.
 
 #### Shared setup
-State $T$ (a pose, not a vector) with 6x6 tangent covariance $P$; a per-step body-frame twist input $u$; a point cloud $`\{p_i\}`$ known in the object's own body frame, observed as noisy world-frame points $z_i$.
+- **State:** a pose $T$ (rotation $R$, translation $t$), not a vector, with a 6×6 covariance $P$ over its [tangent space](../glossary.md#lie-algebra-and-tangent-space).
+- **Motion model:** $`T_k = T_{k-1}\exp(u_{k-1}\Delta t)`$. The object moves by a [twist](../glossary.md#twist) $`u = [v, \omega]`$ (linear and angular velocity in its own body frame) for $\Delta t$.
+- **Observation model:** a point cloud $`\{p_i\}`$ known in the object's own body frame is observed as noisy world-frame points $`z_i = R\,p_i + t + \text{noise}`$.
 
 #### Predict - identical for both filters
 The mean is composed with the group operation (not addition), which is *exact* here:
@@ -212,7 +209,7 @@ The mean is composed with the group operation (not addition), which is *exact* h
 ```
 
 - $`J_{\text{self}} = \mathrm{Ad}_{\exp(-u_{k-1}\Delta t)}`$ (`se3_adjoint`; $`\mathrm{Ad}`$ is the **adjoint**, [glossary](../glossary.md#adjoint)) is exact for this composition.
-- $J_\tau = J_r(u_{k-1}\Delta t)$ (`se3_right_jacobian`) is a first-order (in the twist noise) linearization.
+- $J_\tau = J_r(u_{k-1}\Delta t)$ (`se3_right_jacobian`), the [right Jacobian](../glossary.md#right-and-left-jacobians) of $\exp$, is a first-order (in the twist noise) linearization.
 - $`Q = \Delta t^2\,\mathrm{diag}(\sigma_v^2 I_3, \sigma_\omega^2 I_3)`$ is the covariance of the twist increment $u\Delta t$, where $`\sigma_v`$ and $`\sigma_\omega`$ are the standard deviations of the linear and angular velocity noise.
 
 The full per-function math, including the UKF, vanilla KF and batch GN, is in [pointcloud_pose_tracking_empirical_note.md §1.1](pointcloud_pose_tracking_empirical_note.md#11-the-filter-math-concretely).
@@ -226,10 +223,10 @@ Here $`R_{\text{pred}}`$ and $`t_{\text{pred}}`$ are the rotation and translatio
 | Jacobian $H_i$ | $`\left[R_{\text{pred}} \;\; -R_{\text{pred}}\,p_i^\wedge\right]`$ | $`\left[I \;\; -p_i^\wedge\right]`$ |
 | Depends on current estimate? | Yes - $R_{\text{pred}}$ appears in $H$ itself | **No** - only the fixed, known $p_i$ appears |
 
-Both then use the same gain, covariance and pose-update formulas (each with its own $H$ and $r_k$), with $`R_{\text{meas}} = \sigma^2 I`$ the point-noise covariance (named this way because $R$ already means rotation in this section):
+Both then use the same gain, covariance and pose-update formulas (each with its own $H$ and $r_k$), with $`R_{\text{diag}} = \sigma^2 I`$ the point-noise covariance (named as in the code and the [empirical note](pointcloud_pose_tracking_empirical_note.md); plain $R$ already means rotation in this section):
 
 ```math
-K_k = P_k^-H^\top(HP_k^-H^\top+R_{\text{meas}})^{-1} \qquad \hat T_k = \hat T_k^-\exp(K_k r_k) \qquad P_k = (I-K_kH)P_k^-
+K_k = P_k^-H^\top(HP_k^-H^\top+R_{\text{diag}})^{-1} \qquad \hat T_k = \hat T_k^-\exp(K_k r_k) \qquad P_k = (I-K_kH)P_k^-
 ```
 
 #### What this example does and doesn't show
@@ -276,19 +273,15 @@ With $b_g$ and $b_a$ in the state, the dynamics are not group-affine in the stan
 
 ## 7. Geometry-aware is not the same as more accurate
 
-A common misconception is **KF → EKF → IEKF = three levels of accuracy**. That's not quite right:
-
-- **KF:** different mathematical assumptions (linear).
-- **EKF:** generic nonlinear approximation.
-- **IEKF:** geometry-aware nonlinear approximation.
+A common misconception is **KF → EKF → IEKF = three levels of accuracy**. That's not quite right: they make different assumptions (§4's "Assumes" column), not three grades of the same one.
 
 An IEKF can sometimes have **better convergence and consistency properties** than a conventional EKF because the linearization is aligned with the system's inherent symmetries. That is not the same as being more accurate everywhere.
 
 **A concrete data point** from this repo's own point-cloud pose-tracking benchmark ([use_numpy/pointcloud_pose_tracking.py](../../use_numpy/pointcloud_pose_tracking.py), [use_manif/pointcloud_pose_tracking.py](../../use_manif/pointcloud_pose_tracking.py)):
 - **Accuracy: identical.** Under [isotropic](../glossary.md#isotropic-and-anisotropic) point-noise covariance, EKF and IEKF produce **exactly identical** corrections $K r$ and posterior $P$, so both converge to the same estimate.
   - Proof: the body-frame and world-frame residual/Jacobian pairs differ only by a per-point rotation, which cancels out of $K r$ and $P$ ($K$ itself differs by that rotation).
-  - Numerical check: $`K r`$ and the poses agree to ~1e-14, $`P`$ to ~1e-16.
-- **Speed: IEKF wins.** Its fixed Jacobian made it about 27-30% faster per step than EKF at identical memory - [the empirical note's §2.4](pointcloud_pose_tracking_empirical_note.md#24-what-actually-differs-between-them-speed-not-accuracy) measured 260 vs. 369 µs/step. Timing is machine-dependent and noisy: in one re-run the order flipped.
+  - Numerical check: $`K r`$ and the poses agree to ~1e-14, and $`P`$ to round-off (~1e-15 relative to its size).
+- **Speed: IEKF wins.** Its fixed Jacobian made it about 27-30% faster per step than EKF at nearly identical memory - [the empirical note's §2.4](pointcloud_pose_tracking_empirical_note.md#24-what-actually-differs-between-them-speed-not-accuracy) measured 260 vs. 369 µs/step. Timing is machine-dependent and noisy: in one re-run the order flipped.
 - **Takeaway:** "geometry-aware" doesn't always mean "more accurate" - sometimes it means "cheaper to compute the same answer." The accuracy gap only opens up once the noise model or system structure breaks the symmetry that made them equivalent here (for example, anisotropic measurement noise).
 
 ---
@@ -297,27 +290,13 @@ An IEKF can sometimes have **better convergence and consistency properties** tha
 
 The one-liners are in §4's table. As a decision procedure:
 
-```text
-                 State estimation
-                        │
-                        ▼
-               ┌─────────────────┐
-               │ Linear system?  │
-               └────────┬────────┘
-              Yes       │       No
-          ┌─────────────┴─────────────┐
-          ▼                           ▼
-     Standard KF          ┌───────────────────────┐
-                          │ Important geometric   │
-                          │ symmetries (rotations,│
-                          │ poses on a Lie group)?│
-                          └───────────┬───────────┘
-                         No           │          Yes
-                  ┌───────────────────┴───────────────┐
-                  ▼                                   ▼
-                 EKF                                 IEKF
-          "Linearize locally"           "Linearize while respecting
-                                              the geometry"
+```mermaid
+flowchart LR
+    A["State estimation<br/>problem"] --> B{"Linear<br/>models?"}
+    B -->|Yes| KF["Standard KF"]
+    B -->|No| C{"Rotations or poses<br/>(a Lie group)?"}
+    C -->|No| EKF["EKF<br/>linearize locally"]
+    C -->|Yes| IEKF["IEKF<br/>linearize while respecting<br/>the geometry"]
 ```
 
 The last distinction is the one to internalize: **a robot pose is not just a vector; it has geometry.** That is one of the main reasons the IEKF is attractive for inertial navigation, visual-inertial estimation, and SLAM.
@@ -327,6 +306,14 @@ The last distinction is the one to internalize: **a robot pose is not just a vec
 ## 9. Other prominent variants worth keeping in mind
 
 KF, EKF, and IEKF aren't the whole landscape. A few others come up constantly in robotics/SLAM/VIO work.
+
+| Variant | Core idea | What it fixes | Cost or catch | More in this repo |
+| --- | --- | --- | --- | --- |
+| **UKF** | push a few sigma points through the *exact* function | no derivatives; captures curvature a first-order Jacobian misses | several times slower per step than EKF/IEKF here | [extra_kf_variants.md §1](extra_kf_variants.md#1-unscented-kalman-filter-ukf), [empirical note §3](pointcloud_pose_tracking_empirical_note.md#3-ukf-vs-ekfiekf-close-but-not-exact) |
+| **ESKF** | a nominal state plus a small error state kept near zero | only a near-zero error is linearized; rotations become small rotations | the error estimate must be folded into the nominal state and reset after every update | [extra_kf_variants.md §2](extra_kf_variants.md#2-error-state-kalman-filter-eskf) |
+| **MSCKF** | keep past camera poses, not landmarks; use each landmark once, then discard it | state size no longer grows with the number of landmarks | covariance cost grows as the cube of the window of poses | - |
+| **Iterated EKF** | relinearize the measurement at the updated estimate and repeat (Gauss-Newton inside one update) | linearization error for very nonlinear or very informative measurements | several update passes per step | - |
+| **EqF** | the invariant idea for any symmetry, not just matrix Lie groups | systems whose state is not a Lie group but is acted on by one | the system's symmetry (group action) must be found first | - |
 
 ### UKF (Unscented Kalman Filter) - "Don't linearize the function, sample around it instead"
 
@@ -344,7 +331,7 @@ Instead of estimating landmark positions jointly with the pose (as EKF-SLAM does
 
 At each update, relinearize the measurement model around the *updated* state estimate and repeat until convergence - equivalent to Gauss-Newton ([glossary](../glossary.md#gauss-newton)) applied inside a single EKF update (Bell & Cathey 1993). This reduces linearization error for measurements that are very nonlinear or very informative.
 
-**A naming collision:** "IEKF" is used in the literature for *both* Iterated EKF and Invariant EKF - two unrelated ideas that share an acronym. This doc uses IEKF exclusively for Invariant EKF (§2-§5); when reading other material, check which one is meant.
+This is the *other* "IEKF" from §3's naming note: in this doc, IEKF always means the Invariant EKF.
 
 ### EqF - "Generalize the invariant idea to any symmetry, not just matrix Lie groups"
 
