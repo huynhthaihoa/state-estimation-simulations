@@ -1,6 +1,6 @@
 # Quaternion intuitive explanation
 
-For SLAM, state estimation and robotics, a quaternion is best understood as a way to represent **3D orientation** without the problems of Euler angles.
+For [SLAM](../glossary.md#slam-simultaneous-localization-and-mapping), state estimation and robotics, a quaternion is best understood as a way to represent **3D orientation** without the problems of Euler angles.
 
 ---
 
@@ -48,7 +48,8 @@ So a quaternion reads as **"rotate around this axis by this amount."** The four 
 > **Watch the component order and the convention.**
 >
 > - **Component order.** This doc writes quaternions scalar-first, $(w, x, y, z)$. Many libraries store them scalar-last, $[x, y, z, w]$: scipy's `Rotation.as_quat()`, ROS (Robot Operating System) messages, and this repo's own `utils.py`. Reading one ordering as the other silently gives a different rotation.
-> - **Multiplication convention.** **Hamilton** (used here, and by most robotics libraries) and **JPL** (common in older aerospace and MSCKF-era VIO papers) compose in opposite orders. Solà (2017) compares them.
+> - **Multiplication convention.** **Hamilton** (used here, and by most robotics libraries) and **JPL** (common in older aerospace and early visual-inertial odometry (VIO) papers) compose in opposite orders. Solà (2017) compares them.
+>   Under Hamilton, $`q \otimes \mathbf{v} \otimes q^{\ast}`$ actively rotates the vector $\mathbf{v}$ (§13), and $q$ maps body coordinates to world coordinates, like $X$ in [left_right_invariant.md](../filtering/left_right_invariant.md). JPL reverses the product order and encodes the inverse (frame) rotation.
 > - Always check both before mixing code or equations from different sources.
 
 ---
@@ -90,7 +91,7 @@ At zero rotation ($\theta = 0$), $w = \cos 0 = 1$ and $x = y = z = 0$, giving $q
 
 ## 6. Why are quaternions so useful in robotics?
 
-Suppose the [IMU](../glossary.md#imu-inertial-measurement-unit) says "the robot rotated slightly during this 10 ms interval." We update the orientation $R_{k+1}=R_k\Delta R$. A rotation matrix ($`R \in SO(3)`$) needs **9 numbers**, while a quaternion needs only $q = (w,x,y,z)$ with the unit constraint. More importantly, composing rotations becomes quaternion multiplication, $q_{\text{new}}=q_{\text{old}}\otimes\Delta q$ (where $`\otimes`$ is the **quaternion product**, defined in §13, and $`\Delta q`$ is the quaternion of the small rotation $`\Delta R`$ measured over the interval):
+Suppose the [IMU](../glossary.md#imu-inertial-measurement-unit) says "the robot rotated slightly during this 10 ms interval." We update the orientation $R_{k+1}=R_k\Delta R$. A rotation matrix ($`R`$ in the rotation group [SO(3)](../glossary.md#so3-and-se3)) needs **9 numbers**, while a quaternion needs only $q = (w,x,y,z)$ with the unit constraint. More importantly, composing rotations becomes quaternion multiplication, $q_{\text{new}}=q_{\text{old}}\otimes\Delta q$ (where $`\otimes`$ is the **quaternion product**, defined in §13, and $`\Delta q`$ is the quaternion of the small rotation $`\Delta R`$ measured over the interval):
 
 > **Quaternion multiplication = "apply one rotation after another."**
 
@@ -113,11 +114,11 @@ Now rotate it +90° around the Z-axis (Z pointing out of the page, so positive i
 
 ```text
    ┌───┐
-   │ P │
-   │ H │
- ← │ O │
-   │ N │
    │ E │
+   │ N │
+ ← │ O │
+   │ H │
+   │ P │
    └───┘
 ```
 
@@ -208,9 +209,9 @@ The tricky part is:
 
 > **A quaternion does not live in ordinary 4D Euclidean space.**
 
-It lives on the **unit quaternion manifold**. That's why modern VIO/SLAM systems often estimate a **small 3D rotational error** $\delta q$ rather than directly adding a 4D quaternion error.
+It lives on the **unit quaternion [manifold](../glossary.md#manifold)**. That's why modern VIO/SLAM systems often estimate a **small rotational error** $\delta q$ rather than directly adding a 4D quaternion error. This $\delta q$ is itself a unit quaternion near the identity, $`\delta q \approx (1, \tfrac{1}{2}\delta\theta)`$, parameterized by a 3-vector $\delta\theta$: the error state of the **error-state Kalman filter (ESKF)**. Estimating it is the **multiplicative EKF (MEKF)** idea.
 
-The small error can be attached on either side, and both are common:
+The small error can be attached on either side, and both are common ($`\hat q`$ is the estimated orientation):
 
 - $`q_{\text{true}} = \delta q\otimes \hat q`$: the error is expressed in the world frame (fixed reference axes). In the terminology of [left_right_invariant.md](../filtering/left_right_invariant.md) this is a **right-invariant** error.
 - $`q_{\text{true}} = \hat q\otimes \delta q`$: the error is expressed in the body frame (axes attached to the robot). This is the **left-invariant** error, the convention of Solà's ESKF and of this repo's `run_iekf`.

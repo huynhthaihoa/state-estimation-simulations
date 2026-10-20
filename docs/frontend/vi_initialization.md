@@ -2,10 +2,10 @@
 
 > **Note:** A visual-inertial state estimator combines a camera with an [IMU](../glossary.md#imu-inertial-measurement-unit) to track the position, velocity, and orientation of a moving robot or device.
 
-Before a visual-inertial estimator can run its normal loop (preintegrate IMU, optimize against camera constraints), it has to solve a chicken-and-egg bootstrapping problem. It must find **metric scale** (real-world units such as meters), gravity direction, initial velocity, and IMU bias. A **monocular** (single) camera or a bias-corrupted IMU cannot give any of these on its own.
+Before a visual-inertial estimator can run its normal loop ([preintegrate](../glossary.md#imu-preintegration) IMU, optimize against camera constraints), it has to solve a chicken-and-egg bootstrapping problem. It must find **metric scale** (real-world units such as meters), gravity direction, initial velocity, and [IMU bias](../glossary.md#bias). A **monocular** (single) camera or a bias-corrupted IMU cannot give any of these on its own.
 
 This builds on:
-- **IMU preintegration** ($\Delta R, \Delta v, \Delta p$ and their bias Jacobians) from [imu_preintegration.md](../optimization/imu_preintegration.md). This doc covers what must happen *before* that machinery can be trusted.
+- **IMU preintegration** ($\Delta R, \Delta v, \Delta p$ and their bias [Jacobians](../glossary.md#jacobian)) from [imu_preintegration.md](../optimization/imu_preintegration.md). This doc covers what must happen *before* that machinery can be trusted.
 - **Factor graphs** from [factor_graph.md](../optimization/factor_graph.md), the optimizer we hand off to (§4).
 
 ---
@@ -15,9 +15,9 @@ This builds on:
 Every other doc in this repo assumes a decent initial guess already exists: `pose_graph.py`'s optimizer starts from [dead reckoning](../optimization/factor_graph.md#2-why-do-we-need-it), `bundle_adjustment_advanced.py`'s Gauss-Newton starts from a triangulated point, `pnp_estimation.py`'s Gauss-Newton starts from a linear DLT solve ([triangulation_pnp.md](triangulation_pnp.md)). Visual-inertial initialization has *no* such starting point yet. Four unknowns must be pinned down before anything else can proceed:
 
 - **Scale:** a monocular camera recovers structure and motion only up to an unknown positive scale factor. "This camera moved some distance $d$" could mean 1 meter or 100, and vision alone can't say which.
-- **Gravity direction:** the accelerometer senses specific force ([glossary](../glossary.md#imu-inertial-measurement-unit)), so gravity enters the preintegration residual (see [imu_preintegration.md §7](../optimization/imu_preintegration.md#7-what-the-accompanying-scripts-actually-do-and-dont), where the demo omits it). Handling it requires knowing which way gravity points in the estimator's frame.
-- **Velocity:** the IMU measures acceleration, so integrating it gives velocity only up to an unknown starting value. Each keyframe's velocity must be recovered too.
-- **Bias** ($b_g$, $b_a$): [imu_preintegration.md §1](../optimization/imu_preintegration.md#1-the-problem)'s "Problem B". Every raw sample was integrated using *some* bias estimate, and an uninitialized (zero) guess can be badly wrong, especially for the gyroscope.
+- **Gravity direction:** the accelerometer senses specific force ([glossary](../glossary.md#imu-inertial-measurement-unit)), so gravity enters the preintegration residual (see the "Implementation notes" in [imu_preintegration.md §4](../optimization/imu_preintegration.md#implementation-notes), which state that the demo omits it). Handling it requires knowing which way gravity points in the estimator's frame.
+- **Velocity:** the IMU measures acceleration, so integrating it gives velocity only up to an unknown starting value. Each [keyframe](../glossary.md#keyframe)'s velocity must be recovered too.
+- **Bias** ($b_g$, $b_a$; the $g$ in $b_g$ stands for gyroscope, not gravity): the gyroscope and accelerometer offsets are part of the state, so they must be initialized too. Every raw sample was integrated using *some* bias estimate, and an uninitialized (zero) guess can be badly wrong, especially for the gyroscope.
 
 If any of these is wrong at the start, the optimizer's very first linearization is already off.
 
@@ -26,6 +26,8 @@ If any of these is wrong at the start, the optimizer's very first linearization 
 ## 2. The classic linear-alignment pipeline
 
 The standard solution (popularized by VINS-Mono, a monocular visual-inertial estimator; see References) runs vision and inertial data through a short window of keyframes *before* switching over to the full nonlinear estimator, in two steps. Step 1 is closed-form; Step 2 is a linear solve followed by a short iterative gravity refinement:
+
+> **Note:** Structure from Motion (SfM) is a computer-vision technique that recovers camera poses and sparse 3D point positions from a sequence of 2D images taken from different viewpoints.
 
 ```text
 Vision-only SfM over a short window
@@ -39,38 +41,36 @@ Step 2: gravity + scale + velocities
 Hand off to IMU preintegration + factor-graph optimization
 ```
 
-> **Note:** Structure from Motion (SfM) is a computer-vision technique that recovers camera poses and sparse 3D point positions from a sequence of 2D images taken from different viewpoints.
-
 With a single (monocular) camera, SfM translations and structure are correct only up to an unknown scale factor, while rotations are not affected. That is why §1 lists scale, not rotation, as an unknown.
 
 **Intuition for Step 1** (toy case: one keyframe pair, 1 s apart):
-- SfM says the camera turned 10.0°. The preintegrated gyro says 10.5°.
-- The 0.5° gap, spread over 1 s, is a gyro bias of about 0.5°/s.
+- SfM says the camera turned 10.0°. The preintegrated gyroscope says 10.5°.
+- The 0.5° gap, spread over 1 s, is a gyroscope bias of about 0.5°/s.
 - The real step does this fit jointly over all keyframe pairs in the window.
 
 **Step 1 - gyroscope bias.**
 - Short vision-only SfM gives relative rotations between keyframes that don't depend on scale.
-- Each should match the corresponding preintegrated $\Delta R$ ([imu_preintegration.md §3](../optimization/imu_preintegration.md#3-what-gets-compressed)); any mismatch is explained by the still-unknown gyro bias.
+- Each should match the corresponding preintegrated $\Delta R$ ([imu_preintegration.md §3](../optimization/imu_preintegration.md#3-what-gets-compressed)); any mismatch is explained by the still-unknown gyroscope bias.
 - $\Delta R$'s bias sensitivity is already a Jacobian ($J_{R,b_g}$, [imu_preintegration.md §4](../optimization/imu_preintegration.md#4-the-bias-sensitivity-jacobians)), so this is a small **linear** [least-squares](../glossary.md#nonlinear-least-squares) problem for $\delta b_g$ over all keyframe pairs in the window.
 - It is solved once, in closed form, with no iteration, for the linearized (first-order) model.
 
 **Step 2 - gravity, scale, and velocities.**
 - **Tiny example (toy case: ignores gravity and starting velocity):** vision says the camera moved 2 units, and the IMU says the same move was 1 m. So the scale is $`s = 1\,\text{m} / 2\,\text{units} = 0.5`$ m/unit.
 - The real solve repeats this match over many keyframe pairs. That also pins down gravity and the velocities.
-- With the gyro bias corrected, $\Delta v$ and $\Delta p$ from every keyframe pair (still functions of the *unknown* scale $s$ and gravity vector $g$ in the vision frame) are combined with the vision-only relative poses into a second linear system.
+- With the gyroscope bias corrected, $\Delta v$ and $\Delta p$ are IMU measurements (they depend only on the raw samples and the bias). The unknown scale $s$ sits in the vision positions, and gravity $g$ enters the equations that link the two. Each keyframe pair therefore gives equations tying the measured $\Delta v$, $\Delta p$ to $s$, $g$ and the velocities, and together with the vision-only relative poses these form a second linear system.
 - It is solved jointly for $s$, $g$, and every keyframe's velocity.
 - The true gravity magnitude is known (~9.81 m/s²), so the raw linear $g$ is then refined by re-parameterizing it as a magnitude-constrained direction (2 degrees of freedom on a sphere) instead of a free 3-vector.
-- Without this refinement, noise in the linear solve can give $g$ the wrong magnitude, which would corrupt the recovered scale.
+- Without this refinement, noise in the linear solve can give $g$ the wrong magnitude, which plausibly also degrades the recovered scale because $s$ and $g$ are solved together (our inference, not a claim from the sources).
 
 **Accelerometer bias** is left near zero at this stage: over a short window its effect on $\Delta v/\Delta p$ is small relative to gravity and noise, so estimating it here is poorly conditioned (small noise changes the answer a lot). It is refined later, once the full optimizer has more data.
 
 **What the alignment needs from the data.** The solve only works if the motion reveals the unknowns, so real systems check before trusting it:
 
 - **Enough acceleration.** At constant velocity the accelerometer senses only gravity, and a scaled-up trajectory moving at a scaled-up constant speed fits the IMU data equally well, so scale is [unobservable](../glossary.md#observability). The window needs acceleration that is both non-zero and sufficiently varied.
-- **Enough translation.** Under pure rotation the vision-only SfM has no parallax to recover structure and translation from, so there is nothing for the IMU to align against.
+- **Enough translation.** Under pure rotation the vision-only SfM has no [parallax](triangulation_pnp.md#2-triangulation-worked-from-the-real-code) (the angle between the viewing rays to one point from different camera positions) to recover structure and translation from, so there is nothing for the IMU to align against.
 - **Known camera-IMU extrinsics.** The alignment needs the rotation and offset between camera and IMU; VINS-Mono can estimate the extrinsic rotation online if it isn't calibrated.
 
-VINS-Mono, for example, initializes only with stable feature tracking and sufficient parallax (more than 30 tracked features and 20 rotation-compensated pixels), and otherwise waits for new frames. The paper notes that acceleration excitation is needed for scale to be observable; the released code computes an IMU-excitation statistic but only logs a warning when it is low.
+VINS-Mono, for example, initializes only with stable feature tracking and sufficient parallax (more than 30 tracked features and 20 rotation-compensated pixels, i.e. average feature displacement between frames after removing the apparent shift caused by camera rotation), and otherwise waits for new frames. The paper notes that acceleration excitation is needed for scale to be observable; the released code computes an IMU-excitation statistic but only logs a warning when it is low.
 
 ---
 
@@ -102,12 +102,12 @@ That is a much larger undertaking than the other scripts in this repo.
 
 ## 6. One-sentence summary
 
-> **Visual-inertial initialization supplies the starting guess other docs assume: we align a short, sufficiently exciting vision-only window against preintegrated IMU bundles (a closed-form gyro-bias step, then a linear solve with a short gravity refinement) to recover scale, gravity direction, velocities, and gyroscope bias, then hand off to ordinary preintegration + factor-graph optimization.**
+> **Visual-inertial initialization supplies the starting guess other docs assume: we align a short, sufficiently exciting vision-only window against preintegrated IMU bundles (a closed-form gyroscope-bias step, then a linear solve with a short gravity refinement) to recover scale, gravity direction, velocities, and gyroscope bias, then hand off to ordinary preintegration + factor-graph optimization.**
 
 ---
 
 ## 7. References
 
-1. Qin, T., & Shen, S. (2017). *Robust Initialization of Monocular Visual-Inertial Estimation on Aerial Robots*. IROS 2017, 4225-4232. https://doi.org/10.1109/IROS.2017.8206284 - the source of the linear gyro-bias/gravity-scale-velocity alignment pipeline in §2.
+1. Qin, T., & Shen, S. (2017). *Robust Initialization of Monocular Visual-Inertial Estimation on Aerial Robots*. IROS 2017, 4225-4232. https://doi.org/10.1109/IROS.2017.8206284 - the source of the linear gyroscope-bias/gravity-scale-velocity alignment pipeline in §2.
 2. Qin, T., Li, P., & Shen, S. (2018). *VINS-Mono: A Robust and Versatile Monocular Visual-Inertial State Estimator*. IEEE Transactions on Robotics, 34(4), 1004-1020. https://doi.org/10.1109/TRO.2018.2853729 - the full system this initialization pipeline bootstraps; already cited in [filtering_smoothing.md §12](../filtering_smoothing.md#12-references) and [marginalization.md §11](../optimization/marginalization.md#11-references).
 3. Campos, C., Montiel, J. M. M., & Tardós, J. D. (2020). *Inertial-Only Optimization for Visual-Inertial Initialization*. ICRA 2020, 51-57. https://doi.org/10.1109/ICRA40945.2020.9197334 - ORB-SLAM3's inertial-only MAP-estimation alternative to §2's linear pipeline, named in §3's contrast.

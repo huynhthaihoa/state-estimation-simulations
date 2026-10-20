@@ -2,15 +2,15 @@
 
 ## 1. The big idea
 
-> **Lie group = the actual transformations we can perform.**
+> **[Lie group](../glossary.md#lie-group) = the actual transformations we can perform.**
 
-> **Lie algebra = the small, local motions that generate those transformations.**
+> **[Lie algebra](../glossary.md#lie-algebra-and-tangent-space) = the small, local motions that generate those transformations.**
 
 For robotics:
 
 - Rotation matrix → an actual orientation
 - Quaternion → an actual orientation ([quaternion.md](quaternion.md))
-- $SE(3)$ transformation → an actual robot pose
+- $SE(3)$ transformation → an actual robot [pose](../glossary.md#pose)
 - Lie algebra → a convenient way to describe **tiny changes** to those poses
 
 An analogy:
@@ -268,8 +268,7 @@ Just like $\mathfrak{so}(3)$ has a hat operator (§7), $\mathfrak{se}(3)$ has it
 0 & 1 \end{bmatrix}
 ```
 
-- $V$ is a $3\times3$ matrix, built purely from $\phi$, that "bends" the raw translation $\rho$ to account for the coupling. Its exact formula isn't needed here.
-- The $SO(3)$ exponential and the raw translation cannot be glued together: the $SE(3)$ exponential mixes the two.
+- $V$ is a $3\times3$ matrix, built purely from $\phi$, that "bends" the raw translation $\rho$ to account for the coupling. It equals $`J_l(\phi)`$, the $SO(3)$ left Jacobian ([jacobian.md §11.4](jacobian.md#114-closed-form-for-so3)); its exact formula isn't needed here.
 - The log map has the mirror-image subtlety: recovering $\rho$ from a pose needs $V^{-1}$, not just the translation column.
 
 **Tiny example:** drive forward at 1 m/s while turning left at 90°/s, for 1 s.
@@ -285,15 +284,17 @@ $$T_{\text{new}} = T_{\text{old}}\exp(\xi^\wedge)$$
 
 This is the foundation of many **pose-graph optimization, bundle adjustment, visual-inertial estimation, and SLAM** implementations.
 
+In code: `skew`, `so3_exp`, `so3_log`, `so3_left_jacobian`, `se3_exp`, `se3_log` and `se3_adjoint` in [use_numpy/lie_utils.py](../../use_numpy/lie_utils.py) (for $`SE_2(3)`$ see §11.1). The code and the [glossary](../glossary.md#twist) write the $SE(3)$ tangent as $[v, \omega]$ where this doc writes $[\rho, \phi]$: same order, translation first.
+
 ### 11.1 Extended poses: pose plus velocity
 
-A filter driven by an IMU needs velocity as well as pose: the accelerometer changes the velocity, and only the velocity changes the position. **$`SE_2(3)`$**, the group of **extended poses**, stores the velocity $`v`$ as a second column next to the position $`p`$:
+A filter driven by an [IMU](../glossary.md#imu-inertial-measurement-unit) (inertial measurement unit) needs velocity as well as pose: the accelerometer changes the velocity, and only the velocity changes the position. **$`SE_2(3)`$**, the group of **extended poses**, stores the velocity $`v`$ as a second column next to the position $`p`$:
 
 ```math
 X = \begin{bmatrix} R & v & p \\ 0 & 1 & 0 \\ 0 & 0 & 1 \end{bmatrix} \in SE_2(3)
 ```
 
-- It has 9 **degrees of freedom (DoF)**, the independent numbers needed to describe it: 3 for rotation, 3 for velocity, 3 for position.
+- It has 9 **[degrees of freedom (DoF)](../glossary.md#degrees-of-freedom-dof)**: 3 for rotation, 3 for velocity, 3 for position.
 - The "2" counts the vector columns. Adding $`k`$ more (for example, foot-contact points) gives $`SE_{k+2}(3)`$.
 
 **Composition and inverse** work column by column, as for $`SE(3)`$:
@@ -304,7 +305,7 @@ X_1 X_2 = (R_1 R_2,\; v_1 + R_1 v_2,\; p_1 + R_1 p_2), \qquad X^{-1} = (R^\top,\
 
 So a velocity changes frame exactly like a position. **Tiny example:** a drone flies at 2 m/s forward in its own frame, $`X_2 = (I,\, (2, 0, 0),\, 0)`$. That frame is yawed by 90° in the world, $`X_1 = (R_z(90^\circ),\, 0,\, 0)`$. The velocity of $`X_1 X_2`$ is $`R_1 v_2 = (0, 2, 0)`$: 2 m/s along the world $`y`$ axis.
 
-**Tangent space.** A small change is a 9-vector $`\xi = (\phi, \nu, \rho)`$: rotation, velocity, position. This rotation-first order is the one [invariant_saltation_ekf.md](../filtering/invariant_saltation_ekf.md) uses; note that §11 above orders the $`SE(3)`$ vector translation-first. The hat and exponential maps are
+**Tangent space.** A small change is a 9-vector $`\xi = (\phi, \nu, \rho)`$: rotation, velocity, position (this $`\nu`$ is the velocity part of the tangent vector, not the innovation or noise $`\nu`$ of other docs). This rotation-first order is the one [invariant_saltation_ekf.md](../filtering/invariant_saltation_ekf.md) uses (the $`SE(3)`$ order of §11 is translation-first; see the table in §14). The hat and exponential maps are
 
 ```math
 \xi^\wedge = \begin{bmatrix} \phi^\wedge & \nu & \rho \\ 0 & 0 & 0 \\ 0 & 0 & 0 \end{bmatrix}, \qquad
@@ -312,17 +313,13 @@ So a velocity changes frame exactly like a position. **Tiny example:** a drone f
 ```
 
 - $`J_l(\phi)`$ is the $`SO(3)`$ left Jacobian ([jacobian.md §11](jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space)). It is the same matrix as the $`V`$ of §11, so both columns are bent exactly like the $`SE(3)`$ translation: with $`\phi = (0, 0, \pi/2)`$, $`\nu = (1, 0, 0)`$ becomes $`(0.637,\ 0.637,\ 0)`$.
-- The **adjoint** moves a perturbation from one side of $`X`$ to the other, $`X \exp(\xi^\wedge) = \exp\big((\mathrm{Ad}_X\, \xi)^\wedge\big)\, X`$, with
-
-```math
-\mathrm{Ad}_X = \begin{bmatrix} R & 0 & 0 \\ v^\wedge R & R & 0 \\ p^\wedge R & 0 & R \end{bmatrix}
-```
+- The adjoint $`\mathrm{Ad}_X`$ of $`SE_2(3)`$ is given in §11.2.
 
 **Why not store $`R`$ in $`SO(3)`$ and $`v`$, $`p`$ as plain vectors?** Both hold the same numbers; the difference is what the group product buys the filter.
 
 - With this product, one IMU step over $`h`$ is $`X^+ = \Gamma\, f(X)\, \Upsilon`$. Here $`\Gamma`$ is a fixed matrix holding gravity, $`f(R, v, p) = (R, v, p + v h)`$ respects the group product (a **group automorphism**: $`f(X_1 X_2) = f(X_1)\,f(X_2)`$), and $`\Upsilon`$ holds the IMU increments. Systems of this form are [group-affine](../glossary.md#group-affine-dynamics-trajectory-independence).
-- For a group-affine system, the **invariant error** $`\eta = \hat X X^{-1}`$ between estimate and truth evolves in the same way whatever the trajectory, and its logarithm evolves through a constant matrix, even for large errors. This is the basis of the **invariant EKF** (Barrau & Bonnabel, 2017).
-- With separate pieces, the error dynamics depend on the current estimate. In [invariant_saltation_ekf.md §6](../filtering/invariant_saltation_ekf.md#6-results-consistency-through-the-bounces), the world-frame EKF is overconfident before the body's first bounce on the ground (NEES 14-19 against a consistent 9), while the invariant EKF on $`SE_2(3)`$ is close to consistent. That document attributes the gap most likely to Jacobians evaluated at a poor initial estimate, and does not isolate it further.
+- For a group-affine system, the **invariant error** $`\eta = \hat X X^{-1}`$ between estimate and truth (Barrau & Bonnabel's form; the [glossary](../glossary.md#invariant-and-equivariant) and [left_right_invariant.md §1](../filtering/left_right_invariant.md#1-the-setup) use its inverse $`X \hat X^{-1}`$, and both are right-invariant) evolves in the same way whatever the trajectory, and its logarithm evolves through a constant matrix, even for large errors. This is the basis of the [**invariant EKF**](../glossary.md#iekf-invariant-ekf) (Barrau & Bonnabel, 2017).
+- With separate pieces, the error dynamics depend on the current estimate. In [invariant_saltation_ekf.md §6](../filtering/invariant_saltation_ekf.md#6-results-consistency-through-the-bounces), the world-frame EKF is overconfident before the body's first bounce on the ground ([NEES](../glossary.md#consistency-and-nees), normalized estimation error squared, 14-19 against a consistent 9), while the invariant EKF on $`SE_2(3)`$ is close to consistent. That document attributes the gap most likely to Jacobians evaluated at a poor initial estimate, and does not isolate it further.
 
 In code: `se23_make`, `se23_parts`, `se23_inv`, `se23_exp`, `se23_log` and `se23_adjoint` in [use_numpy/lie_utils.py](../../use_numpy/lie_utils.py), and `manif.SE_2_3`, whose tangent order is (position, rotation, velocity).
 
@@ -341,6 +338,12 @@ So a nudge applied on the right of $`T`$ (in the robot frame) equals the nudge $
 
 ```math
 \mathrm{Ad}_T = \begin{bmatrix} R & t^\wedge R \\ 0 & R \end{bmatrix}
+```
+
+- For $`SE_2(3)`$, with $`X = (R, v, p)`$ and the rotation-first order $`\xi = (\phi, \nu, \rho)`$ of §11.1:
+
+```math
+\mathrm{Ad}_X = \begin{bmatrix} R & 0 & 0 \\ v^\wedge R & R & 0 \\ p^\wedge R & 0 & R \end{bmatrix}
 ```
 
 **Tiny example:** the robot stands at $`t = (2, 0, 0)`$, facing world $`+y`$ (yawed by 90°).
@@ -394,7 +397,7 @@ except that the "+" is replaced by a group operation. This update is a [retracti
 
 ## 13. Why not just use Euler angles?
 
-We could optimize $x,y,z,\text{roll},\text{pitch},\text{yaw}$ directly, but Euler angles bring singularities (**gimbal lock:** at pitch 90° two rotation axes line up and one rotation direction is lost), awkward composition, coordinate-dependent behavior, and problematic derivatives. The Lie algebra gives a **local minimal representation** of the perturbation (as many numbers as degrees of freedom, none redundant) while the state stays on the correct **manifold** (a curved space that is locally flat).
+We could optimize $x,y,z,\text{roll},\text{pitch},\text{yaw}$ directly, but Euler angles bring singularities (**gimbal lock:** at pitch 90° two rotation axes line up and one rotation direction is lost), awkward composition, coordinate-dependent behavior, and problematic derivatives. The Lie algebra gives a **local minimal representation** of the perturbation (as many numbers as degrees of freedom, none redundant) while the state stays on the correct [**manifold**](../glossary.md#manifold) (a curved space that is locally flat).
 
 ---
 
@@ -410,6 +413,14 @@ We could optimize $x,y,z,\text{roll},\text{pitch},\text{yaw}$ directly, but Eule
 | $`SE_2(3)`$ | All possible poses with velocity (§11.1) |
 | $`\mathfrak{se}_2(3)`$ | Small 9-DoF changes of pose and velocity |
 
+Conventions in this repo (code in [use_numpy/lie_utils.py](../../use_numpy/lie_utils.py)):
+
+| Group | State | Tangent vector (component order) | `Exp` / `Log` in `lie_utils` | Default perturbation side (exceptions: §15) |
+| ----- | ----- | -------------------------------- | ---------------------------- | ------------------------------------------- |
+| $`SO(3)`$ | $`R`$, $`3\times3`$ | $`\delta\theta \in \mathbb{R}^3`$ | `so3_exp` / `so3_log` | right: $`R\exp(\delta\theta^\wedge)`$ (§10) |
+| $`SE(3)`$ | $`T = (R, t)`$, $`4\times4`$ | $`\xi = (\rho, \phi) \in \mathbb{R}^6`$, translation first | `se3_exp` / `se3_log` | right: $`T\exp(\xi^\wedge)`$ (§11) |
+| $`SE_2(3)`$ | $`X = (R, v, p)`$, $`5\times5`$ | $`\xi = (\phi, \nu, \rho) \in \mathbb{R}^9`$, rotation first | `se23_exp` / `se23_log` | right: $`X\exp(\xi^\wedge)`$ (§11.2) |
+
 $$\boxed{SO(3) \underset{\exp}{\overset{\log}{\rightleftarrows}} \mathfrak{so}(3)}$$
 
 $$\boxed{SE(3) \underset{\exp}{\overset{\log}{\rightleftarrows}} \mathfrak{se}(3)}$$
@@ -422,7 +433,7 @@ In optimization we typically have an error $\text{error} = f(T)$ and want to kno
 
 $$f(T\exp(\delta\xi^\wedge)) \approx f(T)+J\delta\xi$$
 
-where $J$ is the **Jacobian with respect to the Lie-algebra perturbation**. Whether the perturbation is applied on the right, as here, or on the left changes $J$; [jacobian.md §11](jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space) explains the left and right Jacobians this leads to. Most docs here perturb on the right. The exception is [invariant_saltation_ekf.md](../filtering/invariant_saltation_ekf.md), which perturbs on the left to match its right-invariant error ([left_right_invariant.md](../filtering/left_right_invariant.md#1-the-setup) explains the pairing).
+where $J$ is the **Jacobian with respect to the Lie-algebra perturbation**. Whether the perturbation is applied on the right, as here, or on the left changes $J$; [jacobian.md §11](jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space) explains the left and right Jacobians this leads to. Most docs here perturb on the right. The exceptions are the two right-invariant filters, [invariant_saltation_ekf.md](../filtering/invariant_saltation_ekf.md) and [hexapod_contact_inekf.md](../filtering/hexapod_contact_inekf.md), which perturb on the left to match their right-invariant error, and whose world-frame baselines perturb the rotation on the left too ([left_right_invariant.md](../filtering/left_right_invariant.md#1-the-setup) explains the pairing).
 
 That's why Lie algebra is common in modern SLAM: it gives optimization algorithms a **locally Euclidean 6D space** to work in, while the actual pose remains a valid element of $SE(3)$.
 

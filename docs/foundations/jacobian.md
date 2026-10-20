@@ -102,23 +102,23 @@ So we can think of the Jacobian as a **sensitivity table**. This $H$ is schemati
 
 Suppose a 3D point $P = (X, Y, Z)$ is projected onto the image:
 
-$$u = f\frac{X}{Z} \qquad v = f\frac{Y}{Z}$$
+$$u = f_x\frac{X}{Z} \qquad v = f_y\frac{Y}{Z}$$
 
-Here $`f`$ is the camera's focal length and $`u, v`$ are pixel coordinates (not the generic function $f$ of §2). This is nonlinear because of the division by $Z$. We ask:
+Here $`f_x, f_y`$ are the camera's focal lengths (in pixels) and $`u, v`$ are pixel coordinates (the principal point is ignored). This is nonlinear because of the division by $Z$. We ask:
 
 > "What happens to the image point if the 3D point moves slightly?"
 
 The Jacobian answers that to first order. For example:
 
-- $\partial u/\partial X = f/Z$: if $X$ changes slightly, $u$ changes by about $f/Z$ times that amount.
-- $\partial u/\partial Z = -fX/Z^2$: moving the point in depth changes its image position, by an amount that depends on its current depth and horizontal position.
+- $\partial u/\partial X = f_x/Z$: if $X$ changes slightly, $u$ changes by about $f_x/Z$ times that amount.
+- $\partial u/\partial Z = -f_x X/Z^2$: moving the point in depth changes its image position, by an amount that depends on its current depth and horizontal position.
 
 Putting every partial derivative together gives the full Jacobian:
 
 ```math
 {J = \begin{bmatrix} \frac{\partial u}{\partial X} & \frac{\partial u}{\partial Y} & \frac{\partial u}{\partial Z} \\ 
-\frac{\partial v}{\partial X} & \frac{\partial v}{\partial Y} & \frac{\partial v}{\partial Z} \end{bmatrix} =\begin{bmatrix} f/Z & 0 & -fX/Z^2 \\ 
-0 & f/Z & -fY/Z^2 \end{bmatrix}}
+\frac{\partial v}{\partial X} & \frac{\partial v}{\partial Y} & \frac{\partial v}{\partial Z} \end{bmatrix} =\begin{bmatrix} f_x/Z & 0 & -f_x X/Z^2 \\ 
+0 & f_y/Z & -f_y Y/Z^2 \end{bmatrix}}
 ```
 
 Notice the zeros: $\partial u/\partial Y = 0$ and $\partial v/\partial X = 0$, because horizontal image position ($u$) doesn't depend on vertical 3D position ($Y$) at all, and vice versa for $v$ and $X$. This is the projection Jacobian a visual-SLAM or bundle-adjustment system computes at every reprojected point, with $(X, Y, Z)$ the point in *camera* coordinates. It is then chained with the Jacobians of the world-to-camera transform to get derivatives with respect to the pose and the world-frame point.
@@ -127,7 +127,7 @@ Notice the zeros: $\partial u/\partial Y = 0$ and $\partial v/\partial X = 0$, b
 
 ## 5. Why does EKF need it?
 
-Suppose the real system is nonlinear: $z = h(x)$. The EKF still evaluates the exact $h$ at its estimate, to predict the measurement. What it can't do is push a whole probability distribution through $h$ exactly: the Kalman gain and covariance update need a linear model. So for those it asks:
+Suppose the real system is nonlinear: $z = h(x)$. The [EKF (Extended Kalman Filter)](../glossary.md#ekf-extended-kalman-filter) still evaluates the exact $h$ at its estimate, to predict the measurement. What it can't do is push a whole probability distribution through $h$ exactly: the Kalman gain and covariance update need a linear model. So for those it asks:
 
 > "Around my current estimate $\hat{x}$, can I approximate this nonlinear function with a linear one?"
 
@@ -146,25 +146,13 @@ So the Jacobian is the **local slope of a multidimensional nonlinear function**.
 
 ## 6. The mountain picture
 
-Imagine standing somewhere on a complicated mountain we can't see in full:
+Imagine standing somewhere on a complicated mountain we can't see in full.
 
-```text
-                 /\       /\
-        /\      /  \_____/  \
-   ____/  \____/             \____
-```
+We can still ask local questions: "If I take one tiny step north, what happens to my altitude?" and the same for east. The Jacobian collects those local slopes, so around our position the mountain is approximated by a **flat plane**, the **local linear approximation**. The figure shows the one-dimensional version: the curve is the actual terrain, and the dashed tangent line is the approximation around our position.
 
-We can still ask local questions: "If I take one tiny step north, what happens to my altitude?" and the same for east. The Jacobian collects those local slopes, so around our position the mountain is approximated by a **flat plane**, the **local linear approximation**:
+![Left: cos θ with its tangent at the estimate θ̂ = 30° and ±5° and ±40° bands; the tangent is 0.3 cm off at +5° and 17.5 cm off at +40°. Right: Monte Carlo distribution of cos θ versus the EKF's Gaussian, matching for σ = 5° and clearly different for σ = 40°](../../assets/ekf_linearization_concept.png)
 
-```text
-             actual mountain
-                /
-               /
-              /
-             /________
-            /
-       you ●
-```
+*Figure: the tangent at the estimate (30°) is an excellent stand-in for the curve when the uncertainty is small (5°: 0.3 cm gap) and a poor one when it is large (40°: 17.5 cm gap).*
 
 The EKF does exactly this around its current estimate.
 
@@ -176,7 +164,7 @@ The mountain idea of §6, written as an equation. Let $\delta x$ be a slight cha
 
 $$\boxed{\delta z \approx H\delta x}$$
 
-That is why Jacobians appear throughout EKF, ESKF, IEKF, bundle adjustment, [nonlinear least squares](../glossary.md#nonlinear-least-squares), factor graphs, visual odometry and SLAM.
+That is why Jacobians appear throughout EKF, [ESKF](../glossary.md#eskf-error-state-kalman-filter) (error-state Kalman filter), [IEKF](../glossary.md#iekf-invariant-ekf) (invariant EKF), bundle adjustment, [nonlinear least squares](../glossary.md#nonlinear-least-squares), factor graphs, visual odometry and SLAM.
 
 ---
 
@@ -198,7 +186,7 @@ The system $x_{k+1} = Fx_k$ is already linear, so no Jacobian is necessary.
 
 ### EKF
 
-The system $x_{k+1} = f(x_k)$ is nonlinear (here $`f`$ is the generic state-transition function again, not the focal length), so we linearize:
+The system $x_{k+1} = f(x_k)$ is nonlinear (here $`f`$ is the generic state-transition function again), so we linearize:
 
 $$F_k = \left.\frac{\partial f}{\partial x}\right|_{\hat{x}_k}$$
 
@@ -218,7 +206,7 @@ So instead of blindly asking "What is the derivative with respect to my state ve
 
 That's one reason Lie groups and Jacobians become so tightly connected in modern SLAM.
 
-A manifold perturbation on its own isn't yet what makes a filter **invariant**: error-state filters such as the ESKF and MEKF (multiplicative EKF, which perturbs attitude by composition) already perturb on the manifold. The IEKF goes one step further and picks a left- or right-[invariant](../glossary.md#invariant-and-equivariant) error. For **group-affine** dynamics ([glossary](../glossary.md#group-affine-dynamics-trajectory-independence)) this makes its linearization independent of the current estimate; see [lie_algebra.md §11.1](lie_algebra.md#111-extended-poses-pose-plus-velocity)). See [kf_ekf_iekf.md §5](../filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error) and [left_right_invariant.md](../filtering/left_right_invariant.md).
+A manifold perturbation on its own isn't yet what makes a filter **invariant**: error-state filters such as the ESKF and MEKF (multiplicative EKF, which perturbs attitude by composition) already perturb on the manifold. The IEKF goes one step further and picks a left- or right-[invariant](../glossary.md#invariant-and-equivariant) error. For **group-affine** dynamics ([glossary](../glossary.md#group-affine-dynamics-trajectory-independence)) this makes its linearization independent of the current estimate (see [lie_algebra.md §11.1](lie_algebra.md#111-extended-poses-pose-plus-velocity)). See [kf_ekf_iekf.md §5](../filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error) and [left_right_invariant.md](../filtering/left_right_invariant.md).
 
 ---
 
@@ -240,32 +228,32 @@ In the EKF specifically:
 
 Everywhere above, perturbing an input meant simple addition: $x \to x + \delta x$. That works because $x$ lives in a vector space.
 
-A rotation $R \in SO(3)$ does not. There is no such thing as $R + \delta R$ - the result generally isn't even a valid rotation. Instead, a small perturbation $\delta\varphi \in \mathbb{R}^3$ is turned into a rotation via the exponential map $\text{Exp}(\delta\varphi)$ (rotation vector to rotation matrix; see the [glossary](../glossary.md#exp-and-log-maps)), and then **composed** (matrix-multiplied) with $R$:
+A rotation $R \in SO(3)$ does not. There is no such thing as $R + \delta R$ - the result generally isn't even a valid rotation. Instead, a small perturbation $\delta\varphi \in \mathbb{R}^3$ is turned into a rotation via the exponential map $\mathrm{Exp}(\delta\varphi)$ (rotation vector to rotation matrix; see the [glossary](../glossary.md#exp-and-log-maps)), and then **composed** (matrix-multiplied) with $R$:
 
 ```math
-R' = \text{Exp}(\delta\varphi)\,R \qquad \text{or} \qquad R' = R\,\text{Exp}(\delta\varphi)
+R' = \mathrm{Exp}(\delta\varphi)\,R \qquad \text{or} \qquad R' = R\,\mathrm{Exp}(\delta\varphi)
 ```
 
-Both are valid ways to perturb $R$ - but they are not the same $R'$ in general, because matrix multiplication doesn't commute. That non-commutativity, together with the nonlinearity of $\text{Exp}$ (§11.2), is the reason the left and right versions differ. On a vector space the distinction never comes up, because addition commutes.
+Both are valid ways to perturb $R$ - but they are not the same $R'$ in general, because matrix multiplication doesn't commute. That non-commutativity, together with the nonlinearity of $\mathrm{Exp}$ (§11.2), is the reason the left and right versions differ. On a vector space the distinction never comes up, because addition commutes.
 
 ### 11.2 The actual question being asked
 
-Suppose we have a rotation built from $\varphi$, i.e. $\text{Exp}(\varphi)$, and we nudge its argument: $\text{Exp}(\varphi + \delta\varphi)$. Because $\text{Exp}$ is a curved, nonlinear map (just like $u = fX/Z$ in §4), we cannot simply distribute the addition. We can still ask the usual sensitivity question - "how does the output change?" - and express the answer as a small rotation composed onto $\text{Exp}(\varphi)$, either on the left or on the right:
+Suppose we have a rotation built from $\varphi$, i.e. $\mathrm{Exp}(\varphi)$, and we nudge its argument: $\mathrm{Exp}(\varphi + \delta\varphi)$. Because $\mathrm{Exp}$ is a curved, nonlinear map (just like $u = f_x X/Z$ in §4), we cannot simply distribute the addition. We can still ask the usual question - "how does the output change?" - and express the answer as a small rotation composed onto $\mathrm{Exp}(\varphi)$, either on the left or on the right:
 
 ```math
-\text{Exp}(\varphi+\delta\varphi)\;\approx\;\text{Exp}\big(J_l(\varphi)\,\delta\varphi\big)\cdot\text{Exp}(\varphi) \qquad\text{(left)}
+\mathrm{Exp}(\varphi+\delta\varphi)\;\approx\;\mathrm{Exp}\big(J_l(\varphi)\,\delta\varphi\big)\cdot\mathrm{Exp}(\varphi) \qquad\text{(left)}
 ```
 
 ```math
-\text{Exp}(\varphi+\delta\varphi)\;\approx\;\text{Exp}(\varphi)\cdot\text{Exp}\big(J_r(\varphi)\,\delta\varphi\big) \qquad\text{(right)}
+\mathrm{Exp}(\varphi+\delta\varphi)\;\approx\;\mathrm{Exp}(\varphi)\cdot\mathrm{Exp}\big(J_r(\varphi)\,\delta\varphi\big) \qquad\text{(right)}
 ```
 
-So $J_l$ and $J_r$ are still what §10 says a Jacobian is - a local sensitivity map, "small change in input → small change in output" - applied to the exponential map instead of a vector-valued function, and reported by which side the resulting perturbation attaches to.
+So $J_l$ and $J_r$ are still Jacobians in the sense of §10, applied to the exponential map instead of a vector-valued function, and reported by which side the resulting perturbation attaches to.
 
 ### 11.3 The intuition: compass vs. steering wheel
 
-- **Right Jacobian** $J_r(\varphi)$: the extra rotation is applied after $\text{Exp}(\varphi)$, so it's expressed in the object's **own current (body) frame**. Like turning a car's steering wheel a bit more - "a bit more" is relative to however the car is already pointed.
-- **Left Jacobian** $J_l(\varphi)$: the extra rotation is applied before, so it's expressed in the **fixed world/global frame**. Like someone nudging our heading by a fixed compass bearing, regardless of which way we're facing.
+- **Right Jacobian** $J_r(\varphi)$: the extra rotation multiplies $\mathrm{Exp}(\varphi)$ on the right, so it's a rotation about the object's **own current (body) axes**. Like turning a car's steering wheel a bit more - "a bit more" is relative to however the car is already pointed.
+- **Left Jacobian** $J_l(\varphi)$: the extra rotation multiplies $\mathrm{Exp}(\varphi)$ on the left, so it's a rotation about the **fixed world/global axes**. Like someone nudging our heading by a fixed compass bearing, regardless of which way we're facing.
 
 Near the identity ($\varphi \to 0$) there's no rotation yet to disagree about "whose frame," so $J_l(0) = J_r(0) = I$. This is the flat-tangent-plane picture of [lie_algebra.md §6](lie_algebra.md#6-lie-algebra-zoom-in-locally): at the identity the manifold looks flat. The distinction only shows up when we linearize away from the identity, around some existing rotation.
 
@@ -289,9 +277,9 @@ The approximation drops terms of second order in $`\delta\varphi`$, and the last
 Y(1) \approx I + \big[J_l(\varphi)\,\delta\varphi\big]_\times \approx \mathrm{Exp}\big(J_l(\varphi)\,\delta\varphi\big), \qquad J_l(\varphi) = \int_0^1 \mathrm{Exp}(t\varphi)\,dt
 ```
 
-The closed form follows by integrating the Rodrigues form $`\mathrm{Exp}(t\varphi) = I + \frac{\sin t\theta}{\theta}\Phi + \frac{1-\cos t\theta}{\theta^2}\Phi^2`$ term by term: $`\int_0^1 \sin t\theta\,dt = \frac{1-\cos\theta}{\theta}`$ and $`\int_0^1 (1-\cos t\theta)\,dt = \frac{\theta-\sin\theta}{\theta}`$ give the two coefficients above. The same steps with the perturbation on the right, $`\mathrm{Exp}(\varphi)^{-1}\mathrm{Exp}(\varphi+\delta\varphi)`$, give $`J_r(\varphi) = \int_0^1 \mathrm{Exp}(-t\varphi)\,dt`$.
+The closed form follows by integrating the Rodrigues form $`\mathrm{Exp}(t\varphi) = I + \frac{\sin t\theta}{\theta}\Phi + \frac{1-\cos t\theta}{\theta^2}\Phi^2`$ term by term: $`\int_0^1 \sin t\theta\,dt = \frac{1-\cos\theta}{\theta}`$ and $`\int_0^1 (1-\cos t\theta)\,dt = \frac{\theta-\sin\theta}{\theta}`$ give the two coefficients above (after dividing by $`\theta`$ and $`\theta^2`$ from the Rodrigues form). The same steps with the perturbation on the right, $`\mathrm{Exp}(\varphi)^{-1}\mathrm{Exp}(\varphi+\delta\varphi)`$, give $`J_r(\varphi) = \int_0^1 \mathrm{Exp}(-t\varphi)\,dt`$.
 
-Useful identities. Each follows in one line from the two integrals: flip the sign of $`\varphi`$; use $`\mathrm{Exp}(t\varphi)^\top = \mathrm{Exp}(-t\varphi)`$; and use $`\mathrm{Exp}(\varphi)\,\mathrm{Exp}(-t\varphi) = \mathrm{Exp}\big((1-t)\varphi\big)`$ (all three checked numerically against `so3_right_jacobian` and `so3_exp` in `use_numpy/lie_utils.py`):
+Useful identities, with $`R(\varphi) = \mathrm{Exp}(\varphi)`$ the rotation matrix of $`\varphi`$. Each follows in one line from the two integrals: flip the sign of $`\varphi`$; use $`\mathrm{Exp}(t\varphi)^\top = \mathrm{Exp}(-t\varphi)`$; and use $`\mathrm{Exp}(\varphi)\,\mathrm{Exp}(-t\varphi) = \mathrm{Exp}\big((1-t)\varphi\big)`$ (all three checked numerically against `so3_right_jacobian` and `so3_exp` in `use_numpy/lie_utils.py`):
 
 ```math
 J_r(\varphi) = J_l(-\varphi) \qquad J_r(\varphi) = J_l(\varphi)^\top \qquad J_l(\varphi) = R(\varphi)\,J_r(\varphi)
@@ -316,8 +304,8 @@ Notice $J_r = J_l^\top$, as the identity predicts. Plugging $\theta \to 0$ into 
 ### 11.6 Where this actually matters
 
 - **[IMU preintegration](../glossary.md#imu-preintegration):** the effect of a small change in gyroscope bias is naturally expressed in the sensor's own (body) frame, so bias-correction Jacobians in preintegration use $J_r$ - worked out end-to-end in [imu_preintegration.md](../optimization/imu_preintegration.md).
-- **Covariance propagation on the manifold:** a rotation's uncertainty is a covariance on the tangent vector $\delta\varphi$, and what it numerically means depends on whether $\delta\varphi$ is defined via $`R\,\text{Exp}(\delta\varphi)`$ (right) or $`\text{Exp}(\delta\varphi)\, R`$ (left).
-  - Converting between them is a multiplication by $R$ (the [adjoint](lie_algebra.md#112-the-adjoint-moving-a-small-motion-between-frames), which for rotations is $R$ itself): $`\text{Exp}(\delta\varphi_{\text{left}})\,R = R\,\text{Exp}(\delta\varphi_{\text{right}})`$ gives $`\delta\varphi_{\text{left}} = R\,\delta\varphi_{\text{right}}`$.
+- **Covariance propagation on the manifold:** a rotation's uncertainty is a covariance on the tangent vector $\delta\varphi$, and what it numerically means depends on whether $\delta\varphi$ is defined via $`R\,\mathrm{Exp}(\delta\varphi)`$ (right) or $`\mathrm{Exp}(\delta\varphi)\, R`$ (left).
+  - Converting between them is a multiplication by $R$ (the [adjoint](lie_algebra.md#112-the-adjoint-moving-a-small-motion-between-frames), which for rotations is $R$ itself): $`\mathrm{Exp}(\delta\varphi_{\text{left}})\,R = R\,\mathrm{Exp}(\delta\varphi_{\text{right}})`$ gives $`\delta\varphi_{\text{left}} = R\,\delta\varphi_{\text{right}}`$.
   - Hence $`\Sigma_{\text{left}} = R\,\Sigma_{\text{right}}R^\top`$: a change of frame, not a change of the underlying uncertainty.
   - The §11.4 identity $`J_l = R\,J_r`$ follows from the same fact.
 - **Factor graphs/bundle adjustment on $SE(3)$:** residual Jacobians w.r.t. a pose depend on which perturbation convention (left vs. right) the library uses, and the update must apply the step with the same convention. Mixing them gives wrong step directions: the optimization can converge slowly, converge to the wrong place, or diverge, all while the code runs without error.

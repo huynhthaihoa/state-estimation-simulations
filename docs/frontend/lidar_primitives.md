@@ -14,7 +14,7 @@ Man-made scenes are full of primitives: floors, walls and ceilings are planes; p
 - **Honesty about degeneracy.** In a corridor with only planes, nothing fixes the position along the corridor. The primitive method's Gauss-Newton Hessian ([glossary](../glossary.md#normal-equations-and-hessian)) says so; the ICP variants find spurious information and report 0.1-2 mm of uncertainty while being off by 12-29 cm.
 - **Landmarks.** A plane seen from many poses is a natural **landmark** ([glossary](../glossary.md#landmark)) for a factor graph.
 
-The price is a narrower convergence basin than point-to-plane ICP's: primitives must be matched before anything else works.
+The price is a narrower **convergence basin** (the set of initial errors a method recovers from) than point-to-plane ICP's: primitives must be matched before anything else works.
 
 ![Two panels from lidar_primitives.py: one scan of the corridor with pillars seen from above, with points colored by the primitive they were assigned to (two floor/ceiling planes, two wall planes, three cylinders, the rest unassigned); and the L-shaped corridor of experiment 4 with its walls, pillars and 40 sensor poses 1 m apart](../../assets/lidar_primitives_concept.png)
 
@@ -22,6 +22,8 @@ The price is a narrower convergence basin than point-to-plane ICP's: primitives 
 
 ### Scope
 Simulated scans only: an open-ended corridor (6 m wide, 3 m high), optionally with two staggered rows of floor-to-ceiling pillars (radius 0.25 m, every 8 m), and an L-shaped version of it; a spinning 32-ring LiDAR (±20°, 360 points per ring, 20 m range) with Gaussian noise on the range only. Static scenes, no motion distortion within a scan, no intensity. Run with `uv run python use_numpy/lidar_primitives.py` (several minutes per experiment; `--experiment 1|2|3|4` for one). [`use_manif/lidar_primitives.py`](../../use_manif/lidar_primitives.py) is the same with manif poses. It agrees with the numpy version to round-off, except in runs that pass through a nearly singular step (§4), where round-off decides the outcome: of the experiment 2 starts compared (2 pairs, 2 starts per size), one at 2 m and 30° converges in numpy and fails in manif.
+
+**Reproducibility.** The tables of experiments 1-4 are printed by the script above. The results tagged "(one-off run, not scripted)" come from one-off diagnostic runs that no committed script reproduces: the §2.1 normal errors, the §2.2 isolation table, 3D numbers and 2D circle table, the §3 pairing-gate and cylinder side-check numbers, the §4 classification of failed starts and the §5 per-pair singular-value ratios. The tests in `tests/` assert only the direction and rough size of the range-fit effect, not these numbers.
 
 ---
 
@@ -31,14 +33,14 @@ Everything that never touches a pose lives in the shared [`lidar_utils.py`](../.
 
 **Primitives.** A plane is $`(n, d)`$ with $`n^\top x + d = 0`$ and $`\|n\| = 1`$; in a scan's sensor frame $n$ points toward the sensor, so $`d > 0`$ is the sensor's distance to the plane. A cylinder is $`(a, c, r)`$: unit axis $a$, the axis point $c$ closest to the frame origin ($`a^\top c = 0`$), radius $r$. Unit vectors live on the sphere $`S^2`$, a 2D **manifold** ([glossary](../glossary.md#manifold)), so plane normals and cylinder axes are updated by a **retraction** ([glossary](../glossary.md#retraction)) along a tangent basis (`s2_exp`/`s2_log`) rather than by adding 3-vectors: 3 degrees of freedom per plane, 5 per cylinder.
 
-**Normals.** Each point gets a normal from a PCA of its 12 nearest neighbors: the eigenvector of the smallest eigenvalue of their scatter matrix.
+**Normals.** Each point gets a normal from a PCA (principal component analysis) of its 12 nearest neighbors: the eigenvector of the smallest eigenvalue of their scatter matrix.
 
-**Sequential RANSAC** ([`triangulation_pnp.md`](triangulation_pnp.md) uses RANSAC for outlier rejection; ref. 3). Every round draws the best plane hypothesis (from 3 random points) and the best cylinder hypothesis (from 2 points and their normals: the axis is $`n_1 \times n_2`$, and in the plane orthogonal to it the two normal lines meet at the axis). A point is an inlier if it is within 3σ of the surface (at least 5 cm) and its normal agrees within 25°. Both hypotheses are refined (PCA for the plane, Gauss-Newton on 5 parameters for the cylinder), and the one with more inliers wins; its inliers leave the pool. This competition is the selection rule of Schnabel et al. (ref. 4), and it was not optional here: extracting all planes first gave 7-8 "planes" per scan instead of 4, because within a few centimeters the side of a pillar that faces the sensor is flat enough to pass as a plane, and the nearest pillars, the most useful ones, disappeared.
+**Sequential RANSAC** (random sample consensus: fit a model to a few random points and keep the one most points agree with; [`triangulation_pnp.md`](triangulation_pnp.md) uses RANSAC for outlier rejection; ref. 3). Every round draws the best plane hypothesis (from 3 random points) and the best cylinder hypothesis (from 2 points and their normals: the axis is $`n_1 \times n_2`$, and in the plane orthogonal to it the two normal lines meet at the axis). A point is an **inlier** (the opposite of an outlier, [glossary](../glossary.md#outlier-and-robust-kernel)) if it is within 3σ of the surface (at least 5 cm) and its normal agrees within 25°. Both hypotheses are refined (PCA for the plane, Gauss-Newton on 5 parameters for the cylinder), and the one with more inliers wins; its inliers leave the pool. This competition is the selection rule of Schnabel et al. (ref. 4), and it was not optional here: extracting all planes first gave 7-8 "planes" per scan instead of 4, because within a few centimeters the side of a pillar that faces the sensor is flat enough to pass as a plane, and the nearest pillars, the most useful ones, disappeared.
 
 Two more fixes came out of the tests:
 
 - **Divergent cylinder fits.** A refinement can run off to a huge radius; a fit is now rejected unless its radius stays in $`[0.05, 1]`$ m and it keeps enough inliers.
-- **Corner contamination.** Near the line where a wall meets the floor, normals average over both surfaces, so a few floor or ceiling points pass the wall's distance band with a "close enough" normal while sitting up to 4 cm off the wall. That tilted noise-free wall fits by up to $`1.5 \times 10^{-4}`$ rad. A final cut at 3 robust standard deviations of the residuals ($`1.4826 \times`$ the median absolute residual) brings it below $`2 \times 10^{-7}`$ rad; the cut points go back to the pool for the floor to claim.
+- **Corner contamination.** Near the line where a wall meets the floor, normals average over both surfaces, so a few floor or ceiling points pass the wall's distance band with a "close enough" normal while sitting up to 4 cm off the wall. That tilted noise-free wall fits by up to $`1.5 \times 10^{-4}`$ rad. A final cut at 3 robust standard deviations of the residuals ($`1.4826 \times`$ the median absolute [residual](../glossary.md#residual-error)) brings it below $`2 \times 10^{-7}`$ rad; the cut points go back to the pool for the floor to claim.
 
 ---
 
@@ -57,11 +59,11 @@ Planes are easy: thousands of inliers average the noise away. Pillars show two e
 
 ### 2.1 More points per ring made pillar detection worse
 
-At 40 mm noise, 720 points per ring finds only 61% of the pillars, with 12 false detections, where 180 points per ring finds all of them. The normals are the reason. A fixed 12-neighbor PCA covers a smaller patch when the points are denser, so the same range noise tilts the normal more: on the planes' points at 40 mm noise the median normal error is 5.3° at 180 points per ring and 11.9° at 720. The cylinder hypotheses and the 25° normal test both rely on those normals. A fixed neighborhood *radius* instead of a fixed count should remove the effect (not tested here); the script keeps the fixed count so the effect stays visible.
+At 40 mm noise, 720 points per ring finds only 61% of the pillars, with 12 false detections, where 180 points per ring finds all of them. The normals are the reason. A fixed 12-neighbor PCA covers a smaller patch when the points are denser, so the same range noise tilts the normal more: on the planes' points at 40 mm noise the median normal error is 5.3° at 180 points per ring and 11.9° at 720 (one-off run, not scripted). The cylinder hypotheses and the 25° normal test both rely on those normals. A fixed neighborhood *radius* instead of a fixed count should remove the effect (not tested here); the script keeps the fixed count so the effect stays visible.
 
 ### 2.2 The usual cylinder fit underestimates the radius
 
-The orthogonal-distance fit minimizes $`\sum_i (\|(I - aa^\top)(x_i - c)\| - r)^2`$, the distance of each point to the surface. It underestimates the radius, by a bias that grows with the square of the noise: about −5 mm at 20 mm noise, −17 mm at 40 mm. Fitting only the true pillar points, starting from the true parameters, isolates the cause (σ = 4 cm, 67 fits):
+The orthogonal-distance fit minimizes $`\sum_i (\|(I - aa^\top)(x_i - c)\| - r)^2`$, the distance of each point to the surface. It underestimates the radius, by a bias that grows with the square of the noise: about −5 mm at 20 mm noise, −17 mm at 40 mm. Fitting only the true pillar points, starting from the true parameters, isolates the cause (σ = 4 cm, 67 fits; one-off run, not scripted):
 
 | Noise added to the true pillar points | Mean radius error |
 |---|---|
@@ -72,7 +74,7 @@ The orthogonal-distance fit minimizes $`\sum_i (\|(I - aa^\top)(x_i - c)\| - r)^
 
 So it is the estimator, not RANSAC or the inlier selection. The orthogonal fit is the maximum-likelihood fit only when the noise is the same in every direction, and even then it is slightly biased: noise around the pillar lengthens each point's distance to the axis by about $`\sigma^2 / (2r)`$ on average, 3.2 mm here, close to the measured +3.6 and +4.0 mm. LiDAR noise lies along the ray instead, and the sensor sees only the near side of a pillar. A plausible reading of the large negative bias: near the pillar's silhouette the rays graze the surface, so range noise slides points along it, and on a one-sided arc a smaller radius with the axis moved toward the sensor fits those points almost as well. The bias is measured here, not derived in closed form.
 
-The **range fit** (`refine_cylinder_range`) instead compares each point's measured range with the range at which its ray meets the cylinder, which is the maximum-likelihood fit for range-only noise. A ray that misses the current cylinder gets its closest-approach range plus a second residual, its gap to the surface; both are continuous at tangency. Dropping missed rays instead would discard exactly the rays that say "the pillar is wider". A 2D check (a circle seen from 4 m, 300 trials) shows the difference:
+The **range fit** (`refine_cylinder_range`) instead compares each point's measured range with the range at which its ray meets the cylinder, which is the maximum-likelihood fit for range-only noise. A ray that misses the current cylinder gets its closest-approach range plus a second residual, its gap to the surface; both are continuous at tangency. Dropping missed rays instead would discard exactly the rays that say "the pillar is wider". A 2D check (a circle seen from 4 m, 300 trials; one-off run, not scripted) shows the difference:
 
 | Radius | Orthogonal fit, σ 2 / 4 cm | Range fit, σ 2 / 4 cm |
 |---|---|---|
@@ -80,7 +82,7 @@ The **range fit** (`refine_cylinder_range`) instead compares each point's measur
 | 0.5 m | −2.0 / −8.7 mm | +0.1 / +1.1 mm |
 | 1.0 m | −1.2 / −5.9 mm | −0.1 / +0.3 mm |
 
-In 3D on the true pillar points the range fit gives −0.3 mm at 2 cm (orthogonal −4.4) and −4.1 mm at 4 cm (orthogonal −16.9), with a larger spread at 4 cm (7.6 against 5.0 mm). A first-order fix, weighting each orthogonal residual by how much range noise can move that point off the surface, only reached −11.8 mm: a second-order bias needs the exact residual.
+In 3D on the true pillar points (one-off run, not scripted) the range fit gives −0.3 mm at 2 cm (orthogonal −4.4) and −4.1 mm at 4 cm (orthogonal −16.9), with a larger spread at 4 cm (7.6 against 5.0 mm). A first-order fix, weighting each orthogonal residual by how much range noise can move that point off the surface, only reached −11.8 mm: a second-order bias needs the exact residual.
 
 Inside the full pipeline (same RANSAC inliers for both fits), the range fit's bias changes sign:
 
@@ -99,7 +101,7 @@ At 40 mm the range fit cuts the radius bias 2.7-4.4× and the axis error 1.5-2.5
 
 ## 3. Three residuals, one solver
 
-Registration estimates $`T \in SE(3)`$, the pose of the source scan's sensor in the target scan's sensor frame (target point $`= T \cdot`$ source point). All three methods share one Gauss-Newton loop ([glossary](../glossary.md#gauss-newton)) with the right perturbation $`T \leftarrow T\,\mathrm{Exp}(\xi)`$, $`\xi = [\delta v, \delta\theta]`$ ([glossary](../glossary.md#left-and-right-perturbation)), and every residual of a source point $p$ goes through the same point-action Jacobian
+Registration estimates $`T \in SE(3)`$ ([glossary](../glossary.md#so3-and-se3)), the pose of the source scan's sensor in the target scan's sensor frame (target point $`= T \cdot`$ source point). All three methods share one Gauss-Newton loop ([glossary](../glossary.md#gauss-newton)) with the right perturbation $`T \leftarrow T\,\mathrm{Exp}(\xi)`$ ([glossary](../glossary.md#exp-and-log-maps)), $`\xi = [\delta v, \delta\theta]`$ (translation first, as in [`lie_algebra.md` §11](../foundations/lie_algebra.md#11-se3-this-is-where-robotics-gets-really-interesting); [glossary](../glossary.md#left-and-right-perturbation)), and every residual of a source point $p$ goes through the same point-action [Jacobian](../glossary.md#jacobian)
 
 ```math
 \frac{\partial\, T\,\mathrm{Exp}(\xi)\, p}{\partial \xi}\Big|_{\xi = 0} = \begin{bmatrix} R & -R\,p^\wedge \end{bmatrix}
@@ -112,15 +114,15 @@ with $`p^\wedge`$ the skew-symmetric matrix of $p$ ([glossary](../glossary.md#ha
 | point-to-point | $`Tp - q`$ (3 rows) | nearest target point |
 | point-to-plane | $`n_q^\top (Tp - q)`$ | nearest target point |
 | primitives, plane | $`n^\top Tp + d`$ | the source point's plane, matched to a target plane |
-| primitives, cylinder | $`\|(I - aa^\top)(Tp - c)\| - r`$ | the source point's cylinder, matched to a target cylinder |
+| primitives, cylinder | $`\lVert (I - aa^\top)(Tp - c) \rVert - r`$ | the source point's cylinder, matched to a target cylinder |
 
 **Association happens at every iteration**, from the current estimate; nothing is handed over. Primitives are matched one-to-one, cheapest first, inside gates: normals within 20° and offsets within 1 m for planes; axes within 20°, axis distance within 1 m and radii within 0.1 m for cylinders.
 
 ### A coarse-to-fine pairing gate
-Nearest neighbors farther apart than a gate are dropped. A fixed 1 m gate was a strawman: started exactly at the truth with no noise, point-to-plane drifted to 4-12 mm and 0.1-0.2° (4 scan pairs), and point-to-point kept only 85-98% of the true motion. The likely cause is pairs whose nearest neighbor lies on another surface, where the target scan did not sample that surface (between rings, behind a pillar): tightening the gate to 0.1 m shrank the point-to-plane error to 0.6-2.6 mm and 0.014-0.020°. A gate that starts at 1 m and shrinks by 0.7 per iteration down to 0.1 m, common ICP practice, keeps the 1 m reach for the first iterations; on one pair it brings the drift from the truth to 7 mm (point-to-point) and 2.6 mm / 0.02° (point-to-plane). What remains is the sampling floor: the two scans never hit the same surface points.
+Nearest neighbors farther apart than a gate are dropped. A fixed 1 m gate was a strawman: started exactly at the truth with no noise, point-to-plane drifted to 4-12 mm and 0.1-0.2° (4 scan pairs; one-off run, not scripted), and point-to-point kept only 85-98% of the true motion. The likely cause is pairs whose nearest neighbor lies on another surface, where the target scan did not sample that surface (between rings, behind a pillar): tightening the gate to 0.1 m shrank the point-to-plane error to 0.6-2.6 mm and 0.014-0.020°. A gate that starts at 1 m and shrinks by 0.7 per iteration down to 0.1 m, common ICP practice, keeps the 1 m reach for the first iterations; on one pair (one-off run, not scripted) it brings the [drift](../glossary.md#drift) from the truth to 7 mm (point-to-point) and 2.6 mm / 0.02° (point-to-plane). What remains is the sampling floor: the two scans never hit the same surface points.
 
 ### A side check for cylinders
-The distance to a cylinder does not know which side was scanned. In 2 of 50 starts, primitive registration converged 0.34 m off along the corridor with the correct matches; at that solution every point of 2 of the 3 matched pillars sat on the far side of its target pillar (none did at the truth). A point now counts only if its normal, mapped by $T$, points away from the target axis, as on the side a sensor can see. That removed those failures.
+The distance to a cylinder does not know which side was scanned. In 2 of 50 starts (one-off run, not scripted), primitive registration converged 0.34 m off along the corridor with the correct matches; at that solution every point of 2 of the 3 matched pillars sat on the far side of its target pillar (none did at the truth). A point now counts only if its normal, mapped by $T$, points away from the target axis, as on the side a sensor can see. That removed those failures.
 
 ### Steps
 Each step is the minimum-norm least-squares solution, with singular values below $`10^{-6}`$ of the largest treated as zero. That only drops directions with no information at all, up to round-off; a merely weak direction is kept, which matters in §5.
@@ -140,7 +142,9 @@ Corridor with pillars, 1 cm range noise, 10 scan pairs (the source sensor 0.82 m
 | point-to-plane | 100% | 100% | 100% | 98% | 16% | 1.3-2.4 mm, 0.013° | 13-20 (100 at 2 m) |
 | primitives | 100% | 100% | 100% | 84% | 2% | 0.2-0.4 mm, 0.002° | 4-5 (1 at 2 m: no matches) |
 
-The primitive method is the most accurate (sub-millimeter) and needs the fewest iterations, but point-to-plane ICP recovers from larger initial errors. Classifying every failed start by what was matched at the start:
+The committed figure shows 84% for primitives at 1 m and 20°; a re-run may print 86%. This cell moves by a start or two between machines because near-singular steps there are decided by floating-point round-off (the Scope paragraph notes the same for runs through a nearly singular step).
+
+The primitive method is the most accurate (sub-millimeter) and needs the fewest iterations, but point-to-plane ICP recovers from larger initial errors. Classifying every failed start by what was matched at the start (one-off run, not scripted):
 
 - **At 1 m and 20° (8 failures).** 2 start with only planes matched, which leaves the corridor axis free (§5); 6 start with planes and 1-2 pillars, all matched correctly. In 7 of the 8, the first one or two Gauss-Newton steps jump, mostly along the corridor axis, by 3 m to 9 km, and every match is lost: the planes leave the axis free and 1-2 pillars hold it only weakly, and from a 20° error the linearization is poor. The 8th diverges in rotation instead. Limiting the step along weak directions (the solution remapping of §5, or a damped or trust-region step) targets this; neither is implemented.
 - **At 2 m and 30° (49 failures).** 36 starts match nothing on the first iteration (the 20° gates), so there is nothing to solve; 9 match only planes (mostly two) and run off by 190 m to 10 km; 4 also match a pillar and stall 2-6 m off with the rotation still 30-67° wrong. The single success is round-off luck: the manif backend, identical up to $`10^{-16}`$ at the start, fails it (see Scope).
@@ -157,7 +161,7 @@ Point-to-point ICP is slow and stalls: from 0.5 m and 10°, 78% of its starts fa
 
 In the plain corridor every surface is parallel to the corridor axis: floor, ceiling and both walls. Sliding the sensor along the axis changes no point-to-surface distance, so the position along the axis is not observable from these surfaces ([glossary](../glossary.md#observability)). The question is which method knows that.
 
-Each method's Hessian $`H = J^\top J`$ is evaluated at the true pose (so it describes the problem, not wherever the solver ended), and its predicted standard deviation along the axis is $`\sigma \sqrt{g^\top H^{+} g}`$, with $`H^+`$ the pseudo-inverse, $g$ the axis direction and σ the range noise ([glossary](../glossary.md#information-matrix)). Using σ for every residual flatters the ICP variants: their residuals also carry the target point's noise (and, for point-to-plane, its normal's) and the sampling mismatch of §3, so their σ would be optimistic even without degeneracy. Separately, each method registers the scans from a 0.2 m, 2° initial error. 10 scan pairs, 1 cm noise:
+Each method's Hessian $`H = J^\top J`$ is evaluated at the true pose (so it describes the problem, not wherever the solver ended), and its predicted standard deviation along the axis is $`\sigma \sqrt{g^\top H^{+} g}`$, with $`H^+`$ the pseudo-inverse (`np.linalg.pinv`, `rcond=1e-12`), $g$ the axis direction and σ the range noise ([glossary](../glossary.md#information-matrix)). $`H = J^\top J`$ mixes metres (translation) and radians (rotation), so its eigenvalue ratio is only meaningful for comparing the rows of the table below. Using σ for every residual flatters the ICP variants: their residuals also carry the target point's noise (and, for point-to-plane, its normal's) and the sampling mismatch of §3, so their σ would be optimistic even without degeneracy. Separately, each method registers the scans from a 0.2 m, 2° initial error. 10 scan pairs, 1 cm noise:
 
 | Scene | Method | Hessian eigenvalue ratio (min/max) | Weakest direction along the axis? | Predicted σ along / across the axis (median) | Actual error along the axis (median) | Ratio of the two medians |
 |---|---|---|---|---|---|---|
@@ -168,18 +172,18 @@ Each method's Hessian $`H = J^\top J`$ is evaluated at the true pose (so it desc
 | with pillars | point-to-plane | $`1.1 \times 10^{-2}`$ | yes | 0.42 / 0.12 mm | 1.35 mm | 3.3 |
 | with pillars | primitives | $`4.2 \times 10^{-3}`$ | yes | 0.49 / 0.11 mm | 0.36 mm | 0.74 |
 
-For a consistent estimate ([glossary](../glossary.md#consistency-and-nees)) with Gaussian errors and a similar σ in every pair, the ratio of the two medians is about 0.67 (the median of a standard normal's absolute value). With 10 pairs this is a rough check.
+For a consistent estimate ([glossary](../glossary.md#consistency-and-nees)) with Gaussian errors and a similar σ in every pair, the ratio of the two medians is about 0.67 (the median of a standard normal's absolute value). Only one of the six ratios in the table is close to it: the primitive method's with pillars. With 10 pairs this is a rough check.
 
 Three different behaviors:
 
 - **Point-to-point ICP does not see the degeneracy.** Its Hessian is as well conditioned in the plain corridor as with pillars, with the same 0.11 mm in every direction, because every pair pulls in all three directions, including along the wall. It is off by 118 mm along the corridor while reporting a tenth of a millimeter. Even with pillars it is off by 116 of its own σ.
 - **Point-to-plane ICP sees it but underrates it.** Its weakest direction is the corridor axis, with a predicted σ 18 times the one across it. But the axis still gets spurious information, presumably because the PCA normals of a noisy wall are not exactly perpendicular to it: the predicted 2.1 mm against an actual 288 mm.
-- **The primitive method sees what is there.** In the plain corridor its Hessian has essentially no information along the axis (eigenvalue ratio $`3 \times 10^{-12}`$, predicted σ 13 m), and plain Gauss-Newton does what that predicts: with nothing holding it, the step along the axis is driven by sub-millimeter fit errors divided by almost zero, and the estimate runs off by tens of meters (its median error is 2.7 of its own σ). The rank cutoff of §3 just misses it: the singular-value ratio, $`1.7 \times 10^{-6}`$, is above the $`10^{-6}`$ cutoff. With pillars it is consistent: a median of 0.74 σ, close to the 0.67 of a Gaussian.
+- **The primitive method sees what is there.** In the plain corridor its Hessian has essentially no information along the axis (eigenvalue ratio $`3 \times 10^{-12}`$, predicted σ 13 m), and plain Gauss-Newton does what that predicts: with nothing holding it, the step along the axis is driven by sub-millimeter fit errors divided by almost zero, and the estimate runs off by tens of meters (its median error is 2.7 of its own σ). The rank cutoff of §3 usually just misses it (per-pair values: one-off run, not scripted): in 8 of the 10 pairs the singular-value ratio ($`1.5`$ to $`3.2 \times 10^{-6}`$; median over all 10 pairs about $`1.7 \times 10^{-6}`$) is above the $`10^{-6}`$ cutoff, so the axis step is kept. In the other two pairs ($`8 \times 10^{-7}`$ and $`6 \times 10^{-8}`$) the cutoff zeroes the axis step. The predicted σ is a separate computation, with `np.linalg.pinv` at `rcond=1e-12`. With pillars it is consistent: a median of 0.74 σ, close to the 0.67 of a Gaussian.
 
-The pillars fix the axis because a vertical cylinder constrains both horizontal directions: its axis is a point in the floor plan. Of the six ratios in the table (about 1,100, 140, 2.7, 116, 3.3 and 0.74), only one is close to the Gaussian 0.67: the primitive method's with pillars.
+The pillars fix the axis because a vertical cylinder constrains both horizontal directions: its axis is a point in the floor plan.
 
 ### What a real system does about it
-Zhang, Kaess and Singh (ref. 6) detect degeneracy from the eigenvalues of exactly this Hessian and then **remap the solution**: the update is applied only along well-constrained eigenvectors, and the weak directions keep their prior value (from odometry or an IMU). The script implements only the diagnosis.
+Zhang, Kaess and Singh (ref. 6) detect degeneracy from the eigenvalues of exactly this Hessian and then **remap the solution**: the update is applied only along well-constrained eigenvectors, and the weak directions keep their prior value (from [odometry](../glossary.md#odometry) or an [IMU](../glossary.md#imu-inertial-measurement-unit), inertial measurement unit). The script implements only the diagnosis.
 
 ---
 
@@ -189,13 +193,13 @@ Zhang, Kaess and Singh (ref. 6) detect degeneracy from the eigenvalues of exactl
 
 **Odometry.** Each scan is registered to the previous one with the primitive method, and the poses are chained. Each step starts from the true relative pose perturbed by 0.1 m and 2° in a random direction, standing in for an IMU or wheel-odometry prior. The corner turns up to about 38° per step, beyond the 20° matching gate, so a constant-velocity guess would fail there for reasons unrelated to this experiment. The odometry information is $`H / \sigma^2`$ of each registration, which §5 found to be honest for this method.
 
-**Factor graph** ([glossary](../glossary.md#factor-graph)). Variables: the 40 poses and one world plane $`(n_w, d_w)`$ per landmark. Factors: one odometry factor per step, $`\mathrm{Log}(Z^{-1} X_i^{-1} X_j)`$ as in [`pose_graph_optimization.md`](../optimization/pose_graph_optimization.md), and one plane factor per extracted plane. The landmark predicted in the sensor frame of pose $`(R, t)`$ is $`n = R^\top n_w`$, $`d = d_w + n_w^\top t`$, and the residual against the measured plane $`(n_s, d_s)`$ is
+**Factor graph** ([glossary](../glossary.md#factor-graph)). Variables: the 40 poses and one world plane $`(n_w, d_w)`$ per landmark. Factors: one odometry factor per step, $`\mathrm{Log}(Z^{-1} X_i^{-1} X_j)`$ ($`X_i`$ is the world pose of scan $i$, $`Z`$ the measured relative pose between consecutive scans $i$ and $j$) as in [`pose_graph_optimization.md`](../optimization/pose_graph_optimization.md), and one plane factor per extracted plane. The landmark predicted in the sensor frame of pose $`(R, t)`$ is $`n = R^\top n_w`$, $`d = d_w + n_w^\top t`$, and the residual against the measured plane $`(n_s, d_s)`$ is
 
 ```math
 e = \begin{bmatrix} B(n_s)^\top n \\ d - d_s \end{bmatrix}
 ```
 
-with $`B(n_s)`$ a basis of the tangent plane at $`n_s`$. Each plane factor is weighted by its own fit: the information $`\sum_i J_i^\top J_i / \sigma^2`$ with $`J_i = [p_i^\top B(n_s),\ 1]`$ over the plane's inlier points (a Monte Carlo test shows it matches the scatter of repeated noisy fits within 15%). Landmarks are created online: an extracted plane, mapped to the world by its odometry pose, joins the closest landmark within 10° and 0.5 m, or starts a new one. Pose 0 is anchored (gauge, [glossary](../glossary.md#gauge-freedom)), and the graph is solved with Levenberg-Marquardt ([glossary](../glossary.md#levenberg-marquardt-lm-and-damping)) as in `pose_graph.py`. Cylinders are used for registration only, not as landmarks.
+with $`B(n_s)`$ a basis of the tangent plane at $`n_s`$. Each plane factor is weighted by its own fit: the information $`\sum_i J_i^\top J_i / \sigma^2`$ with $`J_i = [p_i^\top B(n_s),\ 1]`$ over the plane's inlier points (a [Monte Carlo](../glossary.md#monte-carlo-trials) test shows it matches the scatter of repeated noisy fits within 15%). Landmarks are created online: an extracted plane, mapped to the world by its odometry pose, joins the closest landmark within 10° and 0.5 m, or starts a new one. Pose 0 is anchored (gauge, [glossary](../glossary.md#gauge-freedom)), and the graph is solved with Levenberg-Marquardt ([glossary](../glossary.md#levenberg-marquardt-lm-and-damping)) as in `pose_graph.py`. Cylinders are used for registration only, not as landmarks.
 
 **Results** (5 noise realizations, 1 cm noise; ATE is the position RMSE after the best rigid alignment, [glossary](../glossary.md#umeyama-alignment-and-trajectory-rmse); drift is the unaligned error of the last pose):
 
@@ -216,7 +220,7 @@ The landmarks help in all 5 runs (end-point drift 4.4 → 2.4, 5.6 → 4.3, 6.7 
 
 - **Front-end.** Extraction and matching are front-end work ([`frontend_backend.md` §1](../frontend_backend.md#1-slam-front-end---extracting-constraints)); their output is a relative pose with an information matrix, or plane measurements, for the back-end.
 - **The step the point-cloud toy skips.** [`pointcloud_pose_tracking_empirical_note.md`](../filtering/pointcloud_pose_tracking_empirical_note.md) hands every point its correspondence; this doc is that missing step, and §3 shows how much it costs (ICP's sampling floor).
-- **Structural elimination.** A plane landmark can be eliminated the way a BA landmark is (this repo's graph solves densely) ([`bundle_adjustment.md` §12](../optimization/bundle_adjustment.md#12-block-sparsity-and-the-schur-complement)); BALM (ref. 9) does it in closed form for planes.
+- **Structural elimination.** A plane landmark can be eliminated the way a landmark in bundle adjustment ([BA](../glossary.md#bundle-adjustment-ba)) is (this repo's graph solves densely) ([`bundle_adjustment.md` §12](../optimization/bundle_adjustment.md#12-block-sparsity-and-the-schur-complement)); BALM (ref. 9) does it in closed form for planes.
 - **Consistency.** §5 adds an accuracy-vs-honesty case to the [mental map's §6.5](../slam_mental_map.md#65-consistency-not-just-accuracy): ICP's covariance is far too small exactly where the problem is degenerate.
 
 ---
@@ -232,6 +236,8 @@ The landmarks help in all 5 runs (end-point drift 4.4 → 2.4, 5.6 → 4.3, 6.7 
 ---
 
 ## 9. References
+
+Refs. 1-4, 6 and 9 are cited above; refs. 5, 7 and 8 are further reading (LiDAR odometry with feature points, and planes as landmarks).
 
 1. Besl, P. J., & McKay, N. D. (1992). *A Method for Registration of 3-D Shapes*. IEEE Transactions on Pattern Analysis and Machine Intelligence, 14(2), 239-256. https://doi.org/10.1109/34.121791 - point-to-point ICP.
 2. Chen, Y., & Medioni, G. (1992). *Object Modelling by Registration of Multiple Range Images*. Image and Vision Computing, 10(3), 145-155. https://doi.org/10.1016/0262-8856(92)90066-C - point-to-plane registration.
