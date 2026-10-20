@@ -1285,6 +1285,62 @@ def fig_robot_imu_tracking_concept():
            "run (seed 0, other settings default); ξ = [v, ω], right perturbation T·Exp(ξ)")
 
 
+def fig_pose_tracking_dt_sweep():
+    """pointcloud_pose_tracking.py: max gap of UKF and vanilla KF to the EKF trajectory vs the time step dt."""
+    import pointcloud_pose_tracking as m
+    from lie_utils import se3_exp, rotation_geodesic_error
+
+    duration, n_points = 5.0, 20
+    vel_std, gyro_std, point_std, init_std = 0.05, 0.02, 0.03, 0.1
+    dts = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.10, 0.20, 0.40]
+    gap = {"UKF": [], "Vanilla KF": []}          # per dt: (first 1 s pos, after 1 s pos, after 1 s rot deg)
+    for dt in dts:
+        rng = np.random.default_rng(SEED)        # fresh data + T_init per dt, as fig_pose_tracking draws them
+        body, T_true, u_meas, z = m.generate_ground_truth_and_data(duration, dt, n_points, vel_std, gyro_std, point_std, rng)
+        T_init = T_true[0] @ se3_exp(rng.normal(0.0, init_std, 6))
+        P_init = init_std ** 2 * np.eye(6)
+        Q = dt ** 2 * np.diag([vel_std ** 2] * 3 + [gyro_std ** 2] * 3)
+        T_ekf = m.run_ekf(T_init, P_init, u_meas, z, body, dt, Q, point_std)
+        others = {"UKF": m.run_ukf(T_init, P_init, u_meas, z, body, dt, Q, point_std, 1.0, 2.0, -3.0),
+                  "Vanilla KF": m.run_vanilla_kf(T_init, P_init, u_meas, z, body, dt, Q, point_std)}
+        first = np.arange(len(T_ekf)) < int(np.floor(1.0 / dt + 1e-9))   # first floor(1/dt) poses; the pose at t = 1 s counts as "after 1 s"
+        for name, T_x in others.items():
+            pos = np.array([np.linalg.norm(a[:3, 3] - b[:3, 3]) for a, b in zip(T_ekf, T_x)])
+            rot = np.degrees([rotation_geodesic_error(a[:3, :3], b[:3, :3]) for a, b in zip(T_ekf, T_x)])
+            gap[name].append((pos[first].max(), pos[~first].max(), rot[~first].max()))
+    for name, rows in gap.items():
+        print(f"    {name}: dt, first 1 s pos (m), after 1 s pos (m), after 1 s rot (deg)")
+        for dt, (p1, p2, r2) in zip(dts, rows):
+            print(f"      {dt:<6g} {p1:.1e}  {p2:.1e}  {r2:.1e}")
+
+    style_of = {"UKF": C["purple"], "Vanilla KF": C["orange"]}
+    fig, (ax_p, ax_r) = plt.subplots(1, 2)
+    for name, rows in gap.items():
+        g = np.array(rows)
+        col = style_of[name]
+        ax_p.plot(dts, g[:, 1], color=col, ls="-", marker="o", ms=4, lw=1.9, label=f"{name}, after 1 s")
+        ax_p.plot(dts, g[:, 0], color=col, ls="--", marker="o", ms=4, lw=1.4, mfc="none", label=f"{name}, first 1 s")
+        ax_r.plot(dts, g[:, 2], color=col, ls="-", marker="o", ms=4, lw=1.9, label=f"{name}, after 1 s")
+    ref = np.array(dts)
+    ax_p.plot(ref, 3.8e-3 * ref / 0.1, color=PRIOR, lw=1.0, label="reference slope ∝ dt")
+    for ax in (ax_p, ax_r):
+        ax.set(xscale="log", yscale="log", xlabel="time step dt (s)")
+        ax.set_xticks(dts)
+        ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
+        ax.xaxis.set_minor_formatter(FuncFormatter(lambda v, _: ""))
+        ax.axvline(0.1, color="#555555", ls=":", lw=1.1)
+        ax.annotate("default", (0.1, 1), xycoords=("data", "axes fraction"), xytext=(4, -12),
+                    textcoords="offset points", fontsize=9, color="#555555")
+        ax.tick_params(axis="x", labelsize=9)
+    ax_p.set(title="Position gap to EKF", ylabel="max position gap (m)")
+    ax_r.set(title="Rotation gap to EKF, after the first second", ylabel="max rotation gap (deg)")
+    handles, labels = ax_p.get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=5, fontsize=9)
+    finish(fig, "pose_tracking_dt_sweep", "How far UKF and vanilla KF sit from EKF as the step size changes",
+           "pointcloud_pose_tracking.py defaults, seed 0, 5 s run, fresh data per dt; gap = max over the window "
+           "(first 1 s = initial correction; after 1 s = steady state)", bottom=0.08)
+
+
 def fig_pose_tracking_concept():
     """pointcloud_pose_tracking.py: one rigid point cloud, observed as z = T·p + noise; world vs body residual."""
     import pointcloud_pose_tracking as m
@@ -2126,6 +2182,7 @@ FIGURES = {
     "imu_preintegration_concept": fig_imu_preintegration_concept,
     "robot_imu_tracking_concept": fig_robot_imu_tracking_concept,
     "pose_tracking_concept": fig_pose_tracking_concept,
+    "pose_tracking_dt_sweep": fig_pose_tracking_dt_sweep,
     "bundle_adjustment_concept": fig_bundle_adjustment_concept,
     "bundle_adjustment_advanced_concept": fig_bundle_adjustment_advanced_concept,
     "pose_graph_incremental_concept": fig_pose_graph_incremental_concept,
