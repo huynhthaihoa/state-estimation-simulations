@@ -13,9 +13,9 @@ Think of it as **"fixing the robot's entire trajectory using a network of geomet
 A robot's [**pose**](../glossary.md#pose) is its position + orientation.
 
 - 2D robot: $x_i = [x, y, \theta]$
-- 3D robot: $T_i \in SE(3)$, which holds a 3D position and a 3D orientation
+- 3D robot: $T_i \in SE(3)$ (the [special Euclidean group](../glossary.md#so3-and-se3)), which holds a 3D position and a 3D orientation
 
-Each robot location along the trajectory is a **node**, and the nodes together form the **pose graph**:
+Each robot location along the trajectory is a **node**, and the nodes together form the [**pose graph**](../glossary.md#pose-graph):
 
 ```text
 t₀       t₁       t₂       t₃       t₄
@@ -35,8 +35,10 @@ Suppose the robot moves from $x_0$ to $x_1$. From [odometry](factor_graph.md#2-w
 That is a constraint between the two poses, and chaining such constraints gives the graph's edges:
 
 ```text
-x₀ ──Δ₀₁── x₁ ──Δ₁₂── x₂ ──Δ₂₃── x₃
+x₀ ──T̃₀₁── x₁ ──T̃₁₂── x₂ ──T̃₂₃── x₃
 ```
+
+The label $\tilde T_{ij}$ on each edge is the **measured relative pose** from $x_i$ to $x_j$ (tilde = measured).
 
 Each edge says:
 
@@ -44,8 +46,8 @@ Each edge says:
 
 > **Note:** "odometry" and "visual odometry" aren't the same sensor, just the same *kind* of measurement from different sources - wheel odometry counts wheel rotations, while visual odometry (VO) tracks features across camera frames to estimate the same incremental relative pose.
 > - The distinction matters for this graph's edges because a single (monocular) camera used this way can only recover relative motion up to an unknown **scale** factor - "the camera moved some distance" could mean 1 meter or 100 - see [vi_initialization.md §1](../frontend/vi_initialization.md#1-the-bootstrapping-problem) for why.
-> - This doc's $\Delta_{ij}$ edges are treated as already-metric (as from wheel odometry, stereo VO, or monocular VO with scale recovered via IMU fusion).
-> - So a pose graph's only gauge freedom is the rigid 6-DoF (3-DoF in 2D) gauge noted in [§7](#7-the-mathematics-is-actually-quite-intuitive), never a scale ambiguity - unlike monocular bundle adjustment's projective edges, whose unresolved scale is discussed in [umeyama_alignment.md](../foundations/umeyama_alignment.md).
+> - This doc's $\tilde T_{ij}$ edges are treated as already-metric (as from wheel odometry, stereo VO, or monocular VO with scale recovered via IMU fusion).
+> - So a pose graph's only gauge freedom is the rigid 6-DoF (3-DoF in 2D) gauge noted in [§7](#7-the-mathematics-is-actually-quite-intuitive), never a scale ambiguity - unlike monocular [bundle adjustment](../glossary.md#bundle-adjustment-ba)'s projective edges, whose unresolved scale is discussed in [umeyama_alignment.md](../foundations/umeyama_alignment.md).
 
 ---
 
@@ -80,7 +82,7 @@ Small errors accumulate with motion. This is [**drift**](../glossary.md#drift).
 
 ## 4. The really important event: loop closure
 
-Suppose the robot recognizes "Hey! I've been here before", for example the same visual landmark/place as at $x_0$. That gives a loop-closure constraint:
+Suppose the robot recognizes "Hey! I've been here before", for example the same visual landmark/place as at $x_0$. That gives a [**loop-closure**](../glossary.md#loop-closure) constraint:
 
 ```text
 x₀ ───── x₁ ───── x₂ ───── x₃ ───── x₄
@@ -108,6 +110,12 @@ So PGO asks:
 
 It doesn't say "x₄ is wrong". It says "maybe x₁, x₂, x₃ and x₄ are all slightly wrong, so let's distribute the error."
 
+The scripts' four-pose square shows this: the optimizer spreads the loop error over the chain instead of fixing only the last pose.
+
+![Two panels from pose_graph.py: the four-pose square loop with ground truth, drifting odometry, the optimized estimate and the loop-closure edge, and each pose's position error before and after optimization](../../assets/pose_graph.png)
+
+*Figure: `use_numpy/pose_graph.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py pose_graph` (the same figure is used in §15.7). Error at the loop-closure node 0.1035 m to 0.0494 m; RMS position error 6.6 cm to 5.2 cm. X1 and X2 get slightly worse while X3 improves.*
+
 ---
 
 ## 6. Imagine stretching a rubber band
@@ -128,15 +136,15 @@ That is what optimization does.
 
 ## 7. The mathematics is actually quite intuitive
 
-For every edge we have the **measured relative transformation** $z_{ij}$ between poses $i$ and $j$. Given our current estimates $T_i$ and $T_j$, the relative transformation they imply is $T_i^{-1}T_j$. We compare the two:
+For every edge we have the **measured relative transformation** $\tilde T_{ij}$ between poses $i$ and $j$. Given our current estimates $T_i$ and $T_j$, the relative transformation they imply is $T_i^{-1}T_j$. We compare the two:
 
-$${\text{error}_{ij} = z_{ij}^{-1}(T_i^{-1}T_j)}$$
+$${E_{ij} = \tilde T_{ij}^{-1}(T_i^{-1}T_j)}$$
 
-That comparison is still a **group element** ($SE(2)$/$`SE(3)`$, not a plain vector), so to measure "how big" it is - and to compute the Jacobians the optimizer needs - we take its **Log map**, which turns it into a tangent-space vector ([glossary](../glossary.md#exp-and-log-maps)):
+That comparison is still a **group element** ($SE(2)$/$`SE(3)`$, not a plain vector), so to measure "how big" it is - and to compute the [Jacobians](../glossary.md#jacobian) the optimizer needs - we take its **Log map**, which turns it into a tangent-space vector ([glossary](../glossary.md#exp-and-log-maps)):
 
-$${e_{ij} = \text{Log}(\text{error}_{ij}) = \text{Log}\big(z_{ij}^{-1}(T_i^{-1}T_j)\big)}$$
+$${e_{ij} = \text{Log}(E_{ij}) = \text{Log}\big(\tilde T_{ij}^{-1}(T_i^{-1}T_j)\big)}$$
 
-That vector $e_{ij}$ is the thing that gets squared below.
+That vector $e_{ij}$ (called $r_{ij}$ from §15.2 on) is the thing that gets squared below.
 
 **Why not just subtract poses?** Try adding to a rotation.
 - 2D toy case: take $`R = I + 0.1\,[\omega]_\times = \begin{bmatrix}1 & -0.1\\ 0.1 & 1\end{bmatrix}`$.
@@ -146,7 +154,7 @@ That vector $e_{ij}$ is the thing that gets squared below.
 ```text
 measured relationship        estimated relationship
         ↓                            ↓
-      zᵢⱼ                        Tᵢ⁻¹ Tⱼ
+      T̃ᵢⱼ                        Tᵢ⁻¹ Tⱼ
         └────────── compare ─────────┘
                        ↓
               error (group element)
@@ -156,9 +164,9 @@ measured relationship        estimated relationship
                  vector eᵢⱼ
 ```
 
-**Tiny example (1D toy case):** an edge measures $`z = 1.0`$ m, but our estimates imply $`1.1`$ m.
+**Tiny example (1D toy case):** an edge measures $`\tilde T = 1.0`$ m, but our estimates imply $`1.1`$ m.
 - The error is $`e = 0.1`$ m, and its plain square is $`0.01`$.
-- With a trust weight $`\Omega = 100`$ (the weighted form $`e^\top \Omega e`$ used later), the cost is $`100 \cdot 0.1^2 = 1.0`$. A trusted edge makes the same gap hurt more.
+- With a trust weight $`\Omega = 100`$ (the [information](../glossary.md#information-matrix) weight; the weighted form $`e^\top \Omega e`$ used later), the cost is $`100 \cdot 0.1^2 = 1.0`$. A trusted edge makes the same gap hurt more.
 
 PGO then minimizes the total error over every edge (odometry edges plus loop-closure edges):
 
@@ -190,17 +198,27 @@ The two differ in what they optimize and what they compare against.
 | Landmarks | explicit variables | not optimized |
 | Asks | "Do my cameras and 3D points explain the images?" | "Do my robot poses form a trajectory consistent with all the relative-pose measurements?" |
 
-```text
-BA: cameras and landmarks (PGO is the §4 graph: poses only)
-
-      [cam] T₀
-       /  \
-      /    \
-    P₁      P₂
-     \      /
-      \    /
-      [cam] T₁
+```mermaid
+flowchart TB
+    subgraph PGO["Pose graph"]
+        direction LR
+        Q0["pose T0"] -- "odometry" --- Q1["pose T1"]
+        Q1 -- "odometry" --- Q2["pose T2"]
+        Q2 -- "odometry" --- Q3["pose T3"]
+        Q3 -. "loop closure" .- Q0
+    end
+    subgraph BA["Bundle adjustment"]
+        direction LR
+        C0["camera T0"] --- P1(("landmark P1"))
+        C0 --- P2(("landmark P2"))
+        C1["camera T1"] --- P1
+        C1 --- P2
+    end
+    BA ~~~ PGO
 ```
+
+- **BA graph:** cameras connect only to the landmarks they observe, never to each other.
+- **Pose graph** (the §4 graph, here with the four poses of the scripts): poses only, no landmark nodes. Edges are relative-pose measurements between poses: odometry along the chain and a loop closure across it.
 
 ---
 
@@ -239,7 +257,7 @@ The trajectory becomes globally consistent. That is what PGO does.
 
 ## 10. Why loop closure is so powerful
 
-- **Without loop closure** the graph is a chain, so there is little opportunity to correct accumulated drift:
+- **Without loop closure** the graph is a chain, so there is no opportunity to correct accumulated drift: the optimum is just [dead reckoning](../glossary.md#dead-reckoning) (checked in [marginalization.md §9](marginalization.md#9-empirical-verification-bounded-vs-unbounded)):
 
   ```text
   x₀ ─ x₁ ─ x₂ ─ x₃ ─ x₄ ─ x₅ ─ x₆
@@ -253,38 +271,22 @@ The trajectory becomes globally consistent. That is what PGO does.
 
 A typical pipeline looks roughly like:
 
-```text
-Camera/LiDAR/IMU
-        │
-        ▼
- Front-end estimation
-        │
-        ▼
-Relative pose
-        │
-        ▼
-   New pose xᵢ
-        │
-        ▼
-   Pose graph
-        │
-        ├──────────────┐
-        │              │
-        ▼              ▼
-Odometry edge     Loop closure
-        │              │
-        └──────┬───────┘
-               ▼
-        Graph optimization
-               │
-               ▼
-     Corrected trajectory
+```mermaid
+flowchart TD
+    A["Camera, LiDAR, IMU"] --> B["Front-end: relative pose estimation"]
+    B --> C["New pose xᵢ"]
+    C --> D["Pose graph"]
+    D --> E["Odometry edge"]
+    D --> F["Loop closure"]
+    E --> G["Back-end: graph optimization"]
+    F --> G
+    G --> H["Corrected trajectory"]
 ```
 
 - Input sensors: **LiDAR** is a laser scanner that measures distances to surrounding surfaces.
-- The **front-end** says: "I think I moved like this."
+- The [**front-end**](../glossary.md#front-end-and-back-end) says: "I think I moved like this."
 - The **back-end** says: "Let's see whether all those estimates make sense together."
-- Keeping the two separate is a core design choice in SLAM.
+- Keeping the two separate is a core design choice in [SLAM](../glossary.md#slam-simultaneous-localization-and-mapping).
 
 ---
 
@@ -298,7 +300,7 @@ For example, if one measurement is highly reliable (weight $w_1 = 100$) and anot
 
 $${\min_X \sum_{(i,j) \in \mathcal{E}} e_{ij}^\top \Omega_{ij} e_{ij}}$$
 
-where $`X`$ is the set of all node poses (defined in §15.1) and $\Omega_{ij}$ is related to the **information/covariance** of the measurement ([glossary](../glossary.md#information-matrix)). This is why sensor uncertainty matters.
+where $`X`$ is the set of all node poses (defined in §15.1) and $\Omega_{ij} = \Sigma_{ij}^{-1}$ is the measurement **information matrix** (inverse covariance). This is why sensor uncertainty matters.
 
 Caveat about the accompanying scripts:
 
@@ -343,7 +345,7 @@ This doc covers only PGO (with BA in §8 as the contrast); filtering is shown he
 
 > **Pose-graph optimization is like taking a trajectory made of slightly inaccurate pieces, connecting those pieces with constraints - including loop closures - and then moving the poses around until the entire graph becomes as geometrically consistent as possible.**
 
-Precisely, **PGO is a sparse nonlinear least-squares problem over poses on $SE(2)$ or $SE(3)$**. The natural next step is to see **why we need Lie groups/Lie algebra ([glossary](../glossary.md#lie-group)) and how Gauss-Newton or Levenberg-Marquardt (both explained in §15.5) moves the poses during optimization**.
+Precisely, **PGO is a sparse nonlinear least-squares problem over poses on $SE(2)$ or $SE(3)$**. The natural next step is to see **why we need Lie groups/Lie algebra ([glossary](../glossary.md#lie-group)) and how [Gauss-Newton](../glossary.md#gauss-newton) or [Levenberg-Marquardt](../glossary.md#levenberg-marquardt-lm-and-damping) (both explained in §15.5) moves the poses during optimization**.
 
 ---
 
@@ -365,21 +367,19 @@ T_i = \begin{bmatrix} R_i & p_i \\
 \mathbf{0}^\top & 1 \end{bmatrix} \in \mathrm{SE}(3)
 ```
 
-The full state vector containing all $N$ pose keyframes is $`X = \{T_1, T_2, \dots, T_N\}`$.
+The full state vector containing all $N$ pose [keyframes](../glossary.md#keyframe) is $`X = \{T_1, T_2, \dots, T_N\}`$. (§7 numbers the poses $T_0, \dots, T_n$, so $N = n + 1$.)
 
 #### Relative Edge Measurements
 
-An edge $`(i, j)`$ between nodes $`i`$ and $`j`$ represents a relative transformation measurement $`z_{ij} = \tilde{T}_{ij} \in \mathrm{SE}(3)`$ (e.g., from ICP scan matching or visual odometry), accompanied by an information matrix $`\Omega_{ij} = \Sigma_{ij}^{-1} \in \mathbb{R}^{6 \times 6}`$ representing measurement confidence.
+An edge $`(i, j)`$ between nodes $`i`$ and $`j`$ represents a relative transformation measurement $`\tilde{T}_{ij} \in \mathrm{SE}(3)`$ (e.g., from ICP scan matching, i.e. iterative closest point: repeatedly match nearest points, then re-align; or from visual odometry), accompanied by an information matrix $`\Omega_{ij} = \Sigma_{ij}^{-1} \in \mathbb{R}^{6 \times 6}`$ representing measurement confidence.
 
 ### 15.2 Residual Vector Formulation on $\mathrm{SE}(3)$
 
-The expected relative transformation between pose $T_i$ and pose $T_j$ according to the current state estimate is $`\hat{T}_{ij} = T_i^{-1} T_j`$. The error matrix $`E_{ij} \in \mathrm{SE}(3)`$ measures the relative deviation between the actual measurement $`\tilde{T}_{ij}`$ and the predicted state transformation $`T_i^{-1} T_j`$:
-
-$${E_{ij} = \tilde{T}_{ij}^{-1} \left( T_i^{-1} T_j \right)}$$
+As in §7, the error matrix $`E_{ij} \in \mathrm{SE}(3)`$ compares the measurement $`\tilde{T}_{ij}`$ with the relative transformation $`\hat{T}_{ij} = T_i^{-1} T_j`$ that the current state estimate predicts.
 
 #### Mapping Error to Tangent Space ${\mathfrak{se}(3)}$
 
-Because optimization requires a 6-dimensional Euclidean vector space, the matrix error ${E_{ij}}$ is mapped to its local tangent space (Lie algebra ${\mathfrak{se}(3)}$) via the logarithmic map ${\log: \mathrm{SE}(3) \to \mathfrak{se}(3)}$, and flattened into a vector ${\mathbb{R}^6}$ using the **${\vee}$ operator** ${(\cdot)^\vee}$ - together, ${\mathrm{Log}(\cdot) = (\log(\cdot))^\vee: \mathrm{SE}(3) \to \mathbb{R}^6}$, mirroring the lowercase/uppercase convention already used for ${\exp}$/$`{\mathrm{Exp}}`$ below:
+Because optimization requires a 6-dimensional Euclidean vector space, the matrix error ${E_{ij}}$ is mapped to its local tangent space (Lie algebra ${\mathfrak{se}(3)}$) via the logarithmic map ${\log: \mathrm{SE}(3) \to \mathfrak{se}(3)}$, and flattened into a vector ${\mathbb{R}^6}$ using the **${\vee}$ operator** ${(\cdot)^\vee}$ (the inverse of the [hat operator](../glossary.md#hat-operator) $`(\cdot)^\wedge`$ of §15.4) - together, ${\mathrm{Log}(\cdot) = (\log(\cdot))^\vee: \mathrm{SE}(3) \to \mathbb{R}^6}$, mirroring the lowercase/uppercase convention already used for ${\exp}$/$`{\mathrm{Exp}}`$ below. This is §7's $e_{ij}$, written $r_{ij}$ from here on:
 
 $${r_{ij}(X) = \left( \log \left( \tilde{T}_{ij}^{-1} T_i^{-1} T_j \right) \right)^\vee \in \mathbb{R}^6}$$
 
@@ -389,7 +389,7 @@ The residual vector stacks a translational and a rotational part:
 r_{ij} = \left[ \mathbf{v}_{ij}^\top \;\; \boldsymbol{\omega}_{ij}^\top \right]^\top
 ```
 
-- $`\mathbf{v}_{ij}`$ is the translational part of the twist, $`\mathbf{v} = V(\boldsymbol{\omega})^{-1} t_E`$ (here $`V(\boldsymbol{\omega})`$ is the **left Jacobian** of $`\mathrm{SO}(3)`$, [glossary](../glossary.md#right-and-left-jacobians), and $`t_E`$ is the translation of $`E_{ij}`$; as in `use_numpy/lie_utils.py`). It equals $`E_{ij}`$'s translation only when $`\boldsymbol{\omega} = \mathbf{0}`$, or to first order.
+- $`\mathbf{v}_{ij}`$ is the translational part of the [twist](../glossary.md#twist), $`\mathbf{v} = V(\boldsymbol{\omega})^{-1} t_E`$ (here $`V(\boldsymbol{\omega})`$ is the **left Jacobian** of $`\mathrm{SO}(3)`$, [glossary](../glossary.md#right-and-left-jacobians), and $`t_E`$ is the translation of $`E_{ij}`$; as in `use_numpy/lie_utils.py`). It equals $`E_{ij}`$'s translation only when $`\boldsymbol{\omega} = \mathbf{0}`$, or to first order.
 - $`\boldsymbol{\omega}_{ij}`$ is the rotational error.
 
 ### 15.3 Objective Function
@@ -408,7 +408,7 @@ Standard vector updates ${T_i \leftarrow T_i + \Delta x_i}$ break the matrix con
 
 #### Local Perturbation Model (Right Multiplication)
 
-We use right perturbations throughout (never left). Applying a local perturbation $`{\boldsymbol{\xi}_i = \left[ \mathbf{v}^\top \;\; \boldsymbol{\omega}^\top \right]^\top \in \mathbb{R}^6}`$ (translation $\mathbf{v}$ first, then rotation $\boldsymbol{\omega}$) to state $T_i$:
+We use [right perturbations](../glossary.md#left-and-right-perturbation) throughout (never left). Applying a local perturbation $`{\boldsymbol{\xi}_i = \left[ \mathbf{v}^\top \;\; \boldsymbol{\omega}^\top \right]^\top \in \mathbb{R}^6}`$ (translation $\mathbf{v}$ first, then rotation $\boldsymbol{\omega}$) to state $T_i$:
 
 $${T_i \oplus \boldsymbol{\xi}_i = T_i \cdot \mathrm{Exp}(\boldsymbol{\xi}_i)}$$
 
@@ -426,13 +426,13 @@ where ${\mathrm{Exp}(\boldsymbol{\xi}) = \exp(\boldsymbol{\xi}^\wedge) \in \math
 Linearizing the residual $r_{ij}$ with respect to local perturbations ${\boldsymbol{\xi}_i}$ and ${\boldsymbol{\xi}_j}$:
 
 ```math
-r_{ij}(X \oplus \boldsymbol{\delta}) \approx r_{ij}(X) + J_i \, \boldsymbol{\xi}_i + J_j \, \boldsymbol{\xi}_j
+r_{ij}(T_i \oplus \boldsymbol{\xi}_i,\, T_j \oplus \boldsymbol{\xi}_j) \approx r_{ij}(X) + J_i \, \boldsymbol{\xi}_i + J_j \, \boldsymbol{\xi}_j
 ```
 
 Here the Jacobians are $`J_i = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_i}`$ and $`J_j = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_j}`$. They are exact (no small-residual approximation), with $`J_j = J_r^{-1}(r_{ij})`$ (the inverse **right Jacobian**, [glossary](../glossary.md#right-and-left-jacobians)) and $`J_i`$ carrying an extra adjoint factor:
 
 - `use_numpy/` evaluates $J_r^{-1}$ from an 18-term series (see [§15.7](#157-the-solver-concretely)); its truncation error is $\lesssim 10^{-12}$ at about 1.6 rad.
-- `use_manif/` uses manif's closed-form Jacobians. For small residuals the two agree to machine precision.
+- `use_manif/` uses manif's closed-form Jacobians. For small residuals the two are expected to agree closely (not checked here).
 
 ```math
 {J_i = - J_r^{-1}(r_{ij}) \, \mathrm{Ad}\left( T_j^{-1} T_i \right)}
@@ -461,21 +461,21 @@ and ${J_r^{-1}(\cdot)}$ is the inverse right Jacobian of ${\mathrm{SE}(3)}$.
 
 ### 15.5 Solving the Linear System (Gauss-Newton Step)
 
-Stacking all residuals into a global residual vector $`\mathbf{r}(X)`$ and Jacobians into a sparse Jacobian matrix $J$, the linearization takes the standard form:
+Stacking all residuals into a global residual vector $`\mathbf{r}(X)`$ and Jacobians into a sparse Jacobian matrix $J$, the [Gauss-Newton](gauss_newton.md) linearization takes the standard form:
 
 ```math
 {H \, \boldsymbol{\delta}^* = -b}
 ```
 
-- **Gauss-Newton approximation of the Hessian:** ${H = J^\top \Omega J = \sum_{(i,j) \in \mathcal{E}} J_{ij}^\top \Omega_{ij} J_{ij} \in \mathbb{R}^{6N \times 6N}}$
+- **Gauss-Newton approximation of the [Hessian](../glossary.md#normal-equations-and-hessian)** (the information matrix of the linearized problem): ${H = J^\top \Omega J = \sum_{(i,j) \in \mathcal{E}} J_{ij}^\top \Omega_{ij} J_{ij} \in \mathbb{R}^{6N \times 6N}}$
 - **Gradient Vector:** ${b = J^\top \Omega \mathbf{r}(X) \in \mathbb{R}^{6N}}$
 - **Update Vector:** $`{\boldsymbol{\delta}^* = \left[ \boldsymbol{\xi}_1^\top \;\; \boldsymbol{\xi}_2^\top \;\; \dots \;\; \boldsymbol{\xi}_N^\top \right]^\top}`$
 
 Here $F$ has no $\frac{1}{2}$ (as in the code's `cost`), while $b$ is the gradient of $\frac{1}{2}F$. The factor 2 cancels on both sides of the step, so $H\boldsymbol{\delta}^* = -b$ is unchanged.
 
-Because edges only connect adjacent or loop-closing keyframes, $H$ is extremely **sparse** and block-structured. It is typically solved using Sparse Cholesky Factorization (${\mathrm{LL}^\top}$ or ${\mathrm{LDL}^\top}$) or Conjugate Gradients (an iterative linear solver) in solvers like GTSAM or g2o (open-source graph-optimization libraries) - see [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) for the full derivation.
+Because edges only connect adjacent or loop-closing keyframes, $H$ is extremely [**sparse**](../glossary.md#sparsity) and block-structured. It is typically solved using Sparse Cholesky Factorization (${\mathrm{LL}^\top}$ or ${\mathrm{LDL}^\top}$) or Conjugate Gradients (an iterative linear solver) in solvers like GTSAM or g2o (open-source graph-optimization libraries) - see [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) for the full derivation.
 
-**What that factorization is doing:** $H$ is symmetric positive-definite once the gauge is fixed (e.g. the node-0 anchor; it is singular otherwise, see §7), and Cholesky factorization writes it as $H = LL^\top$ with $L$ lower-triangular. Solving $H\boldsymbol{\delta}^* = -b$ then becomes two cheap triangular solves instead of one general one:
+**What that factorization is doing:** $H$ is symmetric positive-definite once the gauge is fixed (§7: e.g. the node-0 anchor; it is singular otherwise), and Cholesky factorization writes it as $H = LL^\top$ with $L$ lower-triangular. Solving $H\boldsymbol{\delta}^* = -b$ then becomes two cheap triangular solves instead of one general one:
 
 $$Ly = -b \quad\text{(forward substitution)}, \qquad L^\top \boldsymbol{\delta}^* = y \quad\text{(back substitution)}$$
 
@@ -487,7 +487,7 @@ Each pass is just row-by-row substitution - no matrix inversion needed.
 - Eliminating a variable can turn some zeros into nonzeros, called [**fill-in**](../glossary.md#fill-in). Example: eliminating $x_2$ out of a chain $x_1 - x_2 - x_3$ creates a new dependency between $x_1$ and $x_3$ even though they were never directly measured.
 - The elimination order controls how much fill-in accumulates. See [`elimination_tree.md`](elimination_tree.md) for a worked elimination example, and [`isam2_optimization.md` §12](isam2_optimization.md#12-variable-ordering-is-also-crucial) for why iSAM2 cares about this.
 
-In practice a pure Gauss-Newton step can overshoot or diverge far from the solution, so a **Levenberg-Marquardt** damping term $\lambda$ is added to the Hessian's diagonal before solving. Both `pose_graph.py` implementations (`use_numpy/` and `use_manif/`) use the Marquardt-scaled form, which scales $\lambda$ by $H$'s own diagonal instead of adding $\lambda I$:
+In practice a pure Gauss-Newton step can overshoot or diverge far from the solution, so a **Levenberg-Marquardt** ([levenberg_marquardt.md](levenberg_marquardt.md)) damping term $\lambda$ is added to the Hessian's diagonal before solving. Both `pose_graph.py` implementations (`use_numpy/` and `use_manif/`) use the Marquardt-scaled form, which scales $\lambda$ by $H$'s own diagonal instead of adding $\lambda I$:
 
 ```math
 {\big(H + \lambda \, \mathrm{diag}(H)\big) \, \boldsymbol{\delta}^* = -b}
@@ -517,7 +517,7 @@ The whole solver is `run_pose_graph_optimization` in [`use_numpy/pose_graph.py`]
 
 ![Two panels from pose_graph.py: the four-pose square loop with ground truth, drifting odometry, the optimized estimate and the loop-closure edge, and each pose's position error before and after optimization](../../assets/pose_graph.png)
 
-*Figure: `use_numpy/pose_graph.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py pose_graph`.*
+*Figure: `use_numpy/pose_graph.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py pose_graph`. Error at the loop-closure node 0.1035 m to 0.0494 m; RMS position error 6.6 cm to 5.2 cm. The optimizer spreads the loop error over the chain, so X1 and X2 get slightly worse while X3 improves.*
 
 **Measurements** (`simulate_noisy_edges`): each edge is the true relative pose with right-multiplied noise. The loop-closure edge scales both std-devs by `--loop-noise-scale` (default 0.5):
 
@@ -531,7 +531,7 @@ The defaults are ${\sigma_p = 0.05}$ m (`--pos-noise-std`) and ${\sigma_r = 0.01
 
 $$\hat{X}_j = X_i Z_{ij}, \qquad e_{ij} = \mathrm{Log}\big(\hat{X}_j^{-1} X_j\big) = \mathrm{Log}\big(Z_{ij}^{-1} X_i^{-1} X_j\big)$$
 
-This is §15.2's $r_{ij}$. In code, $\hat{X}_j$ is `T_pred`.
+This is §15.2's $r_{ij}$ (§7's $e_{ij}$). In code, $\hat{X}_j$ is `T_pred`.
 
 **Jacobians** (the edge loop): the chain rule through `T_pred`, with right perturbations $`X \leftarrow X \, \mathrm{Exp}(\boldsymbol{\xi})`$:
 
@@ -568,7 +568,7 @@ g_i \mathrel{-}= J_i^\top \Omega \, e_{ij}, \qquad g_j \mathrel{-}= J_j^\top \Om
 
 So $g = -b$ in §15.5's notation, and the code solves $`(H + \lambda \, \mathrm{diag}(H)) \boldsymbol{\delta} = g`$. `main` sets $\Omega = I_6$ for every edge, including the loop closure.
 
-**Anchor** (gauge fix): before the edges are added, ${H_{00} \mathrel{+}= 10^6 I_6}$, and nothing is added to $g$. This is a prior that pulls node 0's step ${\boldsymbol{\delta}_0}$ toward zero. It is centered on node 0's current estimate, not on a fixed pose. Two side effects are easy to miss:
+**Anchor** (the gauge fix of §7): before the edges are added, ${H_{00} \mathrel{+}= 10^6 I_6}$, and nothing is added to $g$. This is a prior that pulls node 0's step ${\boldsymbol{\delta}_0}$ toward zero. It is centered on node 0's current estimate, not on a fixed pose. Two side effects are easy to miss:
 
 - The anchor is not part of `cost`, so the accept/reject test ignores it.
 - Because it sits in $\mathrm{diag}(H)$, the Marquardt term damps node 0 far more than the other nodes.
@@ -591,7 +591,7 @@ Robust cost functions replace or reweight the standard $L_2$ norm to cap or redu
 
 ### 16.1 The M-Estimator Framework (Iteratively Reweighted Least Squares)
 
-Instead of minimizing the squared cost $e^2$ (where $e = \sqrt{r^\top \Omega r}$ is the normalized residual scalar), **M-estimators** (estimators that replace squared error with a robust cost) minimize a robust kernel $\rho(e)$. Kernels are conventionally written with a $\frac{1}{2}$ (e.g. $\rho = \frac{1}{2}e^2$ for $L_2$, as in Huber below), while §15.3's $F$ has none. A constant factor changes neither the minimizer nor the weights $w(e)$.
+Instead of minimizing the squared cost $e^2$ (where $e = \sqrt{r^\top \Omega r}$ is the normalized residual scalar: here $e$ is the scalar Mahalanobis norm, not the vector $e_{ij}$ of §7), **M-estimators** (estimators that replace squared error with a robust cost) minimize a robust kernel $\rho(e)$. Kernels are conventionally written with a $\frac{1}{2}$ (e.g. $\rho = \frac{1}{2}e^2$ for $L_2$, as in Huber below), while §15.3's $F$ has none. A constant factor changes neither the minimizer nor the weights $w(e)$.
 
 ```math
 \min_{X} \sum_{(i,j) \in \mathcal{E}} \rho\left( \sqrt{r_{ij}(X)^\top \Omega_{ij} \, r_{ij}(X)} \right)
@@ -647,15 +647,11 @@ The scaling factor $s_{ij}$ is calculated in closed form at each iteration using
 s_{ij} = \min\left(1, \; \frac{2 \Phi}{\Phi + e_{ij}^2}\right)
 ```
 
-```text
-                       DCS Scaling Factor (s_ij)
-          1.0 |────────────┐
-              |             \
-              |              \___   (s_ij decreases once e_ij^2 > Phi)
-          0.0 +--------------------> e_ij^2 (Error)
-              0            Phi
+![Left panel: weight on the information matrix against residual magnitude on a log axis for plain least squares, Huber, Cauchy, Geman-McClure and DCS, with the square root of the DCS threshold marked. Right panel: DCS scale and its square against squared error, with the threshold marked where the scale starts to drop](../../assets/robust_kernel_weights.png)
 
-```
+*Figure: weight applied to an edge's information matrix for the kernels of §16 (left, log axis) and the DCS scale with its square (right), plotted by `uv run python assets/make_figures.py robust_kernel_weights`. Formulas from §16, no repo solver implements robust kernels.*
+
+At $\Phi = 12.59$, $s_{ij}$ is $1$ up to $e_{ij}^2 = \Phi$, then $0.7726$ at $e_{ij}^2 = 20$, $0.2236$ at $100$ and $0.002515$ at $10^4$. At residual magnitude $e = 10$ the plotted weights are Huber $0.1$, Cauchy $0.0099$, Geman-McClure $9.8 \times 10^{-5}$ and DCS $s^2 = 0.05$: DCS keeps full weight up to $e = \sqrt{\Phi} \approx 3.55$ and decays gently at first, so its "Very High" rating in §16.4 refers to the far tail.
 
 #### How DCS Handles Outliers:
 
@@ -682,7 +678,7 @@ What is DCS's cost? Be careful, because the obvious reading is wrong:
 
 ### 16.5 Practical Considerations in Implementation
 
-1. **Threshold Tuning ($\delta, k, \Phi$):** The parameters set the boundary between inliers and outliers. In $\mathrm{SE}(3)$ PGO, error $e^2$ approximately follows a Chi-Square distribution ($\chi^2$) with 6 degrees of freedom, for inliers with well-modeled Gaussian noise. Setting $\Phi$ or $k^2$ corresponding to the 95% or 99% quantile of $\chi^2(6)$ (e.g., $\Phi \approx 12.59$) provides a sound baseline.
+1. **Threshold Tuning ($\delta, k, \Phi$):** The parameters set the boundary between inliers and outliers. In $\mathrm{SE}(3)$ PGO, error $e^2$ approximately follows a [Chi-Square distribution](../glossary.md#chi-square-distribution) ($\chi^2$) with 6 degrees of freedom, for inliers with well-modeled Gaussian noise. Setting $\Phi$ or $k^2$ corresponding to the 95% or 99% quantile of $\chi^2(6)$ (e.g., $\Phi \approx 12.59$) provides a sound baseline.
 2. **Graduated Non-Convexity (GNC):** Highly non-convex robust functions (like DCS or Geman-McClure) can introduce local minima if applied from a poor initial guess. Modern solvers use GNC to start with a convex $L_2$ loss and gradually harden the robust kernel as iterations progress.
 
 This section is theory only: neither `use_numpy/pose_graph.py` nor `use_manif/pose_graph.py` implements Huber, Cauchy, or DCS reweighting. Both still use the single unweighted `info_matrix = np.eye(6)` noted in §12. Robust reweighting is a natural extension, not something the accompanying scripts exercise.

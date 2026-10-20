@@ -136,7 +136,7 @@ BA doesn't say "the cameras are correct, I'll fix the points" or "the points are
 
 > **"I'll adjust everything together until the entire reconstruction explains the image measurements as well as possible."**
 
-To see why both must move, look at the RMSE panel of the figure in [§6.1](#61-the-ba-math-concretely). It compares landmarks-only, poses-only and joint bundle adjustment.
+To see why both must move, look at the [RMSE](../glossary.md#rmse-root-mean-square-error) panel of the figure in [§6.1](#61-the-ba-math-concretely). It compares landmarks-only, poses-only and joint bundle adjustment.
 
 ---
 
@@ -165,7 +165,7 @@ With noise and imperfect estimates, they don't intersect perfectly:
 
 We can think of BA as adjusting the **bundle of rays** and the camera poses together until everything fits.
 
-(Recovering a single point from rays with already-known poses, rather than adjusting everything jointly, is triangulation on its own. See [frontend/triangulation_pnp.md](../frontend/triangulation_pnp.md) for the closed-form math this repo implements, plus its inverse problem, PnP.)
+(Recovering a single point from rays with already-known poses, rather than adjusting everything jointly, is triangulation on its own. See [frontend/triangulation_pnp.md](../frontend/triangulation_pnp.md) for the closed-form math this repo implements, plus its dual problem, PnP: recovering a camera pose from known points.)
 
 ![Two top-view panels from bundle_adjustment.py's defaults: rays back-projected through one landmark's measured pixels from all eight cameras, scattered at the noisy initial guess and meeting at one point after joint bundle adjustment](../../assets/bundle_adjustment_concept.png)
 
@@ -209,7 +209,7 @@ Real implementations usually wrap the squared reprojection error in a **robust l
 
 ### 6.1 The BA math, concretely
 
-`bundle_adjustment.py` minimizes the objective above with plain Gauss-Newton ([glossary](../glossary.md#gauss-newton)). Each pose $T_i$ is a $4\times4$ camera-to-world matrix with rotation $R_i$ and translation $t_i$. Each landmark $P_j$ is a world point. Pose corrections are 6-vectors $\delta = [\delta v, \delta\omega]$, translation first.
+`bundle_adjustment.py` minimizes the objective above with plain Gauss-Newton ([glossary](../glossary.md#gauss-newton)). Each pose $T_i$ is an $SE(3)$ element ([glossary](../glossary.md#so3-and-se3)), stored as a $4\times4$ camera-to-world matrix with rotation $R_i$ and translation $t_i$. Each landmark $P_j$ is a world point. Pose corrections are 6-vectors $\delta = [\delta v, \delta\omega]$, translation first.
 
 ![Two panels from bundle_adjustment.py: a top-down view of cameras on an arc around a landmark cluster (ground truth, noisy initial guess, joint BA), and log-scale RMSE for the noisy initial guess, landmarks-only, poses-only and joint bundle adjustment](../../assets/bundle_adjustment.png)
 
@@ -219,7 +219,9 @@ The same run, animated over its Gauss-Newton iterations. Optimizing poses and la
 
 ![Animation of bundle_adjustment.py: left, a top-down view of cameras and landmarks moving from the noisy initial guess onto ground truth over the Gauss-Newton iterations; right, the reprojection RMSE falling to about 1.2 px on a log scale, below the landmarks-only (100 px) and poses-only (54 px) levels](../../assets/bundle_adjustment.gif)
 
-*Animation: `use_numpy/animate_bundle_adjustment.py` at its defaults (seed 0), rendered by `uv run python use_numpy/animate_bundle_adjustment.py --out assets/bundle_adjustment.gif`. Each iterate is aligned to ground truth for display (**gauge freedom:** the whole scene can shift, rotate or rescale without changing any reprojection error), and the motion between the 7 iterates is interpolated.*
+*Animation: `use_numpy/animate_bundle_adjustment.py` at its defaults (seed 0), rendered by `uv run python use_numpy/animate_bundle_adjustment.py --out assets/bundle_adjustment.gif`. Each iterate is aligned to ground truth for display (**[gauge freedom](../glossary.md#gauge-freedom):** the whole scene can shift, rotate or rescale without changing any reprojection error), and the motion between the 7 iterates is interpolated.*
+
+#### Projection and Jacobians
 
 **Projection** (`camera_project`): move the point into the camera frame, then apply the **pinhole model** (an ideal camera whose rays all pass through one point) with intrinsics $(f_x, f_y, c_x, c_y)$:
 
@@ -232,7 +234,7 @@ Here $`z`$ is the point's depth in the camera frame, not the pixel observation $
 
 **Intuition (projection Jacobian,** [glossary](../glossary.md#jacobian)**):** it says how many pixels the image point moves per metre the 3D point moves, and far points move less.
 
-- Tiny example: shift a point $`1`$ cm sideways, with $`f_x = 800`$. The pixel moves by $`f_x \cdot 0.01 / z`$.
+- **Tiny example (projection Jacobian):** shift a point $`1`$ cm sideways, with $`f_x = 800`$. The pixel moves by $`f_x \cdot 0.01 / z`$.
 - At $`z = 5`$ m that is $`1.6`$ px. At $`z = 10`$ m it is $`0.8`$ px. This is the $`f_x/z`$ entry of $`J_{\text{proj}}`$ below (the projection Jacobian $`\partial\pi/\partial p_c`$).
 - Sign: if the camera moves right by $`d`$, the point moves left by $`d`$ in the camera frame. This is the $`-I_3`$ in the pose block below.
 
@@ -247,27 +249,33 @@ J_{\text{pose}} = J_{\text{proj}} \begin{bmatrix} -I_3 & [p_c]_\times \end{bmatr
 J_{\text{point}} = J_{\text{proj}}\, R_i^\top
 ```
 
-Here $`[p_c]_\times`$ is the skew-symmetric **hat** matrix of $`p_c`$ and $`\mathrm{Exp}`$ is the **exponential map** ([glossary](../glossary.md#exp-and-log-maps)). $J_{\text{pose}}$ is for a right perturbation $`T_i \leftarrow T_i\,\mathrm{Exp}(\delta)`$. The block $`[-I_3 \;\; [p_c]_\times]`$ comes from inverting the perturbed pose, which puts the perturbation on the left with a minus sign:
+Here $`[p_c]_\times`$ is the skew-symmetric **hat** matrix of $`p_c`$ ([glossary](../glossary.md#hat-operator)) and $`\mathrm{Exp}`$ is the **exponential map** ([glossary](../glossary.md#exp-and-log-maps)). $J_{\text{pose}}$ is for a right perturbation $`T_i \leftarrow T_i\,\mathrm{Exp}(\delta)`$. The block $`[-I_3 \;\; [p_c]_\times]`$ comes from inverting the perturbed pose, which puts the perturbation on the left with a minus sign:
 
 ```math
 \left(T_i\,\mathrm{Exp}(\delta)\right)^{-1} P_j = \mathrm{Exp}(-\delta)\, p_c \approx p_c - \delta v - \delta\omega \times p_c = p_c - \delta v + [p_c]_\times \delta\omega
 ```
 
-**Gauss-Newton step.** The residual is $r_{ij} = z_{ij} - \pi(p_c)$. It linearizes to $r_{ij} - J\delta$, so every solver builds and solves the same normal equations, where $`W`$ is the weight (information) matrix of one pixel residual, $`\omega_{\text{px}} = 1/\sigma_{\text{px}}^2`$ with $`\sigma_{\text{px}}`$ the pixel-noise standard deviation (see the table):
+#### Gauss-Newton step and solvers
+
+**Gauss-Newton step.** The residual is $r_{ij} = z_{ij} - \pi(p_c)$. It linearizes to $r_{ij} - J\delta$, so every solver builds and solves the same [normal equations](../glossary.md#normal-equations-and-hessian). Here $`\Omega`$ is the weight ([information](../glossary.md#information-matrix)) matrix of one pixel residual: $`I_2`$ for the one-sided solvers, and $`\Omega_{\text{px}} = \omega_{\text{px}} I_2`$ with $`\omega_{\text{px}} = 1/\sigma_{\text{px}}^2`$ for the joint solver, where $`\sigma_{\text{px}}`$ is the pixel-noise standard deviation (see the table). $`H`$ is the Gauss-Newton **Hessian** (the information matrix of the linearized problem):
 
 ```math
-H\,\delta = g, \qquad H = \sum_{(i,j)} J^\top W J, \qquad g = \sum_{(i,j)} J^\top W r_{ij}
+H\,\delta = g, \qquad H = \sum_{(i,j)} J^\top \Omega J, \qquad g = \sum_{(i,j)} J^\top \Omega\, r_{ij}
 ```
 
-| Solver | Unknowns | $J$ per observation | $W$ | Added to $H$ |
+Because $`r`$ is measured minus predicted, the right-hand side is $`+g`$. In the glossary's notation (residual = prediction − measurement, $`H\,\delta = -b`$) this is $`g = -b`$; [gauss_newton.md](gauss_newton.md) uses the glossary sign and has a note on the difference.
+
+| Solver | Unknowns | $J$ per observation | $\Omega$ | Added to $H$ |
 | --- | --- | --- | --- | --- |
-| `run_ba_landmarks_only` | one landmark at a time (poses fixed): a separate $3\times3$ solve per landmark | $J_{\text{point}}$ | $1$ | $`10^{-9} I_3`$ |
-| `run_ba_poses_only` | one camera at a time (landmarks fixed): a separate $6\times6$ solve per camera | $J_{\text{pose}}$ | $1$ | $`10^{-9} I_6`$ |
-| `run_bundle_adjustment` | every pose and landmark: one dense system of size $6N + 3M$ | both blocks | $`\omega_{\text{px}} = 1/\sigma_{\text{px}}^2`$ | $`10^{-6} I`$ plus the gauge prior below |
+| `run_ba_landmarks_only` | one landmark at a time (poses fixed): a separate $3\times3$ solve per landmark | $J_{\text{point}}$ | $I_2$ | $`10^{-9} I_3`$ |
+| `run_ba_poses_only` | one camera at a time (landmarks fixed): a separate $6\times6$ solve per camera | $J_{\text{pose}}$ | $I_2$ | $`10^{-9} I_6`$ |
+| `run_bundle_adjustment` | every pose and landmark: one dense system of size $6N + 3M$ | both blocks | $`\Omega_{\text{px}} = \omega_{\text{px}} I_2`$ | $`10^{-6} I`$ plus the gauge prior below |
 
 All three solvers then apply $`T_i \leftarrow T_i\,\mathrm{Exp}(\delta_i)`$ and $P_j \leftarrow P_j + \delta_j$. They stop when the step norm $`\|\delta\|`$ drops below `gn_tol`. The joint system has the arrow-head block structure described in §12, but the script solves it densely.
 
-**Gauge prior** (`run_bundle_adjustment`): joint BA has a 7-DoF gauge freedom (rigid motion plus scale). The script fixes it with a prior factor on cameras 0 and 1. The prior mean $\bar T_k$ is each camera's own noisy initial guess:
+#### Gauge prior and initial guess
+
+**Gauge prior** (`run_bundle_adjustment`): joint BA has a 7-[DoF](../glossary.md#degrees-of-freedom-dof) gauge freedom (rigid motion plus scale). The script fixes it with a prior factor on cameras 0 and 1. The prior mean $\bar T_k$ is each camera's own noisy initial guess:
 
 ```math
 e_k = \mathrm{Log}\left(\bar T_k^{-1} T_k\right), \qquad
@@ -287,7 +295,8 @@ $J_r^{-1}$ is the inverse **right Jacobian** ([glossary](../glossary.md#right-an
 
 **Initial guess** (`perturb_initial_guess`): $`T_i \leftarrow T_i\,\mathrm{Exp}(\xi)`$ with $`\xi \sim \mathcal{N}(0, \sigma_{\text{pose}}^2 I_6)`$, and $P_j \leftarrow P_j + \mathcal{N}(0, \sigma_{\text{lm}}^2 I_3)$.
 
-Script defaults:
+#### Script defaults
+
 
 - Scene: 8 cameras on a 180° arc of radius 5 m, 60 landmarks sampled. A camera sees a landmark only if it projects inside the image, and landmarks seen by fewer than 2 cameras are dropped. The defaults keep 48 landmarks and 292 observations.
 - Camera: $f_x = f_y = 800$ px on a 640×480 image (about 44°×33° field of view).
@@ -300,21 +309,7 @@ Script defaults:
 
 ## 7. Why BA is so powerful
 
-Suppose the estimated trajectory is off. The observations say the cameras should be somewhere else, and the landmarks move too (× = initial estimate, ● = after BA):
-
-
-```text
-             Before             After
-
-Camera 1       ×                  ●
-Camera 2       ×                  ●
-Camera 3       ×                  ●
-Camera 4       ×                  ●
-
-Landmark A     ×                  ●
-Landmark B     ×                  ●
-Landmark C     ×                  ●
-```
+Suppose the estimated trajectory is off. The observations say the cameras should be somewhere else, and the landmarks move too.
 
 Everything moves together to minimize the total reprojection error.
 
@@ -329,26 +324,12 @@ BA is an **optimization-based SLAM technique**. Recall the two estimation strate
 
 BA is the latter. We solve one giant optimization problem:
 
-```text
-        Camera poses
-             ↓
-     T₀ T₁ T₂ T₃ T₄
-      ↘  ↓  ↙ ↘  ↓
-       landmarks
-      P₀ P₁ P₂ P₃
-             ↓
-       projection
-             ↓
-     predicted pixels
-             ↓
-     compare with data
-             ↓
-      total error
-             ↓
-       optimization
-             ↓
-      better poses +
-      better points
+```mermaid
+flowchart TD
+    A["Current estimate:<br/>camera poses T_i and landmarks P_j"] --> B["Projection:<br/>predicted pixel from T_i inverse applied to P_j"]
+    B --> C["Residual r_ij = observed pixel z_ij - predicted pixel<br/>total error = sum over all observed pairs (i, j)"]
+    C --> D["Gauss-Newton step:<br/>solve H delta = g"]
+    D --> E["Better poses and better points:<br/>T_i updated with Exp(delta_i), P_j with P_j + delta_j<br/>repeat from the top until the step is tiny"]
 ```
 
 ---
@@ -360,14 +341,7 @@ BA is the latter. We solve one giant optimization problem:
 | **Pose graph** | $`\{T_0, T_1, \ldots, T_n\}`$ only (landmarks already marginalized or not in the problem) | relative poses |
 | **Bundle adjustment** | camera poses + 3D landmarks | image reprojection errors |
 
-```text
-Pose graph:                          Bundle adjustment:
-
-T₀ ───── T₁ ───── T₂ ───── T₃              T₀       T₁       T₂
-│                          │                \        |       /
-└────── loop closure ──────┘                 \       |      /
-                                              P₁    P₂    P₃
-```
+In a pose graph the edges are relative-pose constraints between poses, including loop closures. In BA there are no pose-pose edges: cameras are coupled only through the landmarks they observe (§10). For the graph comparison, see [pose_graph_optimization.md §8](pose_graph_optimization.md#8-why-is-this-different-from-bundle-adjustment).
 
 - **Pose graph:** "Make the poses geometrically consistent."
 - **Bundle adjustment:** "Make the entire camera + 3D structure explain the images."
@@ -387,7 +361,7 @@ Camera variables ─── Landmark variables
 ```
 
 - Camera $T_1$ only directly interacts with the landmarks it observes.
-- That makes the problem **sparse**, which is one of the fundamental reasons efficient BA algorithms are possible.
+- That makes the problem **sparse** ([glossary](../glossary.md#sparsity)), which is one of the fundamental reasons efficient BA algorithms are possible.
 
 ---
 
@@ -400,7 +374,7 @@ Imagine a pile of photographs and a rough miniature 3D reconstruction. We ask: "
 - landmark 1 is too far away
 - landmark 2 is too high
 
-So we keep adjusting poses and landmarks, reprojecting and measuring the image error, until the reconstruction is as consistent with the images as possible (the loop in §8).
+So we keep adjusting poses and landmarks, reprojecting and measuring the image error, until the reconstruction is as consistent with the images as possible (the pipeline in §8, repeated).
 
 ---
 
@@ -429,26 +403,22 @@ Pts   │ coupling │     block-     │
 
 Real scenes usually have far more points than cameras, so solvers use the **Schur complement trick**:
 
-1. Marginalize out the point block (cheap, since it is block-diagonal and each point's small block inverts independently).
+1. [Marginalize](../glossary.md#marginalization) out the point block (cheap, since it is block-diagonal and each point's small block inverts independently).
 2. Solve the much smaller reduced camera-only system.
 3. Back-substitute to recover the points.
 
-**Tiny example:** a toy with 2 cameras and 1 point, one number each, and no prior.
+**Tiny example (Schur complement):** a toy with 2 cameras and 1 point, one number each, and no prior.
 - Let $`J = \begin{bmatrix}1 & 0 & 1\\ 0 & 1 & 1\end{bmatrix}`$ (columns: camera 1, camera 2, point). The point block is $`1 \cdot 1 + 1 \cdot 1 = 2`$.
 - Eliminating the point gives the reduced camera matrix $`\begin{bmatrix}1 & 0\\ 0 & 1\end{bmatrix} - \tfrac{1}{2}\begin{bmatrix}1 & 1\\ 1 & 1\end{bmatrix} = \begin{bmatrix}0.5 & -0.5\\ -0.5 & 0.5\end{bmatrix}`$.
 - The new $`-0.5`$ links the two cameras. They never touched each other, but they share a point (covisibility).
-- This matrix is singular because the toy has no gauge prior. That is expected here.
+- This matrix is singular because the toy has no gauge prior (§6.1), as expected.
 - In real BA each point block is only $`3 \times 3`$, so inverting all of them is cheap.
 
 It is the same style of sparsity exploitation that makes [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) tractable at scale.
 
-`bundle_adjustment.py` doesn't need this trick. Its toy scenes are small (8 cameras and 48 landmarks by default), so `run_bundle_adjustment` solves the full dense joint system every iteration. Schur-complement marginalization is what a production solver (COLMAP, g2o, GTSAM, Ceres) does at real scene sizes, not something this demo implements.
+`bundle_adjustment.py` doesn't need this trick. Its toy scenes are small (8 cameras and 48 landmarks by default), so `run_bundle_adjustment` solves the full dense joint system every iteration. Schur-complement marginalization is what a production solver (COLMAP for SfM; g2o, GTSAM and Ceres as general sparse least-squares libraries) does at real scene sizes, not something this demo implements.
 
-$H = J^\top J$ above is the plain textbook form. The scripts' actual $H$ has extra terms:
-
-- `run_bundle_adjustment` weights every reprojection block by $\omega_{\text{px}} = 1/\sigma_{\text{px}}^2$, adds the gauge-prior blocks on cameras 0 and 1, and adds $10^{-6} I$ (see [§6.1](#61-the-ba-math-concretely)).
-- `run_windowed_gn_lm` in `bundle_adjustment_advanced.py` uses no weighting but solves $`(H + \lambda\,\mathrm{diag}(H))\,\delta = g`$ (see §13), where $`\lambda`$ is the **LM damping** factor ([glossary](../glossary.md#levenberg-marquardt-lm-and-damping)).
-- None of these changes the sparsity pattern: the prior and damping touch only diagonal blocks, and the weights rescale blocks that already exist.
+$H = J^\top J$ above is the plain textbook form. The scripts' actual $H$ adds pixel weights, the gauge prior and a small diagonal term in `run_bundle_adjustment` ([§6.1](#61-the-ba-math-concretely)). `run_windowed_gn_lm` in `bundle_adjustment_advanced.py` is unweighted but solves $`(H + \lambda\,\mathrm{diag}(H))\,\delta = g`$ (see [§13.6](#136-in-this-repo)), where $`\lambda`$ is the **LM damping** factor ([glossary](../glossary.md#levenberg-marquardt-lm-and-damping)). None of these changes the sparsity pattern: the prior and damping touch only diagonal blocks, and the weights rescale blocks that already exist.
 
 ---
 
@@ -463,10 +433,10 @@ Local BA and Global BA minimize the same reprojection objective from §6. Local 
 | Input | Sequential video with continuous tracking | Unordered photo collections (or long video) |
 | Frequency | Continuous, runs on every new keyframe | Periodic (e.g. COLMAP's default: after ~10% growth in registered images or points) or a final pass |
 | Outlier handling | Fast local robust cost (Huber) + **chi-square gating** (rejecting observations whose weighted squared error exceeds a chi-square threshold) | Heavy re-triangulation, track merging/filtering |
-| Scaling | Roughly constant per window | Grows up to cubically with the number of camera poses (dense reduced system) |
+| Scaling | Bounded per window (set by the window size, not the map) | Grows up to cubically with the number of camera poses (dense reduced system) |
 
 
-The example systems name where each style is the *workhorse*, not the only one used: ORB-SLAM2 also runs a full BA after a loop closure, and COLMAP runs a local BA after every image it registers (§13.4).
+The example systems name where each style is the *workhorse*, not the only one used: ORB-SLAM2 also runs a full BA after a [loop closure](../glossary.md#loop-closure), and COLMAP runs a local BA after every image it registers (§13.4).
 
 ### 13.1 Why not re-solve everything every time?
 
@@ -523,7 +493,7 @@ But fixing a pose treats it as exactly known, which throws its uncertainty away.
 Drift has two parts, and they need different cures.
 
 - **Inconsistency between windows.** Each window was solved against a slightly different frozen border, so neighboring windows disagree a little about the landmarks they share. The measurements *can* see this: solved jointly, the disagreement shows up as reprojection error. A Global BA pass removes it.
-- **Error the measurements can't see.** On a path that never revisits a place, nothing ties the end of the map to its start. The measurements only fix each part of the map relative to its neighbors, so the uncertainty in where the far end is grows with distance from the anchor. Even a perfect joint solve has this drift. A monocular setup adds **scale drift** on top, since images only determine the scene up to a scale factor (Strasdat et al. 2010).
+- **Error the measurements can't see.** On a path that never revisits a place, nothing ties the end of the map to its start. The measurements only fix each part of the map relative to its neighbors, so the uncertainty in where the far end is grows with distance from the anchor. Even a perfect joint solve has this drift. A monocular (single-camera) setup adds **scale drift** on top, since images only determine the scene up to a scale factor (Strasdat et al. 2010).
 
 Only new information cures the second part: a loop closure or another sensor, such as GPS, or an IMU, which makes roll, pitch and metric scale observable. So real systems split the work. ORB-SLAM runs Local BA on every keyframe. When it detects a loop, it estimates a similarity transform between the two ends (7 DoF, so scale drift is corrected too) and spreads the correction along the trajectory with pose-graph optimization ([pose_graph_optimization.md](pose_graph_optimization.md)). ORB-SLAM2 then runs a full BA in a separate thread to refine the result.
 
@@ -540,16 +510,16 @@ The cost: even after the Schur complement from §12, the reduced camera-only sys
 
 ### 13.5 Choosing between them
 
-Use **Local BA** for real-time robotics/AR/VR (augmented/virtual reality) where sub-30ms latency matters more than perfect global consistency (loop closure repairs that later).
+Use **Local BA** for real-time robotics/AR/VR (augmented/virtual reality) where low, predictable latency matters more than perfect global consistency (loop closure repairs that later).
 
-Use **Global BA** for offline reconstruction - meshes, NeRF/Gaussian-Splatting input scenes, photogrammetric surveys - where total geometric fidelity matters more than runtime.
+Use **Global BA** for offline reconstruction - meshes, NeRF/Gaussian-Splatting input scenes (learned 3D scene models), photogrammetric surveys - where total geometric fidelity matters more than runtime.
 
 ### 13.6 In this repo
 `bundle_adjustment.py`'s three solvers (`run_ba_landmarks_only`, `run_ba_poses_only`, `run_bundle_adjustment`) are single-batch joint solves over the whole toy scene, closest in spirit to a (tiny) Global BA pass. They have no windowing, no covisibility graph and no incremental registration, so they don't model Local BA's real-time behavior at all.
 
 `bundle_adjustment_advanced.py` fills that gap. A camera moves keyframe-by-keyframe through a landmark corridor while a covisibility graph is built incrementally:
 
-- **Local BA:** every new keyframe triggers a bounded solve over an active window (the new keyframe plus its covisible neighbors, with other observing keyframes held fixed) - §13.2's diagram, made concrete.
+- **Local BA:** every new keyframe triggers a bounded solve over an active window (the window of §13.2, made concrete)
 - **Global BA:** a periodic pass over the whole map runs alongside for comparison.
 
 ![Three panels from bundle_adjustment_advanced.py: the keyframe path through a landmark corridor with the Local-only and Local plus Global estimates, solve time per call for the bounded Local BA window versus Global BA, and trailing trajectory RMSE over keyframes for both modes](../../assets/bundle_adjustment_advanced.png)
@@ -557,15 +527,21 @@ Use **Global BA** for offline reconstruction - meshes, NeRF/Gaussian-Splatting i
 *Figure: `use_numpy/bundle_adjustment_advanced.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py bundle_adjustment_advanced`.*
 
 
-**What it confirms:** the "Scaling" row above. Measured wall-clock solve time stays roughly flat for the local window as the map grows, while Global BA's grows with it.
+**What it confirms:** the "Scaling" row above. In the default run (one BLAS thread), the measured wall-clock solve time of the local window stays bounded (8-470 ms, set by how many landmarks the window holds, with no trend in map size), while Global BA's grows from 0.36 s at keyframe 8 to about 1.4-1.9 s at keyframes 40-49.
 
 **What it doesn't confirm:** a reliable accuracy payoff from Global BA on this small scene.
 
-- **Open path (default):** the default seed happens to look like a loss for Global BA (final trajectory RMSE 2.1359 m Local-only → 2.7124 m Local+Global, +27%), and no single seed is representative.
-  - The 15-seed sweep in the script's regression test gives 6/15 wins and a median difference of +0.06 m. That test uses a different scene: 12 keyframes, 10 landmarks per keyframe, 8 m view range, `min_observations` = 2 and a Global pass every 4 keyframes.
-  - A 20-seed sweep at the script's defaults gives 11/20 wins and a median of −0.02 m.
-  - That's a wash either way, plus an occasional seed that diverges to thousands of meters in *either* mode from a rare bad local minimum in the windowed GN/LM solve.
-- **Loop closure** (`--arc-span-deg 350 --n-keyframes 190`): the path swings back within view of its start, and the script reports `Loop closure detected at keyframe K ...`.
+Four sweeps compare Local+Global with Local-only (final trajectory RMSE, the script's own metric):
+
+| Sweep | Scene | Global BA wins | Local+Global minus Local-only |
+| --- | --- | --- | --- |
+| Regression test, 15 seeds | 12 keyframes, 10 landmarks per keyframe, 8 m view range, `min_observations` = 2, Global pass every 4 keyframes | 6/15 | median +0.06 m |
+| Script defaults, 20 seeds | the defaults listed at the end of this section | 11/20 | median −0.02 m |
+| Script defaults, seed 0 only | the defaults | loss | 2.1359 m → 2.7124 m (+27%) |
+| Loop closure, seeds 0-4 | `--arc-span-deg 350 --n-keyframes 190` | 1/5 (one single-thread run) | varies widely, often much worse |
+
+- **Open path (default):** the default seed happens to look like a loss for Global BA, and no single seed is representative. The 15-seed sweep is the script's regression test. The 20-seed sweep is a wash either way, plus an occasional seed that diverges to thousands of meters in *either* mode from a rare bad local minimum in the windowed GN/LM solve.
+- **Loop closure:** the path swings back within view of its start, and the script reports `Loop closure detected at keyframe K ...`.
   - No code changes are needed, because the covisibility bookkeeping, window builder and Global BA solve don't assume temporal locality. The extra keyframes only keep the default run's ~0.5 m spacing (at 50 keyframes it grows to ~1.9 m, and too few landmarks get triangulated for the closure to register).
   - Over seeds 0-4 the closure is detected on all 5 paths (keyframes 183-186). The Local-only final error on the default seed is 13.46 m.
   - The Local+Global result on this long run is unstable. In our re-runs it varied widely across seeds (better than Local-only on only 1 of 5 seeds in one single-thread run, often much worse) and even changed with the **BLAS** (the linear-algebra library NumPy calls) thread count.
@@ -573,26 +549,34 @@ Use **Global BA** for offline reconstruction - meshes, NeRF/Gaussian-Splatting i
 
 So judge Global BA's benefit here from the aggregate statistics, not from any single run's printed numbers.
 
-**Why Global BA rarely helps on the open path.** §13.3 predicts the answer: most of the error is the kind Global BA can't see. A one-off check over seeds 0-4 at the script's defaults (not part of the test suite) confirms this, and finds a second, script-specific error source:
+**Why Global BA rarely helps on the open path.** §13.3 predicts the answer: most of the error is the kind Global BA can't see. A one-off check by script call over seeds 0-4 at the script's defaults (not part of the test suite) confirms this, and finds a second, script-specific error source. Each row aligns the Local-only trajectory to ground truth with a single similarity transform (Umeyama, §14):
 
-- **Most of the final error is one transform of the whole map.** Aligning each final trajectory to ground truth with a single similarity transform (Umeyama, §14) removes 47-97% of the Local-only position RMSE over keyframes 2-49 (default seed: 1.27 m → 0.44 m). What remains, the inconsistency Global BA can actually fix, is small.
+| Seed | Local-only final error (m) | RMSE raw → aligned (m) | Removed by alignment | Fitted scale | Rotation (°) | Final error, keyframe 1 at true pose (m) | Fitted scale, keyframe 1 at true pose |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | 2.1359 | 1.272 → 0.441 | 65% | 1.083 | 4.8 | 4.1046 | 1.254 |
+| 1 | 3.4752 | 2.212 → 0.066 | 97% | 0.846 | 1.7 | 0.2080 | 0.989 |
+| 2 | 2.9208 | 1.903 → 0.064 | 97% | 0.900 | 7.3 | 1.3336 | 0.930 |
+| 3 | 1.4611 | 0.920 → 0.489 | 47% | 0.948 | 0.9 | 8.8921 (mirrored local minimum) | 0.982 |
+| 4 | 3.4821 | 2.076 → 0.921 | 56% | 0.814 | 5.9 | 0.8873 | 0.981 |
+
+*Source: one-off check by script call, not part of the test suite. Final errors are the script's own metric, RMSE over the last 10 keyframes. The alignment columns use keyframes 2-49 on both sides. In the last two columns only keyframe 1's initial pose is replaced by the true one; the rest of the front-end chain is unchanged.*
+
+- **Most of the final error is one transform of the whole map.** Alignment removes 47-97% of the Local-only position RMSE over keyframes 2-49 (default seed: 1.27 m → 0.44 m). What remains, the inconsistency Global BA can actually fix, is small.
 - **That transform has two parts:**
   - **Orientation drift** of up to ~7° (0.9-7.3°), which stays even with a perfect anchor: §13.3's unobservable drift.
-  - **Scale error.** Keyframes 0 and 1 are hard-fixed and keyframe 1 keeps its noisy front-end pose. The anchor pair sets the map's scale, and its errors (with keyframe 1's orientation error and window-to-window scale drift) contribute to the scale error. The Local-only fitted scale is off by up to ~19% (0.81-1.08).
-  - Re-running with keyframe 1 fixed at its true pose (only its initial pose is replaced; the rest of the front-end chain is unchanged) brings the scale within 3% of correct on three of the five seeds (the default seed stays at 1.25) and lowers the median final Local-only error from 2.92 m to 1.33 m. The mean doesn't improve, because seed 3 falls into a mirrored local minimum (a 171° orientation offset) once the anchor changes.
+  - **Scale error.** The anchor pair (keyframes 0 and 1, §14) sets the map's scale, and keyframe 1 keeps its noisy front-end pose. Its errors (with keyframe 1's orientation error and window-to-window scale drift) contribute to the scale error. The Local-only fitted scale is off by up to ~19% (0.81-1.08).
+  - With keyframe 1 at its true pose, the scale is within 3% of correct on three of the five seeds (the default seed stays at 1.25), and the median final Local-only error falls from 2.92 m to 1.33 m. The mean doesn't improve, because seed 3 falls into a mirrored local minimum (a 171° orientation offset) once the anchor changes.
 - **Global BA can make the scale worse.** On seed 2 with the noisy anchor, Global BA pulls the rest of the map into agreement with the wrong baseline: the fitted scale goes from 0.90 to 0.67 and the final error from 2.92 m to 9.55 m. With keyframe 1 at its true pose, the same seed improves instead (1.33 m → 0.70 m).
-
-(Final errors are the script's own metric, RMSE over the last 10 keyframes. The alignment figures use keyframes 2-49 on both sides.)
 
 The anchor choice mirrors real monocular SLAM, where the first two keyframes' baseline sets the map's otherwise arbitrary scale. That's why monocular results are normally scored after a similarity alignment (§14), and why this script's raw, unaligned error mostly measures drift and gauge rather than what BA itself can fix.
 
 **The windowed solver** (`run_windowed_gn_lm`). Local and Global BA call the same solver. They differ only in which poses and points are unknowns:
 
-- **Local** (`build_active_window`, `run_local_ba_step`): the new keyframe $k$ plus up to `max_window_keyframes` − 1 of its covisible neighbors (keyframes sharing at least `min_shared_for_covisibility` landmarks with $k$, strongest first) are active. Every already-triangulated landmark those keyframes see is active too. Every other keyframe that observes an active landmark is held fixed.
+- **Local** (`build_active_window`, `run_local_ba_step`): the window of §13.2, built from the new keyframe $k$ plus up to `max_window_keyframes` − 1 covisible neighbors (keyframes sharing at least `min_shared_for_covisibility` landmarks with $k$, strongest first). Only already-triangulated landmarks can be active.
 - **Global** (`run_global_ba`): every keyframe processed so far and every triangulated landmark are unknowns.
-- **Gauge:** keyframes 0 and 1 (`anchor_keyframes`) are never unknowns in either solve. Keyframe 0 starts at its true pose. Keyframe 1 keeps its front-end estimate. There is no prior factor.
+- **Gauge:** no prior factor. Keyframes 0 and 1 (`anchor_keyframes`) are hard-fixed in both solves (keyframe 0 at its true pose, keyframe 1 at its front-end estimate; see §14).
 
-It uses the residual and Jacobians from [§6.1](#61-the-ba-math-concretely), unweighted ($W = I$). An observation from a fixed keyframe adds only its $J_{\text{point}}$ block. Each iteration solves a Levenberg-Marquardt system:
+It uses the residual and Jacobians from [§6.1](#61-the-ba-math-concretely), unweighted ($\Omega = I_2$). An observation from a fixed keyframe adds only its $J_{\text{point}}$ block. Each iteration solves a Levenberg-Marquardt system:
 
 ```math
 \left(H + \lambda\,\mathrm{diag}(H)\right)\delta = g, \qquad \text{cost} = \sum \|z - \pi(T^{-1}P)\|^2
@@ -600,14 +584,14 @@ It uses the residual and Jacobians from [§6.1](#61-the-ba-math-concretely), unw
 
 Diagonal entries of $H$ below $10^{-12}$ are floored to $10^{-12}$ before scaling. $\lambda$ starts at $10^{-3}$ in every call. A trial step is accepted only if it lowers the cost, and then $\lambda \leftarrow \max(\lambda/2, 10^{-7})$. Otherwise $\lambda \leftarrow 2\lambda$ and the solve is retried, up to 10 times. The loop stops when no step is accepted after 10 retries, when the step norm drops below `gn_tol`, or after `gn_max_iters` iterations.
 
-**Why cheirality matters (tiny example):** **cheirality** is the requirement that a point lie in front of the camera (positive depth). The pinhole $`u = f_x\,x/z + c_x`$ flips sign with $`z`$. Take $`f_x = 800`$, $`c_x = 320`$.
+**Tiny example (cheirality):** **cheirality** is the requirement that a point lie in front of the camera (positive depth). The pinhole $`u = f_x\,x/z + c_x`$ flips sign with $`z`$, so cheirality matters. Take $`f_x = 800`$, $`c_x = 320`$.
 - A point in front, $`P_c = (-1, 0, 5)`$, gives $`u = 160`$.
 - The point $`(1, 0, -5)`$ behind the camera gives the same $`u = 160`$.
 - So a point behind the camera can look like a valid mirrored pixel. The solver must reject it explicitly.
 
-Two cheirality rules protect the solve, using `point_depth` (the $z$ of $`R^\top(P - t)`$). First, any observation whose point is already behind its camera when the call starts is dropped for this call (gating). Second, a trial that puts any remaining point behind its camera gets infinite cost, so it is rejected. New landmarks are triangulated once they have `min_observations` observers (`triangulate_landmark`, then `refine_landmark_gn`, see [triangulation_pnp.md](../frontend/triangulation_pnp.md)). They are committed only if `passes_cheirality` holds. After each local and global solve, `cull_invalid_points` deletes any landmark that is now behind one of its observers, so it can be triangulated again later.
+Two cheirality rules protect the solve, using `point_depth` (the depth $`p_{c,z}`$, the third entry of $`R^\top(P - t)`$). First, any observation whose point is already behind its camera when the call starts is dropped for this call (gating). Second, a trial that puts any remaining point behind its camera gets infinite cost, so it is rejected. New landmarks are triangulated once they have `min_observations` observers (`triangulate_landmark`, then `refine_landmark_gn`, see [triangulation_pnp.md](../frontend/triangulation_pnp.md)). They are committed only if `passes_cheirality` holds. After each local and global solve, `cull_invalid_points` deletes any landmark that is now behind one of its observers, so it can be triangulated again later.
 
-Script defaults: 50 keyframes on a 90° arc of radius 15 m, 8 landmarks per keyframe, 6 m view range, `min_observations` = 3, `min_shared_for_covisibility` = 2, `max_window_keyframes` = 6, a Global BA pass every 8 keyframes (plus one at the end), `gn_tol` = $10^{-6}$, `gn_max_iters` = 15, front-end se3 twist noise std 0.02 per step, $\sigma_{\text{px}} = 1$ px.
+Script defaults: 50 keyframes on a 90° arc of radius 15 m, 8 landmarks per keyframe, 6 m view range, `min_observations` = 3, `min_shared_for_covisibility` = 2, `max_window_keyframes` = 6, a Global BA pass every 8 keyframes (plus one at the end), `gn_tol` = $10^{-6}$, `gn_max_iters` = 15, per-step front-end twist noise std 0.02 (6-vector, mixed m and rad), $\sigma_{\text{px}} = 1$ px.
 
 ---
 

@@ -93,17 +93,17 @@ After linearization, the nonlinear optimization becomes approximately a linear l
 
 Here $`A`$ is the stacked, **noise-whitened** (each row scaled so its residual has unit noise covariance) Jacobian of all factors, $`b`$ is the stacked (negated) residual vector, and $`\Delta x`$ is the update step to the variables. (§14.1 writes the same step as $`\boldsymbol\delta`$.)
 
-Instead of solving this from scratch every time, we factorize $A = QR$ (or work with a related factorization of the information/Hessian system).
+Instead of solving this from scratch every time, we factorize $A = QR$ (or work with a related factorization of the Hessian system).
 
 > **Note:** QR decomposition factors a matrix as $A=QR$, with $Q$ orthogonal and $R$ upper-triangular. Because $Q$ is orthogonal, it doesn't change the least-squares solution. Minimizing $`\lVert A\Delta x - b \rVert^2`$ therefore reduces to the cheap triangular solve $R\Delta x = Q^\top b$.
 >
 > For iSAM, the key property is that $R$ can be updated incrementally with **Givens rotations** (plane rotations that zero one entry by mixing two rows) when a new row (factor) arrives. No refactorization of $A$ is needed.
 
 **Intuition: $R$ is a square root of the information.**
-- Like $25 = 5 \cdot 5$: $R^\top R = H$ (the information matrix, $H = A^\top A$), so $R$ holds the same information in a "half-size" form.
+- Like $25 = 5 \cdot 5$: $R^\top R = H = A^\top A$, where $H = J^\top \Omega J$ is the Gauss-Newton Hessian (the information matrix of the linearized problem; $\Omega$ is the measurement information matrix, see [glossary](../glossary.md#information-matrix)). So $R$ holds the same information in a "half-size" form. $R$ is the upper-triangular factor ($R = L^\top$ for the Cholesky factor $L$ of $H$; it is not a rotation).
 - $R$ is triangular, so its last row involves only the newest variable. That variable is solved first.
-- Its value is then substituted upward into the rows above, one variable at a time.
-- This is why a new variable adds only a row at the bottom, and old rows stay valid.
+- Its value is then substituted upward into the rows above, one variable at a time ([back-substitution](../glossary.md#back-substitution)).
+- This is why an odometry edge into the newest node only rewrites the last two blocks of rows (the nodes it touches); rows further up stay valid. A loop-closure row touches $x_0$ and rewrites almost everything (§6).
 
 The important point:
 
@@ -151,11 +151,11 @@ x0 ── x1 ── x2 ── x3 ── x4
        loop closure
 ```
 
-The loop closure can affect **many previous poses**, so incremental optimization cannot simply update $x_4$.
+The [loop closure](../glossary.md#loop-closure) can affect **many previous poses**, so incremental optimization cannot simply update $x_4$.
 
 - Original iSAM still absorbs the loop-closure factor like any other: one more row folded into the factorization with Givens rotations (§3).
 - But this row links $x_4$ back to $x_0$, so the rotations sweep through most of the factorization and leave it denser (fill-in; [glossary](../glossary.md#fill-in)).
-- Original iSAM cleans this up periodically, in one batch step that relinearizes everything and chooses a new [variable ordering](../glossary.md#variable-ordering) (Kaess et al. 2008).
+- Original iSAM cleans this up periodically, in one batch step that [relinearizes](../glossary.md#relinearization) everything and chooses a new [variable ordering](../glossary.md#variable-ordering) (Kaess et al. 2008).
 - This repo's script goes straight to that batch step when the loop closes (§14.1).
 
 **Why it sweeps:** Givens rotations start at the first nonzero column of the new row. An odometry row starts near the end; a loop-closure row touches $`x_0`$ (column 0), so it sweeps every column (worked in §14.1).
@@ -166,7 +166,7 @@ Loop closures are therefore where incremental updates lose most of their advanta
 
 ## 7. Beyond iSAM: iSAM2
 
-Original iSAM stops at §3's mechanism: Givens-rotation updates to the factorization, plus §6's periodic batch step. Its successor, **iSAM2** (Kaess et al. 2012), reorganizes the same factorization as a **Bayes tree**. That lets it find exactly which part of the solution a new factor affects and recompute only that part. It relinearizes and reorders incrementally instead of in periodic batch steps.
+Original iSAM stops at §3's mechanism: Givens-rotation updates to the factorization, plus §6's periodic batch step. Its successor, **iSAM2** (Kaess et al. 2012), reorganizes the same factorization as a **Bayes tree**. That lets it find exactly which part of the solution a new factor affects and recompute only that part. It relinearizes only the variables that moved enough (**selective relinearization**; the iSAM2 paper calls it **fluid relinearization**) and reorders incrementally, instead of in periodic batch steps.
 
 [`isam2_optimization.md` §6.1](isam2_optimization.md#61-isam-vs-isam2-side-by-side) compares the two side by side; see the rest of that doc for iSAM2, and [`bayes_tree.md`](bayes_tree.md) for the tree itself.
 
@@ -182,32 +182,6 @@ Original iSAM stops at §3's mechanism: Givens-rotation updates to the factoriza
 | Good for offline SLAM           | Good for online SLAM            |
 | Simple conceptual model         | More complicated implementation |
 | Example: standard Gauss-Newton ([glossary](../glossary.md#gauss-newton))  | Example: iSAM/iSAM2             |
-
-```text
-BATCH
-
-new measurement
-      ↓
-┌───────────────────┐
-│ Optimize ALL      │
-│ variables again   │
-└───────────────────┘
-```
-
-versus:
-
-```text
-INCREMENTAL
-
-new measurement
-      ↓
-┌───────────────────┐
-│ Find affected     │
-│ variables         │
-└─────────┬─────────┘
-          ↓
-   Update those parts
-```
 
 ---
 
@@ -234,7 +208,7 @@ x4 ───────── x0
 
 $x_0$ is the anchor, so it stays put. The small errors of every odometry step add up along the chain and show at $x_4$. The loop closure tells us the trajectory is inconsistent, so the optimizer may change $x_1, \ldots, x_4$. All of them can move, because the loop closure ties $x_4$ back to $x_0$ through the whole chain.
 
-As §6 explains, this is the expensive case. This repo's script handles it with a full batch relinearization; original iSAM inserts the row with Givens rotations and cleans up the fill-in at its next periodic batch step.
+This is the expensive case (see §6).
 
 This is why **smoothing** matters: the system is not merely estimating $x_t$, it keeps refining $x_0, \ldots, x_t$ using all available information.
 
@@ -242,38 +216,17 @@ This is why **smoothing** matters: the system is not merely estimating $x_t$, it
 
 ## 10. Filtering vs iSAM
 
-This connects directly to **[filtering vs optimization/smoothing](../filtering_smoothing.md)**.
+Full comparison: **[filtering vs optimization/smoothing](../filtering_smoothing.md)**.
 
 ### EKF-style filtering
 
-Conceptually:
+Once $x_0$ is processed, its information is summarized and the filter moves forward. It tracks $`P(x_t \mid z_{1:t})`$, where $`z_{1:t}`$ denotes all measurements received from time 1 to $`t`$.
 
-```text
-x0 → x1 → x2 → x3 → x4
-                    ↑
-            current state
-```
-
-Once $x_0$ is processed, we largely summarize its information and move forward. We primarily care about:
-
-$$P(x_t \mid z_{1:t})$$
-
-where $`z_{1:t}`$ denotes all measurements received from time 1 to $`t`$.
-
----
+> **Filtering:** "What is my best estimate of the robot NOW?"
 
 ### iSAM/smoothing
 
-```text
-x0 ── x1 ── x2 ── x3 ── x4
-│     │     │     │     │
-└─────┴─────┴─────┴─────┘
-       all history
-```
-
-Here we maintain a representation of the entire trajectory $x_{0:t}$ and continuously refine it.
-
-> **Filtering:** "What is my best estimate of the robot NOW?"
+It maintains the entire trajectory $x_{0:t}$ and continuously refines it.
 
 > **Smoothing:** "Given everything I've seen, what were the best estimates of the robot's states throughout the entire trajectory?"
 
@@ -281,61 +234,13 @@ Here we maintain a representation of the entire trajectory $x_{0:t}$ and continu
 
 ## 11. Where iSAM fits into the SLAM mental map
 
-The earlier topics connect like this:
-
-```text
-                    SLAM
-                     │
-             State estimation
-                     │
-          ┌──────────┴──────────┐
-          │                     │
-      Filtering             Smoothing
-          │                     │
-       EKF/KF              Factor graph
-                                │
-                       Nonlinear optimization
-                                │
-                    ┌───────────┴──────────┐
-                    │                      │
-                  Batch              Incremental
-                    │                      │
-             Gauss-Newton            iSAM/iSAM2
-             Levenberg-Marquardt
-```
-
-And underneath the pose optimization (see the [glossary](../glossary.md#1-geometry-and-lie-groups) for SE(3), Lie algebra and perturbation):
-
-```text
-SE(3)
- ↓
-Lie algebra
- ↓
-Perturbation
- ↓
-Jacobian
- ↓
-Linearization
- ↓
-Gauss-Newton
- ↓
-Factorization
- ↓
-iSAM/iSAM2
-```
-
-This is one corner of the repo-wide map in [slam_mental_map.md](../slam_mental_map.md), which places every doc and script on one picture.
+The full map is in [slam_mental_map.md](../slam_mental_map.md), which places every doc and script on one picture. iSAM sits under **smoothing**, **factor graph**, **nonlinear optimization**, **incremental** (next to batch: Gauss-Newton and Levenberg-Marquardt). Underneath the pose optimization (see the [glossary](../glossary.md#1-geometry-and-lie-groups) for SE(3), Lie algebra and perturbation) the chain is SE(3) → Lie algebra → perturbation → Jacobian → linearization → Gauss-Newton → factorization → iSAM/iSAM2.
 
 ---
 
 ## 12. An analogy: drawing a map while walking
 
-Imagine we draw a map while walking. At every step:
-
-- **Batch:** "Let me redraw the entire map from scratch."
-- **Incremental:** "I already have a pretty good map. I'll incorporate this new information into it."
-
-And when we recognize a place we've visited before: "This new observation conflicts with my old map, so I adjust the affected parts." That's **iSAM**.
+Same idea as §4's spreadsheet: **batch** redraws the whole map at every step, **incremental** folds the new information into the existing map. Recognizing a place visited before is a loop closure (§6).
 
 ---
 
@@ -352,10 +257,10 @@ And **iSAM2** takes this further by using a **Bayes tree** to efficiently identi
 [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`) implements §3's mechanism:
 - New odometry edges are absorbed into a running square-root-information matrix via Givens-rotation row insertion (`qr_insert_row` in `utils.py`) instead of rebuilding the linear system from scratch.
 - It is contrasted directly against a batch baseline that re-solves everything at every new node, reproducing §1/§8's batch-vs-incremental comparison.
-- It does not measure §6/§9's "loop closure needs a wide update" point. The script always triggers a full relinearization on the loop-closure edge, plus periodically otherwise. Panel (c) of the concept figure below illustrates the point.
+- It does not measure §6/§9's "loop closure needs a wide update" point: it always runs a full relinearization at the loop closure (§14.1). Panel (c) of the concept figure below illustrates the point.
 
 **It does not implement iSAM2's Bayes tree (§7), nor any variable reordering.** Only the Bayes tree is iSAM2-specific:
-- Variable reordering (via COLAMD) to bound fill-in is already part of *original* iSAM (Kaess et al. 2008, periodic batch reordering during full relinearization). What iSAM2 actually adds on top is making that reordering *incremental/fluid* (reordering only as needed, tied to the Bayes tree) instead of a periodic full pass.
+- Variable reordering (via COLAMD, a fill-reducing ordering heuristic; [glossary](../glossary.md#variable-ordering)) to bound fill-in is already part of *original* iSAM (Kaess et al. 2008, periodic batch reordering during full relinearization). What iSAM2 actually adds on top is making that reordering *incremental* (reordering only as needed, tied to the Bayes tree) instead of a periodic full pass.
 - So skipping variable reordering is a simplification relative to even the 2008 original, not just relative to iSAM2.
 
 For the Bayes tree itself, see [`bayes_tree.md`](bayes_tree.md); for the full iSAM2 algorithm this repo doesn't implement, see [`isam2_optimization.md`](isam2_optimization.md).
@@ -370,9 +275,9 @@ For the Bayes tree itself, see [`bayes_tree.md`](bayes_tree.md); for the full iS
 
 ### 14.1 The incremental math, concretely
 
-The script solves the same pose graph as `pose_graph.py`. `linearize_edge` returns that script's residual ${e_{ij} = \mathrm{Log}(Z_{ij}^{-1} X_i^{-1} X_j)}$ (where $`Z_{ij}`$ is the measured relative pose from node $`i`$ to node $`j`$) and Jacobians $J_i$, $J_j$ (see [pose_graph_optimization.md §15.7](pose_graph_optimization.md#157-the-solver-concretely)).
+The script solves the same pose graph as `pose_graph.py`. `linearize_edge` returns that script's residual ${e_{ij} = \mathrm{Log}(Z_{ij}^{-1} X_i^{-1} X_j)}$ (where $`Z_{ij}`$ is the measured relative pose from node $`i`$ to node $`j`$; $`Z_{ij} = \tilde{T}_{ij}`$ in [pose_graph_optimization.md §15](pose_graph_optimization.md#15-mathematical-breakdown-of-the-error-formulation-and-lie-algebra-operations)) and Jacobians $J_i$, $J_j$ (see [pose_graph_optimization.md §15.7](pose_graph_optimization.md#157-the-solver-concretely)).
 
-The difference is how the linear system is stored and updated. Instead of $H$ and the gradient $`g = A^\top b`$ (the right-hand side of the normal equations $`H\boldsymbol{\delta} = g`$), the script keeps an upper-triangular square-root-information matrix $R$ and a right-hand side $d$. The step is always ${\boldsymbol{\delta} = R^{-1} d}$ (the same step as $`\Delta x`$ in §3), computed by back substitution (`solve_triangular`).
+The difference is how the linear system is stored and updated. Instead of the Hessian $H$ and the vector $`g = A^\top b`$ (the right-hand side of the normal equations $`H\boldsymbol{\delta} = g`$), the script keeps an upper-triangular square-root-information matrix $R$ and a right-hand side $d$. The step is always ${\boldsymbol{\delta} = R^{-1} d}$ (the same step as $`\Delta x`$ in §3), computed by [back-substitution](../glossary.md#back-substitution) (`solve_triangular`). Here $g$ is the negative gradient, as in [pose_graph_optimization.md §15.7](pose_graph_optimization.md#157-the-solver-concretely); in the glossary's convention ($H\Delta x = -b$, $b = J^\top \Omega r$) it is $g = -b$. The $b$ in $A\boldsymbol{\delta} \approx b$ below is the whitened right-hand side $-S e$, not the glossary's gradient.
 
 **Whitened rows** (`edge_whitened_block`): each edge becomes 6 rows of a least-squares system ${A \boldsymbol{\delta} \approx b}$. With $S$ the upper-triangular square root of the edge information matrix $\Omega$ (`sqrt_info`):
 
@@ -382,13 +287,13 @@ S = \mathrm{chol}(\Omega)^\top, \quad S^\top S = \Omega, \qquad A_{ij} = S \begi
 
 Then $`\lVert A_{ij}\boldsymbol{\delta} - b_{ij} \rVert^2 = (e_{ij} + J\boldsymbol{\delta})^\top \Omega \, (e_{ij} + J\boldsymbol{\delta})`$, the linearized edge cost. `main` sets $\Omega = I_6$, so $S = I_6$ in the default run.
 
-**Anchor rows** (`full_relinearize`): node 0 gets 6 extra rows $`\sqrt{w} \, I_6`$ with right-hand side 0, where $w$ = `--anchor-weight` (default $10^6$). These add ${w I_6}$ to node 0's block of ${A^\top A}$, which is the same gauge fix as `pose_graph.py`'s ${H_{00} \mathrel{+}= 10^6 I_6}$. Like that one, it pulls node 0's step toward zero around its current estimate.
+**Anchor rows** (`full_relinearize`): node 0 gets 6 extra rows $`\sqrt{w} \, I_6`$ with right-hand side 0, where $w$ = `--anchor-weight` (default $10^6$). These add ${w I_6}$ to node 0's block of ${A^\top A}$, which is the same [gauge fix](../glossary.md#gauge-freedom) as `pose_graph.py`'s ${H_{00} \mathrel{+}= 10^6 I_6}$. Like that one, it pulls node 0's step toward zero around its current estimate.
 
 **Full rebuild** (`full_relinearize`): stack the anchor rows and every edge seen so far, all linearized at the current linearization point ${\bar{X}}$ (`x_lin`), then factorize once:
 
 $$A = QR \quad (\texttt{np.linalg.qr}), \qquad d = Q^\top b$$
 
-This gives ${R^\top R = A^\top A = H}$ and ${R^\top d = A^\top b = g}$, the same normal equations as `pose_graph.py` without damping.
+This gives ${R^\top R = A^\top A = H = J^\top \Omega J}$ and ${R^\top d = A^\top b = g}$, the same normal equations as `pose_graph.py` without damping.
 
 **Relinearization loop** (`relinearize_to_convergence`): plain Gauss-Newton on the QR system, with no Levenberg-Marquardt damping and no accept/reject test:
 
@@ -414,12 +319,12 @@ $$\rho = \sqrt{R_{cc}^2 + a_c^2}, \qquad \gamma = \frac{R_{cc}}{\rho}, \qquad \s
 \mathbf{a}_{c:} & \beta \end{bmatrix}
 ```
 
-Each rotation is orthogonal, so after the sweep ${R^\top R}$ has gained exactly ${\mathbf{a}\mathbf{a}^\top}$ (in exact arithmetic; the code skips entries below $10^{-14}$) and ${R^\top d}$ has gained $`\beta \, \mathbf{a}`$. $R$ stays upper triangular, and the leftover $\beta$ is discarded. Two details are easy to miss:
+Each rotation is orthogonal, so after the sweep ${R^\top R}$ has gained exactly ${\mathbf{a}\mathbf{a}^\top}$ (in exact arithmetic; the code skips entries below $10^{-14}$) and ${R^\top d}$ has gained $`\beta \, \mathbf{a}`$. $R$ stays upper triangular, and the leftover $\beta$ is discarded. Three details are easy to miss:
 
-- The rotation also works when $R_{cc} = 0$. Then $\gamma = 0$ and $\sigma = \pm 1$, so the rotation just swaps the new row into row $c$. This is what happens at a new node's still-empty diagonal block.
-- The docstring's "O(m)" (where $`m`$ is the number of columns of $`R`$) is the cost of one rotation, not of one row. A row whose first nonzero is at column $c_0$ can trigger up to ${m - c_0}$ rotations, so the worst case is ${O(m^2)}$ per row.
-- An odometry edge into node $k$ starts at ${c_0 = 6(k-1)}$. Each of its rows needs at most 12 rotations, each at most 12 columns wide, no matter how long the trajectory is.
-- The loop still scans the leading zero columns, which is O(m) per row.
+- The rotation also works when $R_{cc} = 0$. Then $\gamma = 0$ and $\sigma = \pm 1$, so the rotation moves the new row into row $c$ (up to sign). This is what happens at a new node's still-empty diagonal block.
+- The docstring's "O(m) per row" understates the cost: $O(m)$ (where $`m`$ is the number of columns of $`R`$) is the cost of one rotation, not of one row. A row whose first nonzero is at column $c_0$ can trigger up to ${m - c_0}$ rotations, so the worst case is ${O(m^2)}$ per row.
+  - An odometry edge into node $k$ starts at ${c_0 = 6(k-1)}$. Each of its rows needs at most 12 rotations, each at most 12 columns wide, no matter how long the trajectory is.
+  - The loop still scans the leading zero columns, which is O(m) per row.
 
 **Streaming a new node** (`run_incremental_pose_graph`): for node $k$ with odometry edge ${Z_{k-1,k}}$:
 
@@ -441,7 +346,7 @@ It starts from the read-out estimate $X$, not from ${\bar{X}}$. The script never
 - `--nodes-per-side 16` gives 64 nodes, which stream in as ${k = 1, \ldots, 63}$.
 - That makes 9 full relinearizations: the initial one, 7 periodic ones (${k = 8, 16, \ldots, 56}$) and the loop-closure one at ${k = 63}$.
 - The `run_batch_streaming` baseline instead runs `pose_graph.py`'s damped solver from scratch 63 times, starting at `--damping 0.01`.
-- With `--seed 0`, both solvers finish at the same final pose error (0.0334 m).
+- With `--seed 0`, both solvers finish at the same final-node position error (0.0334 m) and rotation error (0.377 deg).
 - The `use_manif/` twin has the same flow, triggers and defaults. It retracts with `x_lin[k] + manif.SE3Tangent(delta_k)`.
 
 ---
@@ -450,5 +355,5 @@ It starts from the read-out estimate $X$, not from ${\bar{X}}$. The script never
 
 1. Dellaert, F., & Kaess, M. (2006). *Square Root SAM: Simultaneous Localization and Mapping via Square Root Information Smoothing*. International Journal of Robotics Research, 25(12), 1181–1203. https://doi.org/10.1177/0278364906072768 - the sparse QR/square-root-information factorization behind §3's $A = QR$ and the claim that most of the previous factorization stays reusable.
 2. Kaess, M., Ranganathan, A., & Dellaert, F. (2008). *iSAM: Incremental Smoothing and Mapping*. IEEE Transactions on Robotics, 24(6), 1365–1378. https://doi.org/10.1109/TRO.2008.2006706 - the original iSAM algorithm (incremental QR updates via Givens rotations, with periodic variable reordering) behind §1, §2, §4–§6, and §9.
-3. Kaess, M., Johannsson, H., Roberts, R., Ila, V., Leonard, J. J., & Dellaert, F. (2012). *iSAM2: Incremental Smoothing and Mapping Using the Bayes Tree*. International Journal of Robotics Research, 31(2), 216–235. https://doi.org/10.1177/0278364911430419 - the Bayes-tree data structure and fluid relinearization behind §7, §11, and §13's iSAM2 description. Covered in full in [`isam2_optimization.md`](isam2_optimization.md) and [`bayes_tree.md`](bayes_tree.md).
+3. Kaess, M., Johannsson, H., Roberts, R., Ila, V., Leonard, J. J., & Dellaert, F. (2012). *iSAM2: Incremental Smoothing and Mapping Using the Bayes Tree*. International Journal of Robotics Research, 31(2), 216–235. https://doi.org/10.1177/0278364911430419 - the Bayes-tree data structure and selective (fluid) relinearization behind §7, §11, and §13's iSAM2 description. Covered in full in [`isam2_optimization.md`](isam2_optimization.md) and [`bayes_tree.md`](bayes_tree.md).
 4. Dellaert, F., & Kaess, M. (2017). *Factor Graphs for Robot Perception*. Foundations and Trends in Robotics, 6(1–2), 1–139. https://doi.org/10.1561/2300000043 - general reference for the factor-graph formulation underlying §3 and §11.

@@ -16,7 +16,7 @@ Think of them as:
 
 ![A "Frontend (online processing)" block (scene tracking, pose estimation) and "Backend (offline processing)" block (pose graph, mapping, loop closure, optimization over a cost landscape) producing an optimized trajectory](images/frontend_backend_4.jpg)
 
-*These four diagrams are illustrative sketches - they don't fully agree with each other, or with the sections below, on exactly which stage owns loop-closure detection vs. correction, or on the online/offline framing. See §3 and §5 for that nuance.*
+*These four diagrams are illustrative sketches - they don't fully agree with each other, or with the sections below, on exactly which stage owns loop-closure detection vs. correction, or on the online/offline framing. See §3 and §5 for that nuance. The fourth diagram's own label reads "Pose Grpah" (sic: pose graph).*
 
 ---
 
@@ -42,13 +42,13 @@ Measurements/constraints
 
 Typical front-end tasks:
 
-- **Feature extraction** (finding distinctive image points, such as corners) - ORB, FAST, SIFT, etc.
+- **Feature extraction** (finding distinctive image points, such as corners) - detectors/descriptors such as ORB (Oriented FAST and Rotated BRIEF), FAST (Features from Accelerated Segment Test), SIFT (Scale-Invariant Feature Transform)
 - **Feature tracking/matching** (finding the same feature again in later frames)
 - **Data association** - determining that a feature in frame $k$ is the same physical point seen in frame $k+1$
-- **Visual odometry** (VO) - odometry computed from camera images
-- **Depth estimation/triangulation** - see [frontend/triangulation_pnp.md](frontend/triangulation_pnp.md) for the actual math, plus its inverse problem, Perspective-n-Point (PnP), which estimates the pose from known points
-- **Keyframe selection**
-- **Loop-closure detection**
+- **Visual odometry** (VO) - [odometry](glossary.md#odometry) computed from camera images
+- **Depth estimation/triangulation** - see [frontend/triangulation_pnp.md](frontend/triangulation_pnp.md) for the actual math, plus its inverse problem, Perspective-n-Point (PnP), which estimates the [pose](glossary.md#pose) from known points
+- **[Keyframe](glossary.md#keyframe) selection** (choosing a subset of frames to keep for optimization)
+- **[Loop-closure](glossary.md#loop-closure) detection**
 
 With a LiDAR instead of a camera, feature matching and motion estimation become **scan registration**: aligning one point cloud with another, point by point or through fitted planes and cylinders. See [frontend/lidar_primitives.md](frontend/lidar_primitives.md).
 
@@ -61,11 +61,11 @@ Frame 1                  Frame 2
           ●                    ●
 ```
 
-The front-end tracks the same points and estimates:
+The front-end tracks the same points and estimates the relative camera pose
 
-$$T_{12}$$
+$$\tilde T_{12} \in \mathrm{SE}(3)$$
 
-meaning:
+(rotation + translation, see [SE(3)](glossary.md#so3-and-se3); the tilde marks a measurement, as in [pose_graph_optimization.md](optimization/pose_graph_optimization.md)), meaning:
 
 > "The camera moved approximately this much from frame 1 to frame 2."
 
@@ -79,13 +79,13 @@ The **back-end takes those constraints and optimizes the robot's trajectory and 
 
 For example, the front-end might produce:
 
-$$T_{01}, T_{12}, T_{23}, T_{34}$$
+$$\tilde T_{01}, \tilde T_{12}, \tilde T_{23}, \tilde T_{34}$$
 
-and landmark observations such as:
+and [landmark](glossary.md#landmark) observations such as:
 
 $$z_{11},\ z_{12},\ z_{21},\ \ldots$$
 
-where $z_{ij}$ is the observation (e.g., the pixel measurement) of landmark $j$ from pose $i$.
+where $z_{ij}$ is the pixel measurement of landmark $j$ from pose $i$ (the bundle-adjustment $z_{ij}$, not the relative-pose $z_{ij}$ of the pose-graph docs).
 
 The back-end asks:
 
@@ -99,7 +99,7 @@ For example:
 \min_{\mathbf{x}} \frac12\sum_i \|r_i(\mathbf{x})\|^2
 ```
 
-where $r_i$ is the [residual](glossary.md#residual-error) of measurement $i$.
+where $\mathbf{x}$ stacks all pose (and landmark) variables and $r_i$ is the [residual](glossary.md#residual-error) of measurement $i$.
 
 **Intuition:** the residual is the gap between prediction and measurement. Toy case: the model predicts a landmark at pixel 100, the camera sees it at 103, so the residual has size 3. The sign convention varies, but the squared cost does not care.
 
@@ -107,7 +107,7 @@ Two levels to keep apart:
 
 **Problem formulations** (what we optimize):
 
-- **[Bundle adjustment](optimization/bundle_adjustment.md)**
+- **[Bundle adjustment (BA)](optimization/bundle_adjustment.md)**
 - **[Pose-graph optimization](optimization/pose_graph_optimization.md)**
 - **[Factor-graph optimization](optimization/factor_graph.md)**
 - **[Nonlinear least squares](optimization/nonlinear_least_square.md)** - the general form behind all of them
@@ -138,7 +138,7 @@ A → B → C → D → A
 
 But every motion estimate has a small error.
 
-So the estimated trajectory drifts, and the final pose does not land back on A:
+So the estimated trajectory [drifts](glossary.md#drift), and the final pose does not land back on A:
 
 ```text
      A ───── B
@@ -152,11 +152,11 @@ Call the poses $x_0$ (A), $x_1$ (B), $x_2$ (C), $x_3$ (D) and $x_4$ (A′, the e
 
 > "This place looks like somewhere I've seen before."
 
-It generates a constraint between the *non-consecutive* poses $x_0$ and $x_4$: a measured relative pose $T_{04}$, which is close to the identity if the robot returned to exactly the same spot.
+It generates a constraint between the *non-consecutive* poses $x_0$ and $x_4$: a measured relative pose $\tilde T_{04}$, which is close to the identity if the robot returned to exactly the same spot.
 
 The **back-end then optimizes the entire trajectory** so that all constraints are satisfied as well as possible.
 
-**Tiny example** (toy case: translation only, equal weights, loop closure fully trusted):
+**Tiny example** (toy case: translation only, $x_0$ anchored, odometry steps weighted equally, loop closure treated as exact):
 
 - The loop closure says $x_4$ should sit back at $x_0$, but the drifted estimate is 0.4 m away.
 - That 0.4 m is spread over the 4 odometry steps, 0.1 m per step.
@@ -178,9 +178,12 @@ This is why the diagrams above disagree:
 | ------------------ | ------------------------------------------------ | --------------------------------------- |
 | Main job           | Understand sensor observations                   | Find globally consistent solution       |
 | Input              | Raw sensor data                                  | Measurements/constraints                |
-| Output             | Features, matches, relative poses, loop-closure candidates| Optimized poses/map (verified loop closures included) |
+| Output             | Features, matches, relative poses, loop-closure candidates| Optimized poses/map; verifies and applies loop closures |
 | Typical algorithms | Feature tracking, VO, matching                   | BA, pose graph, factor graph            |
 | Focus              | Local/sequential                               | Global/accumulated                    |
+
+### Front-end errors become constraints for the back-end
+If data association or motion estimation is wrong, a plain least-squares optimizer tries to satisfy the bad constraint and can converge to a wrong solution. Back-ends therefore often use robust costs ([glossary](glossary.md#outlier-and-robust-kernel); Huber, Cauchy, Dynamic Covariance Scaling (DCS)) that down-weight constraints that disagree strongly with the rest; see [optimization/pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
 
 ---
 
@@ -188,24 +191,9 @@ This is why the diagrams above disagree:
 
 The front-end **doesn't necessarily mean "real-time"**, and the back-end **doesn't necessarily mean "offline."** (Offline means run after all the data is collected; online means run while data arrives.)
 
-(The fourth diagram above labels the front-end "online processing" and the back-end "offline processing" - a common simplification, but, as just stated, not a strict rule.)
+(The fourth diagram above labels the front-end "online processing" and the back-end "offline processing".)
 
-In modern SLAM systems, both can operate online:
-
-```text
-              FRONT-END
-Sensors ──→ Tracking ──→ Constraints
-                          │
-                          ↓
-                    BACK-END
-                   Optimization
-                          │
-                          ↓
-                  Updated SLAM state
-```
-
-### Front-end errors become constraints for the back-end
-If data association or motion estimation is wrong, a plain least-squares optimizer tries to satisfy the bad constraint and can converge to a wrong solution. Back-ends therefore often use robust costs ([glossary](glossary.md#outlier-and-robust-kernel); Huber, Cauchy, DCS) that down-weight constraints that disagree strongly with the rest; see [optimization/pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
+In modern SLAM systems, both stages can operate online (see the pipeline in §1).
 
 ---
 
@@ -213,8 +201,8 @@ If data association or motion estimation is wrong, a plain least-squares optimiz
 
 1. Cadena, C., Carlone, L., Carrillo, H., Latif, Y., Scaramuzza, D., Neira, J., Reid, I., & Leonard, J. J. (2016). *Past, Present, and Future of Simultaneous Localization and Mapping: Toward the Robust-Perception Age*. IEEE Transactions on Robotics, 32(6), 1309–1332. https://doi.org/10.1109/TRO.2016.2624754 - the standard survey that frames the front-end/back-end split used throughout this doc (§1, §2, §4).
 2. Grisetti, G., Kümmerle, R., Stachniss, C., & Burgard, W. (2010). *A Tutorial on Graph-Based SLAM*. IEEE Intelligent Transportation Systems Magazine, 2(4), 31–43. https://doi.org/10.1109/MITS.2010.939925 - the back-end/pose-graph optimization tutorial behind §2 and §4.
-3. Mur-Artal, R., Montiel, J. M. M., & Tardós, J. D. (2015). *ORB-SLAM: A Versatile and Accurate Monocular SLAM System*. IEEE Transactions on Robotics, 31(5), 1147–1163. https://doi.org/10.1109/TRO.2015.2463671 - a concrete worked system pairing an ORB-feature front-end with a local-BA + pose-graph back-end, behind §1's ORB mention and §3's loop-closure walkthrough.
-4. Gálvez-López, D., & Tardós, J. D. (2012). *Bags of Binary Words for Fast Place Recognition in Image Sequences*. IEEE Transactions on Robotics, 28(5), 1188–1197. https://doi.org/10.1109/TRO.2012.2197158 - the DBoW2 place-recognition method behind §3's claim that loop-closure *detection* is a front-end (place-recognition) task.
+3. Mur-Artal, R., Montiel, J. M. M., & Tardós, J. D. (2015). *ORB-SLAM: A Versatile and Accurate Monocular SLAM System*. IEEE Transactions on Robotics, 31(5), 1147–1163. https://doi.org/10.1109/TRO.2015.2463671 - a concrete system using ORB features, local BA and pose-graph loop closing; its Tracking / Local Mapping / Loop Closing threads only roughly follow the front-end/back-end split. Relevant to §1's ORB mention and as a worked loop-closure example for §3.
+4. Gálvez-López, D., & Tardós, J. D. (2012). *Bags of Binary Words for Fast Place Recognition in Image Sequences*. IEEE Transactions on Robotics, 28(5), 1188–1197. https://doi.org/10.1109/TRO.2012.2197158 - the DBoW2 place-recognition method, an example of the place-recognition step in §3's account of loop-closure *detection*.
 5. Chen, W., Shang, G., Ji, A., Zhou, C., Wang, X., Xu, C., Li, Z., & Hu, K. (2022). *An Overview on Visual SLAM: From Tradition to Semantic*. Remote Sensing, 14(13), 3010. https://doi.org/10.3390/rs14133010 - the original source of the diagram in `images/frontend_backend_1.jpg` (see Image sources below).
 6. Chen, W., Zhou, C., Shang, G., Wang, X., Li, Z., Xu, C., & Hu, K. (2022). *SLAM Overview: From Single Sensor to Heterogeneous Fusion*. Remote Sensing, 14(23), 6033. https://doi.org/10.3390/rs14236033 - the original source of the diagram in `images/frontend_backend_2.jpg` (see Image sources below).
 7. Duan, R., Feng, Y., & Wen, C.-Y. (2022). *Deep Pose Graph-Matching-Based Loop Closure Detection for Semantic Visual SLAM*. Sustainability, 14(19), 11864. https://doi.org/10.3390/su141911864 - Figure 1 of this paper is the original source of the diagram in `images/frontend_backend_4.jpg` (see Image sources below).

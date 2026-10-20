@@ -9,9 +9,7 @@
 Suppose the robot has estimated four poses, then moves one more step:
 
 ```text
-Pose 1 → Pose 2 → Pose 3 → Pose 4 → Pose 5
-  ↓        ↓        ↓        ↓        ↓
-  x1       x2       x3       x4       x5
+x1 ─── x2 ─── x3 ─── x4 ─── x5
 ```
 
 - **Naive optimizer:** "New information! Let's optimize $x_1, \ldots, x_5$ all over again." That is expensive.
@@ -31,10 +29,10 @@ x1 ─── x2 ─── x3 ─── x4
 We want the poses that best explain all measurements:
 
 ```math
-X^*=\arg\min_X \sum_i \|r_i(X)\|^2
+X^*=\arg\min_X \sum_i \lVert r_i(X) \rVert_{\Omega_i}^2
 ```
 
-where $`X`$ stacks all the poses, $`r_i(X)`$ is the residual (predicted minus measured) of the $i$-th measurement, and $`X^*`$ is the best-fit $`X`$.
+where $`X`$ stacks all the poses, $`r_i(X)`$ is the residual (predicted minus measured) of the $i$-th measurement, $`\lVert r \rVert_{\Omega}^2 = r^\top \Omega\, r`$ weights it by the [information matrix](../glossary.md#information-matrix) $`\Omega_i`$ of that measurement (large $`\Omega_i`$ = trusted more), and $`X^*`$ is the best-fit $`X`$.
 
 Each odometry measurement says roughly how far the robot moved. The true step was 1 m each time, but every measurement carries a little noise:
 
@@ -50,23 +48,13 @@ x1 ── 1.02 m ── x2 ── 0.97 m ── x3 ── 1.05 m ── x4
 └─────────────────── 2.90 m ────────────────────┘
 ```
 
-The chain adds up to 3.04 m, but the direct measurement says 2.90 m. They can't all be exactly right, so optimization finds the poses that make **all measurements reasonably happy at once**, weighting each by how much it is trusted.
+The chain adds up to 3.04 m, but the direct measurement says 2.90 m. They can't all be exactly right, so optimization finds the poses that make **all measurements reasonably happy at once**, weighting each by how much it is trusted. Doing this from scratch at every step is the batch approach that iSAM and iSAM2 replace ([`isam_optimization.md` §1-§3](isam_optimization.md#1-the-problem-with-ordinary-batch-optimization)).
 
 ---
 
 ## 3. The problem with doing this repeatedly
 
-A robot running at 10 Hz grows the graph with every measurement:
-
-```text
-t1: x1
-t2: x1 → x2
-t3: x1 → x2 → x3
-...
-t1000: 1000 poses
-```
-
-Batch optimization re-solves the whole graph after every new measurement ("new measurement → optimize EVERYTHING → repeat"), so the cost keeps growing with the trajectory. **iSAM** and then **iSAM2** avoid this.
+A robot running at 10 Hz grows the graph with every measurement (1000 poses at t1000), and batch optimization re-solves the whole graph after every new one, so the cost keeps growing with the trajectory. **iSAM** and then **iSAM2** avoid this ([`isam_optimization.md` §1](isam_optimization.md#1-the-problem-with-ordinary-batch-optimization)).
 
 ---
 
@@ -74,47 +62,48 @@ Batch optimization re-solves the whole graph after every new measurement ("new m
 
 iSAM (incremental Smoothing and Mapping) does not re-solve all variables each time. It **reuses the previous factorization**.
 
-Each solve is a Gauss-Newton step $H\Delta x=-g$ with $H=J^\top J$ (see [`gauss_newton.md`](gauss_newton.md)):
+Each solve is a Gauss-Newton step $H\Delta x=-g$ with the Hessian $H=J^\top \Omega J$ (the information matrix of the linearized problem) and $g=J^\top \Omega r$ (this is the glossary's $b$; see [`gauss_newton.md`](gauss_newton.md)). iSAM never forms $H$: it factorizes the whitened Jacobian $A$ (each row scaled by the square root of its $\Omega$), so $H=J^\top \Omega J=A^\top A=R^\top R$, where $R$ is the upper-triangular square-root factor ($R=L^\top$ for the Cholesky factor $L$ of §7; it is not a rotation). The pipeline is factor graph, then whitened Jacobian $A$, then $A=QR$ ($H=R^\top R$), then solve for $\Delta x$ (Givens-rotation details: [`isam_optimization.md` §3](isam_optimization.md#3-why-is-this-possible)).
 
-```text
-Factor graph → Jacobian J → H = JᵀJ → Factorize H → solve Δx
-```
-
-The expensive part is often the **factorization**. When a new pose arrives, most of the old information hasn't changed, so **iSAM keeps the old factorization and updates it**.
+The expensive part is often the **factorization**. When a new pose arrives, most of the old information hasn't changed, so **iSAM keeps the old factorization $R$ and updates it**.
 
 ---
 
 ## 5. Think of it like editing a huge spreadsheet
 
-A spreadsheet has 100,000 rows and we change one cell. We don't delete it and rebuild everything; we update the affected calculations. iSAM2 applies the same philosophy to SLAM:
-
-```text
-Old solution → new measurement → identify affected variables → update those parts → reuse everything else
-```
+The spreadsheet analogy (change one cell, update only the formulas that depend on it) is in [`isam_optimization.md` §4](isam_optimization.md#4-an-analogy-editing-a-spreadsheet) and applied to iSAM vs iSAM2 in §6.1's at-a-glance summary.
 
 ---
 
 ## 6. But what makes iSAM2 special?
 
-iSAM2 improves on the original iSAM with three ideas:
+iSAM2 improves on the **original iSAM** (the 2008 algorithm) with three ideas:
 
 1. **Bayes tree** (§7-§9)
-2. **Selective relinearization** (§10-§11)
+2. **Selective [relinearization](../glossary.md#relinearization)** (§10-§11; the iSAM2 paper calls it **fluid relinearization**)
 3. **Variable reordering** (§12)
 
 ### 6.1 iSAM vs. iSAM2, side by side
 
-iSAM2 solves the same problem as iSAM, on the same factorization. iSAM's **square-root information matrix** $R$ (the triangular factor with $`H=R^\top R`$) and iSAM2's Bayes tree hold the same numbers, for the same variable ordering and linearization point. They are just organized differently. What changes is how much each one can do *incrementally*:
+**At a glance.** Think of a huge spreadsheet where results depend on other results, and one input cell changes:
+- **iSAM:** the whole factorization is one big triangular block $R$. A new measurement edits it row by row. It can't cheaply tell which formulas a relinearization or reordering touches, so every so often it rebuilds the entire sheet.
+- **iSAM2:** the same numbers kept as a tree (the Bayes tree), where every part knows its parent. A new measurement redoes only the branch it touches, so no periodic rebuild is needed.
+- An ordinary measurement is like changing one cell: a few formulas to recompute. A loop closure is like changing a cell many formulas depend on: a much larger region, up to the whole sheet in the worst case (§12's fixed-order example: 16 of 16 variables).
 
-| | iSAM (Kaess et al. 2008) | iSAM2 (Kaess et al. 2012) |
-| --- | --- | --- |
-| Data structure | A sparse upper-triangular matrix $R$ | A Bayes tree: the same factorization, grouped into cliques (§7) |
-| New measurement | Folded into $R$ as a new row, with Givens rotations | The cliques it touches, and everything above them, are removed, re-eliminated and put back (§8-§9) |
-| Relinearization | Periodic batch step: every variable at once | Selective: only variables that moved past a threshold (§10) |
-| Variable reordering | Periodic batch step: COLAMD over every variable | Incremental: CCOLAMD over just the re-eliminated part (§12) |
-| [Loop closure](../glossary.md#loop-closure) | The Givens sweep runs through most of $R$, and the fill-in it adds stays until the next batch step | A large affected region, but re-eliminated right away with a fresh ordering (§9, §12) |
-| Updating the estimate | Back-substitution through $R$ | Starts at the root and stops in branches where the changes are negligible (§13) |
-| Periodic batch steps | Required: the only way to relinearize and reorder | None |
+The table below compares the two, with plain batch optimization for reference.
+
+iSAM2 solves the same problem as iSAM, on the same factorization. iSAM's **square-root information matrix** $R$ (the triangular factor with $`H=R^\top R`$, $`R=L^\top`$) and iSAM2's Bayes tree hold the same numbers, for the same variable ordering and linearization point. They are just organized differently. What changes is how much each one can do *incrementally*:
+
+| | Batch optimization | iSAM (Kaess et al. 2008) | iSAM2 (Kaess et al. 2012) |
+| --- | --- | --- | --- |
+| Same in all three | Same nonlinear least-squares objective, full history kept, sparse factorization | Same | Same |
+| Data structure | n/a (everything is re-solved each time) | A sparse upper-triangular matrix $R$ | A Bayes tree: the same factorization, grouped into **cliques** (a clique is a group of variables eliminated together, one node of the Bayes tree; §7) |
+| New measurement | Reoptimize everything | Folded into $R$ as a new row, with Givens rotations | The cliques it touches, and everything above them, are removed, [re-eliminated](../glossary.md#variable-elimination) and put back (§8-§9) |
+| Relinearization | Broad | Periodic batch step: every variable at once | Selective: only variables that moved past a threshold (§10) |
+| Variable reordering | Important | Periodic batch step: COLAMD (a fill-reducing ordering heuristic; [glossary](../glossary.md#variable-ordering)) over every variable | Incremental: CCOLAMD over just the re-eliminated part, dynamically managed (§12) |
+| [Loop closure](../glossary.md#loop-closure) | Full re-solve, same as any other step | The Givens sweep runs through most of $R$, and the fill-in it adds stays until the next batch step | A large affected region, up to a full re-solve in the worst case (§19), but re-eliminated right away with a fresh ordering (§9, §12) |
+| Updating the estimate | n/a (everything is re-solved each time) | Back-substitution through $R$ | Starts at the root and stops in branches where the changes are negligible (§13) |
+| Periodic batch steps | Every update is one | Required: the only way to relinearize and reorder | None |
+| Real-time suitability | Lower | Cheaper per update except around loop closures, so good for online SLAM ([`isam_optimization.md` §8](isam_optimization.md#8-batch-vs-incremental)) | Higher |
 
 One idea sits behind every row. In matrix form, iSAM can't cheaply tell which part of $R$ a relinearization or a reordering would touch, so it periodically does both for everything. The Bayes tree makes those dependencies explicit (each clique knows its parent), so iSAM2 can redo exactly the affected part at every step and never needs a batch step.
 
@@ -124,7 +113,7 @@ This repo implements the iSAM column minus COLAMD reordering, with loop closures
 
 ## 7. Bayes tree - the most important intuition
 
-Quick recap: [Cholesky](../glossary.md#cholesky-factorization) factorization splits $H$ into $H = LL^\top$ ($L$ lower-triangular). Solving $H\Delta x=-g$ then takes two cheap triangular solves instead of one matrix inversion.
+Quick recap: [Cholesky](../glossary.md#cholesky-factorization) factorization splits $H$ into $H = LL^\top$ ($L$ lower-triangular; the upper-triangular $R$ of §4 is $R = L^\top$). Solving $H\Delta x=-g$ then takes two cheap triangular solves instead of one matrix inversion.
 
 - $H$ is sparse: two poses only interact if a factor directly connects them, so the factorization skips arithmetic on known zeros.
 - Eliminating a variable can turn some of those zeros into nonzeros ([fill-in](../glossary.md#fill-in)), which is why the [variable ordering](../glossary.md#variable-ordering) matters (§12).
@@ -153,12 +142,18 @@ This doc needs only that. For how elimination produces the tree, the cliques, th
 The robot adds $x_5$ and receives a measurement involving it. Usually the new information mainly affects the solution around $x_5$, so iSAM2 conceptually touches only the top of the tree instead of recomputing everything. Schematically (the newest variable lives at the root, §12):
 
 ```text
-Before:                           After the update:
+Before:                              After the update:
 
-   [x4]  ← root                      [x4 x5]  ← re-eliminated root, now with x5
-    │                                 │
- [x1 x2 x3]  ← old, reused         [x1 x2 x3]  ← old, reused
+  [x3 x4]  ← root                      [x4 x5]  ← new root (x4, x5 eliminated last)
+     │                                    │
+  [x2|x3]  ← reused                    [x3|x4]  ← re-eliminated
+     │                                    │
+  [x1|x2]  ← reused                    [x2|x3]  ← reused
+                                          │
+                                       [x1|x2]  ← reused
 ```
+
+In `[x2|x3]`, the bar reads "given": x2 is the variable eliminated at that node and x3 its separator ([`bayes_tree.md` §13](bayes_tree.md#13-one-more-important-concept-cliques)).
 
 Batch optimization would instead recompute all of $x_1, \ldots, x_5$.
 
@@ -184,15 +179,7 @@ x6 ─ x5 ─ x4
 ┆ = new loop-closure factor (x6 ↔ x1)
 ```
 
-The new measurement can now affect **many old poses**. iSAM2 doesn't blindly update only $x_6$; it identifies the affected region of the Bayes tree and redoes that computation:
-
-```text
-normal odometry → small affected region → small update
-
-loop closure    → large affected region → larger update
-```
-
-Ordinary updates are small and loop closures are the occasional large ones, which is a big part of why iSAM2 suits real-time SLAM.
+The new measurement can now affect **many old poses**. iSAM2 doesn't blindly update only $x_6$; it identifies the affected region of the Bayes tree and redoes that computation. A normal odometry edge gives a small affected region and a small update; a loop closure gives a large affected region and a larger update (measured example: the figure in §11). Ordinary updates are small and loop closures are the occasional large ones, which is a big part of why iSAM2 suits real-time SLAM.
 
 ---
 
@@ -224,18 +211,13 @@ It isn't free for that one variable, though. Relinearizing $x_4$ changes every f
 
 ## 11. Why selective updates pay off
 
-Take a SLAM graph with 10,000 poses. After a new measurement, maybe only 50 variables have changed significantly. A batch optimizer might effectively reconsider all 10,000, while iSAM2 focuses on the affected portion:
+Illustrative only (made-up numbers, not measured): in a SLAM graph with 10,000 poses, after a new measurement maybe only 50 variables have changed significantly. A batch optimizer might effectively reconsider all 10,000, while iSAM2 focuses on the affected portion. The exact behavior depends on the graph and ordering.
 
-```text
-Batch optimization          iSAM2
+The measured counterpart from this repo (counts in §19):
 
-████████████████████████    ████
-████████████████████████      ███
-████████████████████████        ██
-                                   █
-```
+![Two rows from bayes_tree_construction.py: the 16-variable elimination chain, where a new odometry edge affects only a few variables at the root end and the loop-closure edge affects all of them](../../assets/bayes_tree_construction.png)
 
-The exact behavior depends on the graph and ordering, but that is the intuition.
+*Figure: `use_numpy/bayes_tree_construction.py` at its defaults, plotted by `uv run python assets/make_figures.py bayes_tree_construction`. Red marks the variables that must be re-eliminated.*
 
 ---
 
@@ -266,40 +248,20 @@ This aims to keep both the fill-in and the next update small.
 
 Putting everything together, one iSAM2 update (simplified from Algorithm 1 of Kaess et al. 2012):
 
-```text
-             new measurements
-                    │
-                    ▼
- 1. Add the new factors (and any new variables)
-                    │
-                    ▼
- 2. Mark the affected variables:
-      - those touched by the new factors
-      - those that moved past the relinearization threshold (§10)
-                    │
-                    ▼
- 3. Remove the Bayes-tree cliques containing them,
-    plus everything above them up to the root
-                    │
-                    ▼
- 4. Relinearize the marked variables' factors (§10)
-                    │
-                    ▼
- 5. Reorder the removed variables (CCOLAMD, §12) and
-    re-eliminate them into a new top of the tree
-                    │
-                    ▼
- 6. Update the estimate from the root downward, stopping
-    in branches where the changes become negligible
-                    │
-                    ▼
-           updated SLAM state ──► wait for the next measurements
+```mermaid
+flowchart TD
+    A["Step 1: Add the new factors<br/>(and any new variables)<br/>from the new measurements"] --> B["Step 2: Mark the affected variables:<br/>(a) those touched by the new factors<br/>(b) those past the relinearization threshold (§10)"]
+    B --> C["Step 3: Remove the Bayes-tree cliques containing them,<br/>plus everything above them up to the root"]
+    C --> D["Step 4: Relinearize the marked variables' factors (§10)"]
+    D --> E["Step 5: Reorder the removed variables (CCOLAMD, §12)<br/>and re-eliminate them into a new top of the tree"]
+    E --> F["Step 6: Update the estimate from the root downward,<br/>stopping in branches where the changes become negligible"]
+    F --> G["Updated SLAM state"]
 ```
 
 Everything below the removed top of the tree keeps its factorization untouched (its estimates can still be updated in step 6).
 
 ### Intuition for step 6
-- Each clique's estimate is computed from its parent's: in symbols, child $`\delta = (d - R_{sep}\,\delta_{parent}) / R_{cc}`$, where $`\delta`$ is the clique's update step, $`R_{cc}`$ is the clique's own diagonal block of the triangular factor $R$, $d$ is the clique's own right-hand side and $R_{sep}$ couples it to its parent.
+- Each clique's estimate is computed from its parent's: in symbols, child $`\delta = (d - R_{sep}\,\delta_{parent}) / R_{cc}`$ (back-substitution through the clique, [glossary](../glossary.md#back-substitution)), where $`\delta`$ is the clique's update step, $`R_{cc}`$ is the clique's own diagonal block of the triangular factor $R$, $d$ is the clique's own right-hand side and $R_{sep}$ couples it to its parent.
 - If the parent's $\delta$ barely moved and the clique's own $d$ is unchanged, the child's $\delta$ does not change either.
 - So the update can stop at that branch, and everything below it is skipped safely.
 - (Conceptual only: this repo does not implement iSAM2.)
@@ -308,36 +270,13 @@ Everything below the removed top of the tree keeps its factorization untouched (
 
 ## 14. iSAM2 vs EKF
 
-**EKF-SLAM** ([glossary](../glossary.md#ekf-extended-kalman-filter)) is fundamentally a **filtering** approach: "I maintain my current estimate and uncertainty, and update it when a measurement arrives." Old information is compressed into the current state.
-
-```text
-prediction → measurement → EKF update → new estimate
-```
-
-**iSAM2** is an **incremental smoothing/optimization** approach: "I keep the history and continuously optimize it." It retains historical variables and constraints.
-
-```text
-x1 ─ x2 ─ x3 ─ x4 ─ x5
-│         │         │
-measurements + loop closures
-          ↓
-   continuously optimize
-```
+**EKF-SLAM** ([glossary](../glossary.md#ekf-extended-kalman-filter)) is a **filtering** approach: it maintains the current estimate and uncertainty, and old information is compressed into the current state. **iSAM2** is an incremental **smoothing**/optimization approach: it keeps the history (historical variables and constraints) and continuously optimizes it. Full comparison: [`filtering_smoothing.md`](../filtering_smoothing.md).
 
 ---
 
 ## 15. iSAM2 vs batch optimization
 
-|                        | Batch optimization    | iSAM2                |
-| ---------------------- | --------------------- | -------------------- |
-| New measurement        | Reoptimize everything | Incrementally update |
-| History                | Kept                  | Kept                 |
-| Nonlinear optimization | Yes                   | Yes                  |
-| Sparse factorization   | Yes                   | Yes                  |
-| Relinearization        | Broad                 | Selective            |
-| Variable ordering      | Important             | Dynamically managed  |
-| Loop closure           | Full re-solve, same as any other step | Large affected region; can approach a full re-solve (§9, §19) |
-| Real-time suitability  | Lower                 | Higher               |
+The batch-vs-iSAM2 comparison (new measurement, history, nonlinear optimization, sparse factorization, relinearization, variable ordering, loop closure, real-time suitability) is the Batch column of the table in §6.1.
 
 The key difference isn't a different SLAM objective; it is **how intelligently the solution is updated**.
 
@@ -345,24 +284,13 @@ The key difference isn't a different SLAM objective; it is **how intelligently t
 
 ## 16. Ordinary measurement vs. loop closure, in spreadsheet terms
 
-Continuing the spreadsheet of §5:
-
-- **Ordinary measurement:** like changing one cell. We find the few formulas that depend on it and recompute only those.
-- **Loop-closure measurement:** like changing a cell that many formulas depend on. A much larger region must be recomputed, but still not the whole sheet.
+An ordinary measurement touches a small region; a loop closure can touch up to the whole tree in the worst case (§12's fixed-order example: 16 of 16 variables). The spreadsheet picture is in §6.1; the loop-closure case is §9.
 
 ---
 
 ## 17. A common misconception: iSAM2 only optimizes the newest pose
 
-That is not correct. iSAM2 maintains a **global smoothing solution**. If a loop closure says $x_{100} \approx x_1$, the correction can propagate backward through the trajectory, so old poses can change:
-
-```text
-x1 ← x2 ← x3 ← ... ← x100
-↑                      ↑
-└──── loop closure ────┘
-```
-
-The cleverness is that iSAM2 determines **which parts need computational attention** rather than blindly recomputing the entire problem.
+That is not correct. iSAM2 maintains a **global smoothing solution**: if a loop closure says $x_{100} \approx x_1$, the correction propagates backward and old poses change. The cleverness is that iSAM2 determines **which parts need computational attention** rather than recomputing the entire problem. Same point as [`isam_optimization.md` §9](isam_optimization.md#9-isam-doesnt-mean-never-touch-old-variables).
 
 ---
 
@@ -379,12 +307,11 @@ The cleverness is that iSAM2 determines **which parts need computational attenti
 Partially. The Bayes-tree construction is implemented; the rest is not:
 - [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds the elimination tree underlying this doc's §7 Bayes tree (symbolic elimination over this repo's pose-graph topology, via `symbolic_eliminate`/`bayes_tree_affected_path` in `utils.py`).
 - It keeps one node per variable and never merges them into cliques, so its affected counts are counts of variables, not cliques. The tree is built once from all edges, the loop-closure edge included, and then queried per edge.
-- It quantifies §9's "small vs. large affected region" claim with a computed example instead of only prose: with the default 16 nodes (`--nodes-per-side 4`), the newest odometry edge affects 2/16 variables and the loop-closure edge affects 16/16.
-- Finding (details in [`bayes_tree.md` §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo)): with a *fixed* elimination order (oldest node first, since §12's variable reordering is explicitly not implemented), this repo's loop-closure edge produces the worst possible case - the entire tree, not just a subtree, gets invalidated.
+- It quantifies §9's "small vs. large affected region" claim with a computed example instead of only prose (figure in §11): with the default 16 nodes (`--nodes-per-side 4`), the newest odometry edge affects 2/16 variables and the loop-closure edge affects 16/16. This is the worst case, because the elimination order is *fixed* (oldest node first; §12's variable reordering is not implemented), so the entire tree, not just a subtree, gets invalidated (details: [`bayes_tree.md` §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo)).
 
 **§10 selective relinearization and §12 variable reordering (CCOLAMD) remain unimplemented.** No numeric solve is integrated with the tree above.
 
-[`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`) implements the original **iSAM v1** mechanism from [`isam_optimization.md`](isam_optimization.md) instead:
+[`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`) implements the **original iSAM** mechanism from [`isam_optimization.md`](isam_optimization.md) instead:
 - incremental Givens-rotation QR row insertion into a running square-root-information matrix;
 - periodic and loop-closure-triggered full relinearization;
 - no Bayes tree.
@@ -397,7 +324,7 @@ So this page's Bayes tree has a runnable counterpart. iSAM2 as a whole (the tree
 
 ## 20. References
 
-1. Kaess, M., Johannsson, H., Roberts, R., Ila, V., Leonard, J. J., & Dellaert, F. (2012). *iSAM2: Incremental Smoothing and Mapping Using the Bayes Tree*. International Journal of Robotics Research, 31(2), 216–235. https://doi.org/10.1177/0278364911430419 - the Bayes tree, fluid/selective relinearization, and dynamic variable reordering this whole doc walks through.
+1. Kaess, M., Johannsson, H., Roberts, R., Ila, V., Leonard, J. J., & Dellaert, F. (2012). *iSAM2: Incremental Smoothing and Mapping Using the Bayes Tree*. International Journal of Robotics Research, 31(2), 216–235. https://doi.org/10.1177/0278364911430419 - the Bayes tree, selective (fluid) relinearization, and dynamic variable reordering this whole doc walks through.
 2. Kaess, M., Ranganathan, A., & Dellaert, F. (2008). *iSAM: Incremental Smoothing and Mapping*. IEEE Transactions on Robotics, 24(6), 1365–1378. https://doi.org/10.1109/TRO.2008.2006706 - the predecessor algorithm (incremental QR updates, no Bayes tree) that [`isam_optimization.md`](isam_optimization.md) covers and that `pose_graph_incremental.py` actually implements.
 
 See also [`bayes_tree.md`](bayes_tree.md) for the full elimination-to-tree mechanism behind §7, and [`isam_optimization.md`](isam_optimization.md) for the non-Bayes-tree predecessor algorithm this doc builds on.

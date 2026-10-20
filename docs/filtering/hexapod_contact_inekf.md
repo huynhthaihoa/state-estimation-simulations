@@ -151,7 +151,7 @@ Results (50 trials; "in window" = $`t \in [4, 8)`$ s):
 
 ## 5. IMU biases: the "imperfect" invariant EKF
 
-Each trial draws a constant gyro **bias** ([glossary](../glossary.md#bias)) (std 0.01 rad/s) and accelerometer bias (std 0.05 m/s²); both filters add the six biases to the state, with that prior. The bias error enters the invariant error through $`-\mathrm{Ad}_{\hat X}`$ ([glossary](../glossary.md#adjoint)), which depends on the estimate. So exact invariance is lost: Hartley et al. call this the **imperfect InEKF** (InEKF is their abbreviation for the invariant EKF). The bias columns of both filters are a first-order discretization (their error shrinks 4× when $`\Delta t`$ halves; tested).
+Each trial draws a constant gyroscope **bias** ([glossary](../glossary.md#bias)) (std 0.01 rad/s) and accelerometer bias (std 0.05 m/s²); both filters add the six biases to the state, with that prior. The bias error enters the invariant error through $`-\mathrm{Ad}_{\hat X}`$ ([glossary](../glossary.md#adjoint)), which depends on the estimate. So exact invariance is lost: Hartley et al. call this the **imperfect InEKF** (InEKF is their abbreviation for the invariant EKF). The bias columns of both filters are a first-order discretization (their error shrinks 4× when $`\Delta t`$ halves; tested).
 
 50 trials; bias NEES should be 6 (95% band $`[5.08, 7.00]`$):
 
@@ -166,7 +166,7 @@ Each trial draws a constant gyro **bias** ([glossary](../glossary.md#bias)) (std
 
 - **The invariant EKF stays consistent** on every measure, even though it is no longer exactly invariant. Its yaw variance can now shrink, but only slightly: the largest single-step decrease was about 0.06% (10 seeds × 3 gaits).
 - **The world-frame EKF is again mildly overconfident in yaw:** yaw NEES 1.27-1.54 against the invariant EKF's 0.84-1.11, above the 1.43 bound for ripple. This is at the default 0.02 rad initial error; §3 shows how it grows with a larger one.
-- **A gyro bias makes yaw drift faster.** The reported yaw σ after 12 s grows 1.4-2× compared with §3 (tripod 2.34° vs 1.15°, ripple 1.84° vs 1.15°, wave 1.62° vs 1.15°). The final-tick values are from 50 runs, so their ratios are noisy; the time-averaged NEES is the reliable number.
+- **A gyroscope bias makes yaw drift faster.** The reported yaw σ after 12 s grows 1.4-2× compared with §3 (tripod 2.34° vs 1.15°, ripple 1.84° vs 1.15°, wave 1.62° vs 1.15°). The final-tick values are from 50 runs, so their ratios are noisy; the time-averaged NEES is the reliable number.
 
 ---
 

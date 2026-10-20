@@ -13,7 +13,7 @@ x1 ───── x2 ───── x3 ───── x4
    odom12   odom23   odom34
 ```
 
-And suppose it observes a landmark:
+And suppose it observes a [landmark](../glossary.md#landmark):
 
 ```text
         l1
@@ -22,7 +22,7 @@ And suppose it observes a landmark:
      x1    x3
 ```
 
-The [factor graph](../glossary.md#factor-graph) represents **constraints**:
+The [factor graph](../glossary.md#factor-graph) (drawn above with the factor nodes omitted) represents **constraints**:
 
 - $x_1$ → $x_2$: odometry
 - $x_2$ → $x_3$: odometry
@@ -46,7 +46,7 @@ After Gauss-Newton linearization, we get something like:
 
 $$H\Delta x=g$$
 
-where $`H`$ is the Hessian, $`g`$ the gradient and $`\Delta x`$ the update step ($`H`$ and $`g`$ are written out below).
+where $`H`$ is the [Hessian](../glossary.md#normal-equations-and-hessian) (the information matrix of the linearized problem), $`g`$ the **negative** gradient ($`g = -b`$ in the glossary's notation $`H\Delta x = -b`$, $`b = J^\top\Omega r`$) and $`\Delta x`$ the update step ($`H`$ and $`g`$ are written out below).
 
 These are the normal equations of the linear least-squares problem
 
@@ -54,7 +54,7 @@ These are the normal equations of the linear least-squares problem
 \min_{\Delta x} \lVert A\Delta x - b \rVert^2, \qquad H = A^\top A, \quad g = A^\top b
 ```
 
-Here $`A`$ is the stacked, noise-whitened Jacobian of all factors and $`b`$ is the stacked (negated) residual vector.
+Here $`A`$ is the stacked, **noise-whitened** Jacobian of all factors (rows scaled by $`\Omega^{1/2}`$, where $`\Omega = \Sigma^{-1}`$ is the measurement [information matrix](../glossary.md#information-matrix), so $`H = J^\top\Omega J = A^\top A`$) and $`b`$ is the stacked negated residual vector. This $`b`$ is not the gradient $`b`$ of the glossary.
 
 We now need to solve this large sparse system efficiently. **Sparse Cholesky factorization** does this: it writes $H = LL^\top$ and solves with two triangular substitutions instead of a full inversion, exploiting that $H$ is mostly zero. See [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) for the full explainer.
 
@@ -135,14 +135,14 @@ This structure tells us:
 
 > **Which variables depend on which other variables after elimination.**
 
-That is what the **Bayes tree** captures.
+That is what the **Bayes tree** captures (strictly, this node-per-variable chain is the elimination tree; the Bayes tree merges some nodes into cliques, §13).
 
 ### 4.1 The elimination game, concretely
 
 `bayes_tree_construction.py` builds this structure with `symbolic_eliminate` in `utils.py`. The function is purely symbolic: it only looks at which variables share a factor, never at numeric values. Variables are integers `0..n-1`, and `order` is the elimination order (`order[0]` goes first, `order[-1]` becomes the root). For each variable $v$ in `order`:
 
 1. **Separator.** $S(v)$ is the set of $v$'s neighbors at the moment it is eliminated. Only variables still in the graph count, because each eliminated variable has already been removed from its neighbors' lists.
-2. **Fill-in.** Every pair of variables in $S(v)$ gets connected, then $v$ is removed from the graph. This is the "summarized information" arrow of §3: the new constraint links all of $v$'s remaining neighbors.
+2. **[Fill-in](../glossary.md#fill-in).** Every pair of variables in $S(v)$ gets connected, then $v$ is removed from the graph. This is the "summarized information" arrow of §3: the new constraint links all of $v$'s remaining neighbors.
 3. **Parent.** $\text{parent}(v)$ is the member of $S(v)$ that comes earliest in `order`, i.e. the next of them to be eliminated. If $S(v)$ is empty, $v$ is the root.
 
 The node $`\{v\} \cup S(v)`$ is what the docstring calls a clique (a group of variables stored together in one tree node; see §13). The script keeps one node per variable and does not apply §13's merge rule (a node joins its parent's clique when its separator equals the parent clique's variables), so strictly it builds the [elimination tree](elimination_tree.md).
@@ -194,7 +194,7 @@ P(x_1,x_2,x_3) = P(x_1 \mid x_2)\,P(x_2 \mid x_3)\,P(x_3)
 
 Each variable ends up conditioned only on its separator, and the separator's next-eliminated member is its parent in the tree (§4.1). The tree represents exactly these conditional relationships.
 
-**What a node holds in numbers:** it is a row of $`R`$, the triangular square root of the information matrix ($`H = R^\top R`$).
+**What a node holds in numbers:** it is a row of $`R = L^\top`$, the upper-triangular square root of the Hessian $`H`$ ($`H = R^\top R`$; $`R`$ is not a rotation).
 - Each row reads $`x_j = (d_j - R_{j,\text{sep}}\, x_{\text{sep}}) / R_{jj}`$, where $`d_j`$ is the row's right-hand-side entry, $`R_{jj}`$ its diagonal entry, $`R_{j,\text{sep}}`$ its entries in the separator columns and $`x_{\text{sep}}`$ the separator variables (§4.1).
 - Chain example: $`x_1 = (d_1 - r_{12}\, x_2) / r_{11}`$ (here $`r_{11}`$, $`r_{12}`$, $`d_1`$ are row 1's diagonal, off-diagonal and right-hand-side entries). This one line is "$`x_1`$ given $`x_2`$".
 - To solve, read the tree from the root down. The root has no parents, so it is solved first. Its value is then substituted into the children.
@@ -213,11 +213,11 @@ Suppose we have:
 x1 ─ x2 ─ x3 ─ x4 ─ x5
 ```
 
-The robot gets a new measurement involving $x_5$. iSAM2 doesn't rebuild everything: with the Bayes tree it asks
+The robot adds the odometry factor $(x_4, x_5)$. iSAM2 doesn't rebuild everything: with the Bayes tree it asks
 
 > "Which part of my factorization is affected by this new factor?"
 
-The tree has the shape of §4's chain, with $x_5$ as the root (new information arrives there) and $x_1$ as the leaf. An update only has to redo the path from the touched variables up to the root. Here $x_5$ *is* the root, so only the top of the tree changes, and $x_1$ to $`x_4`$ below it are left alone.
+The tree has the shape of §4's chain, with $x_5$ as the root (new information arrives there) and $x_1$ as the leaf. An update only has to redo the path from the touched variables up to the root. The new factor touches $x_4$ and $x_5$, so the affected path is $`\{x_4, x_5\}`$ and $x_1$ to $x_3$ are left alone (the script's 2/16 case, §15). Only a factor on $x_5$ alone would change $x_5$ only.
 
 ### Why the path goes up, not down
 - Each node's numbers are computed only from the factors in its own subtree (itself and everything below it). It never reads anything above.
@@ -236,7 +236,7 @@ x1 ─ x2 ─ x3 ─ x4 ─ x5
 └──── loop closure ──┘
 ```
 
-The new loop-closure factor connects $x_1$ and $x_5$, which can change the solution for many variables. The Bayes tree lets iSAM2 identify the affected portion. Using the same chain as §7, every node from $x_1$ (leaf) to $x_5$ (root) is affected.
+The new [loop-closure](../glossary.md#loop-closure) factor connects $x_1$ and $x_5$, which can change the solution for many variables. The Bayes tree lets iSAM2 identify the affected portion. Using the same chain as §7, every node from $x_1$ (leaf) to $x_5$ (root) is affected.
 
 $x_1$ is affected too, not just $x_2$ to $`x_5`$. The new factor touches $x_1$ directly, and $x_1$ is the deepest leaf of this chain. So it is re-eliminated along with everything above it, up to $x_5$.
 
@@ -250,26 +250,7 @@ iSAM2 removes and re-eliminates the affected section, then reinserts it into the
 
 This connects directly to [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) and to iSAM2's use of it in [`isam2_optimization.md` §7](isam2_optimization.md#7-bayes-tree---the-most-important-intuition).
 
-The pipeline:
-
-```text
-Factor Graph
-     │
-     ▼
-Linearization
-     │
-     ▼
-Sparse Linear System
-     │
-     ▼
-Variable Elimination
-     │
-     ▼
-Sparse Factorization
-     │
-     ▼
-Bayes Tree
-```
+The pipeline factor graph → linearization → sparse linear system → variable elimination → sparse factorization → Bayes tree is drawn once, in [`elimination_tree.md` §11](elimination_tree.md#11-the-big-picture).
 
 Then when a new measurement arrives:
 
@@ -329,19 +310,17 @@ while leaving Manager B's branch alone. The CEO is always on the path, just as e
 
 > "If the factor graph already tells us the relationships, why do we need a Bayes tree?"
 
-The factor graph represents **constraints** ("what measurements constrain what?"). It is less convenient for **incrementally solving the linearized system** ("how do we solve it efficiently?"). As in §5, the factor graph is the problem and the Bayes tree is the solution structure.
+Same idea as §5: the factor graph represents **constraints** ("what measurements constrain what?") and is less convenient for **incrementally solving the linearized system** ("how do we solve it efficiently?"), which is what the Bayes tree is for (table in §12).
 
 ---
 
 ## 12. Bayes tree vs factor graph
 
-| Factor Graph                        | Bayes Tree                                       |
-| ----------------------------------- | ------------------------------------------------ |
-| Represents measurements/constraints | Represents elimination/conditional structure     |
-| Bipartite graph (edges only join variables to factors) | Tree structure                                   |
-| Variables + factors                 | Conditional relationships                        |
-| Describes the SLAM problem          | Describes its factorized solution                |
-| Natural representation of SLAM      | Efficient representation for incremental solving |
+| Factor Graph | Bayes Tree |
+| --- | --- |
+| Represents measurements/constraints (variables + factors); the natural representation of SLAM | Represents elimination/conditional structure (conditional relationships); efficient representation for incremental solving |
+| Bipartite graph (edges only join variables to factors) | Tree structure |
+| Describes the SLAM problem | Describes its factorized solution |
 
 ---
 
@@ -410,7 +389,7 @@ Partially. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_constructio
 
 ![Two rows from bayes_tree_construction.py: the 16-variable elimination chain, where a new odometry edge affects 2 variables and the loop-closure edge affects all 16](../../assets/bayes_tree_construction.png)
 
-*Figure: `use_numpy/bayes_tree_construction.py` at its defaults, plotted by `uv run python assets/make_figures.py bayes_tree_construction`.*
+*Figure: `use_numpy/bayes_tree_construction.py` at its defaults, plotted by `uv run python assets/make_figures.py bayes_tree_construction` (root x15 at the left).*
 
 The data structure has a runnable counterpart here. The rest of [iSAM2](isam2_optimization.md) (dynamic reordering, fluid relinearization integrated with a solve) exists only conceptually.
 

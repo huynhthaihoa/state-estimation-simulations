@@ -30,6 +30,8 @@ Standard KF  ┌───┴───────┐
            IEKF
 ```
 
+The chain is the lineage this doc follows: the IEKF is an error-state filter (§2). [slam_mental_map.md](../slam_mental_map.md) instead draws ESKF and IEKF as two sibling variants of the EKF.
+
 The remaining variants deal with **noise, time, robustness, and computational constraints**. This is one corner of the repo-wide map in [slam_mental_map.md](../slam_mental_map.md), which places every doc and script on one picture.
 
 ---
@@ -102,7 +104,7 @@ An ESKF doesn't estimate the entire state directly. It separates a **nominal sta
 
 $$R = \hat R \exp(\delta\theta^\wedge)$$
 
-- Nominal state: $`\hat X = (\hat R,\hat p,\hat v,\hat b_g,\hat b_a)`$ (rotation, position, velocity, gyro bias, accelerometer bias; [glossary](../glossary.md#bias))
+- Nominal state: $`\hat X = (\hat R,\hat p,\hat v,\hat b_g,\hat b_a)`$ (rotation, position, velocity, gyroscope bias, accelerometer bias; [glossary](../glossary.md#bias))
 - Error state, on which the EKF mainly operates: $`\delta x = (\delta\theta,\delta p,\delta v,\delta b_g,\delta b_a)`$
 
 Each cycle has three steps:

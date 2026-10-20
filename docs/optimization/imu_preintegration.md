@@ -1,6 +1,6 @@
 # IMU preintegration
 
-An [IMU](../glossary.md#imu-inertial-measurement-unit) sampled at 100-1000 Hz produces **hundreds of raw samples between two keyframes**. IMU preintegration compresses them into **one relative-motion factor**. When the bias estimate changes, the factor is corrected instantly, without re-touching a single raw sample.
+An [IMU](../glossary.md#imu-inertial-measurement-unit) sampled at 100-1000 Hz produces **tens to hundreds of raw samples between two [keyframes](../glossary.md#keyframe)**. IMU preintegration compresses them into **one relative-motion factor**. When the [bias](../glossary.md#bias) estimate changes, the factor is corrected instantly, without re-touching a single raw sample.
 
 It builds on two earlier ideas:
 
@@ -11,10 +11,10 @@ It builds on two earlier ideas:
 
 ## 1. The problem
 
-An IMU reports angular rate and acceleration at 100-1000 Hz. The keyframes or loop closures that a pose-graph or bundle-adjustment back-end optimizes over arrive at about 1-10 Hz. That gap means 10-1000 raw samples per keyframe, and it causes two problems:
+An IMU reports angular rate and acceleration at 100-1000 Hz. The keyframes or [loop closures](../glossary.md#loop-closure) that a [pose-graph](../glossary.md#pose-graph) or [bundle-adjustment](../glossary.md#bundle-adjustment-ba) back-end optimizes over arrive at about 1-10 Hz. That gap means tens to hundreds of raw samples per keyframe (100 in the demo), and it causes two problems:
 
 - **Problem A - too many samples.** One node per raw sample would add 100+ nodes per second, and the back-end only needs the *net* relative motion between keyframes.
-- **Problem B - bias relinearization.** The **gyro/accel biases ($b_g$, $b_a$)** are part of the optimized state, and the optimizer changes them at each iteration. Every raw sample was integrated with the *old* bias, so in principle every IMU segment must be re-integrated (100+ samples per segment, every iteration).
+- **Problem B - bias [relinearization](../glossary.md#relinearization).** The **gyroscope bias $b_g$** and **accelerometer bias $b_a$** are part of the optimized state, and the optimizer changes them at each iteration. Every raw sample was integrated with the *old* bias, so in principle every IMU segment must be re-integrated (100+ samples per segment, every iteration).
 
 Preintegration solves both:
 
@@ -59,10 +59,10 @@ At every raw IMU sample, [`use_numpy/imu_preintegration.py`](../../use_numpy/imu
 - In the same way, $\Delta p, \Delta v, \Delta R$ stay valid when the optimizer moves the start pose or velocity.
 - Only a bias change needs the Jacobian correction (§4).
 
-Here $\tilde\omega, \tilde v$ are the raw sensor readings (gyro rate and accelerometer reading), $dt$ is the IMU sample period, and $b_g, b_a$ are the bias estimates *in effect when this bundle started*.
+Here $\tilde\omega, \tilde v$ are the raw sensor readings (gyroscope rate and accelerometer reading), $dt$ is the IMU sample period, and $b_g, b_a$ are the bias estimates *in effect when this bundle started*.
 
-- **Update order matters.** Every right-hand side uses the value from *before* this step. $\Delta p$ needs the old $\Delta v$ and old $\Delta R$, and $\Delta v$ needs the old $\Delta R$. So $\Delta p$ is updated first, then $\Delta v$, then $\Delta R$ last. The code does this by saving `R_prev` before touching `self.delta_R`.
-- **Rotations compose, they don't add.** $\Delta R$'s update is the $\text{Exp}$-map composition from [jacobian.md §11.1](../foundations/jacobian.md#111-why-plain-addition-breaks): each micro-step's tiny rotation is *composed onto* the running $\Delta R$.
+- **Update order matters.** Every right-hand side uses the value from *before* this step. $\Delta p$ needs the old $\Delta v$ and old $\Delta R$, and $\Delta v$ needs the old $\Delta R$. So $\Delta p$ is updated first, then $\Delta v$, then $\Delta R$ last. The code orders the updates ($\Delta p$, $\Delta v$, $\Delta R$) and saves `R_prev` for the Jacobian updates that follow, which run after `self.delta_R` has changed.
+- **Rotations compose, they don't add.** $\Delta R$'s update is the [Exp map](../glossary.md#exp-and-log-maps) composition from [jacobian.md §11.1](../foundations/jacobian.md#111-why-plain-addition-breaks): each micro-step's tiny rotation is *composed onto* the running $\Delta R$.
 - **Labelling quirk.** The scripts call their linear input a commanded *velocity* (`--linear-vel`), but the recursions treat it as an accelerometer reading: $\tilde v$ is integrated twice, into $\Delta v$ and then $\Delta p$.
   - With the defaults, one second of "1 m/s" gives $\Delta p_x \approx 0.48$ m.
   - That is $\tfrac12 a t^2$ for $a = 1$ m/s², shortened slightly by the turn. A true velocity would give roughly 1 m.
@@ -73,16 +73,22 @@ Here $\tilde\omega, \tilde v$ are the raw sensor readings (gyro rate and acceler
 
 ## 4. The bias-sensitivity Jacobians
 
-This is what makes preintegration more than "add up the samples." Alongside $\Delta R, \Delta v, \Delta p$, the bundle propagates five Jacobians, one per compressed quantity and bias:
+This is what makes preintegration more than "add up the samples." Alongside $\Delta R, \Delta v, \Delta p$, the bundle propagates five Jacobians, one per compressed quantity and bias that it depends on ($\Delta R$ does not depend on $b_a$, since the accelerometer never enters the rotation, so there is no $J_{R,b_a}$):
 
-$$J_{R,b_g} = \frac{\partial \Delta R}{\partial b_g} \qquad J_{v,b_g} = \frac{\partial \Delta v}{\partial b_g} \qquad J_{v,b_a} = \frac{\partial \Delta v}{\partial b_a} \qquad J_{p,b_g} = \frac{\partial \Delta p}{\partial b_g} \qquad J_{p,b_a} = \frac{\partial \Delta p}{\partial b_a}$$
+```math
+J_{R,b_g} = \frac{\partial \Delta R}{\partial b_g} \qquad J_{v,b_g} = \frac{\partial \Delta v}{\partial b_g} \qquad J_{v,b_a} = \frac{\partial \Delta v}{\partial b_a}
+```
+
+```math
+J_{p,b_g} = \frac{\partial \Delta p}{\partial b_g} \qquad J_{p,b_a} = \frac{\partial \Delta p}{\partial b_a}
+```
 
 These are the "sensitivity map" from [jacobian.md §3](../foundations/jacobian.md#3-think-of-it-as-a-sensitivity-map) ("if I nudge the input a little, how much does the output move?"), tracked incrementally one micro-step at a time. Each step uses the current micro-step's rotation $dR = \text{Exp}((\tilde\omega-b_g)dt)$ and right Jacobian $J_r = J_r\big((\tilde\omega-b_g)dt\big)$, in the same old-value order as §3 (`imu_preintegration.py:68-74`): $p$-Jacobians first, then $v$-Jacobians, then $J_{R,b_g}$ last.
 
 ### Intuition (why bias moves $`\Delta v`$ and $`\Delta p`$)
 - An accelerometer bias is plain "bias × time" in velocity and "bias × time²/2" in position.
-- A gyro bias is sneakier. It tilts the integrated frame, so the accelerometer reading gets pushed the wrong way.
-- **Tiny example (toy case: small angle, ignore the turn):** accel reading 1 m/s², gyro bias error 0.01 rad/s, 1 s.
+- A gyroscope bias is sneakier. It tilts the integrated frame, so the accelerometer reading gets pushed the wrong way.
+- **Tiny example (toy case: small angle, ignore the turn):** accelerometer reading 1 m/s², gyroscope bias error 0.01 rad/s, 1 s.
   - The tilt grows as $`0.01\,t`$ rad, so about 0.01 rad at the end.
   - Sideways velocity error: $`\int a\,\theta\,dt = 0.005`$ m/s.
   - Sideways position error: about $`0.01/6 \approx 0.0017`$ m.
@@ -101,14 +107,14 @@ J_{R,b_g} \leftarrow dR^\top J_{R,b_g} - J_r\,dt
 ```
 
 ### Tiny example (toy case: one axis, constant rate)
-$N=100$, $dt=0.01$ s, so $T=1$ s.
+$N=100$, $dt=0.01$ s, so the window lasts $t_{\text{total}} = N\,dt = 1$ s.
 - On one axis $dR^\top = I$ and $J_r \approx I$, so each step is just $J \leftarrow J - dt$.
-- After 100 steps $J_{R,b_g} \approx -T = -1$ rad per (rad/s).
+- After 100 steps $J_{R,b_g} \approx -t_{\text{total}} = -1$ rad per (rad/s).
 - A bias error of 0.01 rad/s then changes $\Delta R$ by 0.01 rad (0.57°) after 1 s.
 - The minus sign: a larger bias estimate subtracts more rotation, so the correction in §5 points opposite the bias change.
 
 ### Why $`J_{R,b_g}`$ is the one to study
-It is a direct instance of [jacobian.md §11.4](../foundations/jacobian.md#114-closed-form-for-so3)'s identities, and every other $J_{\cdot,b_g}$ inherits from it:
+It is a direct use of $J_r$'s definition ([jacobian.md §11.2](../foundations/jacobian.md#112-the-actual-question-being-asked)) and the closed forms in [jacobian.md §11.4](../foundations/jacobian.md#114-closed-form-for-so3), and every other $J_{\cdot,b_g}$ inherits from it:
 
 - $-J_r\,dt$: $J_r$ is the right Jacobian of the micro-step's rotation. The $dt$ is the chain-rule factor from $`\partial\big((\tilde\omega-b_g)dt\big)/\partial b_g = -dt\,I`$, which also supplies the minus sign.
 - $dR^\top J_{R,b_g}$: the sensitivity accumulated so far is a right perturbation on the old $\Delta R$, and the new step composes $dR$ after it. Moving that perturbation past $dR$ uses the **adjoint** identity ([glossary](../glossary.md#adjoint)) $\text{Exp}(x)\,dR = dR\,\text{Exp}(dR^\top x)$, which is where the $dR^\top$ comes from.
@@ -145,15 +151,21 @@ A preintegrated bundle becomes one **edge** in the sense of [pose_graph_optimiza
                       IMU factor
 ```
 
-A full VIO/VI-SLAM back-end ([glossary](../glossary.md#imu-inertial-measurement-unit)) (GTSAM's `CombinedImuFactor`, ORB-SLAM3, VINS-Mono, etc.) builds a residual comparing this corrected bundle with what the two nodes' current estimates imply: the same "measured vs. predicted, then `Log`" pattern as [pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive). Because the bias correction is $O(1)$, the residual and its Jacobian can be re-evaluated at every optimizer iteration without revisiting the raw 100+ Hz stream.
+A full visual-inertial odometry (VIO) back-end (GTSAM's `CombinedImuFactor`, ORB-SLAM3, VINS-Mono, etc.) builds a residual comparing this corrected bundle with what the two nodes' current estimates imply: the same "measured vs. predicted, then `Log`" pattern as [pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive). Because the bias correction is $O(1)$, the residual and its Jacobian can be re-evaluated at every optimizer iteration without revisiting the raw 100+ Hz stream.
 
 ---
 
 ## 7. What the accompanying scripts actually do (and don't)
 
+| Script | Input | State propagated | Bias Jacobians | Correction | Default result |
+| --- | --- | --- | --- | --- | --- |
+| `imu_preintegration.py` | accelerometer reading + gyroscope rate (+ bias) | $\Delta R, \Delta v, \Delta p$ | yes, five | $O(1)$ first-order correction after a bias change | 100 samples into 1 bundle; corrected $\Delta p$ within 2.3e-6 m of re-integration |
+| `robot_imu_simulation.py` | 6-D body twist (no accelerometer) | $SE(3)$ pose by chained `se3_exp` | none | 1 Hz damped Gauss-Newton on a GPS-like position fix | 2 Gauss-Newton iterations per second; orientation never corrected |
+| `imu_integration_comparison.py` | noisy gyroscope rate + body velocity | naive Euler-angle vs $SO(3)$ Exp-map | none | none | about 70.8° (naive) vs about 0.47° (Exp-map) rotation error after 20 s |
+
 - **`imu_preintegration.py`** (both [`use_numpy/`](../../use_numpy/imu_preintegration.py) and [`use_manif/`](../../use_manif/imu_preintegration.py)) implements §3-§5: compress raw samples into a bundle, track the bias Jacobians, apply the $O(1)$ correction. The two versions are line-for-line equivalent (`use_manif`'s docstring spells out the correspondence: its `rplus()` returns the same `dR`/right-Jacobian pair the numpy version computes by hand). **Neither builds the graph residual of §6**; both stop at compression plus correction.
-- **`robot_imu_simulation.py`** is related but different: it [dead-reckons](factor_graph.md#2-why-do-we-need-it) noisy body-twist readings directly on $SE(3)$ every micro-step (chaining `se3_exp`, no bundle, no bias Jacobians). Its "IMU" reports a 6-D velocity twist, so there is no accelerometer, no bias and no gravity. It periodically runs a small damped [Gauss-Newton](gauss_newton.md) correction against a separate GPS-like position fix. It is about *twist dead reckoning + periodic on-manifold correction*, not preintegration.
-- **`imu_integration_comparison.py`** is also related but different. Like [pointcloud_pose_tracking_empirical_note.md](../filtering/pointcloud_pose_tracking_empirical_note.md), it is an empirical comparison note, not a concept explainer: it plots naive Euler-angle (vector-space) integration against proper $SO(3)$ Exp-map integration. The Exp-map estimate still drifts from gyro noise, just far less: with the defaults, it ends at about 0.47° rotation error vs. about 70.8° for naive. Each method is scored against its own noise-free ground truth (§7.1). No bias correction is involved.
+- **`robot_imu_simulation.py`** is related but different: it [dead-reckons](factor_graph.md#2-why-do-we-need-it) noisy body-twist readings directly on $SE(3)$ (see [SO(3) and SE(3)](../glossary.md#so3-and-se3)) every micro-step, with no bundle and no bias Jacobians. Its "IMU" reports a 6-D velocity twist, so there is no accelerometer, no bias and no gravity. Every second it runs a small damped [Gauss-Newton](gauss_newton.md) correction against a separate GPS-like position fix. It is about *twist dead reckoning + periodic on-manifold correction*, not preintegration.
+- **`imu_integration_comparison.py`** is also related but different. Like [pointcloud_pose_tracking_empirical_note.md](../filtering/pointcloud_pose_tracking_empirical_note.md), it is an empirical comparison note, not a concept explainer: it plots naive Euler-angle (vector-space) integration against proper $SO(3)$ Exp-map integration. The Exp-map estimate still drifts from gyroscope noise, just far less. In `use_numpy`, each method is scored against its own noise-free ground truth (§7.1); the `use_manif` twin scores both against one shared SE(3) truth and ends at 70.4°. No bias correction is involved.
 
 ![Two panels from imu_preintegration.py: the preintegrated position change built up sample by sample from keyframe i to keyframe j, and a log-scale bar chart comparing how much a bias update changes each preintegrated quantity with the error of the first-order Jacobian correction against a full re-integration](../../assets/imu_preintegration.png)
 
@@ -203,7 +215,7 @@ In both, the position step uses the rotation *after* this step's update. That is
 e_R = \arccos\!\left(\frac{\mathrm{tr}(R_{gt}^\top R_{est}) - 1}{2}\right),\qquad e_p = \lVert p_{gt} - p_{est}\rVert
 ```
 
-**`robot_imu_simulation.py`, propagation** (`run_simulation`). The true twist $\xi = [v, \omega]$ (translation first) is drawn once, uniformly per axis from $\pm 1.0$ m/s and $\pm 0.5$ rad/s. Each IMU step ($dt = 0.01$ s, 100 steps per second):
+**`robot_imu_simulation.py`, propagation** (`run_simulation`). The true [twist](../glossary.md#twist) $\xi = [v, \omega]$ (translation first) is drawn once, uniformly per axis from $\pm 1.0$ m/s and $\pm 0.5$ rad/s. Each IMU step ($dt = 0.01$ s, 100 steps per second):
 
 ```math
 T_{true} \leftarrow T_{true}\,\text{Exp}(\xi\,dt), \qquad T_{est} \leftarrow T_{est}\,\text{Exp}\big((\xi + n)\,dt\big),\quad n \sim \mathcal{N}(0, 0.02^2 I_6)
@@ -217,11 +229,11 @@ falling back to $`I + [\omega]_\times`$ and $`V = I + \tfrac{1}{2}[\omega]_\time
 
 **Position fix.** Once per second: $z = t_{true} + n_z$ with $n_z \sim \mathcal N(0, \sigma_{pos}^2 I)$, $\sigma_{pos} = 0.05$ m by default. It measures translation only, never orientation.
 
-**Residual and Jacobian** (`position_observation_jacobian`). For a right perturbation $T_{est} \text{Exp}(\delta\xi)$:
+**Residual and Jacobian** (`position_observation_jacobian`). For a [right perturbation](../glossary.md#left-and-right-perturbation) $T_{est} \text{Exp}(\delta\xi)$:
 
 $$r = z - t_{est}, \qquad J = \frac{\partial t}{\partial \delta\xi} = \begin{bmatrix} R_{est} & 0_{3\times 3} \end{bmatrix}$$
 
-**Solve and retract.** With $\Omega = I/\sigma_{pos}^2$ (built in `__main__` as `pos_info`):
+**Solve and [retract](../glossary.md#retraction).** With the [information matrix](../glossary.md#information-matrix) $\Omega = I/\sigma_{pos}^2$ (built in `__main__` as `pos_info`):
 
 ```math
 \left(J^\top \Omega J + 10^{-4} I_6\right)\delta\xi = J^\top \Omega\, r, \qquad T_{est} \leftarrow T_{est}\,\text{Exp}(\delta\xi)

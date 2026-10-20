@@ -1,12 +1,12 @@
 # Gauss-Newton Optimization
 
-Gauss-Newton and its damped variants, like [Levenberg-Marquardt](levenberg_marquardt.md), are the core optimizers behind **SLAM, [bundle adjustment](bundle_adjustment.md), and [pose-graph optimization](pose_graph_optimization.md)** ([glossary](../glossary.md#slam-simultaneous-localization-and-mapping)). This doc builds the intuition for Gauss-Newton.
+Gauss-Newton and its damped variants, like [Levenberg-Marquardt](levenberg_marquardt.md), are the core optimizers behind **SLAM, [bundle adjustment (BA)](bundle_adjustment.md), and [pose-graph optimization](pose_graph_optimization.md)** ([glossary](../glossary.md#slam-simultaneous-localization-and-mapping)). This doc builds the intuition for Gauss-Newton.
 
 ---
 
 ## 1. The basic idea
 
-We want parameters $x$ that make some measurements fit as well as possible. In SLAM, for example: which robot pose $x$ best explains these sensor measurements?
+We want parameters $x$ that make some measurements fit as well as possible. In SLAM, for example: which robot [pose](../glossary.md#pose) $x$ best explains these sensor measurements?
 
 We define a [residual](../glossary.md#residual-error):
 
@@ -18,7 +18,7 @@ and minimize the **total squared error**:
 \min_x \frac12 \|r(x)\|^2
 ```
 
-We'll call this cost $f(x) = \tfrac12\|r(x)\|^2$.
+We'll call this cost $`f(x) = \tfrac12\lVert r(x)\rVert^2`$.
 
 The problem is that $r(x)$ is usually **nonlinear**. Gauss-Newton's answer:
 
@@ -64,14 +64,14 @@ Then we update and repeat:
 
 $$x_{\text{new}} = x_{\text{old}}+\Delta x$$
 
-> **Note:** solving it needs $J^\top J$ to be invertible, i.e. $J$ must have full column rank. In SLAM it isn't by default: some motions of the whole solution change no residual (a [gauge freedom](../glossary.md#gauge-freedom)), so $J^\top J$ stays singular until something pins the solution down.
+> **Note:** solving it needs $J^\top J$ to be invertible, i.e. $J$ must have full column rank (no direction $\Delta x$ with $J\Delta x = 0$). In SLAM it isn't by default: some motions of the whole solution change no residual (a [gauge freedom](../glossary.md#gauge-freedom)), so $J^\top J$ stays singular until something pins the solution down.
 >
-> - **Pose graphs:** shifting or rotating the whole trajectory together (6 DoF in 3D). Anchoring the first pose fixes it - `pose_graph.py` does this, "heavily anchoring node 0".
-> - **Monocular BA:** also uniformly rescaling the scene (7 DoF), which one pose can't pin. The BA scripts fix *two* cameras instead (a prior on cameras 0 and 1, or two hard-fixed keyframes); see [bundle_adjustment.md §14](bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment).
+> - **Pose graphs:** shifting or rotating the whole trajectory together (6 [degrees of freedom (DoF)](../glossary.md#degrees-of-freedom-dof) in 3D). Anchoring the first pose fixes it - `pose_graph.py` does this, "heavily anchoring node 0".
+> - **Monocular (single-camera) BA:** also uniformly rescaling the scene (7 DoF), which one pose can't pin. The BA scripts fix *two* cameras instead (a prior on cameras 0 and 1, or two hard-fixed keyframes); see [bundle_adjustment.md §14](bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment).
 >
 > [Levenberg-Marquardt](levenberg_marquardt.md)'s damping (its §4-§5; [glossary](../glossary.md#levenberg-marquardt-lm-and-damping)) also keeps the system solvable.
 
-> **Note on signs:** some docs in this repo, such as [bundle_adjustment.md §6.1](bundle_adjustment.md#61-the-ba-math-concretely), write the residual the other way round, $r = \text{measurement} - \text{prediction}$, and take $J$ as the Jacobian of the *prediction*. That $J$ is minus the Jacobian of their residual, so their equation reads $J^\top J\Delta x = +J^\top r$. It's the same step as $J^\top J\Delta x = -J^\top r$ above, just written with different sign conventions.
+> **Note on signs:** some docs in this repo, such as [bundle_adjustment.md §6.1](bundle_adjustment.md#61-the-ba-math-concretely), write the residual the other way round, $r = \text{measurement} - \text{prediction}$ ([nonlinear_least_square.md](nonlinear_least_square.md) does too, but there $J$ is still the Jacobian of its own residual, so no sign flips in its equation), and take $J$ as the Jacobian of the *prediction*. That $J$ is minus the Jacobian of their residual, so their equation reads $J^\top J\Delta x = +J^\top r$. It's the same step as $J^\top J\Delta x = -J^\top r$ above, just written with different sign conventions.
 
 ---
 
@@ -115,15 +115,15 @@ One step gets us much closer to $2$, and repeating converges rapidly.
 
 ## 7. Why is it called Gauss-Newton?
 
-**Newton's method** uses the [Hessian](../glossary.md#normal-equations-and-hessian) $H$ (the second derivatives of $f$) and solves $H\Delta x=-\nabla f$. For nonlinear least squares, the exact Hessian decomposes as:
+**Newton's method** uses the exact [Hessian](../glossary.md#normal-equations-and-hessian) $\nabla^2 f$ (the second derivatives of $f$) and solves $\nabla^2 f\,\Delta x=-\nabla f$. For nonlinear least squares, the exact Hessian decomposes as:
 
-$$H=J^\top J + \sum_i r_i \nabla^2 r_i$$
+$$\nabla^2 f=J^\top J + \sum_i r_i \nabla^2 r_i$$
 
-Gauss-Newton drops the second term, $H \approx J^\top J$, and so solves
+Gauss-Newton drops the second term, $\nabla^2 f \approx J^\top J$, and so solves
 
 $$J^\top J\Delta x=-J^\top r$$
 
-The right-hand sides are the same thing: the gradient of $f(x) = \tfrac12\|r(x)\|^2$ is exactly $\nabla f = J^\top r$. Gauss-Newton only changes the left-hand side. Needing only first derivatives makes it **cheaper and well suited to least-squares problems**.
+The right-hand sides are the same thing: the gradient of $`f(x) = \tfrac12\|r(x)\|^2`$ is exactly $\nabla f = J^\top r$. Gauss-Newton only changes the left-hand side. Needing only first derivatives makes it **cheaper and well suited to least-squares problems**. The matrix $J^\top J$ is the $H$ of the later docs ($H = J^\top\Omega J$ once measurement weights $\Omega$ are added, §8).
 
 > **Note:** dropping $\sum_i r_i \nabla^2 r_i$ is a good approximation when the residuals are small at the solution (the measurements fit well) or $r$ is only mildly nonlinear. With large residuals or strong nonlinearity, the Gauss-Newton step can overshoot and even increase the cost - exactly what [Levenberg-Marquardt's damping](levenberg_marquardt.md#4-the-damping-idea) guards against.
 
@@ -131,7 +131,7 @@ The right-hand sides are the same thing: the gradient of $f(x) = \tfrac12\|r(x)\
 
 ## 8. Why is this everywhere in SLAM?
 
-A robot at pose $T_i$ observes landmark $p_j$. The predicted measurement is
+A robot at pose $T_i$ observes a [landmark](../glossary.md#landmark) $p_j$. The predicted measurement is
 
 $$
 \hat z_{ij} = h(T_i,p_j)
@@ -151,9 +151,11 @@ The residual is $r_{ij} = h(T_i,p_j)-z_{ij}$, and the SLAM problem becomes:
 \sum_{(i,j)\in\mathcal{O}}\|r_{ij}\|^2
 ```
 
+(The $\tfrac12$ of §1 is dropped here; it doesn't change the minimizer.)
+
 where $\mathcal{O}$ is the set of pose-landmark pairs that were actually observed (not every landmark is seen from every pose).
 
-> **Note:** real systems also weight each residual by its measurement's information matrix ([glossary](../glossary.md#information-matrix)), $`r_{ij}^\top\Omega_{ij}\,r_{ij}`$ instead of $\|r_{ij}\|^2$, so precise sensors count more - left out here for readability. See [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty) and [factor_graph.md](factor_graph.md).
+> **Note:** real systems also weight each residual by its measurement's information matrix ([glossary](../glossary.md#information-matrix)), $`r_{ij}^\top\Omega_{ij}\,r_{ij}`$ instead of $`\lVert r_{ij}\rVert^2`$, so precise sensors count more - left out here for readability. See [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty) and [factor_graph.md](factor_graph.md).
 
 This is a huge nonlinear problem. Gauss-Newton linearizes every measurement function around the current estimates of the poses and landmarks:
 
@@ -167,7 +169,7 @@ $$
 
 Solve it → update all poses and landmarks → repeat.
 
-One caveat: landmarks $p_j\in\mathbb{R}^3$ really do just get $p_j \leftarrow p_j+\Delta p_j$. Poses $T_i$ don't, because they live on the $SE(3)$ manifold ([glossary](../glossary.md#manifold)). Their update is a [retraction](../glossary.md#retraction) through the exponential map, $T_i \leftarrow T_i\cdot\mathrm{Exp}(\Delta x_i)$, not plain addition. See [pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive) ("Why not just subtract poses?") and the full derivation there.
+One caveat: landmarks $p_j\in\mathbb{R}^3$ really do just get $p_j \leftarrow p_j+\Delta p_j$. Poses $T_i$ don't, because they live on the [SE(3)](../glossary.md#so3-and-se3) manifold ([glossary](../glossary.md#manifold)). Their update is a [retraction](../glossary.md#retraction) through the exponential map ([Exp](../glossary.md#exp-and-log-maps)), $T_i \leftarrow T_i\cdot\mathrm{Exp}(\Delta x_i)$, not plain addition. See [pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive) ("Why not just subtract poses?") and the full derivation there.
 
 This is the core optimization mechanism behind many **[bundle adjustment](bundle_adjustment.md) and [graph-SLAM](pose_graph_optimization.md) systems**.
 
@@ -177,22 +179,9 @@ This is the core optimization mechanism behind many **[bundle adjustment](bundle
 
 Take §6's example: the residual $r(x) = x^2 - 4$ is a curve, and we're looking for where it hits zero. Gauss-Newton doesn't try to understand the whole curve. Near the current guess, it treats the curve as a straight line: the tangent, which is exactly the linearization $r(x) + J\Delta x$ from §3.
 
-```text
-  r(x)
-  ↑
-  │                                 ●  current guess (r > 0)
-  │                                /
-  │                            . /
-  │                         .  /
-  │    real curve r(x) → .   /        ← tangent line: r(x) + J·Δx
-  │                   .    /
-  │                .     /
-  │             .      /
-  ┼───────────●──────○────────────────────────→ x
-              ↑      ↑
-            root next guess
-                 (where the tangent hits zero)
-```
+![Two panels for Gauss-Newton on the residual x squared minus 4 starting from x = 3: the curve with the tangent at x = 3, which crosses zero at 2.1667, and the next tangent at 2.1667, which crosses zero at 2.0064, next to the true root at 2; and the residual magnitude at iterations 0 to 3 on a log axis, falling from 5 to 4.1e-05](../../assets/gauss_newton_tangent.png)
+
+*Figure: the one-residual example of §6, plotted by `uv run python assets/make_figures.py gauss_newton_tangent`. Left: the curve, the tangent at the starting guess and the tangent at the next guess; each tangent's zero is the next iterate. Right: the residual magnitude per iteration on a log axis (5, 0.694, 0.0257, 4.1e-05), which shrinks faster each step.*
 
 It moves to where that line says the residual is zero: from $x = 3$ to $x \approx 2.167$. The real curve bends, so that isn't the true root ($x = 2$), but it's much closer. A new tangent at $x \approx 2.167$ makes the next jump land even closer.
 
@@ -204,7 +193,7 @@ It moves to where that line says the residual is zero: from $x = 3$ to $x \appro
 
 ### Gradient descent
 
-Gradient descent asks:
+[Gradient descent](../glossary.md#gradient-descent) asks:
 
 > **"Which direction is downhill?"**
 

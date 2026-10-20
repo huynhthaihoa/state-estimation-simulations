@@ -202,7 +202,7 @@ where:
 - $p$ = position
 - $v$ = velocity
 - $q$ = orientation quaternion
-- $b_g$ = gyro bias
+- $b_g$ = gyroscope bias
 - $b_a$ = accelerometer bias
 
 The tricky part is:

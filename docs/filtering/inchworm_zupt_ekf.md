@@ -41,7 +41,7 @@ We work through the simplest concrete version using [`inchworm_zupt_ekf.py`](../
 ### Scope
 This is deliberately a small slice of the real idea.
 
-- It models translation only: ZUPT, not ZARU, which needs gyro-bias ([glossary](../glossary.md#bias)) and orientation states this toy doesn't carry. §5 adds a heading and ZARU in a planar side extension (still without gyro bias). §6 adds anchor slip and a pad displacement sensor in a second side extension.
+- It models translation only: ZUPT, not ZARU, which needs gyroscope bias ([glossary](../glossary.md#bias)) and orientation states this toy doesn't carry. §5 adds a heading and ZARU in a planar side extension (still without gyro bias). §6 adds anchor slip and a pad displacement sensor in a second side extension.
 - It assumes the gait schedule (when anchor/extend happen) is *known*, not detected. What happens once the schedule itself is uncertain is the subject of [`hybrid_saltation_ekf.md` §8](hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter), which we lean on rather than repeat.
 
 ---

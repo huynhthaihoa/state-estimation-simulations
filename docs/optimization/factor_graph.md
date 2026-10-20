@@ -8,37 +8,34 @@ A **factor graph** represents:
 
 It is a **bipartite** graph (edges join only nodes of different kinds) with two kinds of nodes (§6 spells out the distinction):
 
-- **Variables** = things we don't know: robot poses, landmarks, sensor biases, etc.
-- **Factors** = measurements/constraints: [odometry](../glossary.md#odometry), camera observations, IMU, GPS, loop closures, etc.
+- **Variables** = things we don't know: robot poses, [landmarks](../glossary.md#landmark), sensor biases, etc.
+- **Factors** = measurements/constraints: [odometry](../glossary.md#odometry), camera observations, [IMU](../glossary.md#imu-inertial-measurement-unit), GPS, [loop closures](../glossary.md#loop-closure), etc.
 
 ![A bipartite factor graph for a SLAM-style problem: robot poses x0..xn connected by odometry-measurement factors u1..un, with landmarks l1, l2 connected to poses via landmark-measurement factors m1..m4, plus a small "variable node/factor node" legend](../images/factor_graph_1.jpg)
 
-![A pose-graph diagram (in Korean) with keyframe poses P0..P6, a black PriorFactor on P0, blue BetweenFactors along the chain, a red BetweenFactor (loop closure) between P0 and P5, and green UnaryFactors on P5](../images/factor_graph_2.jpg)
+*Image 1: the two node kinds (variable = circle, factor = small dot on the edges it joins), with a prior factor on the first pose, odometry factors between poses and landmark measurements.*
+
+![A pose-graph diagram (legend partly in Korean) with keyframe poses P0..P6, a black PriorFactor on P0, blue BetweenFactors along the chain, a red BetweenFactor (loop closure) between P0 and P5, and green UnaryFactors on P5](../images/factor_graph_2.jpg)
+
+*Image 2: GTSAM factor names: a prior, between factors (red = loop closure) and unary factors, drawn as coloured edges and stubs instead of nodes.*
 
 ![Two stacked example factor graphs from a mapping survey: a pose-only graph (top) with pose parameters X linked by odometry factors Tx and a loop-closure factor Tx, and a pose+landmark graph (bottom) that adds observation factors H connecting poses X to landmark parameters L](../images/factor_graph_3.jpg)
 
+*Image 3: a pose-only graph (top) versus a pose-plus-landmark graph (bottom), with factors drawn as squares.*
+
 ![A small factor graph with poses x0, x1, x2, x3 in a chain and landmarks l7, l16, l78, l71, l82 each connected to one or two poses](../images/factor_graph_4.jpg)
+
+*Image 4: landmarks seen by only one or two poses; no legend, factors are the dots.*
 
 ![A four-layer factor graph for 2D robot localization: landmarks L0-L2 at top connected via bearing factors to poses P0-P2, which are in turn chained together by odometry factors](../images/factor_graph_5.jpg)
 
+*Image 5: bearing factors from poses to landmarks plus odometry factors between poses, laid out in four layers.*
+
 *These diagrams are illustrative sketches from different tutorials/papers; [Image sources](#image-sources) lists which attributions are confirmed and which source is unidentified.*
 
-A text sketch of the same idea:
-
-```text
-        landmark l1
-             ●
-            / \
-       camera observations
-          /     \
-         /       \
-Pose x0 ●─────────● x1 ──────● x2
-         odometry
-```
-
 - The circles are **variables**.
-- In this sketch each labelled line stands for a **factor** joining the variables it touches. A **binary factor** touches two variables.
-- The images above draw factors as their own nodes (dots or squares). That is how a unary factor, such as a prior or GPS fix, fits in: it touches just one variable.
+- Each **factor** joins the variables it touches. A **binary factor** touches two variables.
+- Most of the images above draw factors as their own nodes (dots or squares); the pose-graph figure (`factor_graph_2`) draws them as coloured edges and stubs. A unary factor, such as a [prior](../glossary.md#prior-unary-factor) or GPS fix, touches just one variable.
 
 ---
 
@@ -115,7 +112,7 @@ Then compare them. $Z_{ij}^{-1}\hat Z_{ij}$ is itself a transform, equal to the 
 e_{ij} = \mathrm{Log}\left(Z_{ij}^{-1}\hat Z_{ij}\right) = \mathrm{Log}\left(Z_{ij}^{-1} X_i^{-1} X_j\right) \in \mathbb{R}^6
 ```
 
-This is the residual `pose_graph.py` uses ([pose_graph_optimization.md §15.7](pose_graph_optimization.md#157-the-solver-concretely)); [lie_algebra.md](../foundations/lie_algebra.md) explains Log.
+This is the residual `pose_graph.py` uses ([pose_graph_optimization.md §15.7](pose_graph_optimization.md#157-the-solver-concretely)). pose_graph_optimization.md §15 writes the measurement $`Z_{ij}`$ as $`\tilde T_{ij}`$, the pose $`X_i`$ as $`T_i`$ and the residual $`e_{ij}`$ as $`r_{ij}`$; [lie_algebra.md](../foundations/lie_algebra.md) explains Log.
 
 Conceptually:
 
@@ -163,7 +160,7 @@ e_k^\top\Omega_k e_k
 }
 $$
 
-where $\Omega_k=\Sigma_k^{-1}$ is the [**information matrix**](../glossary.md#information-matrix) (called $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty); downstream docs such as [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md) use $\Omega$).
+where $\Omega_k=\Sigma_k^{-1}$ is the [**information matrix**](../glossary.md#information-matrix), the inverse of the measurement [covariance](../glossary.md#covariance) $\Sigma_k$ (called $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty); downstream docs such as [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md) use $\Omega$). Here $X$ is all variables stacked, while $x_i$ (or $X_i$ in §3) is a single pose.
 
 > **Note:** a precise sensor (small $\Sigma_k$) gives a *large* $\Omega_k$, so its error counts more in the sum; a noisy sensor (large $\Sigma_k$) gives a *small* $\Omega_k$ and is down-weighted. The term $e_k^\top\Omega_k e_k$ is a **squared Mahalanobis distance** - see the [glossary](../glossary.md#mahalanobis-distance) for the definition and the isotropic special case where it collapses to plain squared error divided by a constant.
 
@@ -175,40 +172,29 @@ So:
 
 ## 5. Why call it a "graph"?
 
-The problem naturally looks like a graph. Below, each labelled line is a factor joining the variables it touches (the images in §1 draw factors as nodes instead):
+The problem naturally looks like a graph. Below, variables are circles, factors are squares, and every edge joins a variable to a factor:
 
-```text
-VARIABLES
-
-x0       x1       x2       x3
-●────────●────────●────────●
-    F01      F12      F23
+```mermaid
+graph LR
+    x0(("x0")) --- o01["odometry<br/>x0-x1"]
+    o01 --- x1(("x1"))
+    x1 --- o12["odometry<br/>x1-x2"]
+    o12 --- x2(("x2"))
+    x0 --- i01["IMU<br/>x0-x1"]
+    i01 --- x1
+    x1 --- i12["IMU<br/>x1-x2"]
+    i12 --- x2
+    x0 --- c00["camera<br/>x0-l0"]
+    c00 --- l0(("l0"))
+    x1 --- c10["camera<br/>x1-l0"]
+    c10 --- l0
+    x1 --- c11["camera<br/>x1-l1"]
+    c11 --- l1(("l1"))
+    x2 --- c21["camera<br/>x2-l1"]
+    c21 --- l1
 ```
 
-Adding landmarks:
-
-```text
-       l0    l1
-       ●     ●
-      / \   / \
-     /   \ /   \
-    ●─────●─────●
-    x0    x1    x2
-```
-
-Here landmark $l_0$ is seen from $x_0$ and $x_1$, and $l_1$ from $x_1$ and $x_2$.
-
-Adding IMU:
-
-```text
-x0          x1          x2
-●────IMU────●────IMU────●
- \           \
-  camera      camera
-   \           \
-    ●           ●
-    l0          l1
-```
+Here landmark $l_0$ is seen from $x_0$ and $x_1$, and $l_1$ from $x_1$ and $x_2$. IMU factors link consecutive poses, like odometry factors do.
 
 Every measurement becomes a **factor connecting the variables it depends on**, so the graph shows the **structure of the estimation problem**.
 
@@ -218,7 +204,7 @@ Every measurement becomes a **factor connecting the variables it depends on**, s
 
 ### Variable
 
-Something we're trying to estimate:
+Something we're trying to estimate (§1); here:
 
 - $x_0$ = robot pose
 - $x_1$ = robot pose
@@ -227,7 +213,7 @@ Something we're trying to estimate:
 
 ### Factor
 
-Something that constrains those variables:
+Something that constrains those variables (§1); typical kinds:
 
 ```text
 Odometry factor
@@ -304,7 +290,7 @@ So:
 
 ## 8. Where Gauss-Newton enters
 
-Factor-graph optimization is usually a **nonlinear least-squares problem**.
+Factor-graph optimization is usually a **[nonlinear least-squares](../glossary.md#nonlinear-least-squares) problem**.
 
 We have:
 
@@ -327,7 +313,7 @@ Then **[Gauss-Newton](gauss_newton.md)** solves (every factor's error stacked in
 J^\top \Omega J\,\Delta X = -J^\top \Omega\, e
 ```
 
-and updates $`X \leftarrow X \oplus\Delta X`$. For poses, that $\oplus$ is often implemented using **[Lie algebra](../foundations/lie_algebra.md)/$`SE(3)`$**.
+and updates $`X \leftarrow X \oplus\Delta X`$. For poses, that $\oplus$ is often implemented using **[Lie algebra](../foundations/lie_algebra.md)/$`SE(3)`$**. [Levenberg-Marquardt (LM)](../glossary.md#levenberg-marquardt-lm-and-damping) solves the same linear system with added damping.
 
 Put together, the pieces above connect like this:
 
@@ -365,8 +351,6 @@ Each statement becomes a **factor**, and together they form a giant network of c
 
 > **Move all the unknown positions around until the entire network of statements is as consistent as possible.**
 
-That's factor-graph optimization.
-
 ---
 
 ## 10. Measurements don't have to be perfect
@@ -384,53 +368,17 @@ IMU says:
 x1 should be somewhere else┘
 ```
 
-The optimizer doesn't choose one measurement. It finds the configuration with the **best overall compromise**, weighted by measurement uncertainty. The result is a **local optimum**: better than nearby solutions, not necessarily the best overall. It therefore relies on a good initial guess.
+As in §2, the optimizer doesn't choose one measurement. It finds the configuration with the **best overall compromise**, weighted by measurement uncertainty (§4). The result is a **local optimum**: better than nearby solutions, not necessarily the best overall. It therefore relies on a good initial guess.
 
-And when a loop closure arrives:
+When a loop closure arrives, the optimizer can distribute the accumulated error across the entire trajectory; the before/after loop-closure figure in [pose_graph_optimization.md §15.7](pose_graph_optimization.md#157-the-solver-concretely) ([`assets/pose_graph.png`](../../assets/pose_graph.png)) shows this.
 
-```text
-Before:
-
-x0 ●──●──●──●──●
-                \
-                 \
-                  ● x5
-
-
-After loop closure:
-
-x0 ●──────────────● x5
-   │              │
-   └──●──●──●──●──┘
-```
-
-the optimizer can distribute the accumulated error across the entire trajectory.
-
-This is why graph optimization suits SLAM: one loop closure corrects the whole trajectory, not just the last pose.
+This is why graph optimization suits [SLAM](../glossary.md#slam-simultaneous-localization-and-mapping) (simultaneous localization and mapping): one loop closure corrects the whole trajectory, not just the last pose.
 
 ---
 
 ## 11. The one picture to remember
 
-```text
-          MEASUREMENTS
-       ┌────┬────┬────┐
-       ↓    ↓    ↓    ↓
-
-      Factor Factor Factor
-        │      │      │
-        ↓      ↓      ↓
-
-x0 ●──────●──────●──────● x3
-          x1     x2
-
- ↑                         ↑
- └────── loop closure ─────┘
-```
-
-- **Variables** are what we want to know.
-- **Factors** are what our sensors tell us.
-- **Optimization** finds the variable values that best satisfy all factors simultaneously.
+The one picture to remember is the bipartite graph of §1: **variables** (what we want to know) are circles, **factors** (what our sensors tell us) are attached to the variables they constrain, and **optimization** finds the variable values that best satisfy all factors simultaneously.
 
 The hierarchy:
 

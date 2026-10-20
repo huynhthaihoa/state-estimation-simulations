@@ -88,7 +88,7 @@ Rule of thumb for picking one:
 
 | Situation | Natural choice |
 |---|---|
-| Propagation driven by body-mounted sensors ([IMU](../glossary.md#imu-inertial-measurement-unit) gyro/accel, wheel [odometry](../glossary.md#odometry)) | either, for **group-affine** dynamics (the invariant error evolves on its own, whatever the trajectory; see below) |
+| Propagation driven by body-mounted sensors ([IMU](../glossary.md#imu-inertial-measurement-unit) gyroscope/accelerometer, wheel [odometry](../glossary.md#odometry)) | either, for **group-affine** dynamics (the invariant error evolves on its own, whatever the trajectory; see below) |
 | World-frame measurement of a point fixed on the body: $`h(X) = X b`$ for a known body-frame point $b$ (GPS antenna, or this repo's `use_numpy/pointcloud_pose_tracking.py`, where $b = p_i$) | **left**-invariant |
 | Body-mounted sensor measuring a [landmark](../glossary.md#landmark) known in the world frame: $`h(X) = X^{-1} d`$ for a known world-frame point $d$ | **right**-invariant |
 

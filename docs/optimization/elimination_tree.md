@@ -1,12 +1,12 @@
 # Elimination trees
 
-> An elimination tree tells us **which variables depend on which other variables during sparse Cholesky elimination**.
+> An elimination tree tells us **which variables depend on which other variables during sparse [Cholesky](../glossary.md#cholesky-factorization) elimination**.
 
 ---
 
 ## 1. Start with the simplest example
 
-Suppose our sparse matrix has this structure, with each number a variable:
+Suppose our sparse matrix has this structure, with each number a variable. Draw an edge i ─ j whenever the matrix entry $`H_{ij} \neq 0`$ (the factor graph with the factor nodes folded away):
 
 ```text
 1 ─ 2 ─ 3 ─ 4
@@ -62,7 +62,7 @@ The tree is **not necessarily the original graph**:
 
 ## 3. Connecting it to sparse Cholesky
 
-We want $`H=LL^\top`$, where $`H`$ is the [Hessian](../glossary.md#normal-equations-and-hessian) (information matrix) of the linearized problem and $`L`$ is its lower-triangular Cholesky factor, computed by eliminating variables one by one. Take this graph:
+We want $`H=LL^\top`$, where $`H`$ is the [Hessian](../glossary.md#normal-equations-and-hessian) of the linearized problem and $`L`$ is its lower-triangular Cholesky factor, computed by eliminating variables one by one. Take this graph:
 
 ```text
 1 ─ 2 ─ 3
@@ -75,8 +75,6 @@ We want $`H=LL^\top`$, where $`H`$ is the [Hessian](../glossary.md#normal-equati
 - **Eliminate 3.** Its only remaining neighbor is 4, via that fill-in edge: $\text{parent}(3)=4$.
 
 The result is the same chain as §1's tree, but for a different reason. §1's chain came from a graph that was already a chain; here the 3–4 link exists only because eliminating 2 created it. That is §2's point: the tree is not the original graph.
-
-The tree tells the factorization algorithm where information flows.
 
 ---
 
@@ -127,7 +125,7 @@ x2 ─ factor ─ l2
 x2 ─ factor ─ l3
 ```
 
-**Elimination tree:** what must be computed before what? Here it is for the elimination order $l_1$, $l_2$, $l_3$, $x_1$, $x_2$:
+**Elimination tree:** what must be computed before what? Here it is for the [elimination order](../glossary.md#variable-ordering) $l_1$, $l_2$, $l_3$, $x_1$, $x_2$:
 
 ```text
         x2
@@ -254,14 +252,7 @@ Pose 3
 Landmarks
 ```
 
-In bundle adjustment, where each pose observes many landmarks, this creates lots of fill-in. Eliminating a pose connects every landmark it sees to every other one (§3's fill-in rule), so the landmark block fills in densely. We might end up with a nearly dense lower-triangular $L$, which means a lot of computation:
-
-```text
-█
-██
-███
-████
-```
+In [bundle adjustment](../glossary.md#bundle-adjustment-ba), where each pose observes many landmarks, this creates lots of fill-in. Eliminating a pose connects every landmark it sees to every other one (§3's fill-in rule), so the landmark block fills in densely. We might end up with a nearly dense lower-triangular $L$, which means a lot of computation (counts in the table below).
 
 ---
 
@@ -275,9 +266,27 @@ Landmarks
 Poses
 ```
 
-Landmarks never touch each other directly, so eliminating one only connects the poses that observe it. The structure stays much sparser. This is exactly bundle adjustment's Schur-complement trick ([bundle_adjustment.md §12](bundle_adjustment.md#12-block-sparsity-and-the-schur-complement)): eliminate every landmark first, then solve the much smaller camera-only system.
+Landmarks never touch each other directly, so eliminating one only connects the poses that observe it. The structure stays much sparser. This is exactly bundle adjustment's [Schur-complement](../glossary.md#schur-complement) trick ([bundle_adjustment.md §12](bundle_adjustment.md#12-block-sparsity-and-the-schur-complement)): eliminate every landmark first, then solve the much smaller camera-only system.
 
 The resulting $L$ has far fewer nonzeros. It is always $n \times n$, so only its sparsity changes.
+
+**Counting it.** Here are the counts for two bundle-adjustment graphs at block level (one node per camera or landmark, $n$ nodes in total). Entries are counted in the lower triangle of $L$, diagonal included, and fill-in = nnz($L$) minus the nonzeros of the lower triangle of $H$. All numbers come from the repo's `utils.symbolic_eliminate`.
+
+| Graph | Order | nnz($L$) | fill-in | dense $n(n+1)/2$ |
+| ----- | ----- | -------- | ------- | ---------------- |
+| Toy: 4 cameras, 12 landmarks, $n=16$ | Poses first | 130 | 66 | 136 |
+| Toy: 4 cameras, 12 landmarks, $n=16$ | Landmarks first | 70 | 6 | 136 |
+| Toy: 4 cameras, 12 landmarks, $n=16$ | Interleaved | 133 | 69 | 136 |
+| BA scene: 8 cameras, 48 landmarks, $n=56$ | Poses first | 1471 | 1123 | 1596 |
+| BA scene: 8 cameras, 48 landmarks, $n=56$ | Landmarks first | 376 | 28 | 1596 |
+| BA scene: 8 cameras, 48 landmarks, $n=56$ | Interleaved | 1098 | 750 | 1596 |
+
+- **Toy assumption:** every camera sees every landmark.
+- **BA scene:** the seed-0 defaults of `bundle_adjustment.py`, 292 observations, so each camera sees only some of the landmarks.
+- **Interleaved:** each camera followed by the landmarks it is the first to see.
+- **Reading it:** poses first leaves $L$ nearly dense in both graphs, while landmarks first keeps fill-in to 6 and 28 entries.
+
+The sparsity plots of $H$ and $L$ for the BA scene (with 6 and 3 scalar unknowns per camera and landmark) are the figure in [sparse_cholesky_factorization.md §5](sparse_cholesky_factorization.md#5-ordering-becomes-extremely-important).
 
 ---
 
@@ -299,44 +308,22 @@ That is, the parent of $j$ is the row of the first nonzero below the diagonal in
 
 The concepts above connect into one pipeline:
 
-```text
-                SLAM
-                  │
-                  ▼
-             Factor Graph
-                  │
-                  ▼
-           Linearization
-                  │
-                  ▼
-              Jacobian J
-                  │
-                  ▼
-             H = Jᵀ Ω J
-                  │
-                  ▼
-          Sparse Hessian
-                  │
-          choose ordering
-                  │
-                  ▼
-          Variable Elimination
-                  │
-             ┌────┴────┐
-             ▼         ▼
-         Fill-in   Elimination
-                      Tree
-             │         │
-             └────┬────┘
-                  ▼
-         Sparse Cholesky
-             H = LLᵀ
-                  │
-                  ▼
-              Solve Δx
+```mermaid
+flowchart TD
+    A["SLAM"] --> B["Factor graph"]
+    B --> C["Linearization:<br/>Jacobian J"]
+    C --> D["H = Jᵀ Ω J"]
+    D --> E["Sparse Hessian"]
+    E --> F["Choose ordering"]
+    F --> G["Variable elimination"]
+    G --> H["Fill-in"]
+    G --> I["Elimination tree"]
+    H --> J["Sparse Cholesky:<br/>H = L Lᵀ"]
+    I --> J
+    J --> K["Solve Δx"]
 ```
 
-The elimination structure then feeds the Bayes tree (§7) and iSAM2. Here $`J`$ is the Jacobian of the residuals, and $`\Omega`$ in $`H = J^\top \Omega J`$ is the measurement [information matrix](../glossary.md#information-matrix).
+The elimination structure then feeds the Bayes tree (§7) and iSAM2. Here $`J`$ is the [Jacobian](../glossary.md#jacobian) of the residuals, and $`\Omega`$ in $`H = J^\top \Omega J`$ is the measurement [information matrix](../glossary.md#information-matrix).
 
 ### The simplest mental model
 

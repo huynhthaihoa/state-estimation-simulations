@@ -10,7 +10,7 @@ where $L$ is lower triangular. Column by column, its entries are:
 
 $$L_{jj} = \sqrt{A_{jj} - \sum_{k=1}^{j-1} L_{jk}^2}, \qquad L_{ij} = \frac{1}{L_{jj}}\left(A_{ij} - \sum_{k=1}^{j-1} L_{ik}L_{jk}\right)\ \ (i>j)$$
 
-That sum over earlier columns $k$ is the whole story behind fill-in (§3): even when $A_{ij}=0$, $L_{ij}$ can come out nonzero if $i$ and $j$ share an already-eliminated neighbor $k$ (a variable whose column of $`L`$ is already computed) with $L_{ik}, L_{jk} \neq 0$.
+That sum over earlier columns $k$ is the whole story behind [fill-in](../glossary.md#fill-in) (§3): even when $A_{ij}=0$, $L_{ij}$ can come out nonzero if $i$ and $j$ share an already-[eliminated](../glossary.md#variable-elimination) neighbor $k$ (a variable whose column of $`L`$ is already computed) with $L_{ik}, L_{jk} \neq 0$.
 
 For example:
 
@@ -34,7 +34,7 @@ The key observation is that **large optimization problems often contain mostly z
 
 ## 1. Why does sparsity matter?
 
-Consider a SLAM problem ([glossary](../glossary.md#slam-simultaneous-localization-and-mapping)) with 1,000 robot poses and 5,000 landmarks.
+Consider an illustrative SLAM problem ([glossary](../glossary.md#slam-simultaneous-localization-and-mapping)) with 1,000 robot poses and 5,000 landmarks.
 
 Each measurement connects only a few variables:
 
@@ -55,28 +55,9 @@ Pose 3 ─ Landmark 3
 ...
 ```
 
-Most variables don't directly interact, so the Hessian $H = J^\top \Omega J$ is **sparse** (with Jacobian $`J`$ and measurement **information matrix** $`\Omega`$, [glossary](../glossary.md#information-matrix); §2 derives this).
+Most variables don't directly interact, so the [Hessian](../glossary.md#normal-equations-and-hessian) $H = J^\top \Omega J$ (the information matrix of the linearized problem) is **sparse**. Here $`J`$ is the [Jacobian](../glossary.md#jacobian) and $`\Omega`$ the measurement **[information matrix](../glossary.md#information-matrix)** (§2 gives $H$, §9 gives the exact sparsity rule).
 
-Instead of storing something like:
-
-```text
-████████████████████
-████████████████████
-████████████████████
-████████████████████
-████████████████████
-```
-
-we have something more like this (an illustrative sketch; the real pattern depends on the variable order):
-
-```text
-██
-███
- ███
-  ███
-   ███
-    ██
-```
+A dense matrix stores every entry; $H$ only needs the entries for pairs of variables that share a factor. §5's figure shows this for a real bundle-adjustment scene (8 cameras, 48 landmarks, 192 scalar unknowns): the lower triangle of $H$ has 5712 nonzeros, against 18528 entries for a dense lower triangle. Which entries of $L$ become nonzero then depends on the variable order (§3-§5).
 
 A dense Cholesky algorithm would waste enormous amounts of computation on the zeros. Sparse Cholesky tries to preserve and exploit this structure.
 
@@ -84,11 +65,11 @@ A dense Cholesky algorithm would waste enormous amounts of computation on the ze
 
 ## 2. The basic idea
 
-Suppose we're at the linear-solve step of Gauss-Newton or LM:
+Suppose we're at the linear-solve step of Gauss-Newton or [Levenberg-Marquardt (LM)](../glossary.md#levenberg-marquardt-lm-and-damping):
 
 $$H\Delta x = -b$$
 
-- $H\approx J^\top J$ and $b := J^\top r$, as in [gauss_newton.md](gauss_newton.md).
+- $H\approx J^\top J$ and $b := J^\top r$, as defined in the [glossary](../glossary.md#normal-equations-and-hessian); [gauss_newton.md](gauss_newton.md) writes the same step as $`J^\top J\,\Delta x = -J^\top r`$.
 - Weighted, these become $H = J^\top\Omega J$ and $b = J^\top\Omega r$.
 - $\Omega$ is the information matrix from [factor_graph.md §4](factor_graph.md#4-optimization-means-minimizing-all-those-errors), the same quantity as $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty).
 
@@ -102,14 +83,14 @@ We need $H$ to be symmetric positive definite, and that isn't automatic. If ever
 Gauge in practice:
 
 - **Pose graphs:** the gauge is a rigid motion of the whole trajectory. Anchoring one pose fixes it ([pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive)).
-- **Monocular BA:** the gauge also includes uniform rescaling of the scene (7 DoF), which one anchored pose can't pin. The repo's BA scripts fix two cameras instead ([bundle_adjustment.md §14](bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment)).
+- **Monocular [bundle adjustment (BA)](../glossary.md#bundle-adjustment-ba):** the gauge also includes uniform rescaling of the scene (7 [degrees of freedom](../glossary.md#degrees-of-freedom-dof) in total), which one anchored pose can't pin. The repo's BA scripts fix two cameras instead ([bundle_adjustment.md §14](bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment)).
 - **Either case:** LM's damping $H + \lambda I$ also keeps the system solvable ([levenberg_marquardt.md](levenberg_marquardt.md)).
 
-We then factor $H = LL^\top$, so solving becomes two triangular solves: $Ly=-b$, followed by $L^\top\Delta x=y$.
+We then factor $H = LL^\top$, so solving becomes two triangular solves ([back-substitution](../glossary.md#back-substitution)): $Ly=-b$, followed by $L^\top\Delta x=y$.
 
 The important difference is:
 
-> **Sparse Cholesky only stores and computes the entries of $L$ that can be nonzero (the symbolic pattern).**
+> **Sparse Cholesky only stores and computes the entries of $L$ that can be nonzero (the symbolic pattern, §6).**
 
 The catch is fill-in.
 
@@ -137,7 +118,7 @@ L = \begin{bmatrix} * & 0 & 0 \\
 * & [*] & * \end{bmatrix}
 ```
 
-where $[*]$ marks the entry that was zero in $H$. That newly created nonzero is [fill-in](../glossary.md#fill-in). It comes straight from the formula at the top: $`L_{32} = (H_{32} - L_{31}L_{21}) / L_{22}`$, and $H_{32} = 0$ doesn't help when $L_{31}$ and $L_{21}$ are both nonzero.
+where $[*]$ marks the entry that was zero in $H$. That newly created nonzero is fill-in. It comes straight from the formula at the top: $`L_{32} = (H_{32} - L_{31}L_{21}) / L_{22}`$, and $H_{32} = 0$ doesn't help when $L_{31}$ and $L_{21}$ are both nonzero.
 
 Eliminate the **hub** (variable 1, connected to both others) last instead (order 2, 3, 1, so variable 1 becomes the last row and column), and $L$ has no fill at all. §5 turns this into a general rule.
 
@@ -154,7 +135,7 @@ So:
 
 ## 4. Why does fill-in happen?
 
-The intuitive way to see it is through [variable elimination](../glossary.md#variable-elimination). Take this graph:
+The intuitive way to see it is through variable elimination. Take this graph:
 
 ```text
 1 ─ 2 ─ 3
@@ -183,11 +164,32 @@ So the **order in which variables are eliminated** strongly affects the computat
 
 Both examples follow one rule: eliminating a variable connects all of its remaining neighbors. So eliminate variables with few neighbors first and hubs last.
 
+The figure below applies this to a real bundle-adjustment problem, with the same $H$ under three orders.
+
+![Two rows of three sparsity plots for one bundle-adjustment problem. Top row: the lower triangle of H with poses first, landmarks first and interleaved, each with 5712 nonzeros. Bottom row: the Cholesky factor L for the same three orders, with fill-in drawn in red. Poses first gives a large red triangle over the landmark block, landmarks first gives a small red block at the end, interleaved gives red regions spread under the first columns.](../../assets/sparse_fill_in_orderings.png)
+
+*Sparsity of the Hessian (top row, lower triangle) and of its Cholesky factor (bottom row, red = fill-in) for one bundle-adjustment problem under three elimination orders. Produced by `uv run python assets/make_figures.py sparse_fill_in_orderings`.*
+
+- **Scene:** the defaults of `bundle_adjustment.py` (seed 0): 8 cameras with 6 unknowns each, 48 landmarks with 3 each (192 scalar unknowns), 292 camera-landmark observations.
+- **Orders:** **poses first** (all cameras, then all landmarks), **landmarks first**, and **interleaved** (each camera followed by the landmarks it is the first to see).
+- **Counting:** fill-in = nnz($L$) - nnz(lower triangle of $H$), diagonal included, computed with the repo's `utils.symbolic_eliminate`.
+
+| Order (192 unknowns) | nnz($L$) | fill-in | dense lower triangle |
+| -------------------- | -------- | ------- | -------------------- |
+| Poses first          | 15819    | 10107   | 18528                |
+| Landmarks first      | 6720     | 1008    | 18528                |
+| Interleaved          | 13452    | 7740    | 18528                |
+
+- $H$ is the same in all three top plots (5712 nonzeros in its lower triangle); only the order changes.
+- **Poses first:** eliminating the cameras links landmarks that share a camera, so the landmark block fills in (the large red triangle) and $L$ has 15819 of the 18528 possible entries.
+- **Landmarks first:** landmarks never touch each other, so the only fill-in is among the cameras, in the small block at the end (1008 entries).
+- **Interleaved:** 13452 nonzeros and 7740 fill-in entries, with the red spread under the first columns.
+
 Finding the truly optimal order is NP-hard (no known polynomial-time algorithm), so solvers use heuristics built on that rule:
 
 - **AMD** (Approximate Minimum Degree): repeatedly eliminate the variable with the fewest remaining neighbors.
 - **COLAMD:** the same idea, computed from the columns of $J$ without forming $H$. It is a common choice for batch solvers.
-- **CCOLAMD:** constrained COLAMD, which can force chosen variables (for example the newest poses) to the end. iSAM2 uses it ([isam2_optimization.md §12](isam2_optimization.md#12-variable-ordering-is-also-crucial)).
+- **CCOLAMD:** constrained COLAMD, which can force chosen variables (for example the newest poses) to the end. iSAM2 (an incremental solver) uses it ([isam2_optimization.md §12](isam2_optimization.md#12-variable-ordering-is-also-crucial)).
 - **Nested dissection:** split the graph with a small **separator** (a set of variables whose removal disconnects it), order each half recursively, and put the separator last.
 
 [elimination_tree.md §9](elimination_tree.md#9-why-ordering-matters-so-much) works through the effect of ordering on a SLAM example.
@@ -209,11 +211,11 @@ l_2\\
 \vdots \end{bmatrix}
 ```
 
-with robot poses $x_1, \dots, x_N$ followed by landmarks $l_1, l_2, \dots$. Linearizing the residuals and forming the normal equations gives exactly §2's system $H\Delta x = -b$, with $H = J^\top\Omega J$ and $b = J^\top\Omega r$, which is then factored as $H = LL^\top$.
+with robot poses $x_1, \dots, x_N$ followed by landmarks $l_1, l_2, \dots$ (poses-first order is shown for readability; solvers typically eliminate landmarks first, see §5 and [elimination_tree.md §9](elimination_tree.md#9-why-ordering-matters-so-much)). Linearizing the residuals and forming the normal equations gives exactly §2's system $H\Delta x = -b$, with $H = J^\top\Omega J$ and $b = J^\top\Omega r$, which is then factored as $H = LL^\top$.
 
 Because each measurement only involves a small number of variables, $J$ and $H$ are sparse.
 
-The pattern also stays fixed for a fixed graph. Every Gauss-Newton or LM iteration relinearizes at a new estimate, which changes the *values* in $H$, but the same factors connect the same variables, so the **nonzero pattern** doesn't change. Solvers exploit this by splitting the factorization in two: a **symbolic** step (choose the ordering, predict where $L$'s nonzeros go, allocate memory) done once for a fixed graph, and a **numeric** step (compute the values) repeated every iteration. CHOLMOD's `analyze`/`factorize` calls (CHOLMOD is a sparse Cholesky library) are this split. That's why an expensive ordering heuristic is affordable: its cost is paid once, not per iteration. (Incremental solvers add factors, so their pattern changes and they redo part of this step.)
+The pattern also stays fixed for a fixed graph. Every Gauss-Newton or LM iteration [relinearizes](../glossary.md#relinearization) at a new estimate, which changes the *values* in $H$, but the same factors connect the same variables, so the **nonzero pattern** doesn't change. Solvers exploit this by splitting the factorization in two: a **symbolic** step (choose the ordering, predict where $L$'s nonzeros go, allocate memory) done once for a fixed graph, and a **numeric** step (compute the values) repeated every iteration. CHOLMOD's `analyze`/`factorize` calls (CHOLMOD is a sparse Cholesky library) are this split. That's why an expensive ordering heuristic is affordable: its cost is paid once, not per iteration. (Incremental solvers add factors, so their pattern changes and they redo part of this step.)
 
 ---
 
@@ -279,15 +281,15 @@ Measurement 3:
 Pose 2 ─ Landmark 2
 ```
 
-gives this Hessian structure:
+gives this Hessian structure (pose $i$ is $x_i$, landmark $j$ is $l_j$; poses-first order is shown for readability, solvers typically eliminate landmarks first):
 
 ```text
-       P1 P2 L1 L2
+       x1 x2 l1 l2
 
-P1     X     X  X
-P2        X     X
-L1     X     X
-L2     X  X     X
+x1     X     X  X
+x2        X     X
+l1     X     X
+l2     X  X     X
 ```
 
 The rule is exact: $H_{ij}$ is **structurally nonzero** (nonzero by the sparsity pattern, even if values happen to cancel) exactly when variables $i$ and $j$ appear together in at least one factor. So $H$'s graph is the **factor graph** with each factor replaced by edges between all of its variables.

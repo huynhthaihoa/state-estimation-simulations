@@ -10,9 +10,10 @@ same copy.
     returned point carries the index of the primitive it hit -- used ONLY to
     score extraction and in tests, never handed to an estimator.
   - Extraction: per-point PCA normal + curvature from k nearest neighbors,
-    then sequential RANSAC -- planes first (3-point hypotheses), cylinders
-    on the remainder (2 points + their normals give the axis), each refined
-    by least squares.
+    then sequential RANSAC -- each round draws the best plane hypothesis
+    (3 points) and the best cylinder hypothesis (2 points + their normals
+    give the axis), refines both by least squares, and keeps whichever
+    explains more of the remaining points (see extract_primitives).
   - S^2 helpers: tangent basis, exponential map and log for unit vectors
     (plane normals, cylinder axes).
 

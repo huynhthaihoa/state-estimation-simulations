@@ -42,7 +42,7 @@ A smooth set of transformations that can be composed and inverted, such as $SO(3
 **Symbols:** $\oplus$, $\boxplus$. How an estimate on a manifold takes a step: $T \leftarrow T\cdot\mathrm{Exp}(\Delta x)$ instead of $T + \Delta x$. Some docs write this step as $`T \oplus \Delta x`$ or $`x \boxplus \Delta x`$. See [gauss_newton.md §8](optimization/gauss_newton.md#8-why-is-this-everywhere-in-slam) and [pose_graph_optimization.md §15.6](optimization/pose_graph_optimization.md#156-retractionstate-update).
 
 ### Left and right perturbation
-The two ways to nudge a rotation or pose by a small tangent vector $\xi$: on the right, $T\cdot\mathrm{Exp}(\xi)$ (used by most docs here), or on the left, $\mathrm{Exp}(\xi)\cdot T$. They give different Jacobians, because matrix multiplication does not commute. Solà et al. and `manif` call the right one "right-plus"; it goes with the *left*-invariant error. The exception is [invariant_saltation_ekf.md](filtering/invariant_saltation_ekf.md), which perturbs on the left, $`\exp(\xi)\,X`$ ("left-plus", manif's `lplus`), because it uses the *right*-invariant error. Its world-frame EKF baseline also perturbs the rotation on the left, $`\mathrm{Exp}(\delta\theta)\,R`$. See [jacobian.md §11.1](foundations/jacobian.md#111-why-plain-addition-breaks) and [left_right_invariant.md §1](filtering/left_right_invariant.md#1-the-setup).
+The two ways to nudge a rotation or pose by a small tangent vector $\xi$: on the right, $T\cdot\mathrm{Exp}(\xi)$ (used by most docs here), or on the left, $\mathrm{Exp}(\xi)\cdot T$. They give different Jacobians, because matrix multiplication does not commute. Solà et al. and `manif` call the right one "right-plus"; it goes with the *left*-invariant error. The exceptions are the two right-invariant filters, [invariant_saltation_ekf.md](filtering/invariant_saltation_ekf.md) and [hexapod_contact_inekf.md](filtering/hexapod_contact_inekf.md), which perturb on the left ("left-plus", manif's `lplus`; with their error $`\xi = \log(\hat X X^{-1})`$ the truth is $`X = \exp(-\xi)\,\hat X`$) because they use the *right*-invariant error. Their world-frame EKF baselines also perturb the rotation on the left, $`\mathrm{Exp}(\delta\theta)\,R`$. See [jacobian.md §11.1](foundations/jacobian.md#111-why-plain-addition-breaks) and [left_right_invariant.md §1](filtering/left_right_invariant.md#1-the-setup).
 
 ### Twist
 **Symbols:** $`u`$, $`\xi`$. A 6-vector of linear and angular velocity (translation part first in this repo). Composing a pose with $`\mathrm{Exp}(u\,\Delta t)`$ applies the motion over $`\Delta t`$. See [lie_algebra.md §11](foundations/lie_algebra.md#11-se3-this-is-where-robotics-gets-really-interesting).
@@ -70,13 +70,13 @@ Isotropic noise or uncertainty is the same in every direction: a covariance $\si
 ## 2. Uncertainty and probability
 
 ### Gaussian noise
-**Symbol:** $`\mathcal{N}(0, \Sigma)`$. Measurement noise modelled as a zero-mean normal distribution with covariance $\Sigma$. Under it, minimizing weighted squared errors gives the maximum-likelihood estimate (the unknowns that make the observed measurements most probable; a local one, since the problem is nonlinear). See [nonlinear_least_square.md §12](optimization/nonlinear_least_square.md#12-add-measurement-uncertainty).
+**Symbol:** $`\mathcal{N}(0, \Sigma)`$. Measurement noise modelled as a zero-mean normal distribution with covariance $\Sigma$. Under it, minimizing weighted squared errors gives the maximum-likelihood estimate (the unknowns that make the observed measurements most probable; a local one, since the problem is nonlinear). See [nonlinear_least_square.md §2](optimization/nonlinear_least_square.md#2-why-square-the-errors).
 
 ### Covariance
 **Symbols:** $P$ or $\Sigma$. A matrix describing how uncertain an estimate or a measurement is, and how its errors are correlated. See [kf_ekf_iekf.md §1](filtering/kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear).
 
 ### Information matrix
-**Symbol:** $\Omega = \Sigma^{-1}$. The inverse covariance. It weights each error so that precise measurements count more. [nonlinear_least_square.md](optimization/nonlinear_least_square.md) writes the same quantity as $W$. See [factor_graph.md §4](optimization/factor_graph.md#4-optimization-means-minimizing-all-those-errors).
+**Symbol:** $\Omega = \Sigma^{-1}$. The inverse covariance. It weights each error so that precise measurements count more. [nonlinear_least_square.md](optimization/nonlinear_least_square.md) writes the same quantity as $W$. Not to be confused with the Gauss-Newton Hessian $H = J^\top \Omega J$ of the linearized problem ([entry](#normal-equations-and-hessian)), which some docs also call its information matrix. See [factor_graph.md §4](optimization/factor_graph.md#4-optimization-means-minimizing-all-those-errors).
 
 ### Mahalanobis distance
 **Symbol:** $d$. $`d^2 = r^\top \Omega\, r`$ for a residual $r$ with information matrix $\Omega$. Its square root $d$ is the error measured in standard deviations, accounting for the noise's shape. For isotropic noise with standard deviation $\sigma$, $\Omega = I/\sigma^2$, so it reduces to plain squared error divided by $\sigma^2$. See [pose_graph_optimization.md §15.3](optimization/pose_graph_optimization.md#153-objective-function) and [factor_graph.md §4](optimization/factor_graph.md#4-optimization-means-minimizing-all-those-errors).
@@ -122,7 +122,7 @@ Replacing a nonlinear function by its first-order approximation around the curre
 The starting estimate an iterative solver refines, often from dead reckoning. A poor one can make Gauss-Newton diverge. See [vi_initialization.md §1](frontend/vi_initialization.md#1-the-bootstrapping-problem) and [levenberg_marquardt.md §2](optimization/levenberg_marquardt.md#2-why-not-just-use-gauss-newton).
 
 ### Normal equations and Hessian
-**Symbols:** $H$, $b$. Each Gauss-Newton step solves $H\Delta x = -b$ for the step $\Delta x$, with $H = J^\top \Omega J$ and $b = J^\top \Omega e$. This $H$ approximates the Hessian (the second derivatives) of the cost. See [gauss_newton.md §4](optimization/gauss_newton.md#4-the-optimization-problem) and [§7](optimization/gauss_newton.md#7-why-is-it-called-gauss-newton).
+**Symbols:** $H$, $b$. Each Gauss-Newton step solves $H\Delta x = -b$ for the step $\Delta x$, with $H = J^\top \Omega J$ and $b = J^\top \Omega e$. This $H$ approximates the Hessian (the second derivatives) of the cost. [bayes_tree.md](optimization/bayes_tree.md) and [isam_optimization.md](optimization/isam_optimization.md) write the same step as $H\Delta x = g$ with $g = -b$ (the negative gradient). See [gauss_newton.md §4](optimization/gauss_newton.md#4-the-optimization-problem) and [§7](optimization/gauss_newton.md#7-why-is-it-called-gauss-newton).
 
 ### Gradient descent
 The step $`\Delta x = -\alpha J^\top \Omega e`$ (or $-\alpha J^\top e$ for $\Omega = I$, as the linked doc writes it): straight downhill with step size $\alpha$. Safe with a small step, slow on badly scaled problems. See [levenberg_marquardt.md §3](optimization/levenberg_marquardt.md#3-gradient-descent-has-the-opposite-problem).
@@ -140,7 +140,7 @@ Directions in which the whole solution can move without changing any residual, e
 An outlier is a grossly wrong measurement, such as a false loop closure. Robust kernels (Huber, Cauchy, DCS, ...) down-weight large residuals so outliers can't dominate the solution. See [pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
 
 ### Relinearization
-Recomputing the Jacobians at an updated estimate. iSAM2 does it selectively, only for variables whose estimate has moved enough. See [isam2_optimization.md §10](optimization/isam2_optimization.md#10-selective-relinearization).
+Recomputing the Jacobians at an updated estimate. iSAM2 does it selectively, only for variables whose estimate has moved enough (the iSAM2 paper calls this fluid relinearization). See [isam2_optimization.md §10](optimization/isam2_optimization.md#10-selective-relinearization).
 
 ---
 

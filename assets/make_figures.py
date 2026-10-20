@@ -2227,6 +2227,233 @@ def fig_lidar_primitives():
            "run_degeneracy_experiment, run_landmark_experiment.", bottom=0.04)
 
 
+# --------------------------------------------------------------------------- optimization-doc figures
+# These four figures illustrate docs/optimization/*.md. They use the docs' own
+# toy problems and formulas; where a repo function exists it is called (utils.symbolic_eliminate,
+# bundle_adjustment's scene), otherwise the formula is evaluated directly and printed.
+
+def fig_gauss_newton_tangent():
+    """gauss_newton.md §6/§9/§10: Gauss-Newton on r(x) = x^2 - 4 from x = 3."""
+    r = lambda x: x ** 2 - 4.0
+    J = lambda x: 2.0 * x
+    x = 3.0
+    xs = [x]
+    for _ in range(3):
+        x = x - J(x) * r(x) / J(x) ** 2        # Gauss-Newton step: J^T J dx = -J^T r (scalar)
+        xs.append(x)
+    res = [abs(r(v)) for v in xs]
+    print("    iterates x_k      :", ", ".join(f"{v:.8g}" for v in xs))
+    print("    |r(x_k)|          :", ", ".join(f"{v:.3g}" for v in res))
+    print(f"    tangent at x=3: r = 5 + 6 (x - 3); root x = {xs[1]:.4f}")
+
+    fig, (ax_c, ax_r) = plt.subplots(1, 2, gridspec_kw={"width_ratios": [1.15, 1]})
+    g = np.linspace(1.5, 3.4, 300)
+    ax_c.plot(g, r(g), color=TRUTH, lw=2.2, label=r"$r(x)=x^2-4$")
+    ax_c.plot(g, r(3.0) + J(3.0) * (g - 3.0), color=C["red"], lw=1.8, label=f"tangent at $x=3$ (root {xs[1]:.4f})")
+    ax_c.plot(g, r(xs[1]) + J(xs[1]) * (g - xs[1]), color=C["blue"], lw=1.4, ls="--",
+              label=f"next tangent at $x={xs[1]:.4f}$ (root {xs[2]:.4f})")
+    ax_c.axhline(0, color=PRIOR, lw=1)
+    ax_c.scatter([3.0], [r(3.0)], color=C["red"], zorder=4)
+    ax_c.annotate(r"$x_0=3,\ r=5$", (3.0, 5.0), (2.35, 5.6), arrowprops=dict(arrowstyle="-", color=PRIOR), fontsize=9.5)
+    ax_c.scatter([xs[1]], [0], color=C["red"], zorder=4)
+    ax_c.annotate(f"$x_1={xs[1]:.4f}$", (xs[1], 0), (2.25, -2.3), arrowprops=dict(arrowstyle="-", color=PRIOR), fontsize=9.5)
+    ax_c.scatter([2.0], [0], marker="*", s=170, color=C["gold"], edgecolor=TRUTH, zorder=5, label=r"true root $x=2$")
+    ax_c.set(title="Gauss-Newton in 1D: jump to where the tangent hits zero", xlabel="x", ylabel="r(x)", ylim=(-3.5, 7.5))
+    ax_c.legend(loc="upper left", bbox_to_anchor=(0.0, 0.88))
+
+    k = np.arange(len(res))
+    ax_r.semilogy(k, res, "o-", color=C["red"], lw=2, ms=7)
+    for ki, v in zip(k, res):
+        ax_r.annotate(f"{v:.3g}", (ki, v), (6, 7), textcoords="offset points", fontsize=9.5)
+    ax_r.set(title=r"Residual magnitude $|r(x_k)|$ per iteration", xlabel="iteration k", ylabel=r"$|r(x_k)|$",
+             xticks=k, ylim=(1e-5, 40))
+    finish(fig, "gauss_newton_tangent", "Gauss-Newton on r(x) = x² − 4, starting from x = 3",
+           "Residual and Jacobian J = 2x as in gauss_newton.md §6; each step solves J²Δx = −J·r; "
+           "the iterates come from running that update")
+
+
+def fig_lm_gradient_descent():
+    """levenberg_marquardt.md §3: gradient descent on f = 1/2 (x^2 + 100 y^2) from (10, 1)."""
+    tol, start = 0.01, np.array([10.0, 1.0])
+    grad = lambda p: np.array([p[0], 100.0 * p[1]])
+
+    def run(alpha, done, max_steps):
+        p, path = start.copy(), [start.copy()]
+        while len(path) <= max_steps and not done(np.linalg.norm(p)):
+            p = p - alpha * grad(p)
+            path.append(p.copy())
+        return np.array(path)
+
+    conv = run(0.019, lambda d: d < tol, 5000)
+    div = run(0.021, lambda d: d > 1e8, 5000)
+    n_conv, n_div = len(conv) - 1, len(div) - 1
+    Jm = np.diag([1.0, 10.0]); e0 = np.array([start[0], 10.0 * start[1]])
+    gn = start + np.linalg.solve(Jm.T @ Jm, -Jm.T @ e0)
+    print(f"    alpha=0.019: {n_conv} steps to |p| < {tol}, final p = ({conv[-1, 0]:.5f}, {conv[-1, 1]:.2e}), |p| = {np.linalg.norm(conv[-1]):.5f}")
+    print(f"    alpha=0.021: |p| exceeds 1e8 after {n_div} steps (|p| = {np.linalg.norm(div[-1]):.3g}); |p| at steps 0,10,50 = "
+          + ", ".join(f"{np.linalg.norm(div[s]):.3g}" for s in (0, 10, 50)))
+    print(f"    Gauss-Newton: one step from (10, 1) lands at ({gn[0]:.3g}, {gn[1]:.3g})")
+
+    fig, (ax_c, ax_d) = plt.subplots(1, 2, gridspec_kw={"width_ratios": [1.1, 1]})
+    X, Y = np.meshgrid(np.linspace(-1.5, 11.5, 300), np.linspace(-3.2, 3.2, 300))
+    ax_c.contour(X, Y, 0.5 * (X ** 2 + 100 * Y ** 2), levels=[1, 4, 10, 25, 50, 75], colors=PRIOR, linewidths=0.9)
+    ax_c.plot(conv[:, 0], conv[:, 1], "-", color=C["blue"], lw=1.2, label=f"$\\alpha=0.019$ converges ({n_conv} steps)")
+    ax_c.plot(conv[:12, 0], conv[:12, 1], "o", color=C["blue"], ms=3.5)
+    m = 9
+    ax_c.plot(div[:m + 1, 0], div[:m + 1, 1], "-s", color=C["red"], lw=1.2, ms=3.5,
+              label=f"$\\alpha=0.021$ diverges (first {m} steps; $|y|$ grows 1.1× per step)")
+    ax_c.annotate("", xy=gn, xytext=start, arrowprops=dict(arrowstyle="-|>", color=C["green"], lw=2.2))
+    ax_c.plot([], [], color=C["green"], lw=2.2, label="Gauss-Newton: 1 step")
+    ax_c.scatter([0], [0], marker="*", s=190, color=C["gold"], edgecolor=TRUTH, zorder=5, label="minimum")
+    ax_c.scatter(*start, color=TRUTH, zorder=5)
+    ax_c.annotate("start (10, 1)", start, (7.2, 2.5), arrowprops=dict(arrowstyle="-", color=PRIOR), fontsize=9.5)
+    ax_c.set(title=r"Contours of $f=\frac{1}{2}(x^2+100y^2)$ and the three paths", xlabel="x", ylabel="y", ylim=(-3.2, 3.2))
+    ax_c.legend(loc="lower left", fontsize=8, bbox_to_anchor=(0.0, 0.0))
+
+    ax_d.semilogy(np.linalg.norm(conv, axis=1), color=C["blue"], lw=2, label=r"$\alpha=0.019$")
+    nd = min(n_div, 200)
+    ax_d.semilogy(np.linalg.norm(div[:nd + 1], axis=1), color=C["red"], lw=2, label=r"$\alpha=0.021$")
+    ax_d.axhline(tol, color=PRIOR, ls="--", lw=1)
+    ax_d.text(5, tol * 1.35, f"tolerance {tol}", color="#555555", fontsize=9)
+    ax_d.scatter([n_conv], [np.linalg.norm(conv[-1])], color=C["blue"], zorder=4)
+    ax_d.annotate(f"{n_conv} steps", (n_conv, np.linalg.norm(conv[-1])), (-62, 18), textcoords="offset points", fontsize=9.5)
+    ax_d.set(title="Distance to the minimum per step", xlabel="step", ylabel=r"$\|(x,y)\|$", xlim=(0, max(nd, n_conv) + 5))
+    ax_d.legend(loc="center right")
+    finish(fig, "lm_gradient_descent", "Gradient descent in a narrow valley: the step size must stay below 2/100",
+           "f = ½(x² + 100y²) from (10, 1), fixed step size α; the converged path is plotted to |(x,y)| < 0.01")
+
+
+def fig_sparse_fill_in_orderings():
+    """sparse_cholesky_factorization.md §5-§9: ordering vs fill-in for a BA-like Hessian."""
+    import bundle_adjustment as m
+    from utils import symbolic_eliminate
+
+    rng = np.random.default_rng(SEED)
+    K = (800.0, 800.0, 320.0, 240.0)
+    T_true, P_all = m.generate_ground_truth_scene(8, 60, 5.0, 180.0, 2.0, rng)
+    P_true, obs = m.build_observations(T_true, P_all, K, 1.0, 2, rng)
+    n_cam, n_lm = len(T_true), len(P_true)
+    pairs = sorted({(i, j) for i, j, _ in obs})
+    toy_pairs = [(i, j) for i in range(4) for j in range(12)]
+
+    def orderings(nc, nl, prs):
+        first = {}
+        for i, j in sorted(prs):
+            first.setdefault(j, i)
+        inter = []
+        for i in range(nc):
+            inter += [("c", i)] + [("l", j) for j in range(nl) if first[j] == i]
+        return {"poses first": [("c", i) for i in range(nc)] + [("l", j) for j in range(nl)],
+                "landmarks first": [("l", j) for j in range(nl)] + [("c", i) for i in range(nc)],
+                "interleaved": inter}
+
+    def analyse(nc, nl, prs, order, scalar):
+        """Returns (H_perm, L_perm, nnz_L, fill_in) over blocks (scalar=False) or 6/3-dof scalars."""
+        size = {"c": 6 if scalar else 1, "l": 3 if scalar else 1}
+        base = {}; n = 0
+        for kind, cnt in (("c", nc), ("l", nl)):
+            for idx in range(cnt):
+                base[(kind, idx)] = list(range(n, n + size[kind])); n += size[kind]
+        edges = set()
+        for blk in base.values():
+            edges |= {(a, b) for a in blk for b in blk if a < b}
+        for i, j in prs:
+            edges |= {(a, b) for a in base[("c", i)] for b in base[("l", j)]}
+        scal_order = [s for blk in order for s in base[blk]]
+        sep, _ = symbolic_eliminate(n, edges, scal_order)
+        pos = {v: k for k, v in enumerate(scal_order)}
+        H = np.eye(n, dtype=bool); L = np.eye(n, dtype=bool)
+        for a, b in edges:
+            H[pos[a], pos[b]] = H[pos[b], pos[a]] = True
+        for v, nb in sep.items():
+            for u in nb:
+                L[max(pos[u], pos[v]), min(pos[u], pos[v])] = True
+        nnz_H_lower = int(np.tril(H).sum()); nnz_L = int(L.sum())
+        return H, L, nnz_L, nnz_L - nnz_H_lower, nnz_H_lower, n
+
+    print("    scene: 8 cameras x 48 landmarks (bundle_adjustment defaults, seed 0), "
+          f"{len(obs)} observations -> {len(pairs)} distinct camera-landmark pairs")
+    print(f"    {'scene / level':<38s}{'ordering':<18s}{'n':>5s}{'nnz(H) lower':>14s}{'nnz(L)':>9s}{'fill-in':>9s}{'dense n(n+1)/2':>16s}")
+    results = {}
+    for scene, nc, nl, prs in (("BA scene", n_cam, n_lm, pairs), ("toy 4 cams x 12 lms", 4, 12, toy_pairs)):
+        for scalar in (False, True):
+            level = "6/3-dof scalars" if scalar else "blocks"
+            for name, order in orderings(nc, nl, prs).items():
+                res = analyse(nc, nl, prs, order, scalar)
+                results[(scene, scalar, name)] = res
+                H, L, nnz_L, fill, nnzH, n = res
+                print(f"    {scene + ', ' + level:<38s}{name:<18s}{n:>5d}{nnzH:>14d}{nnz_L:>9d}{fill:>9d}{n * (n + 1) // 2:>16d}")
+
+    fig, axes = plt.subplots(2, 3, figsize=(13, 9.2))
+    for c, name in enumerate(["poses first", "landmarks first", "interleaved"]):
+        H, L, nnz_L, fill, nnzH, n = results[("BA scene", True, name)]
+        Hl = np.tril(H)
+        ax = axes[0, c]
+        ax.spy(Hl, markersize=1.3, color=C["blue"])
+        ax.set_title(f"H, {name}\nnnz(lower H) = {nnzH}", fontsize=10.5)
+        ax = axes[1, c]
+        ax.spy(L & Hl, markersize=1.3, color=C["blue"])
+        ax.spy(L & ~Hl, markersize=1.3, color=C["red"])
+        ax.set_title(f"L, {name}\nnnz(L) = {nnz_L},  fill-in = {fill}", fontsize=10.5)
+    for ax in axes.ravel():
+        ax.grid(False)
+        ax.tick_params(labelsize=8)
+        for s in ax.spines.values():
+            s.set_visible(True)
+    axes[0, 0].set_ylabel("sparsity of H (lower triangle)")
+    axes[1, 0].set_ylabel("sparsity of L (red = fill-in)")
+    fig.subplots_adjust(top=0.84, bottom=0.04, left=0.07, right=0.98, hspace=0.3, wspace=0.18)
+    finish(fig, "sparse_fill_in_orderings", "Elimination order decides the fill-in of the bundle-adjustment Cholesky factor",
+           f"{n_cam} cameras (6-dof) + {n_lm} landmarks (3-dof) = {6 * n_cam + 3 * n_lm} unknowns, {len(pairs)} visible camera-landmark pairs "
+           "(bundle_adjustment.py defaults, seed 0); fill-in from utils.symbolic_eliminate", tight=False)
+
+
+def fig_robust_kernel_weights():
+    """pose_graph_optimization.md §16: IRLS weights of L2, Huber, Cauchy, Geman-McClure, DCS."""
+    delta = k = 1.0                     # §16.1 tiny example: delta = k = 1
+    Phi = 12.59                         # §16.4/§16.5: chi-square(6) 95% quantile
+    w_l2 = lambda e: np.ones_like(e)
+    w_huber = lambda e: np.where(e <= delta, 1.0, delta / np.maximum(e, 1e-12))
+    w_cauchy = lambda e: 1.0 / (1.0 + (e / k) ** 2)
+    w_gm = lambda e: 1.0 / (1.0 + e ** 2) ** 2          # §16.4 table, unit scale
+    s_dcs = lambda e2: np.minimum(1.0, 2.0 * Phi / (Phi + e2))
+    w_dcs = lambda e: s_dcs(e ** 2) ** 2                # Omega_DCS = s^2 Omega
+
+    print("    weight w(e) at e = 0.5, 3.548 (= sqrt(12.59)), 10:")
+    for name, fn in (("L2", w_l2), ("Huber (delta=1)", w_huber), ("Cauchy (k=1)", w_cauchy),
+                     ("Geman-McClure (unit scale)", w_gm), ("DCS s^2 (Phi=12.59)", w_dcs)):
+        vals = fn(np.array([0.5, np.sqrt(Phi), 10.0]))
+        print(f"      {name:<28s}" + "  ".join(f"{v:.4g}" for v in vals))
+    print(f"    DCS s at e^2 = 12.59, 20, 100, 10^4: " + ", ".join(f"{float(s_dcs(v)):.4g}" for v in (Phi, 20.0, 100.0, 1e4)))
+    print(f"    sqrt(Phi) = {np.sqrt(Phi):.3f}")
+
+    fig, (ax_w, ax_s) = plt.subplots(1, 2)
+    e = np.linspace(0.0, 10.0, 1000)
+    for fn, col, ls, lab in ((w_l2, PRIOR, "-", r"plain least squares ($w=1$)"),
+                             (w_huber, C["orange"], "-", r"Huber ($\delta=1$)"),
+                             (w_cauchy, C["blue"], "-", r"Cauchy ($k=1$)"),
+                             (w_gm, C["purple"], "--", r"Geman-McClure ($1/(1+e^2)^2$, unit scale)"),
+                             (w_dcs, C["red"], "-", r"DCS, $s^2$ ($\Phi=12.59$)")):
+        ax_w.semilogy(e, fn(e), color=col, ls=ls, lw=2, label=lab)
+    ax_w.axvline(np.sqrt(Phi), color=PRIOR, ls=":", lw=1)
+    ax_w.text(np.sqrt(Phi) + 0.1, 1.5e-4, r"$e=\sqrt{\Phi}=3.55$", fontsize=9, color="#555555")
+    ax_w.set(title="Weight on the edge's information matrix", xlabel="residual magnitude e", ylabel="w(e)", ylim=(1e-4, 2.5))
+    fig.legend(*ax_w.get_legend_handles_labels(), loc="lower center", ncol=3, fontsize=9)
+
+    e2 = np.linspace(0.0, 100.0, 1000)
+    ax_s.plot(e2, s_dcs(e2), color=C["red"], lw=2.2, label=r"$s=\min(1,\ 2\Phi/(\Phi+e^2))$")
+    ax_s.plot(e2, s_dcs(e2) ** 2, color=C["red"], lw=1.4, ls="--", label=r"$s^2$ (weight actually applied to $\Omega$)")
+    ax_s.axvline(Phi, color=TRUTH, ls=":", lw=1.2)
+    ax_s.scatter([Phi], [1.0], color=TRUTH, zorder=4)
+    ax_s.annotate(r"$\Phi=\chi^2_{0.95}(6)=12.59$: $s$ starts to drop", (Phi, 1.0), (22, 0.88), fontsize=9.5,
+                  arrowprops=dict(arrowstyle="-", color=PRIOR))
+    ax_s.set(title=r"DCS scale $s$ against squared error", xlabel=r"squared error $e^2=r^\top\Omega r$", ylabel="s", ylim=(0, 1.08))
+    ax_s.legend(loc="center right")
+    finish(fig, "robust_kernel_weights", "Robust kernel weights (formulas from §16 of pose_graph_optimization.md)",
+           "Huber δ = 1, Cauchy k = 1 (the §16.1 example values); Geman-McClure at unit scale (§16.4); DCS Φ = 12.59 (§16.5)",
+           bottom=0.12)
+
+
 FIGURES = {
     "pose_tracking": fig_pose_tracking,
     "robot_imu_tracking": fig_robot_imu_tracking,
@@ -2264,6 +2491,10 @@ FIGURES = {
     "lidar_primitives_concept": fig_lidar_primitives_concept,
     "lidar_primitives_extraction": fig_lidar_primitives_extraction,
     "lidar_primitives": fig_lidar_primitives,
+    "gauss_newton_tangent": fig_gauss_newton_tangent,
+    "lm_gradient_descent": fig_lm_gradient_descent,
+    "sparse_fill_in_orderings": fig_sparse_fill_in_orderings,
+    "robust_kernel_weights": fig_robust_kernel_weights,
 }
 
 

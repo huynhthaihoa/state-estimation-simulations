@@ -24,10 +24,10 @@ Conceptual notes on the state-estimation and SLAM ideas behind the code in [`use
 
 ## [`filtering/`](filtering/) - The Kalman-filter lineage
 
-- [kf_ekf_iekf.md](filtering/kf_ekf_iekf.md): KF → EKF → Invariant EKF, in one progression.
 - [linear_nonlinear.md](filtering/linear_nonlinear.md): how to tell whether a system is linear or nonlinear, and whether the nonlinearity matters over the region your uncertainty covers.
-- [extra_kf_variants.md](filtering/extra_kf_variants.md): UKF, ESKF, MSCKF and other variants, and why each exists.
+- [kf_ekf_iekf.md](filtering/kf_ekf_iekf.md): KF → EKF → Invariant EKF, in one progression.
 - [left_right_invariant.md](filtering/left_right_invariant.md): left- vs. right-invariant error formulations in the IEKF (builds on `kf_ekf_iekf.md` §3-§5).
+- [extra_kf_variants.md](filtering/extra_kf_variants.md): UKF, ESKF, MSCKF and other variants, and why each exists.
 - [pointcloud_pose_tracking_empirical_note.md](filtering/pointcloud_pose_tracking_empirical_note.md): an empirical note (not a concept explainer) on why `run_ekf`/`run_iekf` agree to round-off in `pointcloud_pose_tracking.py` while `run_ukf` and `run_vanilla_kf` differ.
 - [hybrid_saltation_ekf.md](filtering/hybrid_saltation_ekf.md): filtering through *discontinuous* motion (hybrid systems, guards, reset maps) with the saltation matrix; implemented in `saltation_matrix_ekf.py`.
 - [invariant_saltation_ekf.md](filtering/invariant_saltation_ekf.md): the same bounce on a Lie group: a right-invariant EKF on $`SE_2(3)`$ for a tumbling IMU body. Covers the saltation matrix in invariant-error coordinates, why the reset breaks the filter's [trajectory independence](glossary.md#group-affine-dynamics-trajectory-independence), and a timing-noise term that keeps it consistent under contact-detection jitter. Implemented in `invariant_saltation_ekf.py`.
@@ -46,7 +46,7 @@ Conceptual notes on the state-estimation and SLAM ideas behind the code in [`use
 - [bundle_adjustment.md](optimization/bundle_adjustment.md): factor graphs specialized to joint camera-pose and 3D-landmark refinement.
 - [sparse_cholesky_factorization.md](optimization/sparse_cholesky_factorization.md): why real solvers exploit the sparsity of the Hessian $`H`$ ([glossary](glossary.md#normal-equations-and-hessian)) in a [Cholesky factorization](glossary.md#cholesky-factorization) (this repo's solves are dense), and the fill-in that variable-elimination order controls.
 - [imu_preintegration.md](optimization/imu_preintegration.md): compressing raw high-rate IMU samples into one relative-motion edge, with bias-sensitivity Jacobians that correct it for bias changes without re-integrating.
-- [isam_optimization.md](optimization/isam_optimization.md): incrementally updating the solution to a growing factor graph (iSAM) instead of re-solving from scratch each step. Implemented in `pose_graph_incremental.py` (iSAM v1 style: Givens-rotation QR updates for odometry edges, a full rebuild at loop closure, no reordering, no Bayes tree).
+- [isam_optimization.md](optimization/isam_optimization.md): incrementally updating the solution to a growing factor graph (iSAM) instead of re-solving from scratch each step. Implemented in `pose_graph_incremental.py` (original-iSAM style: Givens-rotation QR updates for odometry edges, a full rebuild at loop closure, no reordering, no Bayes tree).
 - [elimination_tree.md](optimization/elimination_tree.md): the dependency structure ("what must be computed before what") that variable elimination produces, distinct from the factor graph itself ("who talks to whom"); the setup for the Bayes tree.
 - [bayes_tree.md](optimization/bayes_tree.md): the tree representation of variable-elimination order that iSAM2 uses to find which part of the solution a new factor affects. The underlying elimination tree (one node per variable, not merged into cliques) is built from this repo's pose graph in `bayes_tree_construction.py`.
 - [isam2_optimization.md](optimization/isam2_optimization.md): iSAM's successor, adding a Bayes-tree factorization, selective relinearization and dynamic variable reordering. Only the elimination tree underlying the Bayes tree is built in this repo (`bayes_tree_construction.py`); the rest is conceptual only.

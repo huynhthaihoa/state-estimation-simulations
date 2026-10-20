@@ -81,12 +81,7 @@ def test_so3_inv_right_jacobian_matches_defining_identity(lie_utils):
     rng = np.random.default_rng(5)
     eps = rng.normal(size=3) * 1e-5
 
-    def rotation_log(R):
-        T = np.eye(4)
-        T[0:3, 0:3] = R
-        return lie_utils.se3_log(T)[3:6]  # no standalone so3_log in this codebase
-
-    lhs = rotation_log(lie_utils.so3_exp(omega) @ lie_utils.so3_exp(eps)) - omega
+    lhs = lie_utils.so3_log(lie_utils.so3_exp(omega) @ lie_utils.so3_exp(eps)) - omega
     rhs = Jr_inv @ eps
     assert np.allclose(lhs, rhs, atol=1e-8)
 
