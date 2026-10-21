@@ -62,7 +62,7 @@ A robot running at 10 Hz grows the graph with every measurement (1000 poses at t
 
 iSAM (incremental Smoothing and Mapping) does not re-solve all variables each time. It **reuses the previous factorization**.
 
-Each solve is a Gauss-Newton step $H\Delta x=-g$ with the Hessian $H=J^\top \Omega J$ (the information matrix of the linearized problem) and $g=J^\top \Omega r$ (this is the glossary's $b$; see [`gauss_newton.md`](gauss_newton.md)). iSAM never forms $H$: it factorizes the whitened Jacobian $A$ (each row scaled by the square root of its $\Omega$), so $H=J^\top \Omega J=A^\top A=R^\top R$, where $R$ is the upper-triangular square-root factor ($R=L^\top$ for the Cholesky factor $L$ of §7; it is not a rotation). The pipeline is factor graph, then whitened Jacobian $A$, then $A=QR$ ($H=R^\top R$), then solve for $\Delta x$ (Givens-rotation details: [`isam_optimization.md` §3](isam_optimization.md#3-why-is-this-possible)).
+Each solve is a Gauss-Newton step $H\Delta x=-b$ (the glossary's [normal equations](../glossary.md#normal-equations-and-hessian); see [`gauss_newton.md`](gauss_newton.md)) for the step $\Delta x$ added to the unknowns, with the Hessian $H=J^\top \Omega J$ (the information matrix of the linearized problem) and $b=J^\top \Omega r$. $J$ is the [Jacobian](../glossary.md#jacobian): the matrix of derivatives of the residuals with respect to the unknowns. iSAM never forms $H$: it factorizes the whitened Jacobian $A$ (each row scaled by the square root of its $\Omega$), so $H=J^\top \Omega J=A^\top A=R^\top R$, where $R$ is the upper-triangular square-root factor ($R=L^\top$ for the Cholesky factor $L$ of §7; it is not a rotation). The pipeline is factor graph, then whitened Jacobian $A$, then $A=QR$ ($Q$ orthogonal, $H=R^\top R$), then solve for $\Delta x$ (Givens-rotation details: [`isam_optimization.md` §3](isam_optimization.md#3-why-is-this-possible)).
 
 The expensive part is often the **factorization**. When a new pose arrives, most of the old information hasn't changed, so **iSAM keeps the old factorization $R$ and updates it**.
 
@@ -91,7 +91,7 @@ iSAM2 improves on the **original iSAM** (the 2008 algorithm) with three ideas:
 
 The table below compares the two, with plain batch optimization for reference.
 
-iSAM2 solves the same problem as iSAM, on the same factorization. iSAM's **square-root information matrix** $R$ (the triangular factor with $`H=R^\top R`$, $`R=L^\top`$) and iSAM2's Bayes tree hold the same numbers, for the same variable ordering and linearization point. They are just organized differently. What changes is how much each one can do *incrementally*:
+iSAM2 solves the same problem as iSAM, on the same factorization. iSAM's **square-root information matrix** $R$ (the triangular factor with $`H=R^\top R`$, $`R=L^\top`$) and iSAM2's Bayes tree hold the same numbers, for the same variable ordering and [linearization point](../glossary.md#linearization) (the estimate at which the Jacobians were computed). They are just organized differently. What changes is how much each one can do *incrementally*:
 
 | | Batch optimization | iSAM (Kaess et al. 2008) | iSAM2 (Kaess et al. 2012) |
 | --- | --- | --- | --- |
@@ -113,13 +113,13 @@ This repo implements the iSAM column minus COLAMD reordering, with loop closures
 
 ## 7. Bayes tree - the most important intuition
 
-Quick recap: [Cholesky](../glossary.md#cholesky-factorization) factorization splits $H$ into $H = LL^\top$ ($L$ lower-triangular; the upper-triangular $R$ of §4 is $R = L^\top$). Solving $H\Delta x=-g$ then takes two cheap triangular solves instead of one matrix inversion.
+Quick recap: [Cholesky](../glossary.md#cholesky-factorization) factorization splits $H$ into $H = LL^\top$ ($L$ lower-triangular; the upper-triangular $R$ of §4 is $R = L^\top$). Solving $H\Delta x=-b$ then takes two cheap triangular solves instead of one matrix inversion.
 
 - $H$ is sparse: two poses only interact if a factor directly connects them, so the factorization skips arithmetic on known zeros.
 - Eliminating a variable can turn some of those zeros into nonzeros ([fill-in](../glossary.md#fill-in)), which is why the [variable ordering](../glossary.md#variable-ordering) matters (§12).
 - Full derivation: [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md). Worked elimination example: [`elimination_tree.md`](elimination_tree.md).
 
-After linearization, SLAM gives exactly the $H\Delta x=-g$ system above, and this sparse elimination is run on it. Conceptually:
+After linearization, SLAM gives exactly the $H\Delta x=-b$ system above, and this sparse elimination is run on it. Conceptually:
 
 ```text
 Factor graph
@@ -185,7 +185,7 @@ The new measurement can now affect **many old poses**. iSAM2 doesn't blindly upd
 
 ## 10. Selective relinearization
 
-A nonlinear problem $f(x)$ is approximated around the current estimate:
+A nonlinear problem $f(x)$ (the stacked residuals $r_i$ of §2, with $x$ standing for the unknowns $X$) is approximated around the current estimate:
 
 ```math
 f(x+\Delta x) \approx f(x)+J\Delta x
@@ -261,7 +261,7 @@ flowchart TD
 Everything below the removed top of the tree keeps its factorization untouched (its estimates can still be updated in step 6).
 
 ### Intuition for step 6
-- Each clique's estimate is computed from its parent's: in symbols, child $`\delta = (d - R_{sep}\,\delta_{parent}) / R_{cc}`$ (back-substitution through the clique, [glossary](../glossary.md#back-substitution)), where $`\delta`$ is the clique's update step, $`R_{cc}`$ is the clique's own diagonal block of the triangular factor $R$, $d$ is the clique's own right-hand side and $R_{sep}$ couples it to its parent.
+- Each clique's estimate is computed from its parent's: in symbols, child $`\delta = R_{cc}^{-1}(d - R_{sep}\,\delta_{parent})`$ (in practice a triangular solve with $`R_{cc}`$: back-substitution through the clique, [glossary](../glossary.md#back-substitution)), where $`\delta`$ is the part of $`\Delta x`$ belonging to the clique's variables, $`R_{cc}`$ is the clique's own diagonal block of the triangular factor $R$, $d$ is the clique's own right-hand side and $R_{sep}$ couples it to its parent.
 - If the parent's $\delta$ barely moved and the clique's own $d$ is unchanged, the child's $\delta$ does not change either.
 - So the update can stop at that branch, and everything below it is skipped safely.
 - (Conceptual only: this repo does not implement iSAM2.)
@@ -305,7 +305,7 @@ That is not correct. iSAM2 maintains a **global smoothing solution**: if a loop 
 ## 19. Where this is implemented in this repo
 
 Partially. The Bayes-tree construction is implemented; the rest is not:
-- [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds the elimination tree underlying this doc's §7 Bayes tree (symbolic elimination over this repo's pose-graph topology, via `symbolic_eliminate`/`bayes_tree_affected_path` in `utils.py`).
+- [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds the [elimination tree](../glossary.md#elimination-tree) underlying this doc's §7 Bayes tree (symbolic elimination, which tracks only which variables end up connected and uses no numbers, over this repo's pose-graph topology, via `symbolic_eliminate`/`bayes_tree_affected_path` in `utils.py`).
 - It keeps one node per variable and never merges them into cliques, so its affected counts are counts of variables, not cliques. The tree is built once from all edges, the loop-closure edge included, and then queried per edge.
 - It quantifies §9's "small vs. large affected region" claim with a computed example instead of only prose (figure in §11): with the default 16 nodes (`--nodes-per-side 4`), the newest odometry edge affects 2/16 variables and the loop-closure edge affects 16/16. This is the worst case, because the elimination order is *fixed* (oldest node first; §12's variable reordering is not implemented), so the entire tree, not just a subtree, gets invalidated (details: [`bayes_tree.md` §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo)).
 

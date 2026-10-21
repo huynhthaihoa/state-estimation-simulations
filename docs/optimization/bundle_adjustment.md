@@ -48,7 +48,7 @@ $$p = \pi(T^{-1}P)$$
 where:
 
 - $P$ = 3D point, in world coordinates
-- $T$ = camera pose, camera-to-world (it maps camera-frame points into the world), so $T^{-1}P$ is the point expressed in the camera frame
+- $T$ = camera pose, camera-to-world (it maps camera-frame points into the world), so $T^{-1}P$ is the point expressed in the camera frame (with $P$ in homogeneous coordinates, $[P;\,1]$, so the $4\times4$ matrix can multiply it)
 - $\pi$ = camera projection function
 - $p$ = predicted 2D pixel location
 
@@ -238,7 +238,7 @@ Here $`z`$ is the point's depth in the camera frame, not the pixel observation $
 - At $`z = 5`$ m that is $`1.6`$ px. At $`z = 10`$ m it is $`0.8`$ px. This is the $`f_x/z`$ entry of $`J_{\text{proj}}`$ below (the projection Jacobian $`\partial\pi/\partial p_c`$).
 - Sign: if the camera moves right by $`d`$, the point moves left by $`d`$ in the camera frame. This is the $`-I_3`$ in the pose block below.
 
-**Jacobians** (`camera_project(..., with_jacobians=True)`): both go through $p_c$ by the chain rule.
+**Jacobians** (`camera_project(..., with_jacobians=True)`): $`J_{\text{pose}}`$ ($2\times6$) is the derivative of the predicted pixel with respect to the camera's 6-vector [right perturbation](../glossary.md#left-and-right-perturbation), and $`J_{\text{point}}`$ ($2\times3$) is its derivative with respect to the landmark's world position. They are the two blocks of $J$ in the Gauss-Newton step below. Both go through $p_c$ by the chain rule.
 
 ```math
 J_{\text{proj}} = \frac{\partial \pi}{\partial p_c} = \begin{bmatrix} f_x/z & 0 & -f_x x/z^2 \\ 0 & f_y/z & -f_y y/z^2 \end{bmatrix}
@@ -257,21 +257,23 @@ Here $`[p_c]_\times`$ is the skew-symmetric **hat** matrix of $`p_c`$ ([glossary
 
 #### Gauss-Newton step and solvers
 
-**Gauss-Newton step.** The residual is $r_{ij} = z_{ij} - \pi(p_c)$. It linearizes to $r_{ij} - J\delta$, so every solver builds and solves the same [normal equations](../glossary.md#normal-equations-and-hessian). Here $`\Omega`$ is the weight ([information](../glossary.md#information-matrix)) matrix of one pixel residual: $`I_2`$ for the one-sided solvers, and $`\Omega_{\text{px}} = \omega_{\text{px}} I_2`$ with $`\omega_{\text{px}} = 1/\sigma_{\text{px}}^2`$ for the joint solver, where $`\sigma_{\text{px}}`$ is the pixel-noise standard deviation (see the table). $`H`$ is the Gauss-Newton **Hessian** (the information matrix of the linearized problem):
+**Gauss-Newton step.** The residual is $r_{ij} = z_{ij} - \pi(p_c)$ (the $e$ of §2, same sign). It linearizes to $r_{ij} - J\delta$, so every solver builds and solves the same [normal equations](../glossary.md#normal-equations-and-hessian). Here $`\Omega`$ is the weight ([information](../glossary.md#information-matrix)) matrix of one pixel residual: $`I_2`$ for the one-sided solvers, and $`\Omega_{\text{px}} = \omega_{\text{px}} I_2`$ with $`\omega_{\text{px}} = 1/\sigma_{\text{px}}^2`$ for the joint solver, where $`\omega_{\text{px}}`$ is a scalar weight (unrelated to the rotation part $\delta\omega$ of a pose correction) and $`\sigma_{\text{px}}`$ is the pixel-noise standard deviation (see the table). $`H`$ is the Gauss-Newton **Hessian** (the information matrix of the linearized problem):
 
 ```math
 H\,\delta = g, \qquad H = \sum_{(i,j)} J^\top \Omega J, \qquad g = \sum_{(i,j)} J^\top \Omega\, r_{ij}
 ```
 
-Because $`r`$ is measured minus predicted, the right-hand side is $`+g`$. In the glossary's notation (residual = prediction − measurement, $`H\,\delta = -b`$) this is $`g = -b`$; [gauss_newton.md](gauss_newton.md) uses the glossary sign and has a note on the difference.
+Here $`\delta`$ stacks the corrections of all unknowns being solved for (each pose's 6-vector, each landmark's 3-vector), so the per-pose $\delta$ above is one slice of it. $`g`$ is the right-hand side, the negative gradient of the cost. Because $`r`$ is measured minus predicted, the right-hand side is $`+g`$. In the glossary's notation (residual = prediction − measurement, $`H\,\delta = -b`$) this is $`g = -b`$; [gauss_newton.md](gauss_newton.md) uses the glossary sign and has a note on the difference.
 
 | Solver | Unknowns | $J$ per observation | $\Omega$ | Added to $H$ |
 | --- | --- | --- | --- | --- |
 | `run_ba_landmarks_only` | one landmark at a time (poses fixed): a separate $3\times3$ solve per landmark | $J_{\text{point}}$ | $I_2$ | $`10^{-9} I_3`$ |
 | `run_ba_poses_only` | one camera at a time (landmarks fixed): a separate $6\times6$ solve per camera | $J_{\text{pose}}$ | $I_2$ | $`10^{-9} I_6`$ |
-| `run_bundle_adjustment` | every pose and landmark: one dense system of size $6N + 3M$ | both blocks | $`\Omega_{\text{px}} = \omega_{\text{px}} I_2`$ | $`10^{-6} I`$ plus the gauge prior below |
+| `run_bundle_adjustment` | every pose and landmark: one dense system of size $6N + 3M$ ($N$ cameras, $M$ landmarks) | both blocks | $`\Omega_{\text{px}} = \omega_{\text{px}} I_2`$ | $`10^{-6} I`$ plus the gauge prior below |
 
-All three solvers then apply $`T_i \leftarrow T_i\,\mathrm{Exp}(\delta_i)`$ and $P_j \leftarrow P_j + \delta_j$. They stop when the step norm $`\|\delta\|`$ drops below `gn_tol`. The joint system has the arrow-head block structure described in §12, but the script solves it densely.
+"Added to $H$" is a tiny diagonal term that keeps $H$ invertible. It is a numerical safeguard, not part of the cost.
+
+All three solvers then apply $`T_i \leftarrow T_i\,\mathrm{Exp}(\delta_i)`$ and $P_j \leftarrow P_j + \delta_j$, where $\delta_i$ and $\delta_j$ are the slices of the step for camera $i$ and landmark $j$. They stop when the step norm $`\|\delta\|`$ drops below `gn_tol`. The joint system has the arrow-head block structure described in §12, but the script solves it densely.
 
 #### Gauge prior and initial guess
 
@@ -287,6 +289,8 @@ J_k = J_r^{-1}(e_k), \qquad
 H_{kk} \mathrel{+}= J_k^\top \Omega_{\text{prior}} J_k, \qquad g_k \mathrel{+}= -J_k^\top \Omega_{\text{prior}}\, e_k
 ```
 
+$J_k$ is the derivative of the prior residual $e_k$ with respect to camera $k$'s right perturbation (that is why $J_r^{-1}$ appears). $H_{kk}$ is camera $k$'s diagonal $6\times6$ block of $H$ and $g_k$ its slice of $g$. $e_k$ is estimate minus prior mean, the opposite sign to the measured-minus-predicted $r$, hence the $-J_k^\top \Omega_{\text{prior}} e_k$ in $g_k$.
+
 $J_r^{-1}$ is the inverse **right Jacobian** ([glossary](../glossary.md#right-and-left-jacobians)), computed by `compute_se3_inv_right_jacobian`; $`\mathrm{Log}`$ is the **logarithm map** (inverse of $`\mathrm{Exp}`$, same glossary section) and $`\sigma_{\text{pose}}`$ is the standard deviation of the prior on camera pose.
 
 - One prior pose would remove only the 6 rigid DoF. The second also pins the distance between the two cameras, which fixes scale.
@@ -300,7 +304,7 @@ $J_r^{-1}$ is the inverse **right Jacobian** ([glossary](../glossary.md#right-an
 
 - Scene: 8 cameras on a 180° arc of radius 5 m, 60 landmarks sampled. A camera sees a landmark only if it projects inside the image, and landmarks seen by fewer than 2 cameras are dropped. The defaults keep 48 landmarks and 292 observations.
 - Camera: $f_x = f_y = 800$ px on a 640×480 image (about 44°×33° field of view).
-- Noise: $\sigma_{\text{pose}} = 0.1$, $\sigma_{\text{lm}} = 0.3$ m, $\sigma_{\text{px}} = 1$ px.
+- Noise: $\sigma_{\text{pose}} = 0.1$ (std of the noise on each camera's initial pose, a 6-vector std in mixed m and rad), $\sigma_{\text{lm}} = 0.3$ m (std of the noise added to the landmark initial guess), $\sigma_{\text{px}} = 1$ px.
 - Solver: `gn_tol` = $10^{-6}$, at most 30 iterations.
 - `reprojection_rms` reports the RMSE of $`\|z_{ij} - \pi(T_i^{-1}P_j)\|`$. It is unaffected by the Umeyama alignment of §14, because reprojection error is invariant to a **similarity transform** (rotation, translation and uniform scale).
 
@@ -403,7 +407,7 @@ Pts   │ coupling │     block-     │
 
 Real scenes usually have far more points than cameras, so solvers use the **Schur complement trick**:
 
-1. [Marginalize](../glossary.md#marginalization) out the point block (cheap, since it is block-diagonal and each point's small block inverts independently).
+1. [Marginalize](../glossary.md#marginalization) out the point block (cheap, since it is block-diagonal and each point's small block inverts independently). With $c$ the camera block and $p$ the point block, this leaves the reduced camera matrix $`H_{cc} - H_{cp} H_{pp}^{-1} H_{pc}`$, the [Schur complement](../glossary.md#schur-complement).
 2. Solve the much smaller reduced camera-only system.
 3. Back-substitute to recover the points.
 
@@ -559,7 +563,7 @@ So judge Global BA's benefit here from the aggregate statistics, not from any si
 | 3 | 1.4611 | 0.920 → 0.489 | 47% | 0.948 | 0.9 | 8.8921 (mirrored local minimum) | 0.982 |
 | 4 | 3.4821 | 2.076 → 0.921 | 56% | 0.814 | 5.9 | 0.8873 | 0.981 |
 
-*Source: one-off check by script call, not part of the test suite. Final errors are the script's own metric, RMSE over the last 10 keyframes. The alignment columns use keyframes 2-49 on both sides. In the last two columns only keyframe 1's initial pose is replaced by the true one; the rest of the front-end chain is unchanged.*
+*Source: one-off check by script call, not part of the test suite. Final errors are the script's own metric, RMSE over the last 10 keyframes. The alignment columns use keyframes 2-49 on both sides. In the last two columns only keyframe 1's initial pose is replaced by the true one; the rest of the [front-end](../glossary.md#front-end-and-back-end) chain is unchanged (each keyframe's initial pose is a chain of the true relative motions with noise added, a dead-reckoned, visual-odometry-style estimate).*
 
 - **Most of the final error is one transform of the whole map.** Alignment removes 47-97% of the Local-only position RMSE over keyframes 2-49 (default seed: 1.27 m → 0.44 m). What remains, the inconsistency Global BA can actually fix, is small.
 - **That transform has two parts:**

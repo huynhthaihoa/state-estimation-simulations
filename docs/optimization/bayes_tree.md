@@ -195,9 +195,9 @@ P(x_1,x_2,x_3) = P(x_1 \mid x_2)\,P(x_2 \mid x_3)\,P(x_3)
 Each variable ends up conditioned only on its separator, and the separator's next-eliminated member is its parent in the tree (§4.1). The tree represents exactly these conditional relationships.
 
 **What a node holds in numbers:** it is a row of $`R = L^\top`$, the upper-triangular square root of the Hessian $`H`$ ($`H = R^\top R`$; $`R`$ is not a rotation).
-- Each row reads $`x_j = (d_j - R_{j,\text{sep}}\, x_{\text{sep}}) / R_{jj}`$, where $`d_j`$ is the row's right-hand-side entry, $`R_{jj}`$ its diagonal entry, $`R_{j,\text{sep}}`$ its entries in the separator columns and $`x_{\text{sep}}`$ the separator variables (§4.1).
+- Each row reads $`x_j = (d_j - R_{j,\text{sep}}\, x_{\text{sep}}) / R_{jj}`$, where $`d_j`$ is the row's right-hand-side entry, $`R_{jj}`$ its diagonal entry, $`R_{j,\text{sep}}`$ its entries in the separator columns and $`x_{\text{sep}}`$ the separator variables (§4.1). Here $`x_j`$ is the update $`\Delta x_j`$ of variable $j$ (the system solved is $`H\Delta x = g`$ of §2), and $`d`$ solves the forward substitution $`R^\top d = g`$. For a 6-DoF pose each variable is a 6-number block, so each "row" is a block row and the division is a $`6 \times 6`$ triangular solve.
 - Chain example: $`x_1 = (d_1 - r_{12}\, x_2) / r_{11}`$ (here $`r_{11}`$, $`r_{12}`$, $`d_1`$ are row 1's diagonal, off-diagonal and right-hand-side entries). This one line is "$`x_1`$ given $`x_2`$".
-- To solve, read the tree from the root down. The root has no parents, so it is solved first. Its value is then substituted into the children.
+- To solve, read the tree from the root down. The root has no parents (its separator is empty, §4.1, so it is a plain marginal), so it is solved first. Its value is then substituted into the children.
 
 For [iSAM2](isam2_optimization.md) ([incremental](../glossary.md#batch-vs-incremental) smoothing and mapping), the useful translation is:
 
@@ -272,6 +272,8 @@ Re-eliminate
     ▼
 Updated Bayes Tree
 ```
+
+**Relinearize** means recomputing the Jacobians at the updated estimate ([glossary](../glossary.md#relinearization)); **reorder** means choosing a new elimination order for the affected part to limit fill-in ([ordering](sparse_cholesky_factorization.md#5-ordering-becomes-extremely-important)).
 
 This is the core mechanism behind **[iSAM2](isam2_optimization.md)'s incremental efficiency**. The older [iSAM](isam_optimization.md) algorithm uses no Bayes tree. It gets its incremental updates from Givens row insertion (a rotation-based update of a QR factorization when a row is added) plus periodic batch steps.
 
@@ -379,6 +381,7 @@ Partially. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_constructio
 ### What it does
 - `symbolic_eliminate`/`bayes_tree_affected_path` in `utils.py` run the elimination-game construction from §3-§4 (spelled out in §4.1) and the root-ward affected-path query from §7-§9. Every "N/16 affected" count is a count of variables, not cliques.
 - The tree is built once from all edges, the loop-closure edge included, and then queried for each scenario's edge; for this topology, building it without the loop edge gives the same chain and the same affected sets.
+- The script's graph is the chain 0–1–…–15 plus the loop-closure edge (15, 0). Nodes are 0-based here, unlike $x_1, x_2, \dots$ in the prose above.
 - Defaults: `--nodes-per-side 4`, so 16 nodes; the newest odometry edge (14, 15) affects 2/16 variables and the loop-closure edge (15, 0) affects 16/16.
 - The script plots the "small vs. large affected region" contrast this doc argues for in prose (§7 vs. §8) using a real, computed example instead of an ASCII sketch.
 

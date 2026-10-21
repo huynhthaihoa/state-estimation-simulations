@@ -55,7 +55,7 @@ Pose 3 ─ Landmark 3
 ...
 ```
 
-Most variables don't directly interact, so the [Hessian](../glossary.md#normal-equations-and-hessian) $H = J^\top \Omega J$ (the information matrix of the linearized problem) is **sparse**. Here $`J`$ is the [Jacobian](../glossary.md#jacobian) and $`\Omega`$ the measurement **[information matrix](../glossary.md#information-matrix)** (§2 gives $H$, §9 gives the exact sparsity rule).
+Most variables don't directly interact, so the [Hessian](../glossary.md#normal-equations-and-hessian) $H = J^\top \Omega J$ (the [information matrix](../glossary.md#information-matrix) of the linearized problem, not to be confused with the measurement information matrix $`\Omega`$ below) is **sparse**. Here $`J`$ is the [Jacobian](../glossary.md#jacobian) and $`\Omega`$ the measurement **information matrix** (§2 gives $H$, §9 gives the exact sparsity rule).
 
 A dense matrix stores every entry; $H$ only needs the entries for pairs of variables that share a factor. §5's figure shows this for a real bundle-adjustment scene (8 cameras, 48 landmarks, 192 scalar unknowns): the lower triangle of $H$ has 5712 nonzeros, against 18528 entries for a dense lower triangle. Which entries of $L$ become nonzero then depends on the variable order (§3-§5).
 
@@ -69,6 +69,7 @@ Suppose we're at the linear-solve step of Gauss-Newton or [Levenberg-Marquardt (
 
 $$H\Delta x = -b$$
 
+- $\Delta x$ is the update to the unknowns; $r$ (called $e$ in factor_graph.md) is the stacked residual.
 - $H\approx J^\top J$ and $b := J^\top r$, as defined in the [glossary](../glossary.md#normal-equations-and-hessian); [gauss_newton.md](gauss_newton.md) writes the same step as $`J^\top J\,\Delta x = -J^\top r`$.
 - Weighted, these become $H = J^\top\Omega J$ and $b = J^\top\Omega r$.
 - $\Omega$ is the information matrix from [factor_graph.md §4](factor_graph.md#4-optimization-means-minimizing-all-those-errors), the same quantity as $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty).
@@ -172,7 +173,7 @@ The figure below applies this to a real bundle-adjustment problem, with the same
 
 - **Scene:** the defaults of `bundle_adjustment.py` (seed 0): 8 cameras with 6 unknowns each, 48 landmarks with 3 each (192 scalar unknowns), 292 camera-landmark observations.
 - **Orders:** **poses first** (all cameras, then all landmarks), **landmarks first**, and **interleaved** (each camera followed by the landmarks it is the first to see).
-- **Counting:** fill-in = nnz($L$) - nnz(lower triangle of $H$), diagonal included, computed with the repo's `utils.symbolic_eliminate`.
+- **Counting:** nnz = number of nonzero entries; fill-in = nnz($L$) - nnz(lower triangle of $H$), diagonal included, computed with the repo's `utils.symbolic_eliminate`.
 
 | Order (192 unknowns) | nnz($L$) | fill-in | dense lower triangle |
 | -------------------- | -------- | ------- | -------------------- |
@@ -258,6 +259,8 @@ This is one of the core computational pipelines behind graph-based SLAM.
 | Time                | $O(n^3)$                 | Depends on sparsity/fill-in |
 | Large SLAM          | Usually impractical      | Very useful                 |
 | Ordering important? | No: a dense $L$ has no zeros left to fill | **Extremely important**     |
+
+Here $n$ is the size of $H$ (the number of scalar unknowns).
 
 ---
 

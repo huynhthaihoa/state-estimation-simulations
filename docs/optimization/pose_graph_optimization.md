@@ -15,7 +15,7 @@ A robot's [**pose**](../glossary.md#pose) is its position + orientation.
 - 2D robot: $x_i = [x, y, \theta]$
 - 3D robot: $T_i \in SE(3)$ (the [special Euclidean group](../glossary.md#so3-and-se3)), which holds a 3D position and a 3D orientation
 
-Each robot location along the trajectory is a **node**, and the nodes together form the [**pose graph**](../glossary.md#pose-graph):
+Each robot location along the trajectory is a **node** (written $x_i$ in §1-§6, $T_i$ from §7 on and $X_i$ in the §15.7 code notation), and the nodes together form the [**pose graph**](../glossary.md#pose-graph):
 
 ```text
 t₀       t₁       t₂       t₃       t₄
@@ -140,14 +140,14 @@ For every edge we have the **measured relative transformation** $\tilde T_{ij}$ 
 
 $${E_{ij} = \tilde T_{ij}^{-1}(T_i^{-1}T_j)}$$
 
-That comparison is still a **group element** ($SE(2)$/$`SE(3)`$, not a plain vector), so to measure "how big" it is - and to compute the [Jacobians](../glossary.md#jacobian) the optimizer needs - we take its **Log map**, which turns it into a tangent-space vector ([glossary](../glossary.md#exp-and-log-maps)):
+That comparison is still a **group element** ($SE(2)$/$`SE(3)`$, not a plain vector), so to measure "how big" it is - and to compute the [Jacobians](../glossary.md#jacobian) the optimizer needs - we take its **Log map** ([glossary](../glossary.md#exp-and-log-maps)), which turns it into a **tangent vector** ([glossary](../glossary.md#lie-algebra-and-tangent-space)). A tangent vector is a 6-vector (a small translation $`\mathbf{v}`$, then a small rotation $`\boldsymbol{\omega}`$; 3 numbers in $`SE(2)`$) describing a small step in the flat space at a pose. The $`\boldsymbol{\xi}`$, $`\boldsymbol{\delta}`$ and "twist" of §15 are such vectors.
 
 $${e_{ij} = \text{Log}(E_{ij}) = \text{Log}\big(\tilde T_{ij}^{-1}(T_i^{-1}T_j)\big)}$$
 
 That vector $e_{ij}$ (called $r_{ij}$ from §15.2 on) is the thing that gets squared below.
 
 **Why not just subtract poses?** Try adding to a rotation.
-- 2D toy case: take $`R = I + 0.1\,[\omega]_\times = \begin{bmatrix}1 & -0.1\\ 0.1 & 1\end{bmatrix}`$.
+- 2D toy case: take a rotation angle $`\omega = 0.1`$ rad and add its skew matrix $`\omega^\wedge = \omega\begin{bmatrix}0 & -1\\ 1 & 0\end{bmatrix}`$ to the identity: $`R = I + \omega^\wedge = \begin{bmatrix}1 & -0.1\\ 0.1 & 1\end{bmatrix}`$.
 - Each column has length $`\sqrt{1.01} \approx 1.005`$, and $`R^\top R = 1.01\,I`$. This is not a rotation: it stretches.
 - **Exp** wraps a flat step onto the curved surface of valid poses. **Log** reads the gap between two poses back as a plain vector.
 
@@ -168,7 +168,7 @@ measured relationship        estimated relationship
 - The error is $`e = 0.1`$ m, and its plain square is $`0.01`$.
 - With a trust weight $`\Omega = 100`$ (the [information](../glossary.md#information-matrix) weight; the weighted form $`e^\top \Omega e`$ used later), the cost is $`100 \cdot 0.1^2 = 1.0`$. A trusted edge makes the same gap hurt more.
 
-PGO then minimizes the total error over every edge (odometry edges plus loop-closure edges):
+PGO then minimizes the total error over every edge in $\mathcal{E}$, the set of edges (odometry edges plus loop-closure edges):
 
 ```math
 {\boxed{\min_{T_0,\ldots,T_n}\sum_{(i,j) \in \mathcal{E}}\|e_{ij}\|^2}}
@@ -193,8 +193,8 @@ The two differ in what they optimize and what they compare against.
 
 | | Bundle Adjustment | Pose-graph optimization |
 | --- | --- | --- |
-| Optimizes | camera poses + 3D landmarks | robot poses (given relative-pose constraints) |
-| Compares | image observations vs. reprojection | measured vs. implied relative poses |
+| Optimizes | camera poses + 3D [landmarks](../glossary.md#landmark) | robot poses (given relative-pose constraints) |
+| Compares | image observations vs. [reprojection](../glossary.md#reprojection-error) | measured vs. implied relative poses |
 | Landmarks | explicit variables | not optimized |
 | Asks | "Do my cameras and 3D points explain the images?" | "Do my robot poses form a trajectory consistent with all the relative-pose measurements?" |
 
@@ -233,7 +233,7 @@ Home → A → B → C → D
 Accumulated error makes `D` appear 20 m away from Home, though the person is actually back at Home.
 
 - **Relative cue (loop closure):** we recognize Home again at `D`. That ties two nodes together: "D is about 0 m from Home".
-- **Absolute cue (GPS):** GPS would say "D is very close to this map position". That is an absolute (unary) constraint, i.e. a prior factor on one node, not a relative edge. Loop closure is its relative version.
+- **Absolute cue (GPS):** GPS would say "D is very close to this map position". That is an absolute (unary) constraint, i.e. a [prior factor](../glossary.md#prior-unary-factor) on one node, not a relative edge. Loop closure is its relative version.
 
 Either cue can be handled by distributing the correction instead of moving only `D`:
 
@@ -389,7 +389,7 @@ The residual vector stacks a translational and a rotational part:
 r_{ij} = \left[ \mathbf{v}_{ij}^\top \;\; \boldsymbol{\omega}_{ij}^\top \right]^\top
 ```
 
-- $`\mathbf{v}_{ij}`$ is the translational part of the [twist](../glossary.md#twist), $`\mathbf{v} = V(\boldsymbol{\omega})^{-1} t_E`$ (here $`V(\boldsymbol{\omega})`$ is the **left Jacobian** of $`\mathrm{SO}(3)`$, [glossary](../glossary.md#right-and-left-jacobians), and $`t_E`$ is the translation of $`E_{ij}`$; as in `use_numpy/lie_utils.py`). It equals $`E_{ij}`$'s translation only when $`\boldsymbol{\omega} = \mathbf{0}`$, or to first order.
+- $`\mathbf{v}_{ij}`$ is the translational part of this tangent vector (the "twist" of $`E_{ij}`$: a pose difference here, not the velocity of the [glossary](../glossary.md#twist) entry), $`\mathbf{v} = V(\boldsymbol{\omega})^{-1} t_E`$ (here $`V(\boldsymbol{\omega})`$ is the **left Jacobian** of $`\mathrm{SO}(3)`$, [glossary](../glossary.md#right-and-left-jacobians): the $3\times3$ matrix that bends the translation so that $\mathrm{Exp}$ of the 6-vector does not simply land at $\mathbf{v}$, see [lie_algebra.md §11](../foundations/lie_algebra.md#11-se3-this-is-where-robotics-gets-really-interesting); and $`t_E`$ is the translation of $`E_{ij}`$; as in `use_numpy/lie_utils.py`). It equals $`E_{ij}`$'s translation only when $`\boldsymbol{\omega} = \mathbf{0}`$, or to first order.
 - $`\boldsymbol{\omega}_{ij}`$ is the rotational error.
 
 ### 15.3 Objective Function
@@ -471,6 +471,8 @@ Stacking all residuals into a global residual vector $`\mathbf{r}(X)`$ and Jacob
 - **Gradient Vector:** ${b = J^\top \Omega \mathbf{r}(X) \in \mathbb{R}^{6N}}$
 - **Update Vector:** $`{\boldsymbol{\delta}^* = \left[ \boldsymbol{\xi}_1^\top \;\; \boldsymbol{\xi}_2^\top \;\; \dots \;\; \boldsymbol{\xi}_N^\top \right]^\top}`$
 
+Here $J_{ij}$ is edge $(i,j)$'s block row of $J$ (6 rows): $J_i$ sits in node $i$'s 6 columns, $J_j$ in node $j$'s 6 columns and zeros elsewhere, so the stacked $J$ is sparse and each edge touches only the four $H$ blocks of the §15.7 assembly.
+
 Here $F$ has no $\frac{1}{2}$ (as in the code's `cost`), while $b$ is the gradient of $\frac{1}{2}F$. The factor 2 cancels on both sides of the step, so $H\boldsymbol{\delta}^* = -b$ is unchanged.
 
 Because edges only connect adjacent or loop-closing keyframes, $H$ is extremely [**sparse**](../glossary.md#sparsity) and block-structured. It is typically solved using Sparse Cholesky Factorization (${\mathrm{LL}^\top}$ or ${\mathrm{LDL}^\top}$) or Conjugate Gradients (an iterative linear solver) in solvers like GTSAM or g2o (open-source graph-optimization libraries) - see [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) for the full derivation.
@@ -509,11 +511,13 @@ Once the increment vector ${\boldsymbol{\delta}^*}$ is computed, the system upda
 {T_i^{(k+1)} = T_i^{(k)} \cdot \mathrm{Exp}\left(\boldsymbol{\xi}_i^*\right), \quad \forall i \in \{1, \dots, N\}}
 ```
 
+Here $k$ is the iteration index (not a node index).
+
 This iteration repeats until the accepted step is small, ${\Vert{}\boldsymbol{\delta}^*\Vert{} < \epsilon}$ (`--gn-tol`, default $10^{-6}$). It also stops after `--gn-max-iters` accepted iterations (default 10), or when every damping retry is rejected. The scripts have no separate test on the change in cost ${\Delta F}$.
 
 ### 15.7 The solver, concretely
 
-The whole solver is `run_pose_graph_optimization` in [`use_numpy/pose_graph.py`](../../use_numpy/pose_graph.py). It works on $4 \times 4$ pose matrices $X_k$. Tangent vectors are ordered translation first, $`\boldsymbol{\xi} = [\mathbf{v}^\top \;\; \boldsymbol{\omega}^\top]^\top`$, the same notation as §15.4. The code numbers nodes from 0, while §15.1 numbers them from 1. Below, $X$ is §15's $T$ and $Z_{ij}$ is §15's ${\tilde{T}_{ij}}$.
+The whole solver is `run_pose_graph_optimization` in [`use_numpy/pose_graph.py`](../../use_numpy/pose_graph.py). It works on $4 \times 4$ pose matrices $X_k$ (here $k$ is the node index, not the iteration). Tangent vectors are ordered translation first, $`\boldsymbol{\xi} = [\mathbf{v}^\top \;\; \boldsymbol{\omega}^\top]^\top`$, the same notation as §15.4. The code numbers nodes from 0, while §15.1 numbers them from 1. Below, $X_k$ is one pose, §15's $T_k$ (§1-§6's $x_k$), not the set $X$ of all poses used in §12 and §15; $Z_{ij}$ is §15's ${\tilde{T}_{ij}}$.
 
 ![Two panels from pose_graph.py: the four-pose square loop with ground truth, drifting odometry, the optimized estimate and the loop-closure edge, and each pose's position error before and after optimization](../../assets/pose_graph.png)
 
@@ -573,7 +577,7 @@ So $g = -b$ in §15.5's notation, and the code solves $`(H + \lambda \, \mathrm{
 - The anchor is not part of `cost`, so the accept/reject test ignores it.
 - Because it sits in $\mathrm{diag}(H)$, the Marquardt term damps node 0 far more than the other nodes.
 
-**Cost** (`cost`): $`F = \sum e_{ij}^\top \Omega \, e_{ij}`$, with no $\frac{1}{2}$ factor. It is the value printed as "total chi-squared error" and the value the accept test compares.
+**Cost** (`cost`): $`F = \sum e_{ij}^\top \Omega \, e_{ij}`$, with no $\frac{1}{2}$ factor. It is the value printed as "total chi-squared error" and the value the accept test compares. The name is borrowed from the weighted cost $e^\top \Omega e$; with the scripts' $\Omega = I_6$ it is a plain sum of squares, not a true $`\chi^2`$ statistic ([glossary](../glossary.md#chi-square-distribution)).
 
 #### Retraction
 Every node, node 0 included, is updated as $`X_k \leftarrow X_k \, \mathrm{Exp}(\boldsymbol{\delta}_k)`$ (`se3_exp`). `use_manif/` writes the same update as `T + manif.SE3Tangent(delta_k)`.
@@ -591,13 +595,13 @@ Robust cost functions replace or reweight the standard $L_2$ norm to cap or redu
 
 ### 16.1 The M-Estimator Framework (Iteratively Reweighted Least Squares)
 
-Instead of minimizing the squared cost $e^2$ (where $e = \sqrt{r^\top \Omega r}$ is the normalized residual scalar: here $e$ is the scalar Mahalanobis norm, not the vector $e_{ij}$ of §7), **M-estimators** (estimators that replace squared error with a robust cost) minimize a robust kernel $\rho(e)$. Kernels are conventionally written with a $\frac{1}{2}$ (e.g. $\rho = \frac{1}{2}e^2$ for $L_2$, as in Huber below), while §15.3's $F$ has none. A constant factor changes neither the minimizer nor the weights $w(e)$.
+Instead of minimizing the squared cost $e^2$ (where $e = \sqrt{r^\top \Omega r}$ is the normalized residual scalar: here $e$ is the scalar Mahalanobis norm, not the vector $e_{ij}$ of §7; §16.3's $e_{ij}^2$ is this scalar squared for edge $`(i,j)`$), **M-estimators** (estimators that replace squared error with a robust cost) minimize a robust kernel $\rho(e)$. Kernels are conventionally written with a $\frac{1}{2}$ (e.g. $\rho = \frac{1}{2}e^2$ for $L_2$, as in Huber below), while §15.3's $F$ has none. A constant factor changes neither the minimizer nor the weights $w(e)$.
 
 ```math
 \min_{X} \sum_{(i,j) \in \mathcal{E}} \rho\left( \sqrt{r_{ij}(X)^\top \Omega_{ij} \, r_{ij}(X)} \right)
 ```
 
-To integrate this into standard Gauss-Newton or Levenberg-Marquardt solvers without modifying the core linear algebra solver, robust kernels use **Iteratively Reweighted Least Squares (IRLS)**. The robust cost is converted into a modified information matrix $\Omega_{ij}^\text{robust} = w(e) \cdot \Omega_{ij}$, where the weight function $w(e)$ is:
+To integrate this into standard Gauss-Newton or Levenberg-Marquardt solvers without modifying the core linear algebra solver, robust kernels use **Iteratively Reweighted Least Squares (IRLS)**. The robust cost is converted into a modified information matrix $\Omega_{ij}^\text{robust} = w(e) \cdot \Omega_{ij}$, where the weight function $w(e)$ (the robust-kernel weight, not the measurement weights $w_1, w_2$ of §12) is:
 
 $$w(e) = \frac{1}{e} \frac{\partial \rho(e)}{\partial e}$$
 
@@ -625,7 +629,7 @@ Huber acts as quadratic ($L_2$) for small residuals (**inliers**, i.e. measureme
 
 #### Cauchy Loss
 
-Cauchy uses a logarithmic tail (with scale $`k`$, playing the role of Huber's threshold) that flattens out faster than Huber:
+Cauchy uses a logarithmic tail (with scale $`k`$, a kernel parameter playing the role of Huber's threshold, not an index) that flattens out faster than Huber:
 
 $$\rho(e) = \frac{k^2}{2} \ln\left(1 + \frac{e^2}{k^2}\right), \quad w(e) = \frac{1}{1 + \left(\frac{e}{k}\right)^2}$$
 
@@ -668,6 +672,8 @@ At $\Phi = 12.59$, $s_{ij}$ is $1$ up to $e_{ij}^2 = \Phi$, then $0.7726$ at $e_
 | **Cauchy** | Logarithmic ($\ln e^2$) | $\propto \frac{1}{e^2}$ | **High** |
 | **DCS** | Saturating (GM-equivalent, see below) | $\propto \frac{1}{e^4}$ | **Very High** (Effectively turns off bad edges) |
 | **Geman-McClure** | Saturation/Bounded | $\propto \frac{1}{(1 + e^2)^2}$ | **Very High** |
+
+**Geman-McClure** is a bounded loss that flattens for large $e$: at scale 1, $\rho(e) = \frac{1}{2}\frac{e^2}{1+e^2}$ approaches $\frac{1}{2}$, and its weight is $w(e) = \frac{1}{(1+e^2)^2}$ (at $e = 10$: $1/101^2 \approx 9.8 \times 10^{-5}$, the value quoted above).
 
 What is DCS's cost? Be careful, because the obvious reading is wrong:
 

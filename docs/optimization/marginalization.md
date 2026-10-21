@@ -1,6 +1,6 @@
 # Marginalization and sliding-window smoothing
 
-Marginalizing a variable permanently removes it from the optimization and keeps everything it taught us about its neighbors, packaged as one new **prior factor** (see [Prior](../glossary.md#prior-unary-factor)). A real-time estimator can then bound its problem size without discarding what it used to know.
+Marginalizing a variable permanently removes it from the optimization and keeps everything it taught us about its neighbors, packaged as one new **prior factor** (see [Prior](../glossary.md#prior-unary-factor); unary only in the pure-chain case of §8, in general it spans all of $x_a$'s neighbors). A real-time estimator can then bound its problem size without discarding what it used to know.
 
 This doc builds on two earlier ones:
 - **Variable elimination** from [`bayes_tree.md`](bayes_tree.md) §3 ("eliminate $x_1$ → its info gets summarized into a new constraint on $x_2$"). We reuse that mechanic for a different purpose.
@@ -63,8 +63,9 @@ The math (§4) is the same Schur-complement elimination in all three rows; the r
 - Naively keeping only the second diagonal entry says the surviving variable has information 2.
 - The Schur correction subtracts what $x_1$ borrowed from it: $`\Lambda' = 2 - (-1)(1/2)(-1) = 1.5`$.
 - Check: $`\Sigma = \Lambda^{-1} = \begin{bmatrix} 2/3 & 1/3 \\ 1/3 & 2/3 \end{bmatrix}`$, so the marginal variance of the second variable is $`2/3 = 1/1.5`$. The correction is exactly what marginalizing means.
+- $\Lambda'$ here is $\Lambda_b'$ of the general formula below, for the scalar case.
 
-In general, suppose the current window has poses $x_a$ (the oldest, about to be dropped) and $x_b$ (everything still connected to it - [odometry](../glossary.md#odometry) neighbors, and any landmark/IMU-bias variables it shares factors with). After linearization, the joint Gaussian is described by an information matrix $\Lambda$ and information vector $\eta$, partitioned to match. $\Lambda$ is the window's Gauss-Newton Hessian $H = J^\top \Omega J$ (the information matrix of the linearized problem; §8.1 calls it $H$), and is not the damping $\lambda$ of §8.1:
+In general, suppose the current window has poses $x_a$ (the oldest, about to be dropped) and $x_b$ (everything still connected to it - [odometry](../glossary.md#odometry) neighbors, and any landmark/IMU-bias variables it shares factors with). After linearization, the joint Gaussian is described by an information matrix $\Lambda$ and information vector $\eta$, partitioned to match. $\Lambda$ is the window's Gauss-Newton Hessian $H = J^\top \Omega J$ (the information matrix of the linearized problem; §8.1 calls it $H$), where $J$ is the stacked Jacobian of all the window's residuals and $\Omega$ holds the factors' information matrices (see [normal equations](../glossary.md#normal-equations-and-hessian)). It is not the damping $\lambda$ of §8.1. $\eta$ is the linear (right-hand-side) term of the window's linearized system, $g$ in $H\delta = g$ (§8.1); together with $\Lambda$ it describes the Gaussian:
 
 ```math
 \Lambda = \begin{bmatrix} \Lambda_{aa} & \Lambda_{ab} \\ \Lambda_{ba} & \Lambda_{bb} \end{bmatrix}, \qquad \eta = \begin{bmatrix} \eta_a \\ 
@@ -168,9 +169,9 @@ Two deliberate scope choices, both flagged in the script:
 
 ### 8.1 The math, concretely
 
-Poses are written $x$ in §1-§7 and $X_k$ from here on: $4 \times 4$ [SE(3)](../glossary.md#so3-and-se3) matrices. Tangent vectors follow the repo's `[vx, vy, vz, wx, wy, wz]` order. We solve every window by plain Gauss-Newton ([gauss_newton.md](gauss_newton.md)) over two factor types, both linearized at the current estimate on every iteration (§8).
+Poses are written $x$ in §1-§7 and $X_k$ from here on: $4 \times 4$ [SE(3)](../glossary.md#so3-and-se3) matrices. Tangent vectors (6-number small motions of a pose, see [Lie algebra and tangent space](../glossary.md#lie-algebra-and-tangent-space)) follow the repo's `[vx, vy, vz, wx, wy, wz]` order. We solve every window by plain Gauss-Newton ([gauss_newton.md](gauss_newton.md)) over two factor types, both linearized at the current estimate on every iteration (§8).
 
-**Odometry edge** (`linearize_edge`, reused from `pose_graph_incremental.py`). Here $J_r^{-1}$ is the SE(3) inverse [right Jacobian](../glossary.md#right-and-left-jacobians) (`compute_se3_inv_right_jacobian`), $\mathrm{Ad}$ is the [adjoint](../glossary.md#adjoint), $\mathrm{Log}$ is the [Log map](../glossary.md#exp-and-log-maps), and $`Z_{ij}`$ is the measured relative pose from $`X_i`$ to $`X_j`$ ($`Z_{ij} = \tilde T_{ij}`$ in [pose_graph_optimization.md §15](pose_graph_optimization.md#15-mathematical-breakdown-of-the-error-formulation-and-lie-algebra-operations)):
+**Odometry edge** (`linearize_edge`, reused from `pose_graph_incremental.py`). The residual $e_{ij}$ is a 6-vector: the mismatch between the predicted pose $X_i Z_{ij}$ and $X_j$, written as a tangent vector. $J_i$ and $J_j$ are its $6 \times 6$ derivatives with respect to a right perturbation of $X_i$ or $X_j$ ([pose_graph_optimization.md §15.4](pose_graph_optimization.md#154-manifold-optimization-and-linearization)). Here $J_r^{-1}$ is the SE(3) inverse [right Jacobian](../glossary.md#right-and-left-jacobians) (`compute_se3_inv_right_jacobian`), $\mathrm{Ad}$ is the [adjoint](../glossary.md#adjoint), $\mathrm{Log}$ is the [Log map](../glossary.md#exp-and-log-maps), and $`Z_{ij}`$ is the measured relative pose from $`X_i`$ to $`X_j`$ ($`Z_{ij} = \tilde T_{ij}`$ in [pose_graph_optimization.md §15](pose_graph_optimization.md#15-mathematical-breakdown-of-the-error-formulation-and-lie-algebra-operations)):
 
 ```math
 e_{ij} = \mathrm{Log}\big((X_i Z_{ij})^{-1} X_j\big), \qquad
@@ -178,7 +179,7 @@ J_j = J_r^{-1}(e_{ij}), \qquad
 J_i = -J_r^{-1}(-e_{ij})\,\mathrm{Ad}(Z_{ij}^{-1})
 ```
 
-**Prior on the oldest window pose** (`assemble_window_system`). $X_{\text{ref}}$ is a frozen reference pose and $\Omega_p$ is the prior's information matrix:
+**Prior on the oldest window pose** (`assemble_window_system`). $X_{\text{ref}}$ is a frozen reference pose and $\Omega_p$ is the prior's information matrix. The prior factor penalizes pose 0 for differing from $X_{\text{ref}}$: $e_p$ measures how far $X_0$ has moved from $X_{\text{ref}}$, and $J_p$ is the derivative of $e_p$ with respect to the perturbation of $X_0$:
 
 ```math
 e_p = \mathrm{Log}(X_{\text{ref}}^{-1} X_0), \qquad J_p = J_r^{-1}(e_p)
@@ -192,7 +193,7 @@ The first prior is the [gauge](../glossary.md#gauge-freedom) anchor, with $X_{\t
 H = \sum J^\top \Omega\, J, \qquad g = -\sum J^\top \Omega\, e, \qquad H\delta = g, \qquad X_k \leftarrow X_k \mathrm{Exp}(\delta_k)
 ```
 
-In the glossary's convention $g = -b$ (with $b = J^\top \Omega\, e$), and $\delta$ is the step called $\delta^*$ in [pose_graph_optimization.md §15.5](pose_graph_optimization.md#155-solving-the-linear-system-gauss-newton-step).
+Here each $J$ is read as the blocks above ($J_i$, $J_j$ per edge, $J_p$ for the prior), and the prior enters as one more factor with $\Omega_p$ in place of $\Omega$. In the glossary's convention $g = -b$ (with $b = J^\top \Omega\, e$), and $\delta$ is the step called $\delta^*$ in [pose_graph_optimization.md §15.5](pose_graph_optimization.md#155-solving-the-linear-system-gauss-newton-step).
 
 It stops when $\lVert\delta\rVert$ < `gn_tol` ($10^{-6}$) or after `gn_max_iters` (10) iterations. With $W$ poses in the window, $H$ is $6W \times 6W$.
 
@@ -214,7 +215,7 @@ Taking $\Lambda_{bb}$ from the full $H$ instead would also include the b–c edg
 
 The solve therefore never exceeds `window_size` poses, so `max_dof` (the size, in unknowns, of the largest system any solve assembles; §9) is capped at 6 × `window_size`. A marginalized pose keeps the estimate it had when it was dropped.
 
-**Baseline** (`run_full_batch_growing`). For $k = 1 \dots n$, the baseline re-solves the whole graph of the first $k$ poses from scratch. It uses `pose_graph.run_pose_graph_optimization` (adaptive Levenberg-Marquardt ([levenberg_marquardt.md](levenberg_marquardt.md)) starting at λ = 0, via `damping=0.0`), starting from [dead reckoning](../glossary.md#dead-reckoning) from the first ground-truth pose, with node 0 anchored by $10^6 I$ inside that function. Its `max_dof` is $6n$.
+**Baseline** (`run_full_batch_growing`). For $k = 1 \dots n$, the baseline re-solves the whole graph of the first $k$ poses from scratch. It uses `pose_graph.run_pose_graph_optimization` (adaptive Levenberg-Marquardt ([levenberg_marquardt.md](levenberg_marquardt.md)) starting at λ = 0, via `damping=0.0`; the damping λ is the extra term LM adds to $H$, see [glossary](../glossary.md#levenberg-marquardt-lm-and-damping)), starting from [dead reckoning](../glossary.md#dead-reckoning) from the first ground-truth pose, with node 0 anchored by $10^6 I$ inside that function. Its `max_dof` is $6n$.
 
 #### Defaults
 `--window-size 10`; `--nodes-per-side-sweep 2 4 8 16 32 64` (8 to 256 poses); `--side-length 2.0` m; `--pos-noise-std 0.05` m; `--rot-noise-std 0.01` rad; `--anchor-weight 1e6`; `--gn-tol 1e-6`; `--gn-max-iters 10`; `--seed 0`.

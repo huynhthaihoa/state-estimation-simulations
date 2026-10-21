@@ -41,7 +41,7 @@ Gauss-Newton linearizes the error, $e(x+\Delta x)\approx e(x)+J\Delta x$ (with $
 
 $$\boxed{J^\top J\Delta x=-J^\top e}$$
 
-and updates $x\leftarrow x+\Delta x$. (For a pose $T$ in [SE(3)](../glossary.md#so3-and-se3) the update is a [retraction](../glossary.md#retraction), $T \leftarrow T\cdot\mathrm{Exp}(\Delta x)$, not plain addition - see [gauss_newton.md §8](gauss_newton.md#8-why-is-this-everywhere-in-slam).)
+and updates $x\leftarrow x+\Delta x$. (A single pose $x_i$ of §1 is written $T$ from here on, while $x$ stays the whole stacked state. For a pose $T$ in [SE(3)](../glossary.md#so3-and-se3) the update is a [retraction](../glossary.md#retraction), $T \leftarrow T\cdot\mathrm{Exp}(\Delta x)$, not plain addition - see [gauss_newton.md §8](gauss_newton.md#8-why-is-this-everywhere-in-slam).)
 
 This works very well **when the estimate is already reasonably close to the solution**. Now suppose the initial estimate is poor:
 
@@ -76,7 +76,7 @@ Gradient descent just moves in the direction that decreases the error. For $`f =
 
 $$\boxed{\Delta x = -\alpha J^\top e}$$
 
-where $\alpha$ is the **step size**. It uses only the **slope**, with no $J^\top J$ (curvature) term.
+where $\alpha$ is the **step size**. It uses only the **slope**, with no $J^\top J$ term (the Gauss-Newton approximation of the [Hessian](../glossary.md#normal-equations-and-hessian), i.e. the curvature).
 
 **Safer:** to first order a step changes the cost by $`-\alpha\|\nabla f\|^2 < 0`$, so a small enough $\alpha$ always lowers it, and there's no matrix to invert.
 
@@ -139,10 +139,10 @@ gradient-descent-like            Gauss-Newton-like
 
 LM never measures how far it is from the solution - it can't know that. Instead, $\lambda$ follows **how well the last step worked**:
 
-- **Error decreased** (e.g. 100 → 60): **accept** the step, trust the linear model more, $\lambda \downarrow$. The next iteration is more Gauss-Newton-like.
-- **Error increased** (e.g. 100 → 150): **reject** the step, so $x$ stays exactly where it was. Then $\lambda \uparrow$ and re-solve from the same point for a shorter, more cautious step. Repeat until the error decreases, or stop when a retry limit is hit.
+- **Cost decreased** (e.g. 100 → 60): **accept** the step, trust the linear model more, $\lambda \downarrow$. The next iteration is more Gauss-Newton-like.
+- **Cost increased** (e.g. 100 → 150): **reject** the step, so $x$ stays exactly where it was. Then $\lambda \uparrow$ and re-solve from the same point for a shorter, more cautious step. Repeat until the cost decreases, or stop when a retry limit is hit.
 
-Because a bad step is never kept, the error never goes up from one accepted step to the next.
+Because a bad step is never kept, the cost $f$ never goes up from one accepted step to the next.
 
 ```mermaid
 flowchart TD
@@ -153,7 +153,7 @@ flowchart TD
 
 In practice $\lambda$ tends to grow while the linear model predicts poorly (often far from the solution) and shrink near the solution, where the model becomes accurate - but that's a consequence of the rule, not the rule itself.
 
-> **Note:** "did the error drop?" is the simplest acceptance test, and the one this repo uses (§13). Many solvers instead use the **gain ratio**: the actual cost reduction divided by the reduction the linear model predicted. A ratio near 1 means the model is trustworthy ($\lambda \downarrow$); a small or negative ratio means it isn't ($\lambda \uparrow$).
+> **Note:** "did the cost drop?" is the simplest acceptance test, and the one this repo uses (§13). Many solvers instead use the **gain ratio**: the actual cost reduction divided by the reduction the linear model predicted. A ratio near 1 means the model is trustworthy ($\lambda \downarrow$); a small or negative ratio means it isn't ($\lambda \uparrow$).
 
 > **Note:** damping makes each step *safe*, not *global*. LM still only goes downhill from where it starts, so if a poor initial estimate sits in the basin of a wrong local minimum, LM converges to that minimum. In SLAM a reasonable initialization (odometry, a good [front end](../glossary.md#front-end-and-back-end)) is still needed.
 
@@ -167,9 +167,10 @@ $$u =\pi(TX)$$
 
 where:
 
-- $u$ = the pixel coordinates of the landmark in the image
-- $X$ = 3D landmark
-- $T$ = camera pose, written here as world-to-camera, so $TX$ is the landmark in the camera frame. [bundle_adjustment.md](bundle_adjustment.md) uses the inverse convention, and its 3D point $P$ is not a covariance: see [nonlinear_least_square.md §3](nonlinear_least_square.md#3-then-what-makes-it-nonlinear).
+- $u$ = the predicted pixel coordinates of the landmark in the image
+- $z$ = the measured pixel coordinates of the landmark (the measurement)
+- $X$ = 3D landmark (the $l_j$ of §1)
+- $T$ = camera pose (the $x_i$ of §1), written here as world-to-camera, so $TX$ is the landmark in the camera frame. [bundle_adjustment.md](bundle_adjustment.md) uses the inverse convention, and its 3D point $P$ is not a covariance: see [nonlinear_least_square.md §3](nonlinear_least_square.md#3-then-what-makes-it-nonlinear).
 - $\pi$ = camera projection
 
 The [reprojection error](../glossary.md#reprojection-error) is $e = \pi(TX)-z$ (prediction minus measurement, the same convention as [gauss_newton.md](gauss_newton.md)'s residual $r$), and we optimize:
@@ -284,7 +285,7 @@ Per script:
 
 - [`pose_graph.py`](../../use_numpy/pose_graph.py)'s `run_pose_graph_optimization` (both `use_numpy/` and `use_manif/`):
   - starts from `--damping` (default $0.01$); after an accepted step $\lambda \leftarrow \max(\lambda/2,\ 10^{-7})$, after a rejected one $\lambda \leftarrow \max(2\lambda,\ 10^{-6})$;
-  - adds a large constant, $10^6 I$, to the first pose's block of $H$. Pinning that pose removes the [gauge freedom](../glossary.md#gauge-freedom), so $H$ isn't singular to begin with;
+  - adds a large constant, $10^6 I$, to the first pose's $6\times6$ block of $H$. Pinning that pose removes the [gauge freedom](../glossary.md#gauge-freedom), so $H$ isn't singular to begin with;
   - reused by [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) for its batch baseline (its incremental solver runs plain Gauss-Newton);
   - reused by [`sliding_window_marginalization.py`](../../use_numpy/sliding_window_marginalization.py) with an initial damping of $0$, so its first step is a pure Gauss-Newton step. After that, the floors above keep $\lambda \ge 10^{-7}$.
 - [`bundle_adjustment_advanced.py`](../../use_numpy/bundle_adjustment_advanced.py) (both versions):
@@ -294,7 +295,7 @@ Per script:
 - [`lidar_primitives.py`](../../use_numpy/lidar_primitives.py)'s `optimize_plane_graph` (experiment 4; both versions): same accept/reject scheme and 10 retries, but:
   - starts from $\lambda = 10^{-3}$; halves it (floor $10^{-9}$) after an accepted step and multiplies it by $4$ after a rejected one;
   - anchors pose 0 with $10^{12} I$ instead of $10^6 I$;
-  - updates each plane landmark (an $S^2$ normal plus an offset) with the $S^2$ exponential map for the normal, not plain addition.
+  - updates each plane landmark (an $S^2$ normal, i.e. a unit-length 3D vector, plus an offset) with the $S^2$ exponential map for the normal: the 2-component step rotates the normal along a great circle instead of being added to it.
 
 ---
 

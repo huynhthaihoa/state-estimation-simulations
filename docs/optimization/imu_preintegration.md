@@ -5,7 +5,7 @@ An [IMU](../glossary.md#imu-inertial-measurement-unit) sampled at 100-1000 Hz pr
 It builds on two earlier ideas:
 
 - The **node/edge language** from [pose_graph_optimization.md](pose_graph_optimization.md#2-where-do-the-edges-come-from): an edge is a relative-motion constraint between two nodes.
-- The **right Jacobian** from [jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space): $`\text{Exp}(\varphi+\delta\varphi) \approx \text{Exp}(\varphi)\cdot\text{Exp}\big(J_r(\varphi)\,\delta\varphi\big)`$, where the extra rotation is composed on the right, i.e. in the object's own body frame.
+- The **right Jacobian** from [jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space): $`\text{Exp}(\varphi+\delta\varphi) \approx \text{Exp}(\varphi)\cdot\text{Exp}\big(J_r(\varphi)\,\delta\varphi\big)`$, where the extra rotation is composed on the right, i.e. in the object's own body frame. Here $`\text{Exp}`$ turns a rotation vector (an axis times an angle) into a rotation matrix ([glossary](../glossary.md#exp-and-log-maps)).
 
 ---
 
@@ -62,7 +62,7 @@ At every raw IMU sample, [`use_numpy/imu_preintegration.py`](../../use_numpy/imu
 Here $\tilde\omega, \tilde v$ are the raw sensor readings (gyroscope rate and accelerometer reading), $dt$ is the IMU sample period, and $b_g, b_a$ are the bias estimates *in effect when this bundle started*.
 
 - **Update order matters.** Every right-hand side uses the value from *before* this step. $\Delta p$ needs the old $\Delta v$ and old $\Delta R$, and $\Delta v$ needs the old $\Delta R$. So $\Delta p$ is updated first, then $\Delta v$, then $\Delta R$ last. The code orders the updates ($\Delta p$, $\Delta v$, $\Delta R$) and saves `R_prev` for the Jacobian updates that follow, which run after `self.delta_R` has changed.
-- **Rotations compose, they don't add.** $\Delta R$'s update is the [Exp map](../glossary.md#exp-and-log-maps) composition from [jacobian.md §11.1](../foundations/jacobian.md#111-why-plain-addition-breaks): each micro-step's tiny rotation is *composed onto* the running $\Delta R$.
+- **Rotations compose, they don't add.** $\Delta R$'s update is the Exp map composition from [jacobian.md §11.1](../foundations/jacobian.md#111-why-plain-addition-breaks): each micro-step's tiny rotation is *composed onto* the running $\Delta R$.
 - **Labelling quirk.** The scripts call their linear input a commanded *velocity* (`--linear-vel`), but the recursions treat it as an accelerometer reading: $\tilde v$ is integrated twice, into $\Delta v$ and then $\Delta p$.
   - With the defaults, one second of "1 m/s" gives $\Delta p_x \approx 0.48$ m.
   - That is $\tfrac12 a t^2$ for $a = 1$ m/s², shortened slightly by the turn. A true velocity would give roughly 1 m.
@@ -82,6 +82,8 @@ J_{R,b_g} = \frac{\partial \Delta R}{\partial b_g} \qquad J_{v,b_g} = \frac{\par
 ```math
 J_{p,b_g} = \frac{\partial \Delta p}{\partial b_g} \qquad J_{p,b_a} = \frac{\partial \Delta p}{\partial b_a}
 ```
+
+Each $J$ is a $3\times3$ matrix saying how much its quantity changes per unit bias. For $\Delta v$ and $\Delta p$ that is the ordinary derivative. $\Delta R$ is itself a $3\times3$ matrix, so $J_{R,b_g}$ instead gives the tangent vector of a right perturbation: $\Delta R(b_g+\delta b_g) \approx \Delta R\cdot\text{Exp}(J_{R,b_g}\,\delta b_g)$ (used in §5).
 
 These are the "sensitivity map" from [jacobian.md §3](../foundations/jacobian.md#3-think-of-it-as-a-sensitivity-map) ("if I nudge the input a little, how much does the output move?"), tracked incrementally one micro-step at a time. Each step uses the current micro-step's rotation $dR = \text{Exp}((\tilde\omega-b_g)dt)$ and right Jacobian $J_r = J_r\big((\tilde\omega-b_g)dt\big)$, in the same old-value order as §3 (`imu_preintegration.py:68-74`): $p$-Jacobians first, then $v$-Jacobians, then $J_{R,b_g}$ last.
 
@@ -121,9 +123,9 @@ It is a direct use of $J_r$'s definition ([jacobian.md §11.2](../foundations/ja
 
 ### Implementation notes
 
-- Both `lie_utils.py` helpers switch to first-order forms when $\theta = \lVert(\tilde\omega-b_g)dt\rVert < 10^{-6}$: `so3_exp` returns $`I + [\phi]_\times`$ and `so3_right_jacobian` returns $`I - \tfrac{1}{2}[\phi]_\times`$. Otherwise they use the closed forms (Rodrigues and the $J_r$ formula from [jacobian.md §11.4](../foundations/jacobian.md#114-closed-form-for-so3)).
+- Both `lie_utils.py` helpers switch to first-order forms when $\theta = \lVert(\tilde\omega-b_g)dt\rVert < 10^{-6}$ (the rotation vector $\phi = (\tilde\omega-b_g)dt$ of one micro-step has a tiny angle): `so3_exp` returns $`I + [\phi]_\times`$ and `so3_right_jacobian` returns $`I - \tfrac{1}{2}[\phi]_\times`$. Otherwise they use the closed forms (Rodrigues and the $J_r$ formula from [jacobian.md §11.4](../foundations/jacobian.md#114-closed-form-for-so3)).
 - The demo omits two things a real preintegrated factor needs. There is **no gravity term**: a real accelerometer measures specific force ([glossary](../glossary.md#imu-inertial-measurement-unit)), so gravity must be removed, usually in the residual. There is **no preintegrated noise covariance**: the script propagates the bias Jacobians but not Forster et al.'s $\Sigma$ recursion, so the bundle carries no uncertainty.
-- The demo builds its raw readings as the commanded twist plus the *estimated* bias, so $`\tilde v - b_a`$ and $`\tilde\omega - b_g`$ equal the commanded values exactly.
+- The demo builds its raw readings as the commanded [twist](../glossary.md#twist) (a 6-vector of linear and angular velocity) plus the *estimated* bias, so $`\tilde v - b_a`$ and $`\tilde\omega - b_g`$ equal the commanded values exactly.
 
 ---
 
@@ -215,13 +217,13 @@ In both, the position step uses the rotation *after* this step's update. That is
 e_R = \arccos\!\left(\frac{\mathrm{tr}(R_{gt}^\top R_{est}) - 1}{2}\right),\qquad e_p = \lVert p_{gt} - p_{est}\rVert
 ```
 
-**`robot_imu_simulation.py`, propagation** (`run_simulation`). The true [twist](../glossary.md#twist) $\xi = [v, \omega]$ (translation first) is drawn once, uniformly per axis from $\pm 1.0$ m/s and $\pm 0.5$ rad/s. Each IMU step ($dt = 0.01$ s, 100 steps per second):
+**`robot_imu_simulation.py`, propagation** (`run_simulation`). The true twist $\xi = [v, \omega]$ (translation first) is drawn once, uniformly per axis from $\pm 1.0$ m/s and $\pm 0.5$ rad/s. Each IMU step ($dt = 0.01$ s, 100 steps per second):
 
 ```math
 T_{true} \leftarrow T_{true}\,\text{Exp}(\xi\,dt), \qquad T_{est} \leftarrow T_{est}\,\text{Exp}\big((\xi + n)\,dt\big),\quad n \sim \mathcal{N}(0, 0.02^2 I_6)
 ```
 
-The 0.02 noise is hard-coded. `se3_exp` builds $\text{Exp}(\xi)$ with rotation $\text{Exp}(\omega)$ and translation $V v$, where
+The 0.02 noise is hard-coded. `se3_exp` builds $\text{Exp}(\xi)$ with rotation $\text{Exp}(\omega)$ and translation $V v$ ($V$ is the $SO(3)$ [left Jacobian](../glossary.md#right-and-left-jacobians) $J_l(\omega)$, which maps the twist's translation part $v$ to the displacement), where
 
 $$V = I + \frac{1-\cos\theta}{\theta^2}[\omega]_\times + \frac{\theta-\sin\theta}{\theta^3}[\omega]_\times^2$$
 
@@ -232,6 +234,8 @@ falling back to $`I + [\omega]_\times`$ and $`V = I + \tfrac{1}{2}[\omega]_\time
 **Residual and Jacobian** (`position_observation_jacobian`). For a [right perturbation](../glossary.md#left-and-right-perturbation) $T_{est} \text{Exp}(\delta\xi)$:
 
 $$r = z - t_{est}, \qquad J = \frac{\partial t}{\partial \delta\xi} = \begin{bmatrix} R_{est} & 0_{3\times 3} \end{bmatrix}$$
+
+$J$ is the $3\times6$ derivative of the predicted position $t_{est}$ with respect to that perturbation.
 
 **Solve and [retract](../glossary.md#retraction).** With the [information matrix](../glossary.md#information-matrix) $\Omega = I/\sigma_{pos}^2$ (built in `__main__` as `pos_info`):
 

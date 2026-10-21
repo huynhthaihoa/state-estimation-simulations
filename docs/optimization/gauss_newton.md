@@ -42,7 +42,7 @@ Around the current estimate $x$, a first-order Taylor expansion approximates the
 
 $$r(x+\Delta x)\approx r(x) + J\Delta x$$
 
-where $J$ is the **[Jacobian](../foundations/jacobian.md)**. The nonlinear $r(x+\Delta x)$ is replaced locally by the linear $r(x)+J\Delta x$.
+where $\Delta x$ is the step added to the unknowns and $J$ is the **[Jacobian](../foundations/jacobian.md)**: the matrix of derivatives of $r$ with respect to $x$, with one row per residual entry and one column per unknown. The nonlinear $r(x+\Delta x)$ is replaced locally by the linear $r(x)+J\Delta x$.
 
 So instead of asking "which $x$ minimizes this nonlinear function?", we ask "which small change $\Delta x$ makes this linear approximation as small as possible?"
 
@@ -115,7 +115,7 @@ One step gets us much closer to $2$, and repeating converges rapidly.
 
 ## 7. Why is it called Gauss-Newton?
 
-**Newton's method** uses the exact [Hessian](../glossary.md#normal-equations-and-hessian) $\nabla^2 f$ (the second derivatives of $f$) and solves $\nabla^2 f\,\Delta x=-\nabla f$. For nonlinear least squares, the exact Hessian decomposes as:
+**Newton's method** uses the exact [Hessian](../glossary.md#normal-equations-and-hessian) $\nabla^2 f$ (the second derivatives of $f$) and solves $\nabla^2 f\,\Delta x=-\nabla f$. For nonlinear least squares, the exact Hessian decomposes as (with $r_i$ the $i$-th entry of $r$):
 
 $$\nabla^2 f=J^\top J + \sum_i r_i \nabla^2 r_i$$
 
@@ -161,6 +161,8 @@ This is a huge nonlinear problem. Gauss-Newton linearizes every measurement func
 
 $$r_{ij}(x+\Delta x) \approx r_{ij}(x)+J_{ij}\Delta x$$
 
+Here $J_{ij}$ is the derivative of $r_{ij}$ with respect to all the stacked unknowns, nonzero only in the $T_i$ and $p_j$ blocks, because $r_{ij}$ depends on nothing else. $\Delta x_i$ and $\Delta p_j$ are the slices of the step $\Delta x$ that belong to pose $i$ and landmark $j$.
+
 All measurements then stack into one large system:
 
 $$
@@ -169,7 +171,7 @@ $$
 
 Solve it → update all poses and landmarks → repeat.
 
-One caveat: landmarks $p_j\in\mathbb{R}^3$ really do just get $p_j \leftarrow p_j+\Delta p_j$. Poses $T_i$ don't, because they live on the [SE(3)](../glossary.md#so3-and-se3) manifold ([glossary](../glossary.md#manifold)). Their update is a [retraction](../glossary.md#retraction) through the exponential map ([Exp](../glossary.md#exp-and-log-maps)), $T_i \leftarrow T_i\cdot\mathrm{Exp}(\Delta x_i)$, not plain addition. See [pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive) ("Why not just subtract poses?") and the full derivation there.
+One caveat: landmarks $p_j\in\mathbb{R}^3$ really do just get $p_j \leftarrow p_j+\Delta p_j$. Poses $T_i$ don't, because they live on the [SE(3)](../glossary.md#so3-and-se3) manifold ([glossary](../glossary.md#manifold)). Their update is a [retraction](../glossary.md#retraction) through the exponential map ([Exp](../glossary.md#exp-and-log-maps)), $T_i \leftarrow T_i\cdot\mathrm{Exp}(\Delta x_i)$, not plain addition. Here $\Delta x_i$ is a 6-vector in the pose's [tangent space](../glossary.md#lie-algebra-and-tangent-space): 3 translation components, then 3 rotation components. See [pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive) ("Why not just subtract poses?") and the full derivation there.
 
 This is the core optimization mechanism behind many **[bundle adjustment](bundle_adjustment.md) and [graph-SLAM](pose_graph_optimization.md) systems**.
 
@@ -211,7 +213,7 @@ Gauss-Newton asks:
 
 $$J^\top J\Delta x=-J^\top r$$
 
-It uses much more information about the local geometry, so it can converge much faster near the solution. For zero-residual problems like §6's, the term Gauss-Newton drops (§7) vanishes at the solution, and convergence is quadratic: each step's error is at most a constant times the square of the previous one.
+It uses much more information about the local geometry, so it can converge much faster near the solution. For zero-residual problems like §6's (all residuals are zero at the solution), the term Gauss-Newton drops (§7) vanishes at the solution, and convergence is quadratic: each step's error is at most a constant times the square of the previous one.
 
 ---
 

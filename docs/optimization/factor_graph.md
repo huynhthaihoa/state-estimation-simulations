@@ -9,11 +9,11 @@ A **factor graph** represents:
 It is a **bipartite** graph (edges join only nodes of different kinds) with two kinds of nodes (§6 spells out the distinction):
 
 - **Variables** = things we don't know: robot poses, [landmarks](../glossary.md#landmark), sensor biases, etc.
-- **Factors** = measurements/constraints: [odometry](../glossary.md#odometry), camera observations, [IMU](../glossary.md#imu-inertial-measurement-unit), GPS, [loop closures](../glossary.md#loop-closure), etc.
+- **Factors** = measurements/constraints: [odometry](../glossary.md#odometry), camera observations (each measures the [reprojection error](../glossary.md#reprojection-error): the pixel gap between where a landmark was seen and where the estimates project it), [IMU](../glossary.md#imu-inertial-measurement-unit), GPS, [loop closures](../glossary.md#loop-closure), etc.
 
 ![A bipartite factor graph for a SLAM-style problem: robot poses x0..xn connected by odometry-measurement factors u1..un, with landmarks l1, l2 connected to poses via landmark-measurement factors m1..m4, plus a small "variable node/factor node" legend](../images/factor_graph_1.jpg)
 
-*Image 1: the two node kinds (variable = circle, factor = small dot on the edges it joins), with a prior factor on the first pose, odometry factors between poses and landmark measurements.*
+*Image 1: the two node kinds (variable = circle, factor = small dot on the edges it joins), with a [prior factor](../glossary.md#prior-unary-factor) (a factor on a single variable) on the first pose, odometry factors between poses and landmark measurements.*
 
 ![A pose-graph diagram (legend partly in Korean) with keyframe poses P0..P6, a black PriorFactor on P0, blue BetweenFactors along the chain, a red BetweenFactor (loop closure) between P0 and P5, and green UnaryFactors on P5](../images/factor_graph_2.jpg)
 
@@ -29,13 +29,13 @@ It is a **bipartite** graph (edges join only nodes of different kinds) with two 
 
 ![A four-layer factor graph for 2D robot localization: landmarks L0-L2 at top connected via bearing factors to poses P0-P2, which are in turn chained together by odometry factors](../images/factor_graph_5.jpg)
 
-*Image 5: bearing factors from poses to landmarks plus odometry factors between poses, laid out in four layers.*
+*Image 5: bearing factors (a bearing is the direction to a landmark) from poses to landmarks plus odometry factors between poses, laid out in four layers.*
 
 *These diagrams are illustrative sketches from different tutorials/papers; [Image sources](#image-sources) lists which attributions are confirmed and which source is unidentified.*
 
 - The circles are **variables**.
 - Each **factor** joins the variables it touches. A **binary factor** touches two variables.
-- Most of the images above draw factors as their own nodes (dots or squares); the pose-graph figure (`factor_graph_2`) draws them as coloured edges and stubs. A unary factor, such as a [prior](../glossary.md#prior-unary-factor) or GPS fix, touches just one variable.
+- Most of the images above draw factors as their own nodes (dots or squares); the pose-graph figure (`factor_graph_2`) draws them as coloured edges and stubs. A unary factor, such as a prior or GPS fix, touches just one variable.
 
 ---
 
@@ -100,7 +100,7 @@ Worked number: the optimizer only sees the measurements, the three 1 m odometry 
 
 ## 3. A factor is basically an error function
 
-Suppose we have two poses $`X_i, X_j`$, and odometry gives a measured relative transformation $`Z_{ij}`$. We can calculate what the relative transformation *would be* according to our current estimates:
+A [pose](../glossary.md#pose) $`X_i`$ is a rigid motion (rotation plus translation, an [SE(3)](../glossary.md#so3-and-se3) element), so $`X_i^{-1}X_j`$ is the motion from $i$ to $j$. Suppose we have two poses $`X_i, X_j`$, and odometry gives a measured relative transformation $`Z_{ij}`$. We can calculate what the relative transformation *would be* according to our current estimates:
 
 $$
 \hat Z_{ij}=X_i^{-1}X_j
@@ -160,7 +160,7 @@ e_k^\top\Omega_k e_k
 }
 $$
 
-where $\Omega_k=\Sigma_k^{-1}$ is the [**information matrix**](../glossary.md#information-matrix), the inverse of the measurement [covariance](../glossary.md#covariance) $\Sigma_k$ (called $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty); downstream docs such as [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md) use $\Omega$). Here $X$ is all variables stacked, while $x_i$ (or $X_i$ in §3) is a single pose.
+where $\Omega_k=\Sigma_k^{-1}$ is the [**information matrix**](../glossary.md#information-matrix), the inverse of the measurement [covariance](../glossary.md#covariance) $\Sigma_k$ (called $W_i$ in [nonlinear_least_square.md §12](nonlinear_least_square.md#12-add-measurement-uncertainty); downstream docs such as [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md) use $\Omega$). Here $X$ is all variables stacked, while $x_i$ (or $X_i$ in §3) is a single pose (sibling docs write the stacked vector as $x$).
 
 > **Note:** a precise sensor (small $\Sigma_k$) gives a *large* $\Omega_k$, so its error counts more in the sum; a noisy sensor (large $\Sigma_k$) gives a *small* $\Omega_k$ and is down-weighted. The term $e_k^\top\Omega_k e_k$ is a **squared Mahalanobis distance** - see the [glossary](../glossary.md#mahalanobis-distance) for the definition and the isotropic special case where it collapses to plain squared error divided by a constant.
 
@@ -213,7 +213,7 @@ Something we're trying to estimate (§1); here:
 
 ### Factor
 
-Something that constrains those variables (§1); typical kinds:
+Something that constrains those variables (§1); typical kinds (a camera reprojection factor's error is the pixel gap defined in §1):
 
 ```text
 Odometry factor
@@ -303,7 +303,8 @@ But the errors are nonlinear because poses involve rotations and transformations
 So we linearize:
 
 - $`\oplus`$ is the **retraction** that applies a small update $`\Delta X`$ to a state ([glossary](../glossary.md#retraction)).
-- $`J`$ is the **Jacobian** of $`e`$ with respect to $`\Delta X`$ ([glossary](../glossary.md#jacobian)).
+- $`\Delta X`$ is the stacked small step in tangent-space coordinates: 6 numbers per pose, 3 per landmark.
+- $`J`$ is the **Jacobian** of $`e`$ with respect to $`\Delta X`$ ([glossary](../glossary.md#jacobian)): the derivative of the stacked residual, one column per entry of $`\Delta X`$ ([nonlinear_least_square.md §7](nonlinear_least_square.md#7-the-key-trick-make-the-nonlinear-problem-locally-linear)).
 
 $$e(X\oplus\Delta X)\approx e(X)+J\Delta X$$
 

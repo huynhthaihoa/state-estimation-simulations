@@ -6,17 +6,19 @@
 
 ## 1. Start with the simplest example
 
-Suppose our sparse matrix has this structure, with each number a variable. Draw an edge i ─ j whenever the matrix entry $`H_{ij} \neq 0`$ (the factor graph with the factor nodes folded away):
+Suppose our sparse matrix has this structure, with each number a variable. Draw an edge i ─ j whenever the entry $`H_{ij}`$ of the sparse [Hessian](../glossary.md#normal-equations-and-hessian) $`H`$ of the linearized problem is nonzero (the factor graph with the factor nodes folded away):
 
 ```text
 1 ─ 2 ─ 3 ─ 4
 ```
 
-We eliminate in the order $1 \rightarrow 2 \rightarrow 3 \rightarrow 4$:
+We [eliminate](../glossary.md#variable-elimination) in the order $1 \rightarrow 2 \rightarrow 3 \rightarrow 4$:
 
 - Eliminating 1 leaves its information with its only neighbor, 2: `1 → 2`.
 - Eliminating 2 passes it on to 3: `2 → 3`.
 - Eliminating 3 passes it on to 4: `3 → 4`.
+
+Here "information" means a correction: eliminating a variable leaves a [Schur complement](../glossary.md#schur-complement) on its remaining neighbors, and the tree records which neighbor is eliminated first, its parent.
 
 This produces the **elimination tree**:
 
@@ -62,7 +64,7 @@ The tree is **not necessarily the original graph**:
 
 ## 3. Connecting it to sparse Cholesky
 
-We want $`H=LL^\top`$, where $`H`$ is the [Hessian](../glossary.md#normal-equations-and-hessian) of the linearized problem and $`L`$ is its lower-triangular Cholesky factor, computed by eliminating variables one by one. Take this graph:
+We want $`H=LL^\top`$, where $`H`$ is the Hessian of the linearized problem and $`L`$ is its lower-triangular Cholesky factor, computed by eliminating variables one by one. Take this graph:
 
 ```text
 1 ─ 2 ─ 3
@@ -270,7 +272,7 @@ Landmarks never touch each other directly, so eliminating one only connects the 
 
 The resulting $L$ has far fewer nonzeros. It is always $n \times n$, so only its sparsity changes.
 
-**Counting it.** Here are the counts for two bundle-adjustment graphs at block level (one node per camera or landmark, $n$ nodes in total). Entries are counted in the lower triangle of $L$, diagonal included, and fill-in = nnz($L$) minus the nonzeros of the lower triangle of $H$. All numbers come from the repo's `utils.symbolic_eliminate`.
+**Counting it.** Here are the counts for two bundle-adjustment graphs at block level (one node per camera or landmark, $n$ nodes in total). Entries are counted in the lower triangle of $L$, diagonal included (nnz = number of nonzero entries, as in [sparse_cholesky_factorization.md §5](sparse_cholesky_factorization.md#5-ordering-becomes-extremely-important)), and fill-in = nnz($L$) minus the nonzeros of the lower triangle of $H$. All numbers come from the repo's `utils.symbolic_eliminate`.
 
 | Graph | Order | nnz($L$) | fill-in | dense $n(n+1)/2$ |
 | ----- | ----- | -------- | ------- | ---------------- |

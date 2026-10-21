@@ -178,6 +178,8 @@ This is where the [Jacobian](../foundations/jacobian.md) enters. At the current 
 
 $$e(x_k+\Delta x)\approx e(x_k)+J\Delta x,\qquad J=\frac{\partial e}{\partial x}$$
 
+Here $\Delta x$ is the step added to the unknowns ($k$ is the iteration index), and $J$ is the matrix of derivatives of the stacked residual $e$ with respect to the unknowns: one row per residual entry, one column per unknown.
+
 Visually, near the current point the curve is replaced by its tangent line, the local linear approximation (the same picture as [gauss_newton.md §9](gauss_newton.md#9-picture-following-the-tangent)):
 
 ![Two panels for Gauss-Newton on the residual x squared minus 4 starting from x = 3: the curve with the tangent at x = 3, which crosses zero at 2.1667, and the next tangent at 2.1667, which crosses zero at 2.0064, next to the true root at 2; and the residual magnitude at iterations 0 to 3 on a log axis, falling from 5 to 4.1e-05](../../assets/gauss_newton_tangent.png)
@@ -204,7 +206,7 @@ After linearization:
 \min_{\Delta x}\|e+J\Delta x\|^2
 ```
 
-This is a **linear least-squares problem**, solved by the normal equations:
+This is a **linear least-squares problem**. Setting the gradient of the linearized cost to zero gives its [normal equations](../glossary.md#normal-equations-and-hessian), in which $J^\top J$ approximates the cost's curvature (its Hessian):
 
 $$\boxed{J^\top J\Delta x=-J^\top e}$$
 
@@ -250,7 +252,9 @@ Repeat
 
 $$\boxed{(J^\top J+\lambda I)\Delta x=-J^\top e}$$
 
-Both share the same linearization (§9); they differ only in the damping term. Marquardt's variant, $`\lambda\,\mathrm{diag}(J^\top J)`$ in place of $`\lambda I`$, is what this repo's LM solvers use (`pose_graph.py`, `bundle_adjustment_advanced.py` and `lidar_primitives.py`; e.g. `use_numpy/pose_graph.py` solves `np.linalg.solve(H + lam * np.diag(diag_H), g)`); see [levenberg_marquardt.md §10](levenberg_marquardt.md#10-marquardts-scaling).
+Here $\lambda\ge0$ is the damping weight ([levenberg_marquardt.md §4](levenberg_marquardt.md#4-the-damping-idea)).
+
+Both share the same linearization (§9); they differ only in the damping term. Marquardt's variant, $`\lambda\,\mathrm{diag}(J^\top J)`$ in place of $`\lambda I`$ ($`\mathrm{diag}(J^\top J)`$ is $`J^\top J`$ with its off-diagonal entries set to zero), is what this repo's LM solvers use (`pose_graph.py`, `bundle_adjustment_advanced.py` and `lidar_primitives.py`; e.g. `use_numpy/pose_graph.py` solves `np.linalg.solve(H + lam * np.diag(diag_H), g)`, where `H` $`=J^\top\Omega J`$ with $\Omega$ the weight $W$ of §12, `g` $`=-J^\top\Omega e`$ is the negative gradient, and `diag_H` is the diagonal of `H`); see [levenberg_marquardt.md §10](levenberg_marquardt.md#10-marquardts-scaling).
 
 ---
 
@@ -264,7 +268,7 @@ x0 ─── x1 ─── x2
 l0     l1     l2
 ```
 
-Each factor provides a residual $`e_1(x),e_2(x),e_3(x),\dots`$, so the entire problem becomes:
+Each [factor](../glossary.md#factor) (one error term connecting the variables it involves) provides a residual $`e_1(x),e_2(x),e_3(x),\dots`$, so the entire problem becomes:
 
 ```math
 \boxed{\min_x \sum_i \|e_i(x)\|^2}
@@ -339,16 +343,16 @@ Almost every SLAM sensor gives a statement like:
 
 | Sensor | Residual |
 |---|---|
-| Odometry | $`e_{odom}(T_i,T_j)`$ |
-| IMU | $`e_{imu}(T_i,T_j,v_i,v_j,b_i,b_j)`$ |
+| [Odometry](../glossary.md#odometry) | $`e_{odom}(T_i,T_j)`$ |
+| IMU ([preintegration](../glossary.md#imu-preintegration)) | $`e_{imu}(T_i,T_j,v_i,v_j,b_i,b_j)`$ |
 | Camera | $`e_{cam}(T_i,L_j)`$ |
 | GPS | $`e_{gps}(T_i)`$ |
-| Loop closure | $`e_{loop}(T_i,T_j)`$ |
+| [Loop closure](../glossary.md#loop-closure) | $`e_{loop}(T_i,T_j)`$ |
 
 Here:
 
 - $`T_i`$ is the $i$-th **pose** (the same $T$ as in §3 and §5)
-- $`L_j`$ is the $j$-th landmark
+- $`L_j`$ is the $j$-th landmark (the landmark $X_i$ of §3, written $L_j$ here; $i$ now indexes poses)
 - $`v_i`$ is the velocity at pose $i$
 - $`b_i=(b_g,b_a)`$ is the IMU bias at pose $i$: gyroscope bias and accelerometer bias (not the intercept $`b`$ of §1; [glossary](../glossary.md#bias))
 

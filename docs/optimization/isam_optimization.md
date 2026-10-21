@@ -91,7 +91,7 @@ After linearization, the nonlinear optimization becomes approximately a linear l
 \min_{\Delta x} \lVert A\Delta x - b \rVert^2
 ```
 
-Here $`A`$ is the stacked, **noise-whitened** (each row scaled so its residual has unit noise covariance) Jacobian of all factors, $`b`$ is the stacked (negated) residual vector, and $`\Delta x`$ is the update step to the variables. (§14.1 writes the same step as $`\boldsymbol\delta`$.)
+Here $`A`$ is the stacked, **noise-whitened** (each row scaled so its residual has unit noise covariance) Jacobian of all factors, $`b`$ is the stacked (negated) residual vector, and $`\Delta x`$ is the update step to the variables: 6 numbers per pose (3 translation, 3 rotation), the [degrees of freedom](../glossary.md#degrees-of-freedom-dof) of a 3D pose. (§14.1 writes the same step as $`\boldsymbol\delta`$.) Writing $`J`$ for the unwhitened stacked [Jacobian](../glossary.md#jacobian) (derivatives of all residuals with respect to the variables) and $`S`$ for the block-diagonal whitening factor with $`S^\top S = \Omega`$, $`A = SJ`$.
 
 Instead of solving this from scratch every time, we factorize $A = QR$ (or work with a related factorization of the Hessian system).
 
@@ -275,9 +275,9 @@ For the Bayes tree itself, see [`bayes_tree.md`](bayes_tree.md); for the full iS
 
 ### 14.1 The incremental math, concretely
 
-The script solves the same pose graph as `pose_graph.py`. `linearize_edge` returns that script's residual ${e_{ij} = \mathrm{Log}(Z_{ij}^{-1} X_i^{-1} X_j)}$ (where $`Z_{ij}`$ is the measured relative pose from node $`i`$ to node $`j`$; $`Z_{ij} = \tilde{T}_{ij}`$ in [pose_graph_optimization.md §15](pose_graph_optimization.md#15-mathematical-breakdown-of-the-error-formulation-and-lie-algebra-operations)) and Jacobians $J_i$, $J_j$ (see [pose_graph_optimization.md §15.7](pose_graph_optimization.md#157-the-solver-concretely)).
+The script solves the same pose graph as `pose_graph.py`. `linearize_edge` returns that script's residual ${e_{ij} = \mathrm{Log}(Z_{ij}^{-1} X_i^{-1} X_j)}$ (where $`Z_{ij}`$ is the measured relative pose from node $`i`$ to node $`j`$; $`Z_{ij} = \tilde{T}_{ij}`$ in [pose_graph_optimization.md §15](pose_graph_optimization.md#15-mathematical-breakdown-of-the-error-formulation-and-lie-algebra-operations)) and Jacobians $J_i$, $J_j$ (see [pose_graph_optimization.md §15.7](pose_graph_optimization.md#157-the-solver-concretely)). Here $`e_{ij}`$ is a 6-vector (in the tangent space) measuring how far the current $`X_j`$ is from where $`X_i`$ and the measurement $`Z_{ij}`$ predict; $\mathrm{Log}$ turns a pose into such a 6-vector and $\mathrm{Exp}$ does the reverse ([glossary](../glossary.md#exp-and-log-maps)). $`J_i`$, $`J_j`$ are the $`6 \times 6`$ derivatives of $`e_{ij}`$ with respect to a small change to $`X_i`$ and $`X_j`$; they fill node $i$'s and node $j$'s columns of the edge's row $`A_{ij}`$ below.
 
-The difference is how the linear system is stored and updated. Instead of the Hessian $H$ and the vector $`g = A^\top b`$ (the right-hand side of the normal equations $`H\boldsymbol{\delta} = g`$), the script keeps an upper-triangular square-root-information matrix $R$ and a right-hand side $d$. The step is always ${\boldsymbol{\delta} = R^{-1} d}$ (the same step as $`\Delta x`$ in §3), computed by [back-substitution](../glossary.md#back-substitution) (`solve_triangular`). Here $g$ is the negative gradient, as in [pose_graph_optimization.md §15.7](pose_graph_optimization.md#157-the-solver-concretely); in the glossary's convention ($H\Delta x = -b$, $b = J^\top \Omega r$) it is $g = -b$. The $b$ in $A\boldsymbol{\delta} \approx b$ below is the whitened right-hand side $-S e$, not the glossary's gradient.
+The difference is how the linear system is stored and updated. Instead of the Hessian $H$ and the vector $`g = A^\top b`$ (the right-hand side of the normal equations $`H\boldsymbol{\delta} = g`$), the script keeps an upper-triangular square-root-information matrix $R$ and a right-hand side $d$. The step is always ${\boldsymbol{\delta} = R^{-1} d}$ (the same step as $`\Delta x`$ in §3; $`\boldsymbol{\delta}_k`$ is its rows $6k$ to $6k+5$, node $k$'s part), computed by [back-substitution](../glossary.md#back-substitution) (`solve_triangular`). Here $g$ is the negative gradient, as in [pose_graph_optimization.md §15.7](pose_graph_optimization.md#157-the-solver-concretely); in the glossary's convention ($H\Delta x = -b$, $b = J^\top \Omega r$) it is $g = -b$. The $b$ in $A\boldsymbol{\delta} \approx b$ below is the whitened right-hand side $-S e$, not the glossary's gradient.
 
 **Whitened rows** (`edge_whitened_block`): each edge becomes 6 rows of a least-squares system ${A \boldsymbol{\delta} \approx b}$. With $S$ the upper-triangular square root of the edge information matrix $\Omega$ (`sqrt_info`):
 
@@ -285,11 +285,11 @@ The difference is how the linear system is stored and updated. Instead of the He
 S = \mathrm{chol}(\Omega)^\top, \quad S^\top S = \Omega, \qquad A_{ij} = S \begin{bmatrix} \cdots & J_i & \cdots & J_j & \cdots \end{bmatrix}, \qquad b_{ij} = -S \, e_{ij}
 ```
 
-Then $`\lVert A_{ij}\boldsymbol{\delta} - b_{ij} \rVert^2 = (e_{ij} + J\boldsymbol{\delta})^\top \Omega \, (e_{ij} + J\boldsymbol{\delta})`$, the linearized edge cost. `main` sets $\Omega = I_6$, so $S = I_6$ in the default run.
+Then $`\lVert A_{ij}\boldsymbol{\delta} - b_{ij} \rVert^2 = (e_{ij} + J\boldsymbol{\delta})^\top \Omega \, (e_{ij} + J\boldsymbol{\delta})`$, the linearized edge cost, where $`J`$ is the edge's own Jacobian row $`\begin{bmatrix} \cdots & J_i & \cdots & J_j & \cdots \end{bmatrix}`$ (so $`A_{ij} = SJ`$). `main` sets $\Omega = I_6$, so $S = I_6$ in the default run.
 
 **Anchor rows** (`full_relinearize`): node 0 gets 6 extra rows $`\sqrt{w} \, I_6`$ with right-hand side 0, where $w$ = `--anchor-weight` (default $10^6$). These add ${w I_6}$ to node 0's block of ${A^\top A}$, which is the same [gauge fix](../glossary.md#gauge-freedom) as `pose_graph.py`'s ${H_{00} \mathrel{+}= 10^6 I_6}$. Like that one, it pulls node 0's step toward zero around its current estimate.
 
-**Full rebuild** (`full_relinearize`): stack the anchor rows and every edge seen so far, all linearized at the current linearization point ${\bar{X}}$ (`x_lin`), then factorize once:
+**Full rebuild** (`full_relinearize`): stack the anchor rows and every edge seen so far, all linearized at the current **linearization point** ${\bar{X}}$ (`x_lin`: the poses at which the Jacobians are computed; the current estimate is $\bar{X}$ with the correction $\boldsymbol{\delta}$ applied; [glossary](../glossary.md#linearization)), then factorize once:
 
 $$A = QR \quad (\texttt{np.linalg.qr}), \qquad d = Q^\top b$$
 
@@ -300,6 +300,8 @@ This gives ${R^\top R = A^\top A = H = J^\top \Omega J}$ and ${R^\top d = A^\top
 ```math
 \boldsymbol{\delta} = R^{-1} d, \qquad \bar{X}_k \leftarrow \bar{X}_k \, \mathrm{Exp}(\boldsymbol{\delta}_k), \qquad \text{rebuild } R, d \text{ at the new } \bar{X}
 ```
+
+Applying $\boldsymbol{\delta}_k$ through $\mathrm{Exp}$ is a **retraction** ([glossary](../glossary.md#retraction)): $\boldsymbol{\delta}_k$ is a small motion applied to node $k$'s pose, not a new pose, and poses cannot be updated by plain addition.
 
 It stops when ${\lVert \boldsymbol{\delta} \rVert <}$ `--gn-tol` (default $10^{-6}$), or after `--gn-max-iters` steps (default 10). $R$ and $d$ are rebuilt before each convergence check, so the returned $R$ and $d$ always belong to the returned ${\bar{X}}$.
 
@@ -328,7 +330,7 @@ Each rotation is orthogonal, so after the sweep ${R^\top R}$ has gained exactly 
 
 **Streaming a new node** (`run_incremental_pose_graph`): for node $k$ with odometry edge ${Z_{k-1,k}}$:
 
-1. Dead-reckon its linearization point from the previous one: $`\bar{X}_k = \bar{X}_{k-1} Z_{k-1,k}`$.
+1. [Dead-reckon](../glossary.md#dead-reckoning) its linearization point from the previous one: $`\bar{X}_k = \bar{X}_{k-1} Z_{k-1,k}`$.
 2. Pad $R$ and $d$ with 6 zero rows and columns.
 3. Insert the edge's 6 whitened rows one at a time with `qr_insert_row`.
 4. Read out the estimate (`read_out`): ${\boldsymbol{\delta} = R^{-1} d}$, then $`X_k = \bar{X}_k \, \mathrm{Exp}(\boldsymbol{\delta}_k)`$ for every node.
