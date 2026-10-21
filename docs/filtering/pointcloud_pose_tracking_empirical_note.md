@@ -2,7 +2,7 @@
 
 Applies to both [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/pointcloud_pose_tracking.py) and [`use_manif/pointcloud_pose_tracking.py`](../../use_manif/pointcloud_pose_tracking.py), which implement four ways to turn the same predicted point-cloud measurements into a pose correction: `run_ekf`, `run_iekf`, `run_ukf`, `run_vanilla_kf`. The first three are the standard nonlinear Kalman filters: the [EKF](../glossary.md#ekf-extended-kalman-filter) (Extended Kalman Filter), the [IEKF](../glossary.md#iekf-invariant-ekf) (Invariant EKF) and the [UKF](../glossary.md#ukf-unscented-kalman-filter) (Unscented Kalman Filter). **Vanilla KF** here means a plain linear [Kalman filter](../glossary.md#kalman-filter-kf) run on the pose written as 12 ordinary numbers (§1, §4). "They all give similar numbers" hides three different facts on this benchmark:
 
-| Pair | Relation | Gap at the defaults | Main cause | |
+| Pair | Relation | Gap at the defaults | Main cause | Details |
 | --- | --- | --- | --- | --- |
 | EKF vs. IEKF | **Identical**, a proven property of this setup, not a coincidence | ~1e-14 in position and rotation (floating-point round-off) | The same model linearized in two frames; isotropic noise makes the two agree exactly | §2 |
 | UKF vs. EKF/IEKF | **Close**, but a different algorithm; never matches to round-off | ~1.4 mm at the first update (the initial pose correction), then micrometers (~4e-6 to 2e-5 m) | Additive process noise and second-order curvature; grows with the step size above $`\Delta t \approx 0.02`$ s (below that, the fixed $`10^{-9} I`$ sigma-point term sets the gap) | §3 |
@@ -16,12 +16,12 @@ We keep the three claims separate and explain the mechanism behind each.
 
 - **State:** a single rigid [pose](../glossary.md#pose) $T \in SE(3)$: the object's rotation $R$ and translation $t$ ([SE(3)](../glossary.md#so3-and-se3)).
 - **Frames:** the **world frame** is fixed. The **body frame** is attached to the object and moves with it, so a point fixed on the object has constant body-frame coordinates.
-- **Motion model** (`motion_model` in code): where the pose goes next, from the known motion alone, with no sensor data. $`T_{\text{pred}} = T_{\text{prev}}\exp(u\,\Delta t)`$, where the [twist](../glossary.md#twist) $u = [v, \omega]$ is the object's linear and angular velocity in its body frame, held constant over a step of length $\Delta t$. The filters read $u$ from noisy velocity and gyro sensors (§1.1). Composing with this known relative motion makes the state-error propagation exact (the noise still enters to first order, §1.1).
+- **Motion model** (`motion_model` in code): where the pose goes next, from the known motion alone, with no sensor data. $`T_{\text{pred}} = T_{\text{prev}}\,\mathrm{Exp}(u\,\Delta t)`$, where the [twist](../glossary.md#twist) $u = [v, \omega]$ is the object's linear and angular velocity in its body frame, held constant over a step of length $\Delta t$, and $\mathrm{Exp}$ ([glossary](../glossary.md#exp-and-log-maps)) turns the step's motion $`u\,\Delta t`$ into the pose change it produces. The filters read $u$ from noisy velocity and gyro sensors (§1.1). Composing with this known relative motion makes the state-error propagation exact (the noise still enters to first order, §1.1).
   - Example: $v$ = 1 m/s forward and $\omega$ = 0.5 rad/s about the vertical axis, with $\Delta t$ = 0.1 s, moves the object 0.1 m along its own forward axis and turns it by 0.05 rad (≈ 2.9°).
   - This is the simplest [group-affine](../glossary.md#group-affine-dynamics-trajectory-independence) system (right-multiplication by a known group element, listed by Barrau & Bonnabel 2017, Remark 1 [2]); IMU position/velocity/attitude propagation is a richer example of the same class.
   - EKF, IEKF and UKF all use it exactly; **vanilla KF does not**, it only approximates the composition (§4.2).
   - This is context, not part of the EKF/IEKF equivalence argument (§2.2).
-- **Observation model** (`observation_model` in code; also called the measurement model): where the object's points should appear in the world if its pose were $T$. The object is a rigid set of $M$ points $p_i$, known in advance in its body frame. The sensor sees them in the world frame as $z_i = T\cdot p_i + \text{noise}$ ($`T\cdot p_i = R\,p_i + t`$ is the pose applied to a point, `T.act(p_i)` in code), with [isotropic](../glossary.md#isotropic-and-anisotropic) Gaussian noise ($`R_{\text{diag}} = \sigma^2 I`$).
+- **Observation model** (`observation_model` in code; also called the measurement model): where the object's points should appear in the world if its pose were $T$. The object is a rigid set of $M$ points $p_i$, known in advance in its body frame. The sensor sees them in the world frame as $z_i = T\cdot p_i + \text{noise}$ ($`T\cdot p_i = R\,p_i + t`$ is the pose applied to a point, `T.act(p_i)` in code), with [isotropic](../glossary.md#isotropic-and-anisotropic) Gaussian noise ($`R_{\text{diag}} = \sigma_p^2 I`$, where $\sigma_p$ is the point-noise standard deviation per axis).
   - Example: a point $p = [0.5, 0, 0]$ on an object at $t = [2, 0, 0]$ with no rotation should appear at $[2.5, 0, 0]$. The sensor reports that plus about 3 cm of noise. The difference between the predicted and the measured points is what the update corrects.
 
 All four filters run the same **two-step loop** at every **time step** ([predict and update](../glossary.md#predict-and-update-steps)): **predict** the pose with the **motion model**, then **update** it by comparing the measured points with the **observation model**'s prediction. They differ in *which* step they change and *how*, so we compare them one step at a time. In each box, the text below the dashed line says where a filter departs from the shared loop:
@@ -37,15 +37,15 @@ flowchart LR
 ```
 
 ### Predict - where the pose is propagated forward
-EKF, IEKF and UKF all use the exact motion model above on the minimal 6-dim $SE(3)$ tangent state ([glossary](../glossary.md#minimal-vs-ambient-redundant-parameterization)); only vanilla KF changes it.
+EKF, IEKF and UKF all use the exact motion model above on the minimal 6-dim $SE(3)$ tangent state ([glossary](../glossary.md#minimal-vs-ambient-redundant-parameterization)): the estimate is a pose $T$, and its error is a small body-frame correction $\delta$ (3 translation + 3 rotation components) with $`T_{\text{true}} \approx T\,\mathrm{Exp}(\delta)`$, a vector in the [tangent space](../glossary.md#lie-algebra-and-tangent-space). Only vanilla KF changes it.
 
 | Filter | State | Predicted pose | Predicted covariance $P^-$ |
 | --- | --- | --- | --- |
 | EKF, IEKF (identical code) | 6-dim tangent of $SE(3)$ | exact `motion_model` | through the motion model's Jacobians: $`J_{\text{self}} P J_{\text{self}}^\top + J_\tau Q J_\tau^\top`$ |
 | UKF | 6-dim tangent of $SE(3)$ | exact `motion_model`, applied to each sigma point | spread of the propagated sigma points, plus $Q$ |
-| Vanilla KF | 12 numbers $`x = [\text{vec}(R) \in \mathbb{R}^9,\ t \in \mathbb{R}^3]`$ | fixed linear transition matrix, exact only to first order: $`\exp(\omega^\wedge) \approx I + \omega^\wedge`$ | $`A P A^\top`$ plus $Q$ lifted to 12 dims |
+| Vanilla KF | 12 numbers $`x = [\text{vec}(R) \in \mathbb{R}^9,\ t \in \mathbb{R}^3]`$ | fixed linear transition matrix, exact only to first order: $`\mathrm{Exp}(\omega\,\Delta t) \approx I + (\omega\,\Delta t)^\wedge`$ | $`A P A^\top`$ plus $Q$ lifted to 12 dims |
 
-- **Covariance and Jacobians.** The [covariance](../glossary.md#covariance) $P$ is the pose's uncertainty. [Jacobians](../glossary.md#jacobian) are first derivatives. $Q$ is the process-noise covariance and $J_\tau$ the noise Jacobian (both in §1.1). Because the motion is group-affine, EKF's state-error term $J_{\text{self}}$ is exact; the noise term is first order in the input noise.
+- **Covariance and Jacobians.** The [covariance](../glossary.md#covariance) $P$ is the pose's uncertainty: the $6\times6$ covariance of the correction $\delta$ above. [Jacobians](../glossary.md#jacobian) are first derivatives. $Q$ is the process-noise covariance. $J_{\text{self}}$ and $J_\tau$ are the motion model's Jacobians with respect to the previous pose and to the motion increment (both in §1.1). Because the motion is group-affine, $J_{\text{self}}$ is exact; the noise term is first order in the input noise.
 - **Sigma points** (UKF): a few sample poses around the current estimate, chosen so that their spread matches $P$. Each is mapped onto $SE(3)$ with $\mathrm{Exp}$ (a [retraction](../glossary.md#retraction)), pushed through `motion_model`, and recombined into $P^-$ (§1.1).
 - **Vanilla KF** never calls `motion_model`: it swaps the pose for a redundant 12-dim [ambient](../glossary.md#minimal-vs-ambient-redundant-parameterization) state, with $\text{vec}$ taken **row-major**, as `R.flatten()` does (§1.1). Its first-order truncation is the main source of its gap (§4).
 
@@ -59,7 +59,7 @@ Every filter compares the measured points $z_i$ with the predicted ones $T_{\tex
 | UKF | world frame, through fresh sigma points | none: the sigma points' spread gives the gain directly | - | - |
 | Vanilla KF | world frame, $`z_i - (R\,p_i + t)`$, exactly linear in the 12-dim state | linear in the literal sense | once (but $J(R)$ and $A$ every step, §4.5) | re-project $\text{vec}(R)$ onto $SO(3)$ by **SVD** |
 
-- **IEKF's residual is left-invariant**: redefining the world frame (left-multiplying both the true and the estimated pose by the same fixed transform) doesn't change it. The measurement shape $h(T) = T\cdot p_i$ is the $`X b`$ row of [left_right_invariant.md §4](left_right_invariant.md#4-why-it-actually-matters-not-just-bookkeeping)'s table, which pairs with the left-invariant choice.
+- **IEKF's residual is left-invariant**: redefining the world frame (left-multiplying both the true and the estimated pose by the same fixed transform) doesn't change it. The measurement shape $h(T) = T\cdot p_i$ is the $`X b`$ row (a world-frame reading of a point fixed on the body) of [left_right_invariant.md §4](left_right_invariant.md#4-why-it-actually-matters-not-just-bookkeeping)'s table, which pairs with the left-invariant choice.
 - **Vanilla KF's fixed $H$ is stronger than IEKF's**: IEKF's is still the linearization of an $SE(3)$ model. The catch: nothing keeps $\text{vec}(R)$ orthonormal, so after every update it is re-projected onto $SO(3)$ via **SVD** (singular value decomposition, which finds the nearest valid rotation) (§4).
 
 ### Intuition for $`H = [I \;\; -p^\wedge]`$
@@ -110,7 +110,7 @@ R_{\text{diag}} = \sigma_p^2 I_{3M}
 | 0.1 s | 50 | 0.005 m | ≈ 0.035 m |
 | 0.01 s | 500 | 0.0005 m | ≈ 0.011 m |
 
-**Why not the textbook $`Q \approx Q_c\,\Delta t`$.** It depends on how the sensor behaves:
+**Why not the textbook $`Q \approx Q_c\,\Delta t`$.** Here $Q_c$ is the continuous-time noise intensity (variance per second of the white noise on the rates). Which form fits depends on how the sensor behaves:
 
 - **This simulator:** every reading has the same std, however fast we sample → $\Delta t^2$, the matched choice here (not a bug).
 - **Continuous white noise** (how IMU datasheets specify it, per $`\sqrt{\text{Hz}}`$): faster sampling means noisier readings, std $`\propto 1/\sqrt{\Delta t}`$ → $Q \propto \Delta t$, and drift doesn't depend on `--dt`. So this simulator makes a smaller `--dt` look better than real hardware would.
@@ -123,7 +123,7 @@ Every method starts from the same guess, $`T_0^{\text{est}} = T_0\,\mathrm{Exp}(
 | `--n-points` | $M$ | 20 |
 | `--vel-noise-std`, `--gyro-noise-std` | $\sigma_v$, $\sigma_\omega$ | 0.05 m/s, 0.02 rad/s |
 | `--point-noise-std` | $\sigma_p$ | 0.03 m |
-| `--init-pose-noise-std` | $\sigma_0$ | 0.1 |
+| `--init-pose-noise-std` | $\sigma_0$ | 0.1 (m for translation, rad for rotation) |
 | `--ukf-alpha`, `--ukf-beta`, `--ukf-kappa` | $\alpha, \beta, \kappa$ | 1.0, 2.0, -3.0 |
 | `--gn-tol`, `--gn-max-iters` | | 1e-6, 20 |
 
@@ -144,6 +144,11 @@ J_r(\xi) = \sum_{n=0}^{17} \frac{(-\mathrm{ad}_\xi)^n}{(n+1)!}, \qquad
 ```
 
 $\mathrm{Ad}$ is `se3_adjoint`. $J_r$ is `se3_right_jacobian`, which sums the series to 18 terms instead of using a closed form. $J_r^{-1}$ (`compute_se3_inv_right_jacobian`) is the matrix inverse of that series, not a separate formula. $J_{\text{self}}$ is exact, because $`T\,\mathrm{Exp}(\delta)\,\mathrm{Exp}(w) = T\,\mathrm{Exp}(w)\,\mathrm{Exp}(\mathrm{Ad}_{\mathrm{Exp}(-w)}\delta)`$.
+
+| Symbol | Derivative of $T^-$ with respect to | Role in $P^-$ (textbook EKF) | Intuition |
+| --- | --- | --- | --- |
+| $`J_{\text{self}} = \mathrm{Ad}_{\mathrm{Exp}(-w)}`$ | the previous pose $T$ (right perturbation) | $F$, state transition | relabels the old uncertainty's axes in the new body frame (toy case below) |
+| $`J_\tau = J_r(w)`$ | the per-step increment $`w = u\Delta t`$ (the $\tau$ in $J_\tau$; `dtau` in code) | $G$, noise input | maps twist noise onto the pose; $`\approx I`$ for small $w$, so $Q$ passes through almost unchanged |
 
 **Intuition for $J_{\text{self}} = \mathrm{Ad}_{\mathrm{Exp}(-w)}$ in the covariance predict:** it only re-expresses the old uncertainty in the new body frame.
 - Toy case: "30 cm of uncertainty ahead" becomes "30 cm to my left" after I turn 90° right.
@@ -185,7 +190,7 @@ T^+ = T^-\,\mathrm{Exp}(K r), \qquad P^+ = (I - K H)\,P^-
 
 Here $r$ is the stacked residual (the [innovation](../glossary.md#innovation-and-kalman-gain)) and $S$ its covariance: the pose uncertainty mapped onto the points, $`H P^- H^\top`$, plus the sensor noise $`R_{\text{diag}}`$. It is $3M \times 3M$ ($60 \times 60$ at the default $M = 20$). The Kalman gain $K$ ($6 \times 3M$) turns the residual into a pose correction. It moves the pose a lot when $`H P^- H^\top`$ dominates $S$ (the pose is uncertain) and little when $`R_{\text{diag}}`$ does (the points are just noisy).
 
-The **covariance update** uses the simple $(I-KH)P^-$ form, not the **Joseph form** (a longer, numerically safer rewrite that keeps $`P`$ symmetric), and $S$ is inverted explicitly. $P^+$ is not transported by $J_r(Kr)$ after the retraction. This is a common simplification.
+The **covariance update** uses the simple $(I-KH)P^-$ form, not the **Joseph form** (a longer, numerically safer rewrite that keeps $`P`$ symmetric), and $S$ is inverted explicitly. $P^+$ is also not moved to the new estimate: it still describes the error around $T^-$, while the estimate is now $`T^+ = T^-\,\mathrm{Exp}(Kr)`$. Re-centering it on $T^+$ gives, to first order, $`J_r(Kr)\,P^+\,J_r(Kr)^\top`$ (from $`\mathrm{Exp}(Kr + \varepsilon) \approx \mathrm{Exp}(Kr)\,\mathrm{Exp}(J_r(Kr)\,\varepsilon)`$). Skipping this is a common simplification, because $J_r(Kr) \approx I$ for small corrections. At the defaults (20 seeds) it changes $P^+$ by 4-20% at the first update (the large initial correction) and by under 2% afterwards, and changes the position and rotation RMSE by under 0.2%.
 
 #### IEKF (`run_iekf`)
 
@@ -245,7 +250,7 @@ T^+ = \bar T^-\,\mathrm{Exp}\big(K (z_{k+1} - \hat z)\big), \qquad
 P^+ = P^- - K P_{zz} K^\top
 ```
 
-$P_{xz}$ uses $\chi_i$ directly. Their weighted mean is exactly zero because the offsets come in $\pm$ pairs.
+$P_{zz}$ is the covariance of the predicted points plus the point noise (the UKF's counterpart of $S$), and $P_{xz}$ is the cross-covariance between the pose offsets $\chi_i$ and the predicted points. $P_{xz}$ uses $\chi_i$ directly. Their weighted mean is exactly zero because the offsets come in $\pm$ pairs.
 
 #### Vanilla KF (`run_vanilla_kf`)
 
@@ -264,7 +269,7 @@ A = \begin{bmatrix} I_3 \otimes (I + \omega^\wedge)^\top & 0 \\ I_3 \otimes v^\t
 
 Here $\otimes$ is the **Kronecker product**: $I_3 \otimes B$ is the block-diagonal matrix with three copies of $B$, which applies $B$ to each row of $R$ in the row-major $\mathrm{vec}(R)$.
 
-This truncates the exact step in two places. $\mathrm{Exp}(\omega^\wedge) \approx I + \omega^\wedge$ for rotation, and $V(\omega) \approx I$ for translation, where the exact increment is $`R\,V(\omega)\,v`$ (§4.2). $V(\omega)$ is the matrix inside $SE(3)$'s $\mathrm{Exp}$ that bends the straight step $v$ into the arc the object travels while it turns; $V(\omega) \approx I$ treats that arc as a straight line. The noise lift (`se3_tangent_to_ambient_jacobian`) maps a right tangent perturbation at $R$ into the ambient space ($e_j$ is the $j$-th unit vector):
+This truncates the exact step in two places. $\mathrm{Exp}(\omega) \approx I + \omega^\wedge$ for rotation, and $V(\omega) \approx I$ for translation, where the exact increment is $`R\,V(\omega)\,v`$ (§4.2). $V(\omega)$ is the matrix inside $SE(3)$'s $\mathrm{Exp}$ that bends the straight step $v$ into the arc the object travels while it turns; $V(\omega) \approx I$ treats that arc as a straight line. The noise lift (`se3_tangent_to_ambient_jacobian`) maps a right tangent perturbation at $R$ into the ambient space ($e_j$ is the $j$-th unit vector):
 
 ```math
 J(R) = \begin{bmatrix} 0 & \big[\mathrm{vec}(R e_1^\wedge)\ \ \mathrm{vec}(R e_2^\wedge)\ \ \mathrm{vec}(R e_3^\wedge)\big] \\ R & 0 \end{bmatrix}
@@ -287,11 +292,11 @@ x^+ = x^- + K (z_{k+1} - H x^-), \qquad
 P^+ = (I - K H) P^-
 ```
 
-$J$ is evaluated at the pre-predict $R$. The lifted $P_0$ has rank 6. After each update, the rotation block is projected back onto $SO(3)$: with $`U`$, $`V`$ from the SVD of $`R^+`$, $`R \leftarrow U\,\mathrm{diag}(1, 1, s)\,V^\top`$, where $`s = \mathrm{sign}\det(U V^\top)`$. $t^+$ and $P^+$ are left unchanged by that projection.
+$J$ is evaluated at the pre-predict $R$. The lifted $P_0$ has rank 6. After each update, the rotation block is projected back onto $SO(3)$: with $`U`$, $`V`$ the SVD factors of $`R^+`$ (this $`V`$ is not $`V(\omega)`$), $`R \leftarrow U\,\mathrm{diag}(1, 1, s)\,V^\top`$, where $`s = \mathrm{sign}\det(U V^\top)`$. $t^+$ and $P^+$ are left unchanged by that projection.
 
 #### Batch Gauss-Newton (`run_batch_gn`)
 
-It optimizes all poses $T_0..T_N$ jointly ($6(N+1)$ unknowns) against three kinds of [factor](../glossary.md#factor) (one error term each): a prior that keeps $T_0$ near the initial guess, a motion factor between each pair of consecutive poses, and a measurement factor for each observed point. $\bar T_0$ is the shared initial guess $T_0^{\text{est}}$. Here $`F`$ is the total cost, and $`e_0, e_k`$ (defined right after) are the prior and motion residuals:
+It optimizes all poses $T_0..T_N$ jointly ($6(N+1)$ unknowns) against three kinds of [factor](../glossary.md#factor) (one error term each): a prior that keeps $T_0$ near the initial guess, a motion factor between each pair of consecutive poses, and a measurement factor for each observed point. $\bar T_0$ is the shared initial guess $T_0^{\text{est}}$. Here $`F`$ is the total cost, and $`e_0, e_k`$ (defined right after) are the prior and motion residuals. $`\lVert e \rVert^2_{\Sigma^{-1}} = e^\top \Sigma^{-1} e`$ is the squared error weighted by the inverse covariance (a squared [Mahalanobis distance](../glossary.md#mahalanobis-distance)):
 
 ```math
 F = \big\| e_0 \big\|^2_{P_0^{-1}} + \sum_{k=1}^{N} \big\| e_k \big\|^2_{Q^{-1}} + \sum_{k=0}^{N} \sum_{i=1}^{M} \frac{\big\| z_{k,i} - T_k p_i \big\|^2}{\sigma_p^2}
@@ -311,7 +316,7 @@ The Jacobians are taken with respect to right perturbations of each pose:
 \frac{\partial (z_{k,i} - T_k p_i)}{\partial T_k} = -\begin{bmatrix} R_k & -R_k p_i^\wedge \end{bmatrix}
 ```
 
-Each iteration solves the damped normal equations, where $`\Omega`$ is the **information matrix** (inverse covariance) weighting each residual ([glossary](../glossary.md#information-matrix)). It then updates every pose with $`T_k \leftarrow T_k\,\mathrm{Exp}(\delta_k)`$ and stops when $\lVert\delta\rVert$ drops below `gn_tol` or after `gn_max_iters`:
+Each iteration solves the damped normal equations below. The sums run over all factors: $J$ is a factor's Jacobian (above), $e$ its residual, and $`\Omega`$ the **information matrix** (inverse covariance) weighting it ([glossary](../glossary.md#information-matrix)). The $10^{-6} I$ term is a small fixed damping that keeps the system solvable. It then updates every pose with $`T_k \leftarrow T_k\,\mathrm{Exp}(\delta_k)`$ and stops when $\lVert\delta\rVert$ drops below `gn_tol` or after `gn_max_iters`:
 
 ```math
 \Big( \sum J^\top \Omega J + 10^{-6} I \Big)\, \delta = -\sum J^\top \Omega\, e
@@ -337,8 +342,8 @@ There is no line search or Levenberg-Marquardt schedule. It starts from the dead
 
 #### Error metrics (`pose_errors`, `rotation_geodesic_error`)
 
-- The **rotation error** is the angle $\theta$ of the relative rotation $`W = R^\top \hat R`$, in degrees. It is computed as $`\mathrm{atan2}(s, c)`$, where $`c = (\mathrm{tr}\,W - 1)/2 = \cos\theta`$ is read off the symmetric part of $W$ and $`s = \tfrac12 \lVert (W - W^\top)^\vee \rVert = \sin\theta`$ off its skew part ($`^\vee`$ is the inverse of the hat map, [glossary](../glossary.md#hat-operator)). Unlike $\arccos(c)$, this stays accurate for tiny angles, down to round-off. The `use_manif` version computes the same angle as $`\lVert \hat R\ \text{rminus}\ R \rVert`$, and manif's $SO(3)$ $\mathrm{Log}$ also uses `atan2`, so the same accuracy holds there.
-- The **position error** is $\lVert t - \hat t \rVert$.
+- The **rotation error** is the angle $\theta$ of the relative rotation $`W = R^\top \hat R`$ between the true rotation $R$ and the estimated one $\hat R$, in degrees. It is computed as $`\mathrm{atan2}(s, c)`$, where $`c = (\mathrm{tr}\,W - 1)/2 = \cos\theta`$ is read off the symmetric part of $W$ and $`s = \tfrac12 \lVert (W - W^\top)^\vee \rVert = \sin\theta`$ off its skew part ($`^\vee`$ is the inverse of the hat map, [glossary](../glossary.md#hat-operator)). Unlike $\arccos(c)$, this stays accurate for tiny angles, down to round-off. The `use_manif` version computes the same angle as $`\lVert \hat R\ \text{rminus}\ R \rVert`$, and manif's $SO(3)$ $\mathrm{Log}$ also uses `atan2`, so the same accuracy holds there.
+- The **position error** is $\lVert t - \hat t \rVert$, with $t$ the true and $\hat t$ the estimated translation.
 
 "Final" is the error in the last pose, whereas "RMSE" ([root-mean-square error](../glossary.md#rmse-root-mean-square-error)) is calculated over all $N+1$ poses, including $k = 0$. At $k = 0$ the five recursive methods (dead reckoning, EKF, IEKF, UKF, vanilla KF) all still sit at the initial guess, so they share the same initial error in their RMSE, while batch GN already re-optimizes $T_0$. Small RMSE gaps between GN and the recursive filters therefore partly reflect this difference at $k = 0$.
 
@@ -356,12 +361,12 @@ Both filters answer the same question - "how far off is my predicted point cloud
 | The 2 cm mismatch reads as | "2 cm east" | "1.4 cm toward the nose and 1.4 cm to its left" ($1.4^2 + 1.4^2 \approx 2^2$) |
 | Residual | $`r_{\text{world}} = z_i - T_{\text{pred}}\cdot p_i`$ | $`r_{\text{body}} = R_{\text{pred}}^\top\, r_{\text{world}}`$ |
 | Sensitivity $H$ (how a pose tweak moves the points) | $`R_{\text{pred}}\left[I \;\; -p_i^\wedge\right]`$ | $`\left[I \;\; -p_i^\wedge\right]`$ |
-| Point noise as seen in these axes | $\sigma^2 I$ | $`R^\top(\sigma^2 I)R = \sigma^2 I`$, the same sphere |
+| Point noise as seen in these axes | $\sigma_p^2 I$ | $`R^\top(\sigma_p^2 I)R = \sigma_p^2 I`$, the same sphere |
 | Pose correction $K r$ | the same | the same |
 
 Converting between them applies the current rotation estimate, a rigid relabeling of axes that preserves lengths. If both the *error* and the *sensitivity* (how a pose tweak moves the points) are converted consistently, the correction we get back is the same: it is the same arrow described in different axes.
 
-The one thing that could break this is measurement noise that "looks different" depending on the direction we face (e.g. a sensor noisier sideways than in depth). Here the noise is **isotropic**, a sphere of uncertainty around each point, and a sphere looks the same however we rotate it. That is the ingredient that makes the two filters land on identical corrections (to round-off) every step: $`R\,(\sigma^2 I)\,R^\top = \sigma^2 I`$ for any rotation $R$.
+The one thing that could break this is measurement noise that "looks different" depending on the direction we face (e.g. a sensor noisier sideways than in depth). Here the noise is **isotropic**, a sphere of uncertainty around each point, and a sphere looks the same however we rotate it. That is the ingredient that makes the two filters land on identical corrections (to round-off) every step: $`R\,(\sigma_p^2 I)\,R^\top = \sigma_p^2 I`$ for any rotation $R$.
 
 ### 2.2 The algebra
 
@@ -389,7 +394,7 @@ K_{\text{world}} &= P\,H_{\text{world}}^\top S_{\text{world}}^{-1} \\
 \end{aligned}
 ```
 
-The step $`R_{\text{big}}\,R_{\text{diag}}\,R_{\text{big}}^\top = R_{\text{diag}}`$ is exactly where isotropy is used - it's the only place the argument could fail. $P$ and $T_{\text{est}}$ then update identically every step, so the two trajectories never diverge. The argument never mentions sigma points or a noise-injection scheme: it is a statement about two *linearizations* of the same model agreeing, which is why it has no counterpart for UKF (§3).
+The step $`R_{\text{big}}\,R_{\text{diag}}\,R_{\text{big}}^\top = R_{\text{diag}}`$ is exactly where isotropy is used - it's the only place the argument could fail. $P$ and the estimate $T^+$ then update identically every step, so the two trajectories never diverge. The argument never mentions sigma points or a noise-injection scheme: it is a statement about two *linearizations* of the same model agreeing, which is why it has no counterpart for UKF (§3).
 
 ### 2.3 Empirical verification
 
@@ -418,8 +423,8 @@ $H_{\text{body}}$ depends only on the object's known geometry, so it is computed
 | UKF | adds $Q_{\text{tangent}}$ directly to the recombined covariance | sigma points sample the *exact* function |
 | They agree when | $J_\tau = I$: true to first order, but $J_\tau$ departs from $I$ by a term of order $`u\,\Delta t`$ | the model is linear; here it is mildly nonlinear, so the term is small but not zero |
 
-1. **Process noise.** In `run_ekf`, $`P_{\text{pred}} = J_{\text{self}}\,P\,J_{\text{self}}^\top + J_\tau\,Q_{\text{tangent}}\,J_\tau^\top`$, where $J_\tau$ is the right Jacobian of $`u\,\Delta t`$ (`se3_right_jacobian(twist * dt)`). `run_ukf` adds $Q_{\text{tangent}}$ by design (see its docstring): the standard "additive-noise UKF" simplification, which spares the sigma points extra dimensions for process noise.
-2. **Curvature.** `observation_model` is nonlinear in the rotation (it composes through the $\exp$ map under the retraction). The UKF rebuilds the **posterior** (post-update) mean and covariance from exact evaluations, which is what lets a UKF beat an EKF when nonlinearity is strong.
+1. **Process noise.** In `run_ekf`, $`P^- = J_{\text{self}}\,P\,J_{\text{self}}^\top + J_\tau\,Q_{\text{tangent}}\,J_\tau^\top`$, where $J_\tau$ is the right Jacobian of $`u\,\Delta t`$ (`se3_right_jacobian(twist * dt)`). `run_ukf` adds $Q_{\text{tangent}}$ by design (see its docstring): the standard "additive-noise UKF" simplification, which spares the sigma points extra dimensions for process noise.
+2. **Curvature.** `observation_model` is nonlinear in the rotation (it composes through the $\mathrm{Exp}$ map under the retraction). The UKF rebuilds the **posterior** (post-update) mean and covariance from exact evaluations, which is what lets a UKF beat an EKF when nonlinearity is strong.
 
 Both effects shrink as the per-step rotation increment shrinks (smaller $\Delta t$, slower true angular rate, or a tighter prior needing a smaller correction) - which is also a testable prediction (§3.4).
 
@@ -486,7 +491,7 @@ Unlike EKF vs. IEKF (§2.4, speed only, zero accuracy difference), UKF's disagre
 `run_vanilla_kf` changes *what the state itself is*, instead of choosing a residual frame (§2) or a linearization strategy (§3):
 
 - **The gain.** Reparameterizing the pose as an ambient $x = [\text{vec}(R) \in \mathbb{R}^9,\ t \in \mathbb{R}^3]$ vector makes the observation model $`\text{pred}_i = R\,p_i + t`$ **exactly linear**: a textbook linear-KF update with a fixed $H$ and no Jacobian in the update.
-- **Stronger than IEKF's fixed $`H`$ (§2.4).** IEKF's $`H_{\text{body}}`$ is still the linearization of a manifold-valued observation model (just a state-independent one); vanilla KF's $H$ is linear in the literal sense, because its state is a plain Euclidean vector.
+- **Stronger than IEKF's fixed $`H`$ (§2.4).** IEKF's $`H_{\text{body}}`$ is still the linearization of a [manifold](../glossary.md#manifold)-valued observation model (just a state-independent one); vanilla KF's $H$ is linear in the literal sense, because its state is a plain Euclidean vector.
 - **Not Jacobian-free overall.** The predict step still builds $J(R)$ and $A$ every step (§4.5).
 - **The costs.** Three costs come bundled with the gain. None is part of textbook linear-KF theory; they are bolted on so a linear KF can handle a manifold-valued quantity at all (§4.2).
 
@@ -499,11 +504,11 @@ Unlike EKF vs. IEKF (§2.4, speed only, zero accuracy difference), UKF's disagre
 | 3. SVD re-projection | after each update, the rotation is pushed back onto $SO(3)$ from outside the KF math | no | large corrections (the first second), as for 2 |
 
 1. **First-order truncation of the mean itself.**
-   - Every other method composes the mean exactly: $`T_{\text{pred}} = T_{\text{prev}}\exp(u\,\Delta t)`$. `vanilla_kf_transition_matrix` builds a matrix that is exact only for the truncation $\exp(\omega^\wedge) \approx I + \omega^\wedge$.
+   - Every other method composes the mean exactly: $`T_{\text{pred}} = T_{\text{prev}}\,\mathrm{Exp}(u\,\Delta t)`$. `vanilla_kf_transition_matrix` builds a matrix that is exact only for the truncation $\mathrm{Exp}(\omega) \approx I + \omega^\wedge$ (here $\omega$ and $v$ are the per-step increments, as in §1.1).
    - The translation step is truncated too: it uses $`t + R\,v`$, while the exact $SE(3)$ increment is $`t + R\,V(\omega)\,v`$ with $V(\omega) = I + \tfrac{1}{2}\omega^\wedge + O(\lVert\omega\rVert^2)$, i.e. it assumes $V(\omega) \approx I$ (§1.1).
    - Unlike §3.2's point 1 (UKF's additive noise, which only affects *covariance* propagation), this is a real, growing error in the point estimate itself, with no counterpart in EKF, IEKF, UKF, or batch GN.
 2. **Ambient (12-dim, redundant) vs. minimal (6-dim tangent) covariance.** $P$ is lifted from the initial $6\times6$ tangent covariance into the 12-dim ambient space via `se3_tangent_to_ambient_jacobian`, and the whole recursion - predict, update, gain - runs in that redundant linear space. This $P$ isn't directly comparable to the other four methods' $6\times6$ tangent covariance (see [minimal vs. ambient parameterization](../glossary.md#minimal-vs-ambient-redundant-parameterization) in the glossary).
-3. **Post-hoc SVD re-projection.** Nothing in a linear KF keeps a 9-vector an orthonormal rotation matrix. After every update, $\text{vec}(R)$ is re-projected onto $SO(3)$ via SVD ($`U\,\text{diag}\big(1, 1, \mathrm{sign}(\det(UV^\top))\big)\,V^\top`$) and fed back into the recursion. This is bolted on from outside, not part of the KF math; EKF/IEKF/UKF never need it because they stay on the manifold ($\exp$/$`\log`$ for EKF/IEKF, retraction for UKF's sigma points).
+3. **Post-hoc SVD re-projection.** Nothing in a linear KF keeps a 9-vector an orthonormal rotation matrix. After every update, $\text{vec}(R)$ is re-projected onto $SO(3)$ via SVD ($`U\,\text{diag}\big(1, 1, \mathrm{sign}(\det(UV^\top))\big)\,V^\top`$) and fed back into the recursion. This is bolted on from outside, not part of the KF math; EKF/IEKF/UKF never need it because they stay on the manifold: every correction is applied as a [retraction](../glossary.md#retraction) $`T\,\mathrm{Exp}(\delta)`$, which always yields a valid pose.
 
 **Measured (§4.4):** after the initial transient the gap shrinks roughly in proportion to $\Delta t$ (mechanism 1 dominates the steady state), while the first-second gap is large and irregular at every $\Delta t$ (mechanisms 2 and 3).
 
@@ -518,7 +523,7 @@ EKF vs UKF: max pos diff = 1.445e-03 m (at k = 1)   final pos diff = 3.8e-06 m  
 EKF vs VKF: max pos diff = 1.349e-02 m (at k = 1)   final pos diff = 1.4e-03 m   max rot diff = 1.4e-01 deg
 ```
 
-- Vanilla KF's maximum is also at the first update, about 9x UKF's.
+- Vanilla KF (VKF in the output) has its maximum at the first update too, about 9x UKF's.
 - The bigger difference is at the end: after convergence UKF agrees with EKF to micrometers, while vanilla KF is still 1.4 mm away, about 45% of the final error.
 - The script's printed "Final/RMS errors" table makes this easy to miss: at default args, EKF's final rot/pos reads `0.289 deg/0.0031 m` against vanilla KF's `0.314 deg/0.0026 m`, which looks like noise at 3-4 decimal places. Vanilla KF happens to land slightly closer to the truth in position at this final pose, but it follows a different trajectory, not the same one with rounding.
 
