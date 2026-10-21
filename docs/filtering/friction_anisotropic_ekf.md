@@ -41,7 +41,7 @@ Heading is exact and noise-free, driven only by a known, constant commanded turn
 
 ## 1. The setup
 
-A unicycle robot drives at a *known* constant commanded forward speed $v_{\text{cmd}}$ and turn rate $\omega_{\text{cmd}}$, so its true path is an exact circular arc (`exact_arc_step`: closed-form and exact for any $dt$, the same "exact propagation, not a linearization" convention as `saltation_matrix_ekf.flow`; §1.1 gives the formulas and the [Jacobian](../glossary.md#jacobian)). $\omega_{\text{cmd}}$ defaults to $\dfrac{2\pi}{T}$ (where $T$ is the run duration), i.e. exactly one full loop over the run, so the heading sweeps through every orientation relative to a fixed reference.
+A unicycle robot drives at a *known* constant commanded forward speed $v_{\text{cmd}}$ and turn rate $\omega_{\text{cmd}}$, so its true path is an exact circular arc (`exact_arc_step`: closed-form and exact for any $dt$, the same "exact propagation, not a linearization" convention as `saltation_matrix_ekf.flow`; §1.1 gives the formulas and the [Jacobian](../glossary.md#ekf-extended-kalman-filter) $F$ of the motion model, the derivative of the predicted state with respect to the previous state). $\omega_{\text{cmd}}$ defaults to $\dfrac{2\pi}{T}$ (where $T$ is the run duration), i.e. exactly one full loop over the run, so the heading sweeps through every orientation relative to a fixed reference.
 
 On top of that exact commanded arc, true position picks up a random slip disturbance each **tick** (one filter time step), drawn in the **pad's own body frame** (low variance along the grip/forward axis, high variance along the slip/lateral axis) and then rotated into world coordinates by the **true** heading at that instant.
 

@@ -48,7 +48,7 @@ This is deliberately a small slice of the real idea.
 
 ## 1. Why this isn't a hybrid-reset problem
 
-Unlike the bouncing point mass in `hybrid_saltation_ekf.md`, nothing here needs a guard, a reset map, or a saltation matrix ([glossary](../glossary.md#hybrid-system-guard-and-reset-map)). Velocity is externally commanded per phase - an ordinary **switched-linear system** (a different linear model in each phase), not a discontinuous *state* jump the filter's covariance has to be linearized through. The interesting question sits on the **measurement** side: does the filter exploit (or misuse) the zero-velocity information the anchor phase provides?
+Unlike the bouncing point mass in `hybrid_saltation_ekf.md`, nothing here needs a guard, a reset map, or a saltation matrix ([glossary](../glossary.md#saltation-matrix)). Velocity is externally commanded per phase - an ordinary **switched-linear system** (a different linear model in each phase), not a discontinuous *state* jump the filter's covariance has to be linearized through. The interesting question sits on the **measurement** side: does the filter exploit (or misuse) the zero-velocity information the anchor phase provides?
 
 State is $x = [p, v]$ (1D). The gait cycle alternates:
 
@@ -101,10 +101,10 @@ x^{+} = x^{-} + K r, \qquad P^{+} = (I - K H)\,P^{-}
 | Position | `measurement_update_position` | noisy position reading | $`\begin{bmatrix} 1 & 0 \end{bmatrix}`$ | $`\sigma_{\text{pos}}^2`$ | every tick |
 | ZUPT | `measurement_update_zupt` | $0$ (pseudo-measurement) | $`\begin{bmatrix} 0 & 1 \end{bmatrix}`$ | $`\sigma_{\text{zupt}}^2`$ | depends on the variant |
 
-ZUPT is a **pseudo-measurement**: no sensor produces that $z = 0$. The filter is simply told "velocity is zero, give or take $\sigma_{\text{zupt}}$", which is only true if the robot really is stationary. The script's defaults are $\sigma_{\text{pos}} = 0.02$ m and $\sigma_{\text{zupt}} = 0.01$ m/s. Because the two measurement noises are independent, running the ZUPT update right after the position update in the same tick gives the same result as one joint update with both rows of $H$ stacked.
+ZUPT is a **pseudo-measurement**: no sensor produces that $z = 0$. The filter is simply told "velocity is zero, give or take $\sigma_{\text{zupt}}$", which is only true if the robot really is stationary. $\sigma_{\text{pos}}$ is the standard deviation of the noise on each position reading (m). The script's defaults are $\sigma_{\text{pos}} = 0.02$ m and $\sigma_{\text{zupt}} = 0.01$ m/s. Because the two measurement noises are independent, running the ZUPT update right after the position update in the same tick gives the same result as one joint update with both rows of $H$ stacked.
 
 #### The ZUPT update, written out
-With $`H = \begin{bmatrix} 0 & 1 \end{bmatrix}`$ everything reduces to scalars. Write the predicted covariance as
+With $`H = \begin{bmatrix} 0 & 1 \end{bmatrix}`$ everything reduces to scalars, with $R_{\text{zupt}} = \sigma_{\text{zupt}}^2$ the ZUPT noise variance. Write the predicted covariance as
 
 ```math
 P^{-} = \begin{bmatrix} P_{pp} & P_{pv} \\ P_{pv} & P_{vv} \end{bmatrix}
@@ -157,7 +157,7 @@ The defaults' $t_{\text{extend}}$ gives 12 cruise and 20 anchor ticks, enough to
 
 The lesson matches the **Zeno**-regime pitfall ([glossary](../glossary.md#zeno-behavior)) in [`hybrid_saltation_ekf.md` §7](hybrid_saltation_ekf.md#7-two-things-worth-knowing-before-reusing-this-pattern): pick simulation parameters with real margin under a hard failure mode, not by trial against the first numbers that come out.
 
-The headline NEES comparison below excludes the ramp ticks themselves (`is_cruise` excludes them, matching `is_anchor`'s own definition). They are a shared transition cost all three variants pay alike, not the phenomenon being measured, the same convention `hybrid_saltation_ekf.md` uses for its shared bounce-tick spike.
+The headline NEES comparison below uses two windows and excludes the ramp ticks themselves: the **anchor window** is the anchor-phase ticks (`is_anchor`), and the **cruise window** is the constant-speed ticks of the extend phase between the two ramps, $t_{\text{ramp}} \le$ time into the phase $< t_{\text{extend}} - t_{\text{ramp}}$ (`is_cruise`). The ramp ticks are a shared transition cost all three variants pay alike, not the phenomenon being measured, the same convention `hybrid_saltation_ekf.md` uses for its shared bounce-tick spike.
 
 ---
 
@@ -253,7 +253,7 @@ Seed 0, 500 trials. A consistent 5-DoF filter averages NEES 5, with a 95% interv
 #### With matched noise, ZARU keeps the heading honest
 Across seeds 0-3, `phase_conditional` has the lowest overall NEES (6.22-6.38) and the lowest heading RMSE (0.159-0.221 rad) of the four policies in every seed. Dropping ZARU (`phase_conditional_zupt_only`) gives NEES 10.19-11.34, and `never` gives 16.79-19.96. Even `phase_conditional` sits slightly above the interval; the next subsection explains why.
 
-The mechanism shows in $`\sigma_\theta`$, the heading's standard deviation. While anchored, the body does not move, so position says nothing about $`\theta`$, and $`\theta`$ drifts on $`\omega`$'s uncertainty unless ZARU pins it. Seed 0, first to last tick of anchor phases 2-4:
+The mechanism shows in $`\sigma_\theta`$, the filter's reported heading standard deviation, $`\sqrt{P_{\theta\theta}}`$ (what its covariance claims, not the actual error spread). While anchored, the body does not move, so position says nothing about $`\theta`$, and $`\theta`$ drifts on $`\omega`$'s uncertainty unless ZARU pins it. Seed 0, first to last tick of anchor phases 2-4:
 
 - Without ZARU (`phase_conditional_zupt_only`), $`\sigma_\theta`$ grows: 0.21 → 0.44, 0.28 → 0.49 and 0.28 → 0.51 rad.
 - With ZARU (`phase_conditional`), it shrinks: 0.11 → 0.08 rad in each of the three phases.

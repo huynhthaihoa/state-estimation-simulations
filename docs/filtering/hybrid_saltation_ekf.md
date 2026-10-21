@@ -214,12 +214,12 @@ $DR$ has no notion of time: it only transforms a state already on the guard, and
 Ball A is nominal; ball B starts 5 cm higher.
 - At impact speed 10.10 m/s, B needs $`0.05/10.10 \approx 4.95`$ ms more to reach the ground (a first-order estimate; the exact delay is 4.94 ms, §3). So B bounces about 4.95 ms late.
 - At the shared clock time, A has already bounced and B has not. The two states are in different "phases".
-- The correction term below fixes exactly this: $`\Delta t \times`$ (how the state moves after the bounce minus how the mapped pre-bounce state was moving).
+- The correction term below fixes exactly this: $`\delta t \times`$ (how the state moves after the bounce minus how the mapped pre-bounce state was moving).
 - In the height slot that gap is $`+5.05 - (-10.10) = 15.15`$ m/s, so the term is about $`15.15 \times 0.00495 \approx 0.075`$ m. It subtracts: the height offset becomes $`0.05 - 0.075 = -0.025`$ m (see §5).
 - The naive $DR$ has no such term. It acts as if both balls bounced at the same instant.
 
 ### A formula that looks right and is right for a different question
-Before deriving the formula this script uses, we record what *doesn't* work here: a natural first guess that is the correct answer to a different, easily-conflated question. Following the same implicit-differentiation idea as below, but stopping short of the flow that continues *after* the reset, gives
+Before deriving the formula this script uses, we record what *doesn't* work here: a natural first guess that is the correct answer to a different, easily-conflated question. Following the same implicit-differentiation idea (the crossing-time sensitivity derived in the next subsection), but stopping short of the flow that continues *after* the reset, gives
 
 $$\Xi_{\text{own-time}}(x^{-}) = DR(x^{-})\left[I - \frac{f(x^{-}) \otimes Dg(x^{-})}{Dg(x^{-}) \cdot f(x^{-})}\right]$$
 
@@ -231,13 +231,15 @@ $$\Xi_{\text{own-time}}(x^{-}) = DR(x^{-})\left[I - \frac{f(x^{-}) \otimes Dg(x^
 `step_hybrid`, like any fixed-timestep filter, compares nominal and perturbed states at the *same external clock time* (the distinction §3 put a number on). With a shared clock, the flow *after* the reset also depends on where exactly the reset landed, and $\Xi_{\text{own-time}}$ has no term for that. Checked against the finite-difference Jacobian of the *actual* fixed-$`\Delta t`$ tick (perturb the state at the tick's start, run the same `flow`/`crossing_time`/`reset_map` steps to the end of the tick, compare to nominal), it is off by a wide margin: $`\max|\Phi_{\text{after}}\,\Xi_{\text{own-time}}\,\Phi_{\text{before}} - J_{\text{numeric}}| \approx 4.4`$ (test scenario: $x_0=(0,0,0.05,0.3,0.2,-2)$, $e=0.6$, $\Delta t=0.05$ s, $g=9.81$).
 
 ### The derivation this script needs
-Consider a one-parameter family of trajectories $x(t; p)$ ($p$ a perturbation parameter, $p=0$ nominal), each governed by $\dot x = f(x)$ until a $p$-dependent crossing time $`t^{*}(p)`$ defined implicitly by $`g\big(x(t^{*}(p); p)\big) = 0`$, where a reset $x^{+} = R(x^{-})$ is applied and the same flow resumes. Fix a later reference time $T$, independent of $p$, and ask for $\frac{d}{dp}\big[x(T;p)\big]$ - what a fixed-tick filter's covariance propagation needs. Let $S(t) = \left.\dfrac{\partial x(t;p)}{\partial p}\right|_{p=0}$.
+Consider a one-parameter family of trajectories $x(t; p)$ ($p$ a perturbation parameter, $p=0$ nominal), each governed by $\dot x = f(x)$ until a $p$-dependent crossing time $`t^{*}(p)`$ defined implicitly by $`g\big(x(t^{*}(p); p)\big) = 0`$, where a reset $x^{+} = R(x^{-})$ is applied and the same flow resumes. Fix a later reference time $T$, independent of $p$, and ask for $\frac{d}{dp}\big[x(T;p)\big]$ - what a fixed-tick filter's covariance propagation needs. Let $S(t) = \left.\dfrac{\partial x(t;p)}{\partial p}\right|_{p=0}$. Here $x_0$ is the nominal state at the start of the interval ($t=0$) and $\delta x_0$ the initial perturbation, $x(0;p) = x_0 + p\,\delta x_0$, so $S(0) = \delta x_0$.
 
-Implicit differentiation of the guard condition gives the same crossing-time sensitivity as before:
+Implicit differentiation of the guard condition gives the crossing-time sensitivity, how far the crossing time shifts per unit of $p$:
 
 ```math
 \frac{dt^{*}}{dp} = -\frac{Dg \cdot S(t^{*})}{Dg \cdot f^{-}(x^{-})}
 ```
+
+In words: the numerator $`Dg \cdot S(t^{*})`$ is how far the perturbed trajectory is from the guard at the nominal crossing time $`t^{*}`$, and the denominator $`Dg \cdot f^{-}`$ is how fast the nominal trajectory approaches the guard, so the ratio is the time needed to close the gap (the minus sign because $Dg \cdot f^{-} < 0$ on descent: a perturbation above the guard crosses later). [§10](#10-a-simpler-related-quantity-worked-by-hand) works it with numbers.
 
 Since $`x(T;p) = \Phi\big(x^{+}(p),\,T-t^{*}(p)\big)`$ (the flow map, run for whatever time remains after the reset), the chain rule gives two contributions: how the post-reset *state* changes, and how the *remaining flow duration* changes as $`t^{*}(p)`$ shifts:
 

@@ -20,20 +20,20 @@ State, with $`R`$ body-to-world rotation, $`v`$ velocity, $`p`$ position (an **e
 X = \begin{bmatrix} R & v & p \\ 0 & 1 & 0 \\ 0 & 0 & 1 \end{bmatrix} \in SE_2(3)
 ```
 
-- **Flow** (between bounces), driven by the gyro $`\omega`$ and accelerometer $`a`$ (body frame) and gravity $`g`$: $`\dot R = R\,\omega^\wedge`$, $`\dot v = R\,a + g`$, $`\dot p = v`$, with $`\omega^\wedge`$ the [hat operator](../glossary.md#hat-operator) applied to $`\omega`$. The true body spins at a constant **body rate** (its angular velocity in the body frame, the true $`\omega`$). In free flight the accelerometer reads zero **specific force** (it measures acceleration minus gravity, so a falling body reads zero), so translation is exactly ballistic.
-- **Guard:** the ground, $`p_z = 0`$, crossed while descending. As a **guard function** this is $`g(X) = p_z`$, which vanishes at the ground, with gradient $`Dg`$. The letter $g$ does double duty, as in [hybrid_saltation_ekf.md §1](hybrid_saltation_ekf.md#1-what-a-hybrid-dynamical-system-is-here): $g(X)$ and $Dg$ are the guard, while a bare $g$ is gravity. The crossing time is the root of a quadratic in closed form (`crossing_time`).
+- **Flow** (between bounces), driven by the gyro $`\omega`$ and accelerometer $`a`$ (body frame) and gravity $`g = (0, 0, -9.81)`$ m/s² (the default): $`\dot R = R\,\omega^\wedge`$, $`\dot v = R\,a + g`$, $`\dot p = v`$, with $`\omega^\wedge`$ the [hat operator](../glossary.md#hat-operator) applied to $`\omega`$. The true body spins at a constant **body rate** (its angular velocity in the body frame, the true $`\omega`$). In free flight the accelerometer reads zero **specific force** (it measures acceleration minus gravity, so a falling body reads zero), so translation is exactly ballistic.
+- **Guard:** the ground, $`p_z = 0`$, crossed while descending. As a **guard function** this is $`g(X) = p_z`$, which vanishes at the ground, with gradient $`Dg`$ (with respect to the state; used in §4). The letter $g$ does double duty, as in [hybrid_saltation_ekf.md §1](hybrid_saltation_ekf.md#1-what-a-hybrid-dynamical-system-is-here): $g(X)$ and $Dg$ are the guard, while a bare $g$ is gravity. The crossing time is the root of a quadratic in closed form (`crossing_time`).
 - **Reset:** $`(R, v, p) \mapsto (R,\, M v,\, p)`$ with $`M = I - (1+e)\,n n^\top`$ and $`n = e_z`$, the vertical unit vector - the normal velocity is reflected and scaled by the **coefficient of restitution** $`e`$, the ratio of rebound speed to impact speed. With the default 0.8, a body hitting the ground at 10 m/s vertically rebounds at 8 m/s. The horizontal velocity, rotation, position and body rate are unchanged (`reset_map`).
 
 Sensors: noisy IMU readings every **tick** (one filter time step, one per 10 ms IMU sample), and every few ticks the body-frame positions of four known [landmarks](../glossary.md#landmark), $`y_i = R^\top (\ell_i - p) + \nu`$, where $`\ell_i`$ is landmark $`i`$'s world position and $`\nu`$ the measurement noise, with [covariance](../glossary.md#covariance) $`N`$ (here $\nu$ is noise, not the innovation it denotes in the [glossary](../glossary.md#innovation-and-kalman-gain)).
 
 ## 2. Why the RIEKF is attractive between bounces
 
-With $`\hat X`$ the filter's estimate, the right-invariant error is $`\eta = \hat X X^{-1}`$, parameterized by $`\xi = \log(\eta) = (\xi_R, \xi_v, \xi_p) \in \mathbb{R}^9`$ (so the truth is $`X = \exp(-\xi)\,\hat X`$; $`\exp`$/$`\log`$ are the group's exponential and logarithm maps, [glossary](../glossary.md#exp-and-log-maps)). This $`\eta`$ is the inverse of the glossary's $`\eta_R = X \hat X^{-1}`$ ([glossary](../glossary.md#invariant-and-equivariant), [left_right_invariant.md](left_right_invariant.md)); both are right-invariant, and this doc follows Barrau & Bonnabel (2017) and Hartley et al. (2020), as does the code. Two exact properties make it the natural filter here (Barrau & Bonnabel 2017; Hartley et al. 2020):
+With $`\hat X`$ the filter's estimate, the **right-invariant error** is $`\eta = \hat X X^{-1}`$ (right-invariant because multiplying both $X$ and $\hat X$ on the right by the same group element $g$ leaves it unchanged, $`(\hat X g)(X g)^{-1} = \hat X X^{-1}`$; full definition in [left_right_invariant.md §1](left_right_invariant.md#1-the-setup)), parameterized by $`\xi = \mathrm{Log}(\eta) = (\xi_R, \xi_v, \xi_p) \in \mathbb{R}^9`$ (so the truth is $`X = \mathrm{Exp}(-\xi)\,\hat X`$; $`\mathrm{Exp}`$/$`\mathrm{Log}`$ are the group's exponential and logarithm maps, [glossary](../glossary.md#exp-and-log-maps)). This $`\eta`$ is the inverse of the glossary's $`\eta_R = X \hat X^{-1}`$ ([glossary](../glossary.md#invariant-and-equivariant), [left_right_invariant.md](left_right_invariant.md)); both are right-invariant, and this doc follows Barrau & Bonnabel (2017) and Hartley et al. (2020), as does the code. Two exact properties make it the natural filter here (Barrau & Bonnabel 2017; Hartley et al. 2020):
 
 **Propagation is trajectory-independent.** IMU kinematics are [group-affine](../glossary.md#group-affine-dynamics-trajectory-independence). Over a tick of length $`h`$ with constant readings, $`X^+ = \Gamma_h\, f_h(X)\, \Upsilon_h`$ (in this section $`^+`$ means one tick later; from §4 on, just after the impact). Here:
 - $`f_h(R,v,p) = (R, v, p + v h)`$ is a **group automorphism**: it respects the group product, $`f_h(X_1 X_2) = f_h(X_1)\,f_h(X_2)`$;
 - $`\Gamma_h = (I, g h, \tfrac12 g h^2)`$ carries gravity;
-- $`\Upsilon_h`$ carries the body-frame IMU increments (`propagate_mean`).
+- $`\Upsilon_h = (\mathrm{Exp}(\omega h),\, a h,\, \tfrac12 a h^2)`$ carries the body-frame IMU increments, so $`R^+ = R\,\mathrm{Exp}(\omega h)`$, $`v^+ = v + g h + R a h`$, $`p^+ = p + v h + \tfrac12 g h^2 + \tfrac12 R a h^2`$ (`propagate_mean`).
 
 The error then evolves as $`\eta^+ = \Gamma_h f_h(\eta) \Gamma_h^{-1}`$, independently of $`X`$, and its logarithm evolves *exactly linearly*, even for large errors:
 
@@ -41,15 +41,15 @@ The error then evolves as $`\eta^+ = \Gamma_h f_h(\eta) \Gamma_h^{-1}`$, indepen
 \xi^+ = \Phi(h)\,\xi, \qquad \Phi(h) = e^{A h}, \qquad A = \begin{bmatrix} 0 & 0 & 0 \\ g^\wedge & 0 & 0 \\ 0 & I & 0 \end{bmatrix}
 ```
 
-$`\Phi(h)`$ is the invariant error's **transition matrix** over one tick, and $`e^{Ah}`$ is the matrix exponential (not the restitution $e$). `propagation_matrix` builds $`\Phi`$; the test `test_invariant_error_propagates_exactly_even_for_large_errors` checks $`\log(\hat X^+ (X^+)^{-1}) = \Phi\,\xi`$ to $`10^{-10}`$ for a finite $`\xi`$. IMU noise enters in the body frame with covariance $`Q_b`$, so it is mapped by the **adjoint** $`\mathrm{Ad}_{\hat X^+}`$ ([glossary](../glossary.md#adjoint)), and the covariance $`P`$ of $`\xi`$ propagates as $`P^+ = \Phi P \Phi^\top + \mathrm{Ad}_{\hat X^+} Q_b \mathrm{Ad}_{\hat X^+}^\top`$.
+$`\Phi(h)`$ is the invariant error's **transition matrix** over one tick, and $`e^{Ah}`$ is the matrix exponential (not the restitution $e$). `propagation_matrix` builds $`\Phi`$; the test `test_invariant_error_propagates_exactly_even_for_large_errors` checks $`\mathrm{Log}(\hat X^+ (X^+)^{-1}) = \Phi\,\xi`$ to $`10^{-10}`$ for a finite $`\xi`$. IMU noise enters in the body frame with covariance $`Q_b`$, a diagonal $`9 \times 9`$ matrix rebuilt for each interval $`h`$ from the gyro and accelerometer noise standard deviations: $`(\text{gyro std} \cdot h)^2`$ for rotation, $`(\text{accel std} \cdot h)^2`$ for velocity and $`(\tfrac12\, \text{accel std} \cdot h^2)^2`$ for position (`body_noise_covariance`). The **adjoint** $`\mathrm{Ad}_{\hat X^+}`$ ([glossary](../glossary.md#adjoint); here $`9 \times 9`$, unlike the glossary's $`6 \times 6`$ SE(3) adjoint) re-expresses it in the frame of $`\xi`$, so the covariance $`P`$ of $`\xi`$ propagates as $`P^+ = \Phi P \Phi^\top + \mathrm{Ad}_{\hat X^+} Q_b \mathrm{Ad}_{\hat X^+}^\top`$.
 
-**The landmark measurement is right-invariant**, i.e. of the form $`X^{-1} b`$ for a known $`b`$, which is what makes its [Jacobian](../glossary.md#jacobian) constant. Written in homogeneous coordinates (the 3-vector padded with extra entries so that the $`5 \times 5`$ matrix $X$ can act on it), $`y_i = X^{-1} b_i`$ with $`b_i = (\ell_i, 0, 1)`$. The [residual](../glossary.md#residual-error) $`r_i = \hat R\,y_i + \hat p - \ell_i`$ then satisfies $`r_i \approx \xi_R^\wedge \ell_i + \xi_p`$, i.e.
+**The landmark measurement is right-invariant**, i.e. of the form $`X^{-1} b`$ for a known $`b`$, which is what makes its [Jacobian](../glossary.md#jacobian) constant. Written in homogeneous coordinates (the 3-vector padded with extra entries so that the $`5 \times 5`$ matrix $X$ can act on it), $`y_i = X^{-1} b_i`$ with $`b_i = (\ell_i, 0, 1)`$. The [residual](../glossary.md#residual-error) $`r_i = \hat R\,y_i + \hat p - \ell_i`$ (the landmark position implied by the estimate and the body-frame measurement, minus the true landmark; zero for a perfect estimate and noise-free measurement) then satisfies $`r_i \approx \xi_R^\wedge \ell_i + \xi_p`$, i.e.
 
 ```math
 H_i = \begin{bmatrix} -\ell_i^\wedge & 0 & I \end{bmatrix}
 ```
 
-This $`H_i`$ is constant, whatever the estimate (`measurement_jacobian_ri`), with noise $`\hat R N \hat R^\top`$. The ordinary world-frame EKF's (the non-invariant baseline of §6) $`H`$ depends on $`\hat R`$ and $`\hat p`$ instead (`measurement_jacobian_world`).
+This $`H_i`$ is constant, whatever the estimate (`measurement_jacobian_ri`), with noise $`\hat R N \hat R^\top`$ (the body-frame measurement noise $`N`$ rotated into the world frame). The ordinary world-frame EKF's (the non-invariant baseline of §6) $`H`$ depends on $`\hat R`$ and $`\hat p`$ instead (`measurement_jacobian_world`).
 
 ## 3. What the bounce breaks
 
@@ -63,7 +63,7 @@ This vanishes for every $`v_2`$ only when $`M R_1 = R_1 M`$, i.e. when $`R_1`$ m
 
 ## 4. The saltation matrix on the group
 
-The saltation matrix has its textbook form in coordinates where the state is a plain vector. Use world-perturbation coordinates around a base state, $`\delta = (\delta\theta, \delta v, \delta p)`$ with $`R' = \mathrm{Exp}(\delta\theta) R`$ ($`\mathrm{Exp}`$ maps a rotation vector to a rotation, [glossary](../glossary.md#exp-and-log-maps)), $`v' = v + \delta v`$, $`p' = p + \delta p`$. There the vector field is $`f = (R\omega,\; R a + g,\; v)`$, the guard gradient $`Dg`$ picks $`\delta p_z`$, the reset Jacobian is $`DR = \mathrm{blockdiag}(I, M, I)`$ (the block-diagonal matrix with those blocks; $`DR`$ is the derivative of the reset map, not a rotation), and, with $`f^-`$ and $`f^+`$ the vector field just before and just after the impact and $\otimes$ the outer product (Kong et al. 2024, Def. 2, time-invariant guard and reset):
+The saltation matrix has its textbook form in coordinates where the state is a plain vector. Use world-perturbation coordinates around a base state, $`\delta = (\delta\theta, \delta v, \delta p)`$ with $`R' = \mathrm{Exp}(\delta\theta) R`$ ($`\mathrm{Exp}`$ maps a rotation vector to a rotation, [glossary](../glossary.md#exp-and-log-maps)), $`v' = v + \delta v`$, $`p' = p + \delta p`$. There the vector field (not the automorphism $`f_h`$ of §2) is $`f = (R\omega,\; R a + g,\; v)`$, the guard gradient $`Dg`$ picks $`\delta p_z`$, the reset Jacobian is $`DR = \mathrm{blockdiag}(I, M, I)`$ (the block-diagonal matrix with those blocks; $`DR`$ is the derivative of the reset map, not a rotation), and, with $`f^-`$ and $`f^+`$ the vector field just before and just after the impact and $\otimes$ the outer product (Kong et al. 2024, Def. 2, time-invariant guard and reset):
 
 ```math
 \Xi_{\text{world}} = DR + \frac{\left(f^+ - DR\, f^-\right) \otimes Dg}{Dg \cdot f^-}
@@ -78,7 +78,7 @@ Across the reset, only the position-rate component of $`f`$ changes directly ($`
 
 $`DR`$ alone would keep +1 cm. In the fraction, $`Dg \cdot \delta \,/\, Dg \cdot f^-`$ turns the state error into that shift of the impact time, and $`f^+ - DR\,f^-`$ (how the motion differs just after versus just before the bounce) turns the time shift back into a state error. This timing error is *caused by the state*. §7's **timing term** handles an error in the *detected* impact time.
 
-To move between the two coordinate systems: a right-invariant perturbation $`X' = \exp(\xi) X`$ has, to first order, $`\delta\theta = \xi_R`$, $`\delta v = \xi_v - v^\wedge \xi_R`$, $`\delta p = \xi_p - p^\wedge \xi_R`$, i.e. $`\delta = T(X)\,\xi`$ with
+To move between the two coordinate systems: a right-invariant perturbation $`X' = \mathrm{Exp}(\xi) X`$ has, to first order, $`\delta\theta = \xi_R`$, $`\delta v = \xi_v - v^\wedge \xi_R`$, $`\delta p = \xi_p - p^\wedge \xi_R`$, i.e. $`\delta = T(X)\,\xi`$ with
 
 ```math
 T(X) = \begin{bmatrix} I & 0 & 0 \\ -v^\wedge & I & 0 \\ -p^\wedge & 0 & I \end{bmatrix}
@@ -90,7 +90,7 @@ T(X) = \begin{bmatrix} I & 0 & 0 \\ -v^\wedge & I & 0 \\ -p^\wedge & 0 & I \end{
 \Xi_{RI} = T(X^+)^{-1}\,\Xi_{\text{world}}\,T(X^-)
 ```
 
-(`saltation_matrix_ri`). The two $`T`$ factors do not cancel. Even for the reset Jacobian alone, $`T(X^+)^{-1} DR\, T(X^-)`$ differs from the shortcut $`\mathrm{blockdiag}(I, M, I)`$ in one block: the velocity error picks up $`\big((M v^-)^\wedge - M\,(v^-)^\wedge\big)\,\xi_R`$. That term depends on the impact velocity: its largest entries are $`(1+e)\,|v_z^-|`$, 12.6 for a 7 m/s vertical impact speed. It is nonzero even when the velocity is purely vertical. This is the state dependence of §3, made explicit.
+(`saltation_matrix_ri`; the subscript $`RI`$ is right-invariant, the coordinates $`\xi`$ of §2). The two $`T`$ factors do not cancel. Even for the reset Jacobian alone, $`T(X^+)^{-1} DR\, T(X^-)`$ differs from the shortcut $`\mathrm{blockdiag}(I, M, I)`$ in one block: the velocity error picks up $`\big((M v^-)^\wedge - M\,(v^-)^\wedge\big)\,\xi_R`$. That term depends on the impact velocity: its largest entries are $`(1+e)\,|v_z^-|`$, 12.6 for a 7 m/s vertical impact speed. It is nonzero even when the velocity is purely vertical. This is the state dependence of §3, made explicit.
 
 Three bounce treatments are compared in the RIEKF, identical in everything else:
 
@@ -104,7 +104,7 @@ The invariant-naive choice is the tempting one: it applies the reset to $`\xi_v`
 
 ## 5. Verification against the exact hybrid map
 
-The ground truth for "the right Jacobian" is the exact **fixed-time hybrid map**: start above the ground, flow to the crossing, reset, flow to a fixed later time $`T`$ (a time, not the map $`T(X)`$ of §4), with every perturbed trajectory using the same IMU inputs. Call this map $`\Psi`$. Its Jacobian in invariant coordinates, by central finite differences of $`\log(\Psi(\exp(\xi) X_0)\,\Psi(X_0)^{-1})`$, is compared with $`\Phi(T - \tau)\, \Xi\, \Phi(\tau)`$, where $`\tau`$ is the crossing time and $`\Xi`$ each treatment's bounce matrix (`test_saltation_matrix_ri_matches_finite_differences`, three random seeds):
+The ground truth for "the right Jacobian" is the exact **fixed-time hybrid map**: start above the ground, flow to the crossing, reset, flow to a fixed later time $`T`$ (a time, not the map $`T(X)`$ of §4), with every perturbed trajectory using the same IMU inputs. Call this map $`\Psi`$. Its Jacobian in invariant coordinates, by central finite differences of $`\mathrm{Log}(\Psi(\mathrm{Exp}(\xi) X_0)\,\Psi(X_0)^{-1})`$, is compared with $`\Phi(T - \tau)\, \Xi\, \Phi(\tau)`$, where $`\tau`$ is the crossing time and $`\Xi`$ each treatment's bounce matrix (`test_saltation_matrix_ri_matches_finite_differences`, three random seeds):
 
 | Treatment | max abs. difference from finite differences |
 |---|---|

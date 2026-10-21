@@ -46,7 +46,7 @@ The UKF says:
 
 > "I don't want to calculate Jacobians. I'll pick a few carefully chosen points around my estimate and see how the nonlinear function transforms them."
 
-These points are called **sigma points**. They aren't random samples: for an $n$-dimensional state there are $2n+1$ of them, placed deterministically at the mean and at $\pm$ the columns of a matrix square root of $`(n+\lambda)P`$ (this repo uses the Cholesky factor). Here $`P`$ is the state covariance ([glossary](../glossary.md#covariance)). $`\lambda`$ is the UKF scaling parameter, not the LM damping $\lambda$ of the [glossary](../glossary.md#levenberg-marquardt-lm-and-damping).
+These points are called **sigma points**. They aren't random samples: for an $n$-dimensional state there are $2n+1$ of them, placed deterministically at the mean and at $\pm$ the columns of a matrix square root of $`(n+\lambda)P`$ (this repo uses the Cholesky factor). Here $`P`$ is the state covariance ([glossary](../glossary.md#covariance)). $`\lambda`$ is the UKF scaling parameter: $`n+\lambda`$ sets how far the sigma points sit from the mean (larger = further out). This repo's defaults ($`\alpha=1`$, $`\kappa=-3`$, $`n=6`$) give $`\lambda=-3`$ and $`n+\lambda=3`$. It is not the LM damping $\lambda$ of the [glossary](../glossary.md#levenberg-marquardt-lm-and-damping).
 
 Picture the uncertainty as an ellipse:
 
@@ -60,7 +60,7 @@ Picture the uncertainty as an ellipse:
               •
 ```
 
-Instead of approximating the nonlinear function with a tangent line like the EKF, the UKF sends these representative points through the actual nonlinear function, then reconstructs the new mean and covariance:
+Instead of approximating the nonlinear function with a tangent line like the EKF, the UKF sends these representative points through the actual nonlinear function, then reconstructs the new mean and covariance as fixed-weight sums over the transformed points (weights from `unscented_weights`; the centre point's mean weight can be negative, $`-1`$ at this repo's defaults, see the [empirical note](pointcloud_pose_tracking_empirical_note.md#ukf-run_ukf-with-unscented_weights-and-unscented_sigma_offsets-from-utilspy)):
 
 ```text
      uncertainty          nonlinear transformation
@@ -80,13 +80,13 @@ Instead of approximating the nonlinear function with a tangent line like the EKF
 
 The cost: it evaluates the model $2n+1$ times per step instead of once, which adds up for high-dimensional states.
 
-See `run_ukf` in [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/pointcloud_pose_tracking.py)/[`use_manif/pointcloud_pose_tracking.py`](../../use_manif/pointcloud_pose_tracking.py) for a runnable manifold-UKF implementation of this idea.
+See `run_ukf` in [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/pointcloud_pose_tracking.py)/[`use_manif/pointcloud_pose_tracking.py`](../../use_manif/pointcloud_pose_tracking.py) for a runnable manifold-UKF implementation of this idea. It forms each sigma point as $`T\,\mathrm{Exp}(\text{offset})`$ and measures the spread of the transformed points with $`\mathrm{Log}`$ relative to the central point. $`\mathrm{Exp}`$ turns a small tangent vector (a small motion) into a pose and $`\mathrm{Log}`$ is its inverse ([glossary](../glossary.md#exp-and-log-maps)).
 
 ### Unscented vs. Extended
 
 | | EKF | UKF |
 | --- | --- | --- |
-| Handles the nonlinearity by | linearizing with a Jacobian (the tangent line) | pushing sigma points through the exact function (statistical linearization) |
+| Handles the nonlinearity by | linearizing with a Jacobian (the tangent line) | pushing sigma points through the exact function (statistical linearization: a straight line fitted, by weighted least squares, through where the sigma points land, instead of the derivative at one point) |
 | Jacobians | required | not needed |
 | Computational cost | lower | higher |
 | Easy for complicated models | sometimes difficult | often easier |
@@ -104,14 +104,14 @@ An ESKF doesn't estimate the entire state directly. It separates a **nominal sta
 
 $$R = \hat R \exp(\delta\theta^\wedge)$$
 
-- Nominal state: $`\hat X = (\hat R,\hat p,\hat v,\hat b_g,\hat b_a)`$ (rotation, position, velocity, gyroscope bias, accelerometer bias; [glossary](../glossary.md#bias))
+- Nominal state: $`\hat x = (\hat R,\hat p,\hat v,\hat b_g,\hat b_a)`$ (rotation, position, velocity, gyroscope bias, accelerometer bias; [glossary](../glossary.md#bias))
 - Error state, on which the EKF mainly operates: $`\delta x = (\delta\theta,\delta p,\delta v,\delta b_g,\delta b_a)`$
 
 Each cycle has three steps:
 
 1. **Predict:** integrate the nominal state with the full nonlinear model (for example raw [IMU](../glossary.md#imu-inertial-measurement-unit) (inertial measurement unit) samples), and propagate the error covariance $P$ with the linearized error dynamics.
 2. **Update:** a measurement produces an estimate of $\delta x$ through a normal EKF update.
-3. **Inject and reset:** fold $\delta x$ into the nominal state (for rotation, $`\hat R \leftarrow \hat R\exp(\delta\theta^\wedge)`$), then set $\delta x = 0$.
+3. **Inject and reset:** fold $\delta x$ into the nominal state (for rotation, $`\hat R \leftarrow \hat R\,\mathrm{Exp}(\delta\theta)`$, where $`\mathrm{Exp}`$ turns the rotation vector $`\delta\theta`$ (axis × angle, in rad) into the rotation matrix $`\exp(\delta\theta^\wedge)`$), then set $\delta x = 0$.
 
 **Intuition:**
 - Think of a big map (the nominal state) plus a small sticky note (the error state) with the current correction.
@@ -129,7 +129,7 @@ The **MSCKF** (Multi-State Constraint Kalman Filter; Mourikis & Roumeliotis 2007
 
 ### ESKF vs IEKF
 
-They aren't competing alternatives: the IEKF *is* an error-state filter. In fact the ESKF rotation error above, $`\delta\theta = \log(\hat R^{-1}R)`$, already *is* the left-invariant error (for the rotation only; position, velocity and biases stay additive, and that is where the estimate-dependence enters). With $`X`$ and $`\hat X`$ the true and estimated states as group elements, the left-invariant error is $`\eta = \hat X^{-1}X`$ and the right-invariant one is $`X\hat X^{-1}`$. What the IEKF adds is:
+They aren't competing alternatives: the IEKF *is* an error-state filter. In fact the ESKF rotation error above, $`\delta\theta = \mathrm{Log}(\hat R^{-1}R)`$, already *is* the left-invariant error (for the rotation only; position, velocity and biases stay additive, and that is where the estimate-dependence enters). With $`X`$ and $`\hat X`$ the true and estimated states as group elements, the left-invariant error is $`\eta = \hat X^{-1}X`$ and the right-invariant one is $`X\hat X^{-1}`$ (each expresses the truth relative to the estimate; "invariant" means it is unchanged when the same group element is applied to both $`X`$ and $`\hat X`$, see [left_right_invariant.md §1](left_right_invariant.md#1-the-setup)). What the IEKF adds is:
 
 - **Estimate-independent error dynamics.** For **group-affine** dynamics ([glossary](../glossary.md#group-affine-dynamics-trajectory-independence), [lie_algebra.md §11.1](../foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity)) and suitable invariant measurements, the error dynamics and their Jacobians don't depend on the current estimate. This can fail, for example with IMU biases in the state.
 - **Left vs right choice.** We pick the invariant error that matches the measurement.
@@ -146,7 +146,7 @@ The key idea:
 
 > **Exploit the symmetry and Lie-group structure of the system.**
 
-We treat $`R \in SO(3)`$ and $`T \in SE(3)`$ as group elements rather than as ordinary vectors. There are two formulations, using a left-invariant or a right-invariant error. For group-affine systems, both give error dynamics that are independent of the current state, which ordinary EKF linearizations don't. See [left_right_invariant.md](left_right_invariant.md) for what distinguishes the two and when to reach for each.
+We treat $`R \in SO(3)`$ and $`T \in SE(3)`$ as group elements rather than as ordinary vectors. There are two formulations, using a left-invariant or a right-invariant error (the two $`\eta`$ of §2). For group-affine systems, both give error dynamics that are independent of the current state, which ordinary EKF linearizations don't. See [left_right_invariant.md](left_right_invariant.md) for what distinguishes the two and when to reach for each.
 
 Particularly relevant to IMU navigation, VIO, SLAM, robotics and pose estimation.
 

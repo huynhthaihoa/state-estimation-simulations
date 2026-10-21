@@ -8,7 +8,7 @@ The three filters differ in **what kind of system they assume** and **how they d
 
 This builds directly on:
 - **Lie groups and $`SO(3)`$/$`SE(3)`$** from [lie_algebra.md](../foundations/lie_algebra.md) - the geometric structure §3-§5's IEKF discussion is built around.
-- The **right Jacobian/exp map** from [jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space) - the $\exp(\delta\theta^\wedge)$ notation used in §5.
+- The **exponential map** from [lie_algebra.md §8](../foundations/lie_algebra.md#8-the-exponential-map) - the $\exp(\delta\theta^\wedge)$ / $\mathrm{Exp}$ notation used in §5.
 
 ---
 
@@ -75,7 +75,7 @@ This repo's own `run_vanilla_kf` (same point-cloud pose-tracking benchmark refer
 
 ## 2. Extended Kalman Filter: "The world is nonlinear, so I'll approximate it locally"
 
-Now say our robot is moving, with state $s = [p_x, p_y, \theta]$ ($\theta$ is its orientation), speed $v$ (here $`v`$ is a scalar speed, not the measurement noise $`v`$ of §1) and turn rate $\omega$. A unicycle moves like this:
+Now say our robot is moving, with state $x = [p_x, p_y, \theta]$ ($\theta$ is its orientation), speed $v$ (here $`v`$ is a scalar speed, not the measurement noise $`v`$ of §1) and turn rate $\omega$. A unicycle moves like this:
 
 ```math
 p_{x,k+1} = p_{x,k} + v\cos\theta_k\,\Delta t \qquad p_{y,k+1} = p_{y,k} + v\sin\theta_k\,\Delta t \qquad \theta_{k+1} = \theta_k + \omega\,\Delta t
@@ -86,7 +86,7 @@ This is **nonlinear** because of $\cos\theta$ and $\sin\theta$, so a standard KF
 The EKF's idea: pretend the system is linear **around the current estimate**, using a **[Jacobian](../glossary.md#jacobian)** (the matrix of first derivatives: how much each output moves when each input is nudged) to approximate the function locally. For the unicycle, the Jacobian (evaluated at $\hat\theta_k$) is:
 
 ```math
-F_k = \frac{\partial f}{\partial s} = \begin{bmatrix} 1 & 0 & -v\sin\hat\theta_k\,\Delta t \\ 0 & 1 & v\cos\hat\theta_k\,\Delta t \\ 0 & 0 & 1 \end{bmatrix}
+F_k = \frac{\partial f}{\partial x} = \begin{bmatrix} 1 & 0 & -v\sin\hat\theta_k\,\Delta t \\ 0 & 1 & v\cos\hat\theta_k\,\Delta t \\ 0 & 0 & 1 \end{bmatrix}
 ```
 
 Think of a curved road: we don't need to understand the whole curve, only to approximate it around where we currently are. The figure takes one piece of the unicycle model, $\cos\theta$, and replaces it by its tangent at the estimate $\hat\theta = 30°$:
@@ -169,18 +169,18 @@ The IEKF is **not simply "EKF but more accurate"** (§7). It is a different way 
 Say our **estimated orientation** is $\hat R$ and the **true orientation** is $R$.
 
 - **Ordinary EKF thinking:** the error might be ${R-\hat R}$, but subtraction doesn't naturally make sense for rotations. EKF implementations often represent the rotation with Euler angles or a local perturbation and then linearize.
-- **Manifold-error thinking:** ask "what rotation would transform my estimate into the true rotation?" - "my estimate is here; what small motion on the rotation manifold takes me to the truth?" For example:
+- **Manifold-error thinking:** ask "what rotation would transform my estimate into the true rotation?" - "my estimate is here; what small motion on the rotation [manifold](../glossary.md#manifold) takes me to the truth?" For example:
 
 $$R = \hat R \exp(\delta\theta^\wedge)$$
 
-where $\delta\theta$ is a **small rotation error** and $`(\cdot)^\wedge`$ turns a 3-vector into its skew-symmetric matrix ([hat operator](../glossary.md#hat-operator)). This is a much more natural geometric representation for robot motion.
+where $\delta\theta$ is a **small rotation error** and $`(\cdot)^\wedge`$ turns a 3-vector into its skew-symmetric matrix ([hat operator](../glossary.md#hat-operator)). This is a much more natural geometric representation for robot motion. $\exp$ turns that small rotation vector (via its skew matrix) into an actual rotation matrix; $\mathrm{Exp}$ is the same map written directly on the vector, $`\mathrm{Exp}(\delta\theta) = \exp(\delta\theta^\wedge)`$, and on a 6-vector pose motion (translation first, then rotation) it gives a pose.
 
 ### Tiny example (toy case: planar, rotation about $`z`$ only)
 - Estimate 30°, truth 32°. The error is $`\delta\theta = (0,0,2^\circ)`$, one small 3-vector.
 - In this planar case, left and right errors coincide. They differ only for rotations about different axes.
 
 ### A caveat
-$R = \hat R \exp(\delta\theta^\wedge)$ instead of $R - \hat R$ is, by itself, just a **manifold** (**multiplicative**) error representation - it is not automatically "invariant." The three ways to define the error:
+$R = \hat R \exp(\delta\theta^\wedge)$ instead of $R - \hat R$ is, by itself, just a **manifold** (**multiplicative**) error representation - it is not automatically "invariant." The three ways to define the error are in the table below. Its last column uses two terms. The **linearized error dynamics** are how the error evolves from one step to the next, to first order: the transition matrix $F$ that grows $P$ in $P^- = FPF^\top + Q$. An **invariant-form measurement** is one of the form $Xb$ (a known body point, read in the world frame) or $X^{-1}d$ (a known world point, read in the body frame); see the table in [left_right_invariant.md §4](left_right_invariant.md#4-why-it-actually-matters-not-just-bookkeeping).
 
 | Error | Formula | Used by | Do the linearized error dynamics depend on the estimate? |
 | --- | --- | --- | --- |
@@ -189,30 +189,30 @@ $R = \hat R \exp(\delta\theta^\wedge)$ instead of $R - \hat R$ is, by itself, ju
 | **Invariant** | $`\eta = \hat X^{-1}X`$ (left) or $`X\hat X^{-1}`$ (right) | IEKF | **no**, for group-affine dynamics with invariant-form measurements |
 
 - Widely-used filters ([ESKF](../glossary.md#eskf-error-state-kalman-filter) (error-state KF), MEKF, the error-state formulations behind most VIO (visual-inertial odometry: camera + IMU) pipelines) already define their error this way without being IEKFs.
-- What earns the name **invariant** is a further choice: building the error from the group action itself (left- or right-invariant).
-- For [group-affine](../glossary.md#group-affine-dynamics-trajectory-independence) dynamics (IMU kinematics are the standard example) with invariant-form measurements, this makes the **linearized error dynamics** independent of the current state estimate. That property, not the exp/log notation, is what addresses the consistency problem from §2.
+- What earns the name **invariant** is a further choice: building the error from the **group action** itself (applying a pose to a point, $X\cdot b = Rb + t$), left- or right-invariant.
+- For [group-affine](../glossary.md#group-affine-dynamics-trajectory-independence) dynamics (roughly: motion that respects the group's composition rule; IMU kinematics are the standard example) with invariant-form measurements, this makes the **linearized error dynamics** independent of the current state estimate. That property, not the exp/log notation, is what addresses the consistency problem from §2.
 
 ### EKF vs. IEKF, equations side by side
 
 §2 wrote the EKF's predict/update cycle for a vector state. Here we write both filters' equations on the concrete example §1 and §7 use: tracking a pose $T\in SE(3)$ against a known point cloud (`run_ekf`/`run_iekf` in [pointcloud_pose_tracking.py](../../use_numpy/pointcloud_pose_tracking.py)). The point is to see the *one* line where EKF and IEKF diverge, since every other line is identical.
 
 #### Shared setup
-- **State:** a pose $T$ (rotation $R$, translation $t$), not a vector, with a 6×6 covariance $P$ over its [tangent space](../glossary.md#lie-algebra-and-tangent-space).
-- **Motion model:** $`T_k = T_{k-1}\exp(u_{k-1}\Delta t)`$. The object moves by a [twist](../glossary.md#twist) $`u = [v, \omega]`$ (linear and angular velocity in its own body frame) for $\Delta t$.
+- **State:** a pose $T$ (rotation $R$, translation $t$), not a vector. $T$ is the pose $X$ of §2-§3, with the position written $t$ instead of $p$ ($p_i$ below denotes cloud points). $P$ is the 6×6 covariance of the error $\xi$ in $`T = \hat T\,\mathrm{Exp}(\xi)`$, a 6-vector in the [tangent space](../glossary.md#lie-algebra-and-tangent-space) (translation first, then rotation).
+- **Motion model:** $`T_k = T_{k-1}\mathrm{Exp}(u_{k-1}\Delta t)`$. The object moves by a [twist](../glossary.md#twist) $`u = [v, \omega]`$ (linear and angular velocity in its own body frame) for $\Delta t$.
 - **Observation model:** a point cloud $`\{p_i\}`$ known in the object's own body frame is observed as noisy world-frame points $`z_i = R\,p_i + t + \text{noise}`$.
 
 #### Predict - identical for both filters
 The mean is composed with the group operation (not addition), which is *exact* here:
 
 ```math
-\hat T_k^- = \hat T_{k-1}\exp(u_{k-1}\Delta t) \qquad P_k^- = J_{\text{self}}\,P_{k-1}\,J_{\text{self}}^\top + J_\tau\,Q\,J_\tau^\top
+\hat T_k^- = \hat T_{k-1}\mathrm{Exp}(u_{k-1}\Delta t) \qquad P_k^- = J_{\text{self}}\,P_{k-1}\,J_{\text{self}}^\top + J_\tau\,Q\,J_\tau^\top
 ```
 
-- $`J_{\text{self}} = \mathrm{Ad}_{\exp(-u_{k-1}\Delta t)}`$ (`se3_adjoint`; $`\mathrm{Ad}`$ is the **adjoint**, [glossary](../glossary.md#adjoint)) is exact for this composition.
-- $J_\tau = J_r(u_{k-1}\Delta t)$ (`se3_right_jacobian`), the [right Jacobian](../glossary.md#right-and-left-jacobians) of $\exp$, is a first-order (in the twist noise) linearization.
+- $`J_{\text{self}} = \mathrm{Ad}_{\mathrm{Exp}(-u_{k-1}\Delta t)}`$ (`se3_adjoint`; $`\mathrm{Ad}`$ is the **adjoint**, [glossary](../glossary.md#adjoint)) is the 6×6 derivative of the predicted pose with respect to the previous pose's error: it carries $P$ forward. It is exact for this composition.
+- $J_\tau = J_r(u_{k-1}\Delta t)$ (`se3_right_jacobian`), the [right Jacobian](../glossary.md#right-and-left-jacobians) of $\mathrm{Exp}$, is the 6×6 derivative of the predicted pose with respect to the per-step increment $\tau = u_{k-1}\Delta t$: it carries the twist noise $Q$ into the pose. It is a first-order (in the twist noise) linearization.
 - $`Q = \Delta t^2\,\mathrm{diag}(\sigma_v^2 I_3, \sigma_\omega^2 I_3)`$ is the covariance of the twist increment $u\Delta t$, where $`\sigma_v`$ and $`\sigma_\omega`$ are the standard deviations of the linear and angular velocity noise.
 
-The full per-function math, including the UKF, vanilla KF and batch GN, is in [pointcloud_pose_tracking_empirical_note.md §1.1](pointcloud_pose_tracking_empirical_note.md#11-the-filter-math-concretely).
+The Jacobians' Lie-group details (the motion-model table) and the full per-function math, including the UKF, vanilla KF and batch GN, are in [pointcloud_pose_tracking_empirical_note.md §1.1](pointcloud_pose_tracking_empirical_note.md#11-the-filter-math-concretely).
 
 #### Update - this is where they diverge
 Here $`R_{\text{pred}}`$ and $`t_{\text{pred}}`$ are the rotation and translation of the predicted pose $`\hat T_k^-`$.
@@ -223,10 +223,12 @@ Here $`R_{\text{pred}}`$ and $`t_{\text{pred}}`$ are the rotation and translatio
 | Jacobian $H_i$ | $`\left[R_{\text{pred}} \;\; -R_{\text{pred}}\,p_i^\wedge\right]`$ | $`\left[I \;\; -p_i^\wedge\right]`$ |
 | Depends on current estimate? | Yes - $R_{\text{pred}}$ appears in $H$ itself | **No** - only the fixed, known $p_i$ appears |
 
-Both then use the same gain, covariance and pose-update formulas (each with its own $H$ and $r_k$), with $`R_{\text{diag}} = \sigma^2 I`$ the point-noise covariance (named as in the code and the [empirical note](pointcloud_pose_tracking_empirical_note.md); plain $R$ already means rotation in this section):
+Here $M$ is the number of cloud points and $H_i$ is the 3×6 derivative of point $i$'s predicted position (world frame for the EKF, body frame for the IEKF) with respect to $\xi$. $H$ stacks the $M$ blocks ($3M\times6$), $r_k$ stacks the residuals ($3M$ entries) and the correction $K_k r_k$ is a 6-vector.
+
+Both then use the same gain, covariance and pose-update formulas (each with its own $H$ and $r_k$), with $`R_{\text{diag}} = \sigma_p^2 I`$ the point-noise covariance ($`\sigma_p`$ is the point-noise standard deviation in m, 0.03 m by default; named as in the code and the [empirical note](pointcloud_pose_tracking_empirical_note.md); plain $R$ already means rotation in this section):
 
 ```math
-K_k = P_k^-H^\top(HP_k^-H^\top+R_{\text{diag}})^{-1} \qquad \hat T_k = \hat T_k^-\exp(K_k r_k) \qquad P_k = (I-K_kH)P_k^-
+K_k = P_k^-H^\top(HP_k^-H^\top+R_{\text{diag}})^{-1} \qquad \hat T_k = \hat T_k^-\mathrm{Exp}(K_k r_k) \qquad P_k = (I-K_kH)P_k^-
 ```
 
 #### What this example does and doesn't show
@@ -242,7 +244,7 @@ K_k = P_k^-H^\top(HP_k^-H^\top+R_{\text{diag}})^{-1} \qquad \hat T_k = \hat T_k^
 > ```
 
 This benchmark's `run_ekf` is also not the kind of EKF §2 warns about:
-- It already uses the same error as the IEKF, $T = \hat T\exp(\xi)$ (where $`\xi`$ is the 6-vector tangent-space error, [glossary](../glossary.md#lie-algebra-and-tangent-space)), which is why the two share a predict step whose Jacobians depend only on the input $u$, not on the estimate.
+- It already uses the same error as the IEKF, $`T = \hat T\,\mathrm{Exp}(\xi)`$ (with $`\xi`$ as defined in the shared setup), which is why the two share a predict step whose Jacobians depend only on the input $u$, not on the estimate.
 - Its world-frame $H$ is the body-frame $H$ with each point's rows rotated by $R_{\text{pred}}$: the same information in another frame, so the estimate-dependence is harmless, as the exact equivalence confirms.
 - §2's failure mode needs an error defined additively on a vector parametrization (classic EKF-SLAM, with $[x, y, \theta]$ and landmark positions in one flat vector), so that relinearizing at a drifting estimate changes which directions look observable.
 
@@ -260,7 +262,7 @@ Consider a robot state $X = (R, p, v, b_g, b_a)$, where:
 - $b_g$: gyroscope bias
 - $b_a$: accelerometer bias
 
-An ordinary EKF has to repeatedly calculate Jacobians around the current estimate. But the system has **geometric symmetries**: changing the **global reference frame** shouldn't change the **robot's physical behavior**. The IEKF constructs the **estimation error** so that these symmetries are handled naturally. For dynamics with the right structure (**group-affine**, which covers IMU-driven orientation, velocity and position) and invariant-form measurements, this buys three things:
+An ordinary EKF has to repeatedly calculate Jacobians around the current estimate. But the system has **geometric symmetries**: changing the **global reference frame** shouldn't change the **robot's physical behavior**. The IEKF constructs the **estimation error** so that these symmetries are handled naturally. For dynamics with the right structure (**group-affine**, §5, which covers IMU-driven orientation, velocity and position) and invariant-form measurements, this buys three things:
 
 - the linearized error dynamics don't depend on the current estimate, so a bad estimate doesn't distort the propagated covariance;
 - directions no sensor can observe (such as global yaw and position) stay unobservable in the filter, which is what keeps it consistent;
@@ -313,7 +315,7 @@ KF, EKF, and IEKF aren't the whole landscape. A few others come up constantly in
 | **ESKF** | a nominal state plus a small error state kept near zero | only a near-zero error is linearized; rotations become small rotations | the error estimate must be folded into the nominal state and reset after every update | [extra_kf_variants.md §2](extra_kf_variants.md#2-error-state-kalman-filter-eskf) |
 | **MSCKF** | keep past camera poses, not landmarks; use each landmark once, then discard it | state size no longer grows with the number of landmarks | covariance cost grows as the cube of the window of poses | - |
 | **Iterated EKF** | relinearize the measurement at the updated estimate and repeat (Gauss-Newton inside one update) | linearization error for very nonlinear or very informative measurements | several update passes per step | - |
-| **EqF** | the invariant idea for any symmetry, not just matrix Lie groups | systems whose state is not a Lie group but is acted on by one | the system's symmetry (group action) must be found first | - |
+| **EqF** | the invariant idea for any symmetry, not just matrix Lie groups | systems whose state is not a Lie group but is acted on by one | the system's symmetry (group action, §5) must be found first | - |
 
 ### UKF (Unscented Kalman Filter) - "Don't linearize the function, sample around it instead"
 

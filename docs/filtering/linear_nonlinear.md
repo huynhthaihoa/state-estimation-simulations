@@ -6,7 +6,7 @@ We can tell by looking at the model equations, not the data. Write the two model
 x_{k+1} = f(x_k, u_k) + w_k \qquad z_k = h(x_k) + v_k
 ```
 
-The system is linear only if both $f$ and $h$ are linear in the state $x$, meaning they can be written as $f = F x + G u$ and $h = H x$, where $F$, $G$, $H$ don't depend on $x$. Here $`u_k`$ is the control input, $`w_k`$ the process noise and $`v_k`$ the measurement noise ([glossary](../glossary.md#ekf-extended-kalman-filter)), and $`G`$ maps the input into the state. If either $f$ or $h$ isn't linear, the system is nonlinear and the plain Kalman filter (KF) is no longer the exact answer.
+The system is linear only if both $f$ and $h$ are linear in the state $x$, meaning they can be written as $f = F x + G u$ and $h = H x$, where $F$, $G$, $H$ don't depend on $x$. Here $`u_k`$ is the control input and $`v_k`$ the measurement noise ([glossary](../glossary.md#ekf-extended-kalman-filter)), $`w_k`$ is the process noise ([glossary](../glossary.md#predict-and-update-steps)), and $`G`$ maps the input into the state. If either $f$ or $h$ isn't linear, the system is nonlinear and the plain Kalman filter (KF) is no longer the exact answer.
 
 ## 1. Three ways to tell
 
@@ -15,7 +15,7 @@ The system is linear only if both $f$ and $h$ are linear in the state $x$, meani
 3. **Look for these patterns.** Any of them makes a model nonlinear:
    - **Trig of a state:** $\cos\theta$, $\sin\theta$ where $\theta$ is estimated. This is the unicycle in [kf_ekf_iekf.md §2](kf_ekf_iekf.md#2-extended-kalman-filter-the-world-is-nonlinear-so-ill-approximate-it-locally).
    - **States multiplied together:** $v \cdot \cos\theta$ (here $`v`$ is a speed, not the measurement noise), or $`R\,p`$ when both $R$ and $p$ are estimated ($`R`$ the rotation, not the noise covariance; $`p`$ the position).
-   - **Rotations or poses in minimal coordinates:** composing $T \cdot \mathrm{Exp}(\xi)$ (pose $`T`$, tangent-space error $`\xi`$, **exponential map** $`\mathrm{Exp}`$; [glossary](../glossary.md#exp-and-log-maps)), or a pose parameterized by angles. The point-cloud observation $R\,p_i + t$ is the counter-example: it is exactly linear in the state $[\mathrm{vec}(R), t]$ ([pointcloud_pose_tracking_empirical_note.md §4.1](pointcloud_pose_tracking_empirical_note.md#41-what-vanilla-buys-and-costs)). The nonlinearity enters through the rotation constraint and the minimal error coordinates.
+   - **Rotations or poses in minimal coordinates** (as many numbers as degrees of freedom; [glossary](../glossary.md#minimal-vs-ambient-redundant-parameterization)): composing $T \cdot \mathrm{Exp}(\xi)$ (pose $`T`$, tangent-space error $`\xi`$, **exponential map** $`\mathrm{Exp}`$; [glossary](../glossary.md#exp-and-log-maps)), or a pose parameterized by angles. The point-cloud observation $R\,p_i + t$ is the counter-example: it is exactly linear in the state $[\mathrm{vec}(R), t]$ ($\mathrm{vec}(R)$ is the 9 entries of $R$ flattened row-major, as `R.flatten()`; [kf_ekf_iekf.md §1](kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear); see [pointcloud_pose_tracking_empirical_note.md §4.1](pointcloud_pose_tracking_empirical_note.md#41-what-vanilla-buys-and-costs)). The nonlinearity enters through the rotation constraint and the minimal error coordinates.
    - **Division by a state:** camera projection $u = f_x X/Z$ (here $`u`$ is the pixel coordinate, not the control input; $`f_x`$ is the focal length in pixels, not the motion model $`f`$; $`X`$ and $`Z`$ are the lateral and depth coordinates of the point in the camera frame).
    - **Norms and square roots:** range $\sqrt{(x-x_L)^2 + (y-y_L)^2}$ (robot position $`(x, y)`$, [landmark](../glossary.md#landmark) position $`(x_L, y_L)`$).
    - **Switching or contact:** impacts, or stick/slip friction. These are non-smooth, which is what the saltation-matrix EKF in [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) handles.
@@ -127,11 +127,11 @@ print(np.abs(res.mean(0)) / np.sqrt(np.diag(R)),  # mean bias, in sensor sigmas
 
 This prints a bias of about 2.7σ and an extra spread of about 3.9σ at 2 m: clearly nonlinear. The bias is a little above §4.1's 0.25 m estimate because terms beyond second order still matter when $\sigma_p / r = 0.5$. With `x_hat = [50, 0]` it prints about 0.1σ and 0.14σ: effectively linear.
 
-For a cheaper version, use $`2n+1`$ [sigma points](../glossary.md#ukf-unscented-kalman-filter) instead of 5000 samples. If the UKF's predicted mean and covariance differ noticeably from the EKF's, nonlinearity matters.
+For a cheaper version, use $`2n+1`$ ($`n`$ = the state dimension) [sigma points](../glossary.md#ukf-unscented-kalman-filter) instead of 5000 samples. If the UKF's predicted mean and covariance differ noticeably from the EKF's, nonlinearity matters.
 
 ### 4.3 Jacobian drift
 
-Evaluate $J$ at $\hat x \pm \sigma$ along the main axes of $P$ (the eigenvectors, scaled by $\sqrt{\lambda}$; here $`\lambda`$ is an eigenvalue of $`P`$, not the LM damping, $`e`$ the unit eigenvector and $`\sigma`$ the standard deviation along it). If $`\lVert J(\hat x + \sigma e) - J(\hat x)\rVert / \lVert J(\hat x)\rVert`$ is more than a few percent, the linear model varies a lot within our uncertainty.
+Evaluate $J$ at $\hat x \pm \sigma$ along the main axes of $P$ (the eigenvectors, scaled by $\sqrt{\lambda}$; here $`\lambda`$ is an eigenvalue of $`P`$, not the [Levenberg-Marquardt (LM) damping](../glossary.md#levenberg-marquardt-lm-and-damping), $`e`$ the unit eigenvector and $`\sigma`$ the standard deviation along it). If $`\lVert J(\hat x + \sigma e) - J(\hat x)\rVert / \lVert J(\hat x)\rVert`$ is more than a few percent, the linear model varies a lot within our uncertainty.
 
 ### 4.4 After the fact: consistency tests
 

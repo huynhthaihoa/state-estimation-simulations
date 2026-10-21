@@ -33,13 +33,13 @@ Planar body, perfect kinematics (the filter knows where each stance foot is; onl
 ## 1. Model
 
 ### Why planar, not 1D
-In 1D every stance foot measures the same scalar velocity, so six legs only average noise: variance $`\sigma^2/n`$, with $n$ the number of stance feet and $\sigma$ the noise standard deviation (std) of one reading. In the plane, a foot at body-frame offset $`r_i`$ (its position relative to the body centre) sees the body's velocity *plus* the turn: when the body turns in place at $`\omega = 0.2`$ rad/s, a foot 0.15 m to the left moves at 0.03 m/s and its mirror foot at −0.03 m/s. Feet in different places therefore separate forward speed from turn rate.
+In 1D every stance foot measures the same scalar velocity, so six legs only average noise: variance $`\sigma^2/n`$, with $n$ the count of stance feet and $\sigma$ the noise standard deviation (std) of one reading. In the plane, a foot at body-frame offset $`r_i`$ (its position relative to the body centre) sees the body's velocity *plus* the turn: when the body turns in place at $`\omega = 0.2`$ rad/s, a foot 0.15 m to the left moves at 0.03 m/s and its mirror foot at −0.03 m/s. Feet in different places therefore separate forward speed from turn rate.
 
 ### State
 $`x = [p_x, p_y, \theta, u, v, \omega]`$ includes world position $`p = [p_x, p_y]`$, heading $`\theta`$, body-frame velocity $`b = [u, v]`$ (forward, left), and turn rate $`\omega`$:
 - **Heading** $`\theta`$ (also called **yaw**) is the body's orientation in the plane: the angle from the world x-axis to the body's forward axis. It is not the direction of travel (the $`\mathrm{atan2}`$ of the world velocity); the two differ whenever the robot doesn't move straight forward, e.g. when it steps sideways ($`v \neq 0`$), which a hexapod can do.
 - **Turn rate** $`\omega = \dot\theta`$ (yaw rate, rad/s, positive counter-clockwise, i.e. turning left) is how fast the body rotates, not how sharply its path curves: turning in place has $`\omega \neq 0`$ at zero speed.
-- **Velocity** and **turn rate** together are the body's **twist** ([glossary](../glossary.md#twist)). 
+- **Velocity** and **turn rate** together are the body's **twist** ([glossary](../glossary.md#twist)). Here it is a planar twist, 3 numbers $`[u, v, \omega]`$ (the glossary's 6-vector without the out-of-plane parts); $u$ is forward speed.
 
 ### Predict (`predict`)
 A constant-twist model. The predicted twist equals the current one, the noise $`w_k`$ lets it wander, and the pose (position and heading, [glossary](../glossary.md#pose)) is integrated with it over each tick. Nonlinear in $`\theta`$, hence an EKF ([glossary](../glossary.md#ekf-extended-kalman-filter)):
@@ -59,7 +59,7 @@ Each stance foot $i$ reports its velocity relative to the body, in the body fram
 z_i = -\left(b + \omega\, J r_i\right) + n_i, \qquad J = \begin{bmatrix} 0 & -1 \\ 1 & 0 \end{bmatrix}, \qquad n_i \sim \mathcal{N}(0,\ \sigma^2 I), \qquad \sigma = 0.02\ \text{m/s}
 ```
 
-$`\omega J r_i`$ is the planar $`\omega \times r_i`$. The model is linear in the state, and its measurement Jacobian $`H_i`$ ([glossary](../glossary.md#jacobian)) only involves the twist columns:
+$`\omega J r_i`$ is the planar $`\omega \times r_i`$ ($J$ rotates $r_i$ by 90° counter-clockwise); $n_i$ is foot $i$'s reading noise, not the count $n$ of stance feet. The model is linear in the state, so the measurement Jacobian $`H_i`$ ([glossary](../glossary.md#jacobian)) is the derivative of foot $i$'s 2-number reading $z_i$ with respect to the 6-entry state $x$, a $2 \times 6$ matrix, and only its twist columns ($u, v, \omega$) are nonzero:
 
 ```math
 H_i = \begin{bmatrix} 0 & 0 & 0 & -1 & 0 & r_{i,y} \\ 0 & 0 & 0 & 0 & -1 & -r_{i,x} \end{bmatrix}
@@ -71,7 +71,7 @@ All stance feet enter one **joint update** per tick: their readings are stacked 
 No reading involves $`p_x, p_y, \theta`$, so they are **unobservable** ([glossary](../glossary.md#observability)): leg odometry only integrates the **twist**, so errors in position and heading accumulate: they **drift**. This matches the real-robot result that, with leg kinematics and an IMU, everything except global position and heading (yaw) is observable (Bloesch et al. 2013, ref. 3).
 
 ### Controlled comparison (`simulate_trial`)
-Each Monte Carlo trial ([glossary](../glossary.md#monte-carlo-trials)) draws one true trajectory, one initial-guess error and one noise stream per foot, and every gait uses the same draws. Only which feet are down, and where, changes between gaits.
+Each Monte Carlo trial ([glossary](../glossary.md#monte-carlo-trials)) draws one true trajectory, one initial-guess error (std 0.01 m in each position coordinate, 0.01 rad in heading, 0.05 in each twist component (m/s for $u, v$, rad/s for $\omega$); the filter's starting covariance has these as its standard deviations) and one noise stream per foot, and every gait uses the same draws. Only which feet are down, and where, changes between gaits.
 
 ### No saltation matrix here
 In [`hybrid_saltation_ekf.md` §4](hybrid_saltation_ekf.md#4-deriving-xi---including-a-wrong-turn-caught-by-verification), an impact is an event that *jumps the state*, and the saltation matrix carries the covariance across it:
@@ -98,7 +98,7 @@ So $`\Xi = DR = I`$ exactly, and the timing-noise term of [`invariant_saltation_
 One tick's readings pin down the body velocity to about $`\sigma/\sqrt{n}`$; turn rate shrinks at the same rate. The filter, though, averages over many ticks against a twist that slowly wanders, and that averaging shrinks the gait's effect to about $`n^{-1/4}`$.
 
 ### One tick, no filter
-`twist_geometry_std`: std from one tick's readings alone, mean over ticks; deterministic.
+`twist_geometry_std`: the "std" columns are the std of the least-squares twist estimate from one tick's stacked stance-foot readings alone (no prior, no filtering), mean over ticks; deterministic.
 
 | Gait | Feet down | $`u`$ std (m/s) | $`\omega`$ std (rad/s) | $`\sigma/\sqrt{n}`$ (m/s) |
 | --- | --- | --- | --- | --- |
