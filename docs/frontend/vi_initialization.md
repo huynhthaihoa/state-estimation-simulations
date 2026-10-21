@@ -5,7 +5,7 @@
 Before a visual-inertial estimator can run its normal loop ([preintegrate](../glossary.md#imu-preintegration) IMU, optimize against camera constraints), it has to solve a chicken-and-egg bootstrapping problem. It must find **metric scale** (real-world units such as meters), gravity direction, initial velocity, and [IMU bias](../glossary.md#bias). A **monocular** (single) camera or a bias-corrupted IMU cannot give any of these on its own.
 
 This builds on:
-- **IMU preintegration** ($\Delta R, \Delta v, \Delta p$ and their bias [Jacobians](../glossary.md#jacobian)) from [imu_preintegration.md](../optimization/imu_preintegration.md). This doc covers what must happen *before* that machinery can be trusted.
+- **IMU preintegration** ($\Delta R, \Delta v, \Delta p$, the relative rotation, velocity and position between keyframes computed from the IMU samples, and their bias [Jacobians](../glossary.md#jacobian)) from [imu_preintegration.md](../optimization/imu_preintegration.md). This doc covers what must happen *before* that machinery can be trusted.
 - **Factor graphs** from [factor_graph.md](../optimization/factor_graph.md), the optimizer we hand off to (§4).
 
 ---
@@ -51,7 +51,7 @@ With a single (monocular) camera, SfM translations and structure are correct onl
 **Step 1 - gyroscope bias.**
 - Short vision-only SfM gives relative rotations between keyframes that don't depend on scale.
 - Each should match the corresponding preintegrated $\Delta R$ ([imu_preintegration.md §3](../optimization/imu_preintegration.md#3-what-gets-compressed)); any mismatch is explained by the still-unknown gyroscope bias.
-- $\Delta R$'s bias sensitivity is already a Jacobian ($J_{R,b_g}$, [imu_preintegration.md §4](../optimization/imu_preintegration.md#4-the-bias-sensitivity-jacobians)), so this is a small **linear** [least-squares](../glossary.md#nonlinear-least-squares) problem for $\delta b_g$ over all keyframe pairs in the window.
+- $\Delta R$'s bias sensitivity is already a Jacobian ($J_{R,b_g}$, [imu_preintegration.md §4](../optimization/imu_preintegration.md#4-the-bias-sensitivity-jacobians)), so this is a small **linear** [least-squares](../glossary.md#nonlinear-least-squares) problem for $\delta b_g$ (the correction to the gyroscope bias, [imu_preintegration.md §5](../optimization/imu_preintegration.md#5-the-payoff-correcting-for-a-bias-change-without-re-integrating)) over all keyframe pairs in the window.
 - It is solved once, in closed form, with no iteration, for the linearized (first-order) model.
 
 **Step 2 - gravity, scale, and velocities.**
@@ -70,7 +70,7 @@ With a single (monocular) camera, SfM translations and structure are correct onl
 - **Enough translation.** Under pure rotation the vision-only SfM has no [parallax](triangulation_pnp.md#2-triangulation-worked-from-the-real-code) (the angle between the viewing rays to one point from different camera positions) to recover structure and translation from, so there is nothing for the IMU to align against.
 - **Known camera-IMU extrinsics.** The alignment needs the rotation and offset between camera and IMU; VINS-Mono can estimate the extrinsic rotation online if it isn't calibrated.
 
-VINS-Mono, for example, initializes only with stable feature tracking and sufficient parallax (more than 30 tracked features and 20 rotation-compensated pixels, i.e. average feature displacement between frames after removing the apparent shift caused by camera rotation), and otherwise waits for new frames. The paper notes that acceleration excitation is needed for scale to be observable; the released code computes an IMU-excitation statistic but only logs a warning when it is low.
+VINS-Mono, for example, initializes only with stable feature tracking and sufficient parallax (here measured in pixels, as a proxy for the angle above; the paper requires more than 30 tracked features and 20 rotation-compensated pixels, i.e. average feature displacement between frames after removing the apparent shift caused by camera rotation; the released code's `relativePose` instead checks more than 20 matched features and an average displacement of the normalized image points, times a hard-coded 460, above 30), and otherwise waits for new frames. The paper notes that acceleration excitation is needed for scale to be observable; the released code computes an IMU-excitation statistic but only logs a warning when it is low.
 
 ---
 

@@ -68,7 +68,7 @@ That's the **Jacobian**. Notice the convention: each **row** is one output ($y_i
 
 ## 3. Think of it as a "sensitivity map"
 
-Suppose our robot's state is:
+Suppose our robot's state is (called $`p`$ here, $`x`$ from §5 on):
 
 ```math
 p = \begin{bmatrix} x \\ 
@@ -152,7 +152,7 @@ We can still ask local questions: "If I take one tiny step north, what happens t
 
 ![Left: cos θ with its tangent at the estimate θ̂ = 30° and ±5° and ±40° bands; the tangent is 0.3 cm off at +5° and 17.5 cm off at +40°. Right: Monte Carlo distribution of cos θ versus the EKF's Gaussian, matching for σ = 5° and clearly different for σ = 40°](../../assets/ekf_linearization_concept.png)
 
-*Figure: the tangent at the estimate (30°) is an excellent stand-in for the curve when the uncertainty is small (5°: 0.3 cm gap) and a poor one when it is large (40°: 17.5 cm gap).*
+*Figure: $`\cos\theta`$ is the x-step of a robot moving 1 m at heading $`\theta`$. The tangent at the estimate (30°) is an excellent stand-in for the curve when the uncertainty is small (5°: 0.3 cm gap) and a poor one when it is large (40°: 17.5 cm gap).*
 
 The EKF does exactly this around its current estimate.
 
@@ -204,7 +204,7 @@ So instead of blindly asking "What is the derivative with respect to my state ve
 
 > **"What is the derivative with respect to the appropriate local perturbation on the state manifold?"**
 
-That's one reason Lie groups and Jacobians become so tightly connected in modern SLAM.
+Here the **state manifold** is the curved (but locally flat) space the state lives in, so plain addition does not apply ([glossary](../glossary.md#manifold)). That's one reason Lie groups (the set of rotations or poses, which can be composed; [glossary](../glossary.md#lie-group)) and Jacobians become so tightly connected in modern SLAM.
 
 A manifold perturbation on its own isn't yet what makes a filter **invariant**: error-state filters such as the ESKF and MEKF (multiplicative EKF, which perturbs attitude by composition) already perturb on the manifold. The IEKF goes one step further and picks a left- or right-[invariant](../glossary.md#invariant-and-equivariant) error. For **group-affine** dynamics ([glossary](../glossary.md#group-affine-dynamics-trajectory-independence)) this makes its linearization independent of the current estimate (see [lie_algebra.md §11.1](lie_algebra.md#111-extended-poses-pose-plus-velocity)). See [kf_ekf_iekf.md §5](../filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error) and [left_right_invariant.md](../filtering/left_right_invariant.md).
 
@@ -228,7 +228,7 @@ In the EKF specifically:
 
 Everywhere above, perturbing an input meant simple addition: $x \to x + \delta x$. That works because $x$ lives in a vector space.
 
-A rotation $R \in SO(3)$ does not. There is no such thing as $R + \delta R$ - the result generally isn't even a valid rotation. Instead, a small perturbation $\delta\varphi \in \mathbb{R}^3$ is turned into a rotation via the exponential map $\mathrm{Exp}(\delta\varphi)$ (rotation vector to rotation matrix; see the [glossary](../glossary.md#exp-and-log-maps)), and then **composed** (matrix-multiplied) with $R$:
+A rotation $R \in SO(3)$ ([glossary](../glossary.md#so3-and-se3): the set of 3D rotation matrices) does not. There is no such thing as $R + \delta R$ - the result generally isn't even a valid rotation. Instead, a small perturbation is a **rotation vector** $\delta\varphi \in \mathbb{R}^3$: its direction is the rotation axis and its length the angle in radians. The exponential map $\mathrm{Exp}(\delta\varphi)$ ([lie_algebra.md §8](lie_algebra.md#8-the-exponential-map), [glossary](../glossary.md#exp-and-log-maps)) turns it into the rotation matrix that turns by that angle about that axis, and that matrix is then **composed** (matrix-multiplied) with $R$:
 
 ```math
 R' = \mathrm{Exp}(\delta\varphi)\,R \qquad \text{or} \qquad R' = R\,\mathrm{Exp}(\delta\varphi)
@@ -247,6 +247,8 @@ Suppose we have a rotation built from $\varphi$, i.e. $\mathrm{Exp}(\varphi)$, a
 ```math
 \mathrm{Exp}(\varphi+\delta\varphi)\;\approx\;\mathrm{Exp}(\varphi)\cdot\mathrm{Exp}\big(J_r(\varphi)\,\delta\varphi\big) \qquad\text{(right)}
 ```
+
+Here $`\varphi`$ is the rotation vector of the starting rotation, and $`\delta\varphi`$ changes $`\varphi`$ itself, unlike §11.1 where $`\delta\varphi`$ is applied to $`R`$ by composition. $`J_l(\varphi)\,\delta\varphi`$ (or $`J_r(\varphi)\,\delta\varphi`$) is that change re-expressed as a §11.1-style perturbation. $`J_l`$ and $`J_r`$ are $`3\times3`$ matrices (closed forms in §11.4).
 
 So $J_l$ and $J_r$ are still Jacobians in the sense of §10, applied to the exponential map instead of a vector-valued function, and reported by which side the resulting perturbation attaches to.
 
@@ -308,7 +310,7 @@ Notice $J_r = J_l^\top$, as the identity predicts. Plugging $\theta \to 0$ into 
   - Converting between them is a multiplication by $R$ (the [adjoint](lie_algebra.md#112-the-adjoint-moving-a-small-motion-between-frames), which for rotations is $R$ itself): $`\mathrm{Exp}(\delta\varphi_{\text{left}})\,R = R\,\mathrm{Exp}(\delta\varphi_{\text{right}})`$ gives $`\delta\varphi_{\text{left}} = R\,\delta\varphi_{\text{right}}`$.
   - Hence $`\Sigma_{\text{left}} = R\,\Sigma_{\text{right}}R^\top`$: a change of frame, not a change of the underlying uncertainty.
   - The §11.4 identity $`J_l = R\,J_r`$ follows from the same fact.
-- **Factor graphs/bundle adjustment on $SE(3)$:** residual Jacobians w.r.t. a pose depend on which perturbation convention (left vs. right) the library uses, and the update must apply the step with the same convention. Mixing them gives wrong step directions: the optimization can converge slowly, converge to the wrong place, or diverge, all while the code runs without error.
+- **Factor graphs/bundle adjustment on $SE(3)$** ([glossary](../glossary.md#so3-and-se3)): residual Jacobians w.r.t. a pose depend on which perturbation convention (left vs. right) the library uses, and the update must apply the step with the same convention. Mixing them gives wrong step directions: the optimization can converge slowly, converge to the wrong place, or diverge, all while the code runs without error.
 
 ### 11.7 One-sentence intuition
 

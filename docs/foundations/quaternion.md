@@ -49,7 +49,7 @@ So a quaternion reads as **"rotate around this axis by this amount."** The four 
 >
 > - **Component order.** This doc writes quaternions scalar-first, $(w, x, y, z)$. Many libraries store them scalar-last, $[x, y, z, w]$: scipy's `Rotation.as_quat()`, ROS (Robot Operating System) messages, and this repo's own `utils.py`. Reading one ordering as the other silently gives a different rotation.
 > - **Multiplication convention.** **Hamilton** (used here, and by most robotics libraries) and **JPL** (common in older aerospace and early visual-inertial odometry (VIO) papers) compose in opposite orders. Solà (2017) compares them.
->   Under Hamilton, $`q \otimes \mathbf{v} \otimes q^{\ast}`$ actively rotates the vector $\mathbf{v}$ (§13), and $q$ maps body coordinates to world coordinates, like $X$ in [left_right_invariant.md](../filtering/left_right_invariant.md). JPL reverses the product order and encodes the inverse (frame) rotation.
+>   Under Hamilton, $`q \otimes \mathbf{v} \otimes q^{\ast}`$ actively rotates the vector $\mathbf{v}$ ($`\otimes`$ is quaternion multiplication, $`q^{\ast}`$ the conjugate of $`q`$, and $`\mathbf{v}`$ is written as a pure quaternion; all three are defined in §13), and $q$ maps body coordinates to world coordinates, like $X$ in [left_right_invariant.md](../filtering/left_right_invariant.md). JPL reverses the product order and encodes the inverse (frame) rotation.
 > - Always check both before mixing code or equations from different sources.
 
 ---
@@ -145,7 +145,7 @@ has **9 elements**, even though a rotation has only 3 degrees of freedom, and th
   This is much cheaper than re-orthogonalizing a rotation matrix (making its columns perpendicular unit vectors again)
 - efficient for composing rotations
 - easy to interpolate smoothly: **slerp** (spherical linear interpolation), $\text{slerp}(q_0, q_1, t)$, runs from start orientation $`q_0`$ to end orientation $`q_1`$, with fraction $`t \in [0,1]`$.
-  It moves at constant angular speed along the shortest arc. This requires choosing the sign of $q_1$ so that $q_0 \cdot q_1 \ge 0$ (§10)
+  It moves at constant angular speed along the shortest arc. This requires choosing the sign of $q_1$ so that $q_0 \cdot q_1 \ge 0$ (the dot product of the four components; §10)
 - free of gimbal lock
 
 ---
@@ -209,12 +209,12 @@ The tricky part is:
 
 > **A quaternion does not live in ordinary 4D Euclidean space.**
 
-It lives on the **unit quaternion [manifold](../glossary.md#manifold)**. That's why modern VIO/SLAM systems often estimate a **small rotational error** $\delta q$ rather than directly adding a 4D quaternion error. This $\delta q$ is itself a unit quaternion near the identity, $`\delta q \approx (1, \tfrac{1}{2}\delta\theta)`$, parameterized by a 3-vector $\delta\theta$: the error state of the **error-state Kalman filter (ESKF)**. Estimating it is the **multiplicative EKF (MEKF)** idea.
+It lives on the **unit quaternion [manifold](../glossary.md#manifold)**. That's why modern VIO/SLAM systems often estimate a **small rotational error** $\delta q$ rather than directly adding a 4D quaternion error. This $\delta q$ is itself a unit quaternion near the identity, $`\delta q \approx (1, \tfrac{1}{2}\delta\theta)`$, parameterized by a small rotation vector $\delta\theta$ (axis times angle, in radians; hence the $\tfrac{1}{2}$, the half angle of §2): the error state of the **error-state Kalman filter ([ESKF](../glossary.md#eskf-error-state-kalman-filter))**. The filter estimates this correction instead of $q$ itself and applies it by quaternion multiplication, hence the **multiplicative EKF (MEKF)** idea.
 
 The small error can be attached on either side, and both are common ($`\hat q`$ is the estimated orientation):
 
-- $`q_{\text{true}} = \delta q\otimes \hat q`$: the error is expressed in the world frame (fixed reference axes). In the terminology of [left_right_invariant.md](../filtering/left_right_invariant.md) this is a **right-invariant** error.
-- $`q_{\text{true}} = \hat q\otimes \delta q`$: the error is expressed in the body frame (axes attached to the robot). This is the **left-invariant** error, the convention of Solà's ESKF and of this repo's `run_iekf`.
+- $`q_{\text{true}} = \delta q\otimes \hat q`$: the error is expressed in the world frame (fixed reference axes). In the terminology of [left_right_invariant.md §1](../filtering/left_right_invariant.md#1-the-setup) this is a **right-invariant** error.
+- $`q_{\text{true}} = \hat q\otimes \delta q`$: the error is expressed in the body frame (axes attached to the robot). This is the **left-invariant** error, the convention of Solà's ESKF and of this repo's `run_iekf` (in `use_numpy/pointcloud_pose_tracking.py`).
   `run_iekf` uses the $\hat X\,\mathrm{Exp}(\xi)$ form, with $`\hat X`$ the estimated pose and $`\xi`$ the tangent-space error (see the [glossary](../glossary.md#lie-algebra-and-tangent-space)).
 
 This is the error-state idea of [extra_kf_variants.md §2](../filtering/extra_kf_variants.md#2-error-state-kalman-filter-eskf), and it leads directly into **SO(3), Lie groups, Lie algebra, and the Invariant EKF**.
@@ -231,7 +231,7 @@ $$
 \boxed{ \text{Euler angles} \rightarrow \text{Quaternion} \rightarrow SO(3) \rightarrow \mathfrak{so}(3) \rightarrow \text{Lie-group state estimation} }
 $$
 
-That chain is an order of study, not a hierarchy: unit quaternions are a Lie group in their own right, and each rotation in $SO(3)$ corresponds to exactly two of them, $q$ and $-q$ (§10). Both groups share the same small-motion space, so the tools in [lie_algebra.md](lie_algebra.md) apply to either.
+That chain is an order of study, not a hierarchy: unit quaternions are a Lie group in their own right, and each rotation in $SO(3)$ corresponds to exactly two of them, $q$ and $-q$ (§10). Both groups share the same small-motion space (the Lie algebra, the space of small rotations), so the tools in [lie_algebra.md](lie_algebra.md) apply to either.
 
 The next question is **why quaternion multiplication actually performs rotation**.
 
@@ -247,7 +247,7 @@ The answer comes down to four observations.
 
 ### Step 1: the multiplication rule hides a dot product and a cross product
 
-Write a quaternion as a scalar part plus a vector part (here $`\mathbf{v}`$ is the vector part, not the velocity $v$ of §11):
+The four numbers $(w, x, y, z)$ stand for $`w + x\,i + y\,j + z\,k`$, where $`i, j, k`$ are three imaginary units. Write a quaternion as a scalar part plus a vector part (here $`\mathbf{v}`$ is the vector part, not the velocity $v$ of §11):
 
 $$
 q = (w, \mathbf{v}), \qquad \mathbf{v} = (x, y, z)

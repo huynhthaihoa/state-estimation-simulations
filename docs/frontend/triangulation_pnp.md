@@ -61,7 +61,7 @@ Then we polish and validate:
 d_k = \frac{R_k \tilde d_k}{\left\| R_k \tilde d_k \right\|}
 ```
 
-Here $`u_k, v_k`$ are the pixel coordinates of the observation in camera $`k`$, $`(c_x, c_y)`$ is the principal point (the pixel where the optical axis meets the image) and $`(f_x, f_y)`$ are the focal lengths in pixels (the **intrinsics**).
+Here $`\tilde d_k`$ is the unnormalized camera-frame ray (its $`z`$ component is 1), $`d_k`$ is the same ray rotated into the world frame and scaled to unit length, $`u_k, v_k`$ are the pixel coordinates of the observation in camera $`k`$, $`(c_x, c_y)`$ is the principal point (the pixel where the optical axis meets the image) and $`(f_x, f_y)`$ are the focal lengths in pixels (the **intrinsics**).
 
 In the next block, $`A`$ and $`b`$ are the normal-equation matrix and vector of the closest-point problem. The linear system $`AP = b`$ has the point that minimizes the summed squared distances to the rays as its solution. $`P_0`$ is the initial point estimate. This $`A`$ is not the DLT matrix of §3.
 
@@ -75,13 +75,15 @@ $$
 - **Tiny example** (toy case: two rectified cameras (parallel optical axes, offset sideways), baseline $`B`$, focal length $`f`$, depth $`Z`$, pixel noise $`\sigma`$). Depth error is about $`Z^2\sigma/(fB)`$. With $`f=800`$ px, $`Z=10`$ m, $`\sigma=1`$ px: $`B=1`$ m gives 0.125 m of error, and $`B=0.1`$ m gives 1.25 m. A 10 times smaller baseline means a 10 times larger depth error.
 - **The $10^{-9} I$ term.** It keeps the solve defined when all rays are parallel. The depth along the rays is then arbitrary (the term pins the point's coordinate along the ray direction to 0, measured from the world origin).
 
-`refine_landmark_gn` then runs Gauss-Newton on the point alone (here $`P`$ is the 3D point being refined, $`\delta`$ is its step, $`z_k`$ is the observed pixel and $`\pi`$ is the **pinhole** projection (a camera model where every ray passes through the single camera center) that maps a camera-frame point $`(x,y,z)`$ to the pixel $`(f_x x/z + c_x,\; f_y y/z + c_y)`$; $`\delta`$ is a different step in the PnP refinement of §3), with the [Jacobian](../glossary.md#jacobian) $J_{\text{point}}$ from [bundle_adjustment.md §6.1](../optimization/bundle_adjustment.md#61-the-ba-math-concretely):
+`refine_landmark_gn` then runs Gauss-Newton on the point alone (here $`P`$ is the 3D point being refined, $`\delta`$ is its step, $`z_k`$ is the observed pixel and $`\pi`$ is the **pinhole** projection (a camera model where every ray passes through the single camera center) that maps a camera-frame point $`(x,y,z)`$ to the pixel $`(f_x x/z + c_x,\; f_y y/z + c_y)`$; $`\delta`$ is a different step in the PnP refinement of §3), with the [Jacobian](../glossary.md#jacobian) $J_{\text{point}}$ (the $`2\times3`$ derivative of the predicted pixel with respect to the point) from [bundle_adjustment.md §6.1, "Projection and Jacobians"](../optimization/bundle_adjustment.md#projection-and-jacobians):
 
 $$
 \left(\sum_k J_{\text{point},k}^\top J_{\text{point},k} + 10^{-9} I\right)\delta = \sum_k J_{\text{point},k}^\top r_k, \qquad
 r_k = z_k - \pi\left(R_k^\top (P - o_k)\right), \qquad
 P \leftarrow P + \delta
 $$
+
+The residual is measured minus predicted, so the right-hand side is $`+J^\top r`$: the sign convention of [bundle_adjustment.md §6.1](../optimization/bundle_adjustment.md#gauss-newton-step-and-solvers), opposite to the glossary's $`H\Delta x = -b`$ ([glossary](../glossary.md#normal-equations-and-hessian)).
 
 It stops when the step norm drops below `gn_tol`, or earlier if the point's depth becomes non-positive in any observer. `passes_cheirality` then requires a strictly positive depth in every observer, using `point_depth`:
 
@@ -97,7 +99,7 @@ In `bundle_adjustment_advanced.py`, a landmark is triangulated once it has `min_
 
 **Pose convention.** As in §2, poses are camera-to-world ($T_{wc}$): a camera with rotation $R_k$ and center $o_k$ has world-to-camera pose $R_{cw} = R_k^\top$, $t_{cw} = -R_k^\top o_k$. This section's unknown $(R_{cw}, t_{cw})$ is that world-to-camera form, and `refine_pose_gn`'s $T$ is $T_{wc}$.
 
-`pnp_estimation.py` solves the exact mirror image. Given $n$ known 3D points $P_i$ and their observed pixels, first form the calibrated ray for each: $d_i = \left[\frac{u_i-c_x}{f_x}, \frac{v_i-c_y}{f_y}, 1\right]$. Because $d_i$ is parallel to the camera-frame point $R_{cw}P_i + t_{cw}$ ($R_{cw}, t_{cw}$ the unknown world-to-camera pose), their cross product must vanish:
+`pnp_estimation.py` solves the exact mirror image. Given $n$ known 3D points $P_i$ and their observed pixels, first form the calibrated ray for each (the unnormalized camera-frame ray, §2's $`\tilde d`$): $d_i = \left[\frac{u_i-c_x}{f_x}, \frac{v_i-c_y}{f_y}, 1\right]$. Because $d_i$ is parallel to the camera-frame point $R_{cw}P_i + t_{cw}$ ($R_{cw}, t_{cw}$ the unknown world-to-camera pose), their cross product must vanish:
 
 $$d_i \times (R_{cw}P_i + t_{cw}) = 0$$
 
@@ -105,7 +107,7 @@ $$d_i \times (R_{cw}P_i + t_{cw}) = 0$$
 - The 12 entries of $`[R_{cw} \mid t_{cw}]`$ are only defined up to scale, so there are 11 unknowns.
 - Each point gives 2 equations. 5 points give 10, which is less than 11. 6 points give 12, which is enough.
 
-This is **linear and homogeneous** (right-hand side zero) in the 12 flattened entries of $[R_{cw} \mid t_{cw}]$ - exactly the classical **Direct Linear Transform (DLT)** camera-resectioning (recovering a camera's pose from known 3D points) setup, specialized to *known* intrinsics. Stacking two independent rows of this constraint per correspondence gives an overdetermined homogeneous system $Ax=0$ (here $`A`$ is the DLT matrix, not the matrix $`A`$ of §2), solved via `linear_pnp_dlt` as the smallest right-singular vector of $A$, taken from its **singular value decomposition (SVD)** (`np.linalg.svd`).
+This is **linear and homogeneous** (right-hand side zero) in the 12 flattened entries of $[R_{cw} \mid t_{cw}]$ - exactly the classical **Direct Linear Transform (DLT)** camera-resectioning (recovering a camera's pose from known 3D points) setup, specialized to *known* intrinsics. Stacking two independent rows of this constraint per correspondence gives an overdetermined homogeneous system $Ax=0$ ($`x`$ = those 12 entries, spelled out below; here $`A`$ is the DLT matrix, not the matrix $`A`$ of §2), solved via `linear_pnp_dlt` as the smallest right-singular vector of $A$, taken from its **singular value decomposition (SVD)** (`np.linalg.svd`).
 
 **Intuition:** the smallest singular vector is the direction that $A$ squashes the most. Toy case: $`A = \mathrm{diag}(3, 0.1)`$ stretches $`(1,0)`$ to length 3 but shrinks $`(0,1)`$ to 0.1, so $`(0,1)`$ is the best answer to $`Ax \approx 0`$.
 
@@ -133,14 +135,14 @@ The recovered $3\times3$ block is only a *scaled, possibly reflected* rotation -
 
 With noise-free pixels, this recovers the true pose to floating-point precision.
 
-`refine_pose_gn` then runs Gauss-Newton on the true reprojection error. It follows `refine_landmark_gn`'s loop (minus its early exit on non-positive depth) and solves a $6\times6$ system for the pose instead of a $3\times3$ system for the point. Here $`T`$ is the camera-to-world pose $`T_{wc}`$, $`z_i`$ the observed pixel of point $`P_i`$ and $`\pi`$ the same projection as above. The pose is updated by a right-multiplicative correction $T \leftarrow T\cdot\mathrm{Exp}(\delta)$ ([Exp](../glossary.md#exp-and-log-maps) turns a small 6-vector into a pose). It uses the same Jacobian $J_{\text{pose}}$ as bundle adjustment ([bundle_adjustment.md §6.1](../optimization/bundle_adjustment.md#61-the-ba-math-concretely)), for the pose step $\delta = [\delta v, \delta\omega]$ (not the point step $\delta$ of §2):
+`refine_pose_gn` then runs Gauss-Newton on the true reprojection error. It follows `refine_landmark_gn`'s loop (minus its early exit on non-positive depth) and solves a $6\times6$ system for the pose instead of a $3\times3$ system for the point. Here $`T`$ is the camera-to-world pose $`T_{wc}`$, $`z_i`$ the observed pixel of point $`P_i`$ and $`\pi`$ the same projection as above. The pose is updated by a right-multiplicative correction $T \leftarrow T\cdot\mathrm{Exp}(\delta)$ ([Exp](../glossary.md#exp-and-log-maps) turns a small 6-vector into a pose). It uses the same Jacobian $J_{\text{pose}}$ as bundle adjustment (the $`2\times6`$ derivative of the predicted pixel with respect to the pose's right perturbation; [bundle_adjustment.md §6.1, "Projection and Jacobians"](../optimization/bundle_adjustment.md#projection-and-jacobians)), for the pose step $\delta = [\delta v, \delta\omega]$ (not the point step $\delta$ of §2). Here $`\delta v`$ is the translation part and $`\delta\omega`$ the rotation part of the pose correction, in that order:
 
 $$
 \left(\sum_i J_{\text{pose},i}^\top J_{\text{pose},i} + 10^{-9} I_6\right)\delta = \sum_i J_{\text{pose},i}^\top r_i, \qquad
 r_i = z_i - \pi\left(T^{-1} P_i\right)
 $$
 
-It stops when the step norm drops below `gn_tol`. Script defaults: 20 points, sampled at camera-frame depth 3 to 8 m, $f_x = f_y = 800$ px on a 640×480 image, pixel noise $\sigma = 1$ px, `gn_tol` = $10^{-8}$, at most 20 iterations.
+The residual and right-hand side use the same sign convention as §2. It stops when the step norm drops below `gn_tol`. Script defaults: 20 points, sampled at camera-frame depth 3 to 8 m, $f_x = f_y = 800$ px on a 640×480 image, pixel noise $\sigma = 1$ px, `gn_tol` = $10^{-8}$, at most 20 iterations.
 
 ---
 

@@ -42,11 +42,11 @@ Measurements/constraints
 
 Typical front-end tasks:
 
-- **Feature extraction** (finding distinctive image points, such as corners) - detectors/descriptors such as ORB (Oriented FAST and Rotated BRIEF), FAST (Features from Accelerated Segment Test), SIFT (Scale-Invariant Feature Transform)
+- **Feature extraction** (finding distinctive image points, such as corners) - a **detector** finds distinctive image points and a **descriptor** is a numeric signature of the patch around a point, used to match it between frames; examples are ORB (Oriented FAST and Rotated BRIEF), FAST (Features from Accelerated Segment Test), SIFT (Scale-Invariant Feature Transform)
 - **Feature tracking/matching** (finding the same feature again in later frames)
-- **Data association** - determining that a feature in frame $k$ is the same physical point seen in frame $k+1$
+- **Data association** - matching each measurement to the landmark it observes, e.g. determining that a feature in frame $k$ is the same physical point seen in frame $k+1$
 - **Visual odometry** (VO) - [odometry](glossary.md#odometry) computed from camera images
-- **Depth estimation/triangulation** - see [frontend/triangulation_pnp.md](frontend/triangulation_pnp.md) for the actual math, plus its inverse problem, Perspective-n-Point (PnP), which estimates the [pose](glossary.md#pose) from known points
+- **Depth estimation/triangulation** (recovering a 3D point's position from two or more views with known camera poses) - see [frontend/triangulation_pnp.md](frontend/triangulation_pnp.md) for the actual math, plus its inverse problem, Perspective-n-Point (PnP), which estimates the [pose](glossary.md#pose) from known points
 - **[Keyframe](glossary.md#keyframe) selection** (choosing a subset of frames to keep for optimization)
 - **[Loop-closure](glossary.md#loop-closure) detection**
 
@@ -99,7 +99,7 @@ For example:
 \min_{\mathbf{x}} \frac12\sum_i \|r_i(\mathbf{x})\|^2
 ```
 
-where $\mathbf{x}$ stacks all pose (and landmark) variables and $r_i$ is the [residual](glossary.md#residual-error) of measurement $i$.
+where $\mathbf{x}$ stacks all pose (and landmark) variables and $r_i$ is the [residual](glossary.md#residual-error) of measurement $i$, information-weighted (whitened; see [filtering_smoothing.md §3](filtering_smoothing.md#3-optimization-keep-the-history)). The $\frac12$ is a convention that does not change the minimizer.
 
 **Intuition:** the residual is the gap between prediction and measurement. Toy case: the model predicts a landmark at pixel 100, the camera sees it at 103, so the residual has size 3. The sign convention varies, but the squared cost does not care.
 
@@ -107,14 +107,14 @@ Two levels to keep apart:
 
 **Problem formulations** (what we optimize):
 
-- **[Bundle adjustment (BA)](optimization/bundle_adjustment.md)**
-- **[Pose-graph optimization](optimization/pose_graph_optimization.md)**
+- **[Bundle adjustment (BA)](optimization/bundle_adjustment.md)** - jointly refine camera poses and 3D points to minimize reprojection error (the pixel gap between observed and projected points)
+- **[Pose-graph optimization](optimization/pose_graph_optimization.md)** - poses only, linked by relative-pose constraints (odometry and loop closures)
 - **[Factor-graph optimization](optimization/factor_graph.md)**
 - **[Nonlinear least squares](optimization/nonlinear_least_square.md)** - the general form behind all of them
 
 **Solvers** (how we minimize it):
 
-- **[Gauss-Newton](optimization/gauss_newton.md)** and **[Levenberg-Marquardt](optimization/levenberg_marquardt.md)** - step rules inside an iterative solve
+- **[Gauss-Newton](optimization/gauss_newton.md)** and **[Levenberg-Marquardt](optimization/levenberg_marquardt.md)** - how each iteration chooses its step: solve the linearized problem, with LM adding damping to keep the step from overshooting
 - **[iSAM/incremental optimization](optimization/isam_optimization.md)** - a strategy for re-solving incrementally as new constraints arrive
 
 ---
@@ -162,7 +162,7 @@ The **back-end then optimizes the entire trajectory** so that all constraints ar
 - That 0.4 m is spread over the 4 odometry steps, 0.1 m per step.
 - So $x_1, x_2, x_3, x_4$ move back by 0.1, 0.2, 0.3, 0.4 m. Later poses carry more of the drift, so they move more.
 
-In practice, "loop closure" spans both stages. The front-end place-recognition module (which matches the current view against stored ones) detects the candidate match. The back-end verifies it and folds it into the global optimization.
+In practice, "loop closure" spans both stages. The front-end place-recognition module (which matches the current view against stored ones) detects the candidate match. The back-end checks it against the other constraints (robust costs down-weight a closure that disagrees strongly with them; see [§4](#4-front-end-vs-back-end)) and folds it into the global optimization.
 
 This is why the diagrams above disagree:
 

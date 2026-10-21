@@ -25,7 +25,7 @@ No flat map covers the whole globe without distortion, but the local one is much
 
 ## 2. Why do we need Lie algebra?
 
-Take a robot orientation $R \in SO(3)$ that rotates by a small amount $\delta\theta$. We would like to update it as $R_{\text{new}} = R_{\text{old}} + \delta R$.
+Take a robot orientation $R \in SO(3)$ (the set of 3D rotation matrices, §5) that rotates by a small amount $\delta\theta$. We would like to update it as $R_{\text{new}} = R_{\text{old}} + \delta R$.
 
 The problem: a rotation matrix must satisfy $R^\top R=I$ and $\det(R)=1$, and adding numbers to it generally breaks both. We could end up with
 
@@ -93,6 +93,8 @@ For rotations, the Lie group is $SO(3)$: it contains **all valid 3D rotations**.
 
 A rotation matrix is a point in this space. Optimizing directly on it is inconvenient.
 
+A **group** is a set where any two elements compose into another element of the set ($`R_1R_2`$, $`T_1T_2`$), every element has an inverse, and one element, the **identity** ($`I`$, "do nothing"), changes nothing it is composed with. A [**Lie group**](../glossary.md#lie-group) adds that the set is smooth: curved but locally flat.
+
 > **$SO(3)$ tells us where we are.**
 
 ---
@@ -114,7 +116,7 @@ The space these small motions live in is the Lie algebra $\mathfrak{so}(3)$.
 Technically:
 
 - $\mathfrak{so}(3)$ is the tangent space *at the identity*; its elements are $3\times3$ skew-symmetric matrices.
-- The 3-vector $\delta\theta$ holds their coordinates, related by the hat operator of §7.
+- The 3-vector $\delta\theta$ holds their coordinates, related by the hat operator of §7. This coordinate vector ($\delta\theta \in \mathbb{R}^3$, $`\xi \in \mathbb{R}^6`$ for $SE(3)$, a 9-vector for $`SE_2(3)`$) is the **tangent vector**; this doc also calls it a small motion or a perturbation.
 - Near some other $R$ we reuse the same algebra by composing with $R$, as above, so no separate algebra is needed at every point.
 
 ---
@@ -150,6 +152,8 @@ We have a rotation vector $\delta\theta$ (an axis times an angle) and want a rea
 In symbols:
 
 $$R = \exp(\delta\theta^\wedge)$$
+
+Here $`\exp`$ is the **matrix exponential**, the series $`\exp(A) = I + A + A^2/2! + A^3/3! + \cdots`$ applied to a square matrix $`A`$. For $`A = \delta\theta^\wedge`$ the series sums to Rodrigues' formula below, and the same series on the $4\times4$ matrix $`\xi^\wedge`$ gives the $SE(3)$ case (§11). The **matrix logarithm** is its inverse (§9).
 
 ```text
 Lie algebra                     Lie group
@@ -268,7 +272,7 @@ Just like $\mathfrak{so}(3)$ has a hat operator (§7), $\mathfrak{se}(3)$ has it
 0 & 1 \end{bmatrix}
 ```
 
-- $V$ is a $3\times3$ matrix, built purely from $\phi$, that "bends" the raw translation $\rho$ to account for the coupling. It equals $`J_l(\phi)`$, the $SO(3)$ left Jacobian ([jacobian.md §11.4](jacobian.md#114-closed-form-for-so3)); its exact formula isn't needed here.
+- $V$ is a $3\times3$ matrix, built purely from $\phi$, that "bends" the raw translation $\rho$ to account for the coupling. It equals $`J_l(\phi)`$, the $SO(3)$ **left Jacobian**: the matrix that says how $`\mathrm{Exp}(\phi)`$ moves when $\phi$ is nudged, as an extra rotation on the left ($`J_r`$, the right Jacobian: on the right; [jacobian.md §11.2](jacobian.md#112-the-actual-question-being-asked)). Its closed form is in [jacobian.md §11.4](jacobian.md#114-closed-form-for-so3); the exact formula isn't needed here.
 - The log map has the mirror-image subtlety: recovering $\rho$ from a pose needs $V^{-1}$, not just the translation column.
 
 **Tiny example:** drive forward at 1 m/s while turning left at 90°/s, for 1 s.
@@ -318,7 +322,7 @@ So a velocity changes frame exactly like a position. **Tiny example:** a drone f
 **Why not store $`R`$ in $`SO(3)`$ and $`v`$, $`p`$ as plain vectors?** Both hold the same numbers; the difference is what the group product buys the filter.
 
 - With this product, one IMU step over $`h`$ is $`X^+ = \Gamma\, f(X)\, \Upsilon`$. Here $`\Gamma`$ is a fixed matrix holding gravity, $`f(R, v, p) = (R, v, p + v h)`$ respects the group product (a **group automorphism**: $`f(X_1 X_2) = f(X_1)\,f(X_2)`$), and $`\Upsilon`$ holds the IMU increments. Systems of this form are [group-affine](../glossary.md#group-affine-dynamics-trajectory-independence).
-- For a group-affine system, the **invariant error** $`\eta = \hat X X^{-1}`$ between estimate and truth (Barrau & Bonnabel's form; the [glossary](../glossary.md#invariant-and-equivariant) and [left_right_invariant.md §1](../filtering/left_right_invariant.md#1-the-setup) use its inverse $`X \hat X^{-1}`$, and both are right-invariant) evolves in the same way whatever the trajectory, and its logarithm evolves through a constant matrix, even for large errors. This is the basis of the [**invariant EKF**](../glossary.md#iekf-invariant-ekf) (Barrau & Bonnabel, 2017).
+- For a group-affine system, the **invariant error** $`\eta = \hat X X^{-1}`$ between estimate and truth (Barrau & Bonnabel's form; the [glossary](../glossary.md#invariant-and-equivariant) and [left_right_invariant.md §1](../filtering/left_right_invariant.md#1-the-setup) use its inverse $`X \hat X^{-1}`$, and both are right-invariant: unchanged when estimate and truth are both multiplied on the right by the same group element $`G`$, since $`\hat X G\,(XG)^{-1} = \hat X X^{-1}`$) evolves in the same way whatever the trajectory, and its logarithm evolves through a constant matrix, even for large errors. This is the basis of the [**invariant EKF**](../glossary.md#iekf-invariant-ekf) (Barrau & Bonnabel, 2017).
 - With separate pieces, the error dynamics depend on the current estimate. In [invariant_saltation_ekf.md §6](../filtering/invariant_saltation_ekf.md#6-results-consistency-through-the-bounces), the world-frame EKF is overconfident before the body's first bounce on the ground ([NEES](../glossary.md#consistency-and-nees), normalized estimation error squared, 14-19 against a consistent 9), while the invariant EKF on $`SE_2(3)`$ is close to consistent. That document attributes the gap most likely to Jacobians evaluated at a poor initial estimate, and does not isolate it further.
 
 In code: `se23_make`, `se23_parts`, `se23_inv`, `se23_exp`, `se23_log` and `se23_adjoint` in [use_numpy/lie_utils.py](../../use_numpy/lie_utils.py), and `manif.SE_2_3`, whose tangent order is (position, rotation, velocity).
@@ -433,7 +437,7 @@ In optimization we typically have an error $\text{error} = f(T)$ and want to kno
 
 $$f(T\exp(\delta\xi^\wedge)) \approx f(T)+J\delta\xi$$
 
-where $J$ is the **Jacobian with respect to the Lie-algebra perturbation**. Whether the perturbation is applied on the right, as here, or on the left changes $J$; [jacobian.md §11](jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space) explains the left and right Jacobians this leads to. Most docs here perturb on the right. The exceptions are the two right-invariant filters, [invariant_saltation_ekf.md](../filtering/invariant_saltation_ekf.md) and [hexapod_contact_inekf.md](../filtering/hexapod_contact_inekf.md), which perturb on the left to match their right-invariant error, and whose world-frame baselines perturb the rotation on the left too ([left_right_invariant.md](../filtering/left_right_invariant.md#1-the-setup) explains the pairing).
+where $J$ is the **Jacobian with respect to the Lie-algebra perturbation**. Whether the perturbation is applied on the right, as here, or on the left changes $J$. This $`J`$ differentiates the residual $`f`$ with respect to $`\delta\xi`$; it is not the $`J_l`$/$`J_r`$ of [jacobian.md §11](jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space), which differentiate $\mathrm{Exp}$ itself. The two are related by the chain rule. Most docs here perturb on the right. The exceptions are the two right-invariant filters, [invariant_saltation_ekf.md](../filtering/invariant_saltation_ekf.md) and [hexapod_contact_inekf.md](../filtering/hexapod_contact_inekf.md), which perturb on the left to match their right-invariant error, and whose world-frame baselines perturb the rotation on the left too ([left_right_invariant.md](../filtering/left_right_invariant.md#1-the-setup) explains the pairing).
 
 That's why Lie algebra is common in modern SLAM: it gives optimization algorithms a **locally Euclidean 6D space** to work in, while the actual pose remains a valid element of $SE(3)$.
 

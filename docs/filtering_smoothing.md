@@ -80,7 +80,7 @@ Once the filter has moved on, it generally **doesn't go back and reconsider old 
 
 > "I have compressed everything before $t_3$ into my current belief. Now let's continue."
 
-This makes filtering **naturally online** and, for small fixed-size states, computationally efficient (see the caveat in [§6](#6-the-computational-difference)).
+This makes filtering **naturally online** (it processes each measurement as it arrives) and, for small fixed-size states, computationally efficient (see the caveat in [§6](#6-the-computational-difference)).
 
 ### The big limitation of filtering
 
@@ -108,7 +108,7 @@ Therefore, **all those previous poses may need to move**: before the closure `E`
 
 A pure filter cannot do this: it has already compressed the past, so the old poses are no longer in its state and it cannot move them.
 
-An **EKF-SLAM** filter (an [EKF](glossary.md#ekf-extended-kalman-filter), i.e. extended Kalman filter, whose state holds the current pose and every [landmark](glossary.md#landmark)) still benefits from the loop closure. Through the correlations in its [covariance](glossary.md#covariance), it corrects the current pose and the whole landmark map; see [§9](#9-the-precise-distinction).
+An **EKF-SLAM** filter (an [EKF](glossary.md#ekf-extended-kalman-filter), i.e. extended Kalman filter, whose state holds the current pose and every [landmark](glossary.md#landmark)) still benefits from the loop closure. Through the correlations in its [covariance](glossary.md#covariance) (off-diagonal terms tie the current pose to each landmark, so one correction propagates to the others), it corrects the current pose and the whole landmark map; see [§9](#9-the-precise-distinction).
 
 ---
 
@@ -149,7 +149,7 @@ Mathematically, we write:
 where:
 
 - $\mathbf{x}$ = all poses/landmarks
-- $r_i(\mathbf{x})$ = (whitened) measurement [residual](glossary.md#residual-error): scaled by $`\Sigma^{-1/2}`$, with $`\Sigma`$ the measurement covariance, so that $`\|r\|^2 = r^\top \Sigma^{-1} r`$
+- $r_i(\mathbf{x})$ = (whitened) measurement [residual](glossary.md#residual-error): the raw residual $`e`$ scaled by $`\Sigma^{-1/2}`$, i.e. $`r = \Sigma^{-1/2} e`$, with $`\Sigma`$ the measurement covariance, so that $`\|r\|^2 = r^\top r = e^\top \Sigma^{-1} e`$
 - the solver ([Gauss-Newton](glossary.md#gauss-newton) or a damped variant such as [Levenberg-Marquardt](glossary.md#levenberg-marquardt-lm-and-damping)) finds a local minimum of the total error, so a good [initial guess](glossary.md#initial-guess) matters.
 
 This is the fundamental idea behind **[bundle adjustment (BA)](glossary.md#bundle-adjustment-ba)**, **[pose-graph](glossary.md#pose-graph) optimization**, and many modern SLAM systems.
@@ -203,7 +203,7 @@ $${p(x_t \mid z_{0:t})}$$
 
 > "What is my belief about the current state given measurements up to now?"
 
-Smoothing asks something closer to:
+Smoothing asks something closer to ($`x_{0:t}`$ = the states from time 0 to $`t`$):
 
 $${p(x_{0:t} \mid z_{0:t})}$$
 
@@ -233,7 +233,7 @@ x₀ x₁ x₂ x₃
 
 Optimization is often the computational mechanism for obtaining this joint estimate. Strictly, least-squares optimization returns the single most likely trajectory (the **MAP** (maximum a posteriori) estimate, i.e. the peak of $`p(x_{0:t} \mid z_{0:t})`$), not the whole distribution.
 
-The uncertainty around it is usually approximated as a Gaussian. Its [information matrix](glossary.md#information-matrix) is the Gauss-Newton [Hessian](glossary.md#normal-equations-and-hessian) $`H = J^\top \Omega J`$ at the solution, where $`J`$ is the stacked **[Jacobian](glossary.md#jacobian)** of the residuals and $`\Omega = \Sigma^{-1}`$ is the inverse of the measurement covariance $`\Sigma`$. With whitened Jacobians, this is simply $`J^\top J`$.
+The uncertainty around it is usually approximated as a Gaussian. Its [information matrix](glossary.md#information-matrix) is the Gauss-Newton [Hessian](glossary.md#normal-equations-and-hessian) $`H = J^\top \Omega J`$ at the solution (its inverse is the posterior covariance; bigger information means smaller uncertainty), where $`J`$ is the stacked **[Jacobian](glossary.md#jacobian)** of the raw residuals $`e`$ and $`\Omega = \Sigma^{-1}`$ is the inverse of the measurement covariance $`\Sigma`$. The whitened Jacobian is the Jacobian of $`r`$ (§3), $`\tilde J = \Sigma^{-1/2} J`$, so the same $`H`$ is simply $`\tilde J^\top \tilde J`$.
 
 **Tiny example** (toy case: one scalar $x$, measurement $r = x - z$ with $\sigma = 0.5$):
 - Information $= 1/\sigma^2 = 4$, so the variance is $1/4 = 0.25$.
@@ -264,13 +264,13 @@ This gives us a useful trade-off:
 | Computation        | Cheaper for small fixed-size states; $O(n^2)$ per update for EKF-SLAM, with $n$ landmarks (see caveat) | Usually more expensive |
 | Memory             | Lower for a fixed-size state; EKF-SLAM's dense covariance grows as $O(n^2)$ | Higher |
 | Online operation   | Excellent                      | Possible, but needs management             |
-| Global consistency | Harder                         | Stronger                                   |
+| Agreement with all constraints | Harder              | Stronger                                   |
 | Typical idea       | EKF-SLAM                       | Pose graph/factor graph/BA             |
 
 **A caveat on cost:** "filtering is cheaper" holds for small, fixed-size problems, but it inverts at scale.
 - **EKF-SLAM** keeps a *dense* joint covariance, so every update costs roughly $O(n^2)$ in the number of landmarks $n$ (Dissanayake et al., 2001).
 - **Sparse factor-graph smoothing** exploits the sparsity of the graph instead. With an [incremental](glossary.md#batch-vs-incremental) solver such as iSAM2 (Kaess et al., 2012), an odometry measurement only [re-eliminates](glossary.md#variable-elimination) a small part of the [Bayes tree](glossary.md#bayes-tree) near the newest pose.
-- **There is no guaranteed bound:** a loop closure can force re-elimination of most or all of the tree, and the cost depends on the [fill-in](glossary.md#fill-in) of the sparse factorization. This repo's [`bayes_tree_construction.py`](../use_numpy/bayes_tree_construction.py) shows both cases on a 16-node square loop. Under its fixed oldest-first ordering, an odometry edge affects 2 of 16 variables and a loop-closure edge affects all 16; iSAM2 additionally reorders the affected part, so its real cost is lower (see [`bayes_tree.md` §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo)).
+- **There is no guaranteed bound:** a loop closure can force re-elimination of most or all of the tree, and the cost depends on the [fill-in](glossary.md#fill-in) of the sparse factorization. This repo's [`bayes_tree_construction.py`](../use_numpy/bayes_tree_construction.py) shows both cases on a 16-node square loop. Under its fixed oldest-first [variable ordering](glossary.md#variable-ordering) (the order in which variables are eliminated; it controls fill-in), an odometry edge affects 2 of 16 variables and a loop-closure edge affects all 16; iSAM2 additionally reorders the affected part, so its real cost is lower (see [`bayes_tree.md` §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo)).
 
 So most updates in a typical SLAM graph (mostly odometry, occasionally a loop closure) are cheap under iSAM2, while EKF-SLAM pays $O(n^2)$ on every update. This is a main reason large-scale SLAM moved from EKF-SLAM toward factor-graph smoothing.
 
@@ -425,7 +425,7 @@ A filter asks this for both **smooth motion** and **hybrid motion**. The differe
 | | Smooth motion | Hybrid motion |
 |---|---|---|
 | Next step | Integrate the motion model | Also decide **when** the jump happens (e.g. touchdown), then apply it |
-| Uncertainty | Ordinary Jacobian | **[Saltation matrix](glossary.md#saltation-matrix)** ([hybrid_saltation_ekf.md §2](filtering/hybrid_saltation_ekf.md#2-why-the-reset-maps-own-jacobian-is-not-enough)) |
+| Uncertainty | Ordinary Jacobian of the motion model carries the covariance forward | **[Saltation matrix](glossary.md#saltation-matrix)**: the reset map's Jacobian plus a correction for the jump happening slightly earlier or later ([hybrid_saltation_ekf.md §2](filtering/hybrid_saltation_ekf.md#2-why-the-reset-maps-own-jacobian-is-not-enough)) |
 | A wrong call | A small error; the next measurements pull it back | A wrong decision, e.g. contact detected late ([§8](filtering/hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter)) or "velocity = 0" while still moving ([inchworm_zupt_ekf.md §3](filtering/inchworm_zupt_ekf.md#3-the-finding-not-just-always-is-wrong-while-moving)); the filter can't go back and redo it |
 
 ### The smoothing question

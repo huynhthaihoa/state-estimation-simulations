@@ -9,7 +9,7 @@ It is not a [SLAM](../glossary.md#slam-simultaneous-localization-and-mapping) al
 The same closed-form fit also runs *inside* SLAM pipelines:
 
 - point-to-point **ICP** (iterative closest point: repeatedly match each point to its nearest neighbor, then re-align) uses it as the per-iteration alignment step (scale fixed to 1); this is general background, as this repo's ICP (`lidar_primitives.py`) does not call it
-- **monocular** (single-camera) systems use the similarity version to align two maps at a loop closure
+- **monocular** (single-camera) systems use the similarity version to align two maps at a [loop closure](../glossary.md#loop-closure)
 
 ---
 
@@ -20,7 +20,7 @@ A monocular camera looking at a static scene can recover the *shape* of the scen
 - **absolute position/orientation:** the whole reconstruction could be picked up and rigidly moved anywhere, and every [reprojection error](../glossary.md#reprojection-error) would stay identical
 - **absolute scale:** shrinking the entire scene and every camera-to-point distance by the same factor, while changing nothing else, leaves every projected pixel where it was
 
-**Tiny example (toy case: pinhole camera, ignoring the principal point):** a point at $`(X, Z) = (1, 5)`$ and another at $`(2, 10)`$ both land at $`u = f_x X / Z = f_x/5`$ (where $`f_x`$ is the focal length in pixels, $`u`$ the horizontal pixel coordinate, and $`X, Z`$ the point's lateral and depth coordinates). Doubling the whole scene changes no pixel.
+**Tiny example (toy case: pinhole camera, ignoring the principal point, the pixel where the optical axis lands):** a point at $`(X, Z) = (1, 5)`$ and another at $`(2, 10)`$ both land at $`u = f_x X / Z = f_x/5`$ (where $`f_x`$ is the focal length in pixels, $`u`$ the horizontal pixel coordinate, and $`X, Z`$ the point's lateral and depth coordinates). Doubling the whole scene changes no pixel.
 
 Together, that is a **7-parameter similarity ambiguity**: 3 translation + 3 rotation + 1 scale. It is a **gauge freedom** ([glossary](../glossary.md#gauge-freedom)); see the "one subtlety this formula hides" note in [pose_graph_optimization.md](../optimization/pose_graph_optimization.md).
 
@@ -74,10 +74,12 @@ Centering removes translation from the problem; step 4 recovers it.
 
 $$\Sigma = \frac{1}{n} Y^\top X = U D V^\top$$
 
+$`\Sigma`$ is a $3\times3$ matrix: its entry $`(j,k)`$ is the mean product of the $j$-th coordinate of the centered $`Y`$ points and the $k$-th coordinate of the centered $`X`$ points.
+
 **Intuition:**
 
 - $`\Sigma = UDV^\top`$ records how the spread of the centered $Y$ points lines up with the spread of the centered $X$ points.
-- The SVD splits that relation into stretches ($`D`$) and turns ($`U`$, $`V^\top`$).
+- The SVD splits that relation into stretches ($`D`$, the singular values: non-negative, sorted largest first) and turns ($`U`$, $`V^\top`$).
 - Keeping only the turn, $`UV^\top`$, gives the rotation. The stretches go to the scale in step 4.
 - **Tiny example:** for the §5 data, the singular values are $`(0.5,\ 0.5,\ 0.125)`$, and $`UV^\top`$ comes out equal to $`R_{\text{true}}`$, the known rotation of that example.
 
@@ -142,20 +144,20 @@ X = \begin{bmatrix} 0 & 0 & 0\\
 \qquad Y = s\,(R_{\text{true}} X^\top)^\top + t
 ```
 
-Running `umeyama_alignment(X, Y)` recovers $\hat{s} = 2.0$, $\hat{R} = R_{\text{true}}$ and $\hat{t} = (1, 2, 3)$ to floating-point precision ($< 10^{-15}$ max error), since the 4 noise-free points are consistent with exactly one similarity transform. With real (noisy) data, the same four steps return the *least-squares best* $s, R, t$, like fitting a line through noisy points.
+Here $X$ and $Y$ are the raw points (one per row); step 1 centers them. Running `umeyama_alignment(X, Y)` recovers $\hat{s} = 2.0$, $\hat{R} = R_{\text{true}}$ and $\hat{t} = (1, 2, 3)$ to floating-point precision ($< 10^{-15}$ max error), since the 4 noise-free points are consistent with exactly one similarity transform. With real (noisy) data, the same four steps return the *least-squares best* $s, R, t$, like fitting a line through noisy points.
 
 ---
 
 ## 6. Where this is (and isn't) used in this repo
 
-- **[`bundle_adjustment.py`](../../use_numpy/bundle_adjustment.py)** (both `use_numpy/` and `use_manif/`) calls `umeyama_alignment` on the *camera positions* after solving, then applies the recovered $(s, R, t)$ to **both** the camera poses and the landmark positions before computing `pose_errors`/`landmark_errors` against ground truth. This is standard practice for evaluating monocular BA/SfM (Structure from Motion) output; see [bundle_adjustment.md](../optimization/bundle_adjustment.md) for how it fits into that script.
+- **[`bundle_adjustment.py`](../../use_numpy/bundle_adjustment.py)** (both `use_numpy/` and `use_manif/`) calls `umeyama_alignment` on the *camera positions* after solving, then applies the recovered $(s, R, t)$ to **both** the camera poses and the landmark positions before computing `pose_errors` (per-pose rotation error in degrees and position error in metres) and `landmark_errors` (per-landmark position error in metres) against ground truth. This is standard practice for evaluating monocular BA/SfM (Structure from Motion) output; see [bundle_adjustment.md](../optimization/bundle_adjustment.md) for how it fits into that script.
   - Reprojection error is unaffected by the alignment (a similarity transform leaves every projected pixel unchanged), so only the absolute pose/landmark errors depend on this step.
 - **[`bundle_adjustment_advanced.py`](../../use_numpy/bundle_adjustment_advanced.py)** does **not** call it. It hard-fixes **two** [keyframes](../glossary.md#keyframe) (poses 0 and 1) as a gauge anchor instead of using a soft gauge-prior factor (a [prior](../glossary.md#prior-unary-factor) on the first two camera poses that softly pins the gauge):
   - One fixed keyframe removes only the 6 rigid DoF. Scale stays unobservable, since the reconstruction rescaled about that pose satisfies every constraint equally well.
   - A *second* fixed keyframe also fixes the *distance* between the anchors, so no gauge freedom is left.
   - That doesn't mean there's nothing to align. Keyframe 0 is fixed at its true pose, but keyframe 1 keeps its noisy front-end pose, so the scale and orientation it pins are wrong (up to ~19% in scale over seeds 0-4, see [bundle_adjustment.md §13.6](../optimization/bundle_adjustment.md#136-in-this-repo)).
-  - The reported raw error therefore includes a large similarity offset that Umeyama alignment would remove ([§14](../optimization/bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment)).
-- **[`lidar_primitives.py`](../../use_numpy/lidar_primitives.py)** (both `use_numpy/` and `use_manif/`) calls `umeyama_alignment` inside `trajectory_errors` on the estimated and true positions, but keeps only $R$ and computes $t$ from the centroids, $`t = \mu_{\text{true}} - R\mu_{\text{est}}`$. That is a rigid ($s = 1$) alignment for the **ATE** (absolute trajectory error), and the only rigid use of the function in this repo.
+  - The reported raw error (measured directly against ground truth, without the Umeyama fit) therefore includes a large similarity offset that Umeyama alignment would remove ([§14](../optimization/bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment)).
+- **[`lidar_primitives.py`](../../use_numpy/lidar_primitives.py)** (both `use_numpy/` and `use_manif/`) calls `umeyama_alignment` inside `trajectory_errors` on the estimated and true positions, but keeps only $R$ and computes $t$ from the centroids, $`t = \mu_{\text{true}} - R\mu_{\text{est}}`$. That is a rigid ($s = 1$) alignment for the **ATE** (absolute trajectory error: the RMS position error after the rigid fit; [glossary](../glossary.md#umeyama-alignment-and-trajectory-rmse)), and the only rigid use of the function in this repo.
 
 ---
 
