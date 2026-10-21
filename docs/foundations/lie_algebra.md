@@ -139,7 +139,7 @@ so the matrix is the cross product written as a matrix.
 
 ## 8. The exponential map
 
-We have a rotation vector $\delta\theta$ (an axis times an angle) and want a real rotation matrix. The **exponential map** turns a local motion into an actual transformation.
+We have a rotation vector $\delta\theta$ (an axis times an angle) and want a real rotation matrix. The **exponential map** turns a **local motion** into an **actual transformation**.
 
 **Intuition:**
 
@@ -175,7 +175,7 @@ For a small rotation it reduces to $R \approx I+\delta\theta^\wedge$, the first-
 
 ## 9. The logarithm map
 
-The **logarithm map** does the reverse of §8: it turns an actual transformation back into a local motion.
+The **logarithm map** does the reverse of §8: it turns an **actual transformation** back into a **local motion**.
 
 ```text
 Lie group                       Lie algebra
