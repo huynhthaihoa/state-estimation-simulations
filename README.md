@@ -780,6 +780,7 @@ uv run python use_numpy/invariant_saltation_ekf.py --duration 5.0 --dt 0.01 --me
 #### Scripts
 
 - [use_numpy/hexapod_gait_ekf.py](use_numpy/hexapod_gait_ekf.py)
+- [use_numpy/hexapod_gait_ekf_v2.py](use_numpy/invariant_saltation_ekf_v2.py): class-based version, same output
 - [use_numpy/animate_hexapod_gait_ekf.py](use_numpy/animate_hexapod_gait_ekf.py): animated GIF of one run with L2 slipping, embedded in [hexapod_gait_ekf.md](docs/filtering/hexapod_gait_ekf.md); render with `uv run python use_numpy/animate_hexapod_gait_ekf.py --out assets/hexapod_gait_ekf.gif`
 
 #### Usage
