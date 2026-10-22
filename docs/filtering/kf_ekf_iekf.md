@@ -221,7 +221,7 @@ Here $`R_{\text{pred}}`$ and $`t_{\text{pred}}`$ are the rotation and translatio
 | --- | --- | --- |
 | Residual (point $i$, stacked over all $i$) | $`r_{k,i} = z_{k,i} - \big(R_{\text{pred}}\,p_i + t_{\text{pred}}\big)`$ | $`r_{k,i} = R_{\text{pred}}^\top(z_{k,i} - t_{\text{pred}}) - p_i`$ |
 | Jacobian $H_i$ | $`\left[R_{\text{pred}} \;\; -R_{\text{pred}}\,p_i^\wedge\right]`$ | $`\left[I \;\; -p_i^\wedge\right]`$ |
-| Depends on current estimate? | Yes - $R_{\text{pred}}$ appears in $H$ itself | **No** - only the fixed, known $p_i$ appears |
+| Depends on current estimate? | **Yes** - $R_{\text{pred}}$ appears in $H$ itself | **No** - only the fixed, known $p_i$ appears |
 
 Here $M$ is the number of cloud points and $H_i$ is the 3×6 derivative of point $i$'s predicted position (world frame for the EKF, body frame for the IEKF) with respect to $\xi$. $H$ stacks the $M$ blocks ($3M\times6$), $r_k$ stacks the residuals ($3M$ entries) and the correction $K_k r_k$ is a 6-vector.
 
