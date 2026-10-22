@@ -17,7 +17,7 @@ The **error vector** $\xi$ is the small 6-vector (translation first, then rotati
 Barrau & Bonnabel (2017, Eqs. 18 and 25) define the inverses, $\eta^L = X^{-1}\hat X$ and $\eta^R = \hat X X^{-1}$. An inverted error ignores the same frame changes, so everything below holds for both. Only the sign of the small error vector $\xi$ flips.
 
 ### Naming trap
-The perturbation $`X = \hat X\,\mathrm{Exp}(\xi)`$ used in most of this repo is what Solà et al. and the `manif` library (a Lie-group library, used through its Python bindings in this repo's `use_manif/` scripts) call "right-plus" ($\hat X \oplus \xi$), because $\mathrm{Exp}(\xi)$ multiplies on the right. It is the **left**-invariant error: $\eta_L = \hat X^{-1}X = \mathrm{Exp}(\xi)$.
+The perturbation $`X = \hat X\,\mathrm{Exp}(\xi)`$ used in most of this repo is what Solà et al. and the `manif` library (a Lie-group library, used through its Python bindings in this repo's `use_manif/` scripts) call **right-plus** ($\hat X \oplus \xi$), because $\mathrm{Exp}(\xi)$ multiplies on the right. It is the **left-invariant error**: $\eta_L = \hat X^{-1}X = \mathrm{Exp}(\xi)$.
 
 - "Right" in "right-plus" says where the increment is applied.
 - "Left" in "left-invariant" says which frame change the error ignores.
