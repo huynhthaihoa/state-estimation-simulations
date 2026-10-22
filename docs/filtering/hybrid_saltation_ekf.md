@@ -50,7 +50,7 @@ A **hybrid dynamical system** alternates **continuous flow** with **instantaneou
 - **Flow:** $`\dot x = f(x) = \begin{bmatrix} v \\ (0,0,-g) \end{bmatrix}`$ - ordinary free-fall, affine in $x$ (linear plus a constant gravity term), so it can be integrated exactly.
 - **Guard:** $g(x) = p_z$. The system jumps whenever a falling trajectory reaches $g(x) = 0$ (touches the ground). Its gradient $Dg = \partial g/\partial x$ appears throughout this doc, starting in §2. Here it is the constant row vector $(0,0,1,0,0,0)$, which picks out the $p_z$ component.
   - The letter $g$ does double duty, following the saltation-matrix literature: $g(x)$ and $Dg$ are the guard, while a bare $g$ in the dynamics, as in $\tfrac12 g t^2$, is gravity, $9.81\ \text{m/s}^2$.
-- **Reset map:** $R(x)$, applied at the guard - here, $`v_z \mapsto -e\,v_z`$ (an inelastic bounce with restitution $e$, the fraction of the impact speed kept: $e=1$ is fully elastic), position and horizontal velocity untouched. A superscript $-$/$`+`$ on a state, vector field or covariance (e.g. $x^{-}$, $f^{+}$, $P^{-}$, $P^{+}$) means "evaluated just before/after the reset" (see the notation table below).
+- **Reset map:** $R(x)$, applied at the guard - here, $`v_z \mapsto -e\,v_z`$ (a bounce with restitution $e$, the fraction of the impact speed kept: $e=1$ is perfectly elastic, $`e<1`$ loses energy), position $p$ and horizontal velocity $`v_x, v_y`$ untouched (a frictionless contact: the floor pushes only along its normal). A superscript $-$/$`+`$ on a state, vector field or covariance (e.g. $x^{-}$, $f^{+}$, $P^{-}$, $P^{+}$) means "evaluated just before/after the reset" (see the notation table below).
 
 This is the canonical example (the word "saltation" is Latin for "leaping"). It is the simplest analog of a foot-strike impact, a discrete velocity reset at a discrete contact event, without the rotational complexity of [SE(3)](../glossary.md#so3-and-se3). The glossary defines [hybrid system, guard, reset map and saltation matrix](../glossary.md#hybrid-system-guard-and-reset-map).
 
@@ -63,7 +63,7 @@ Several letters mean something different here than in the rest of the repo, or m
 | $f(x)$ | The continuous flow (free fall). |
 | $g(x) = p_z$, $Dg$ | The guard and its gradient, the row vector $(0,0,1,0,0,0)$. A bare $g$ in the dynamics is gravity, $9.81\ \text{m/s}^2$. |
 | $R(x)$, $DR$ | The reset map and its Jacobian, $\text{diag}(1,1,1,1,1,-e)$. Not a rotation, and not a measurement-noise covariance (that is $R_z$). |
-| $e$ | Coefficient of restitution. |
+| $e$ | Coefficient of restitution (dimensionless): the ratio of the relative speed of separation to the relative speed of approach (Newton's restitution law). Against the fixed ground this is the fraction of the impact speed kept, so $`v_z \mapsto -e\,v_z`$. $e=1$ is perfectly elastic and $e=0$ is perfectly inelastic. Real collisions fall between 0 and 1. |
 | $x^{-}$, $x^{+}$ | The state just before and just after the bounce, with $x^{+} = R(x^{-})$. **Never** before/after a measurement update in this doc. |
 | $f^{-}$, $f^{+}$ | The flow evaluated at $x^{-}$ and at $x^{+}$. |
 | $P^{-}$, $P^{+}$ | The covariance just before and just after the bounce. |
