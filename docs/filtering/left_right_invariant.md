@@ -6,7 +6,7 @@ What "left-invariant" and "right-invariant" errors mean in the **Invariant EKF**
 
 ## 1. The setup
 
-State lives on a [Lie group](../glossary.md#lie-group), e.g. a [pose](../glossary.md#pose) $X \in SE(3)$ ([glossary](../glossary.md#so3-and-se3); written $T$ in the glossary and code) mapping body coordinates to world coordinates. We have the true pose $X$ and our estimate $\hat X$. An ordinary EKF defines the error as the subtraction $X - \hat X$, but subtracting two poses leaves the [manifold](../glossary.md#manifold). IEKF uses group composition instead, in two natural ways:
+State lives on a [Lie group](../glossary.md#lie-group), e.g. a [pose](../glossary.md#pose) $X \in SE(3)$ ([glossary](../glossary.md#so3-and-se3); written $T$ in the glossary and code) mapping body coordinates to world coordinates. We have the **true pose** $X$ and **our estimate** $\hat X$. An ordinary EKF defines the error as the subtraction $X - \hat X$, but subtracting two poses leaves the [manifold](../glossary.md#manifold). IEKF uses group composition instead, in two natural ways:
 
 $$\eta_L = \hat X^{-1} X \qquad \text{(left-invariant error)}$$
 $$\eta_R = X \hat X^{-1} \qquad \text{(right-invariant error)}$$
