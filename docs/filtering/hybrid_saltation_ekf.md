@@ -297,7 +297,7 @@ Dg\,\Xi(x^{-}) = -e\,Dg
 
 ## 6. The empirical finding: a modest, real gap, not a dramatic one
 
-The intuitive story going in was that the naive $`P^{+} = DR\,P^{-}\,DR^\top`$ update would be measurably overconfident (too-small reported uncertainty) right after each bounce compared to the saltation-corrected one, and a Monte Carlo NEES consistency check would show it (a consistent 6-[DoF](../glossary.md#degrees-of-freedom-dof) (degrees of freedom) filter averages $\approx 6$, higher means overconfident, lower underconfident). The data does not bear that out.
+The intuitive story going in was that the naive $`P^{+} = DR\,P^{-}\,DR^\top`$ update would be measurably overconfident (too-small reported uncertainty) right after each bounce compared to the saltation-corrected one, and a Monte Carlo NEES consistency check would show it (a consistent 6-[DoF](../glossary.md#degrees-of-freedom-dof) (degrees of freedom) filter averages its state dimension, $`\approx 6`$ here; higher means overconfident, lower underconfident). The data does not bear that out.
 
 Running `saltation_matrix_ekf.py` at its defaults (500 Monte Carlo trials, 3 well-separated bounces from a 5m drop at $e = 0.85$) and looking at NEES in the few ticks immediately following each bounce (excluding the shared spike at the bounce tick itself, which both filters exhibit for the mundane reason that the true trajectory is also close to its own crossing at that tick):
 
