@@ -34,7 +34,7 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from invariant_saltation_ekf import (FILTERS, LABELS, COLORS, LINESTYLES, se23_make, se23_parts, so3_exp,
                                      generate_ground_truth_and_data, initial_estimate, child_detect_rngs,
                                      run_filter, run_monte_carlo_consistency,
-                                     default_landmarks)
+                                     default_landmarks, BounceConfig)
 from utils import averaged_nees_bounds
 
 
@@ -72,6 +72,11 @@ def main():
                         help="Contact-detection time offset (s), positive = late; 0 = exact detection")
     parser.add_argument("--detect-time-noise-std", type=float, default=0.0,
                         help="Contact-detection time jitter std-dev (s); 0 = exact detection")
+    parser.add_argument("--max-bounces", type=int, default=5,
+                        help="Safety cap on bounces processed within one step (see BounceConfig)")
+    parser.add_argument("--min-bounce-speed", type=float, default=0.5,
+                        help="Impact speed (m/s) below which a bounce raises RuntimeError "
+                             "(settling phase not modelled; see BounceConfig)")
     parser.add_argument("--n-mc-trials", type=int, default=200, help="Monte Carlo consistency trials")
     parser.add_argument("--seed", type=int, default=0, help="RNG seed")
     parser.add_argument("--stride", type=int, default=3, help="Filter ticks per GIF frame")
@@ -94,6 +99,7 @@ def main():
         args.gyro_noise_std, args.accel_noise_std, args.meas_noise_std, rng)
     X_init, P_init = initial_estimate(X0, P0_ri, rng)
     detect = (args.detect_time_bias, args.detect_time_noise_std)
+    bounce_cfg = BounceConfig(max_bounces=args.max_bounces, min_bounce_speed=args.min_bounce_speed)
     detect_rngs = child_detect_rngs(rng)
     # With exact detection "saltation_timing" is identical to "saltation", so it is left out.
     shown = [n for n in FILTERS if n != "saltation_timing" or any(detect)]
@@ -101,12 +107,13 @@ def main():
     for name in shown:
         X_list, _, _ = run_filter(name, X_init, P_init[name], gyro, accel, meas, args.dt, args.restitution, g_vec,
                                   landmarks, args.gyro_noise_std, args.accel_noise_std, args.meas_noise_std,
-                                  *detect, detect_rngs[name])
+                                  *detect, detect_rngs[name], bounce_cfg)
         est[name] = np.array([se23_parts(X)[2] for X in X_list])
     print(f"Running Monte Carlo consistency check ({args.n_mc_trials} trials)...")
     avg_nees, _ = run_monte_carlo_consistency(
         X_true, impact_ticks, body_rate, args.dt, args.restitution, g_vec, landmarks, args.meas_every, P0_ri,
-        args.gyro_noise_std, args.accel_noise_std, args.meas_noise_std, args.n_mc_trials, rng, *detect)
+        args.gyro_noise_std, args.accel_noise_std, args.meas_noise_std, args.n_mc_trials, rng, *detect,
+        bounce_cfg=bounce_cfg)
     lo, hi = averaged_nees_bounds(9, args.n_mc_trials)
     for name in shown:
         a = avg_nees[name]

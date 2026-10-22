@@ -80,6 +80,7 @@ is slower than `min_bounce_speed`, instead of modeling the settling phase).
 import argparse
 import os
 import sys
+from dataclasses import dataclass
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -245,6 +246,20 @@ def vector_field_world(X, gyro, accel, g_vec):
     """
     R, v, _ = se23_parts(X)
     return np.concatenate([R @ gyro, R @ accel + g_vec, v])
+
+
+@dataclass(frozen=True)
+class BounceConfig:
+    """Settings that bound how step_hybrid_ri and step_hybrid_world resolve
+    bounces within one step.
+    Fields:
+        max_bounces: safety cap on bounces processed within one step
+        min_bounce_speed: impact speed (m/s) below which a bounce raises
+            RuntimeError instead of being resolved (the slow-bounce settling
+            phase is not modelled)
+    """
+    max_bounces: int = 5
+    min_bounce_speed: float = 0.5
 
 
 def saltation_matrix_world(X_minus, gyro, accel, e, g_vec):
@@ -448,7 +463,7 @@ def generate_ground_truth_and_data(duration, dt, e, g_vec, X0, body_rate, landma
 
 def step_hybrid_ri(X, P, gyro, accel, dt, e, g_vec, gyro_noise_std, accel_noise_std, reset_mode,
                    detect_time_bias=0.0, detect_time_noise_std=0.0, detect_rng=None, timing_noise_std=0.0,
-                   min_bounce_speed=0.5, max_bounces=5):
+                   bounce_cfg=BounceConfig()):
     """RIEKF predict over dt through the hybrid dynamics, splitting the step at
     every ground crossing predicted from the estimate (applied at the detected
     time, see detected_crossing_time). reset_mode selects the covariance
@@ -467,14 +482,13 @@ def step_hybrid_ri(X, P, gyro, accel, dt, e, g_vec, gyro_noise_std, accel_noise_
             error (see detected_crossing_time); all default to exact detection
         timing_noise_std: RMS detection-time error the "saltation_timing"
             filter assumes (s); ignored by the other modes
-        min_bounce_speed: raise if an impact is slower than this (m/s)
-        max_bounces: safety cap per step
+        bounce_cfg: BounceConfig instance with max_bounces and min_bounce_speed
     Returns:
         X, P after dt
         n_bounces: number of bounces resolved in this step
     """
     remaining, n_bounces = dt, 0
-    for _ in range(max_bounces + 1):
+    for _ in range(bounce_cfg.max_bounces + 1):
         tau = crossing_time(X, accel, g_vec)
         impact = tau is not None and tau < remaining
         h = (detected_crossing_time(tau, remaining, detect_time_bias, detect_time_noise_std, detect_rng)
@@ -486,7 +500,7 @@ def step_hybrid_ri(X, P, gyro, accel, dt, e, g_vec, gyro_noise_std, accel_noise_
         remaining -= h
         if not impact:
             return X, P, n_bounces
-        if abs(X[2, 3]) < min_bounce_speed:
+        if abs(X[2, 3]) < bounce_cfg.min_bounce_speed:
             raise RuntimeError("impact slower than min_bounce_speed; shorten --duration")
         Q_timing = np.zeros((9, 9))
         if reset_mode in ("saltation", "saltation_timing"):
@@ -534,7 +548,7 @@ def update_ri(X, P, y, landmarks, meas_noise_std):
 
 def step_hybrid_world(X, P, gyro, accel, dt, e, g_vec, gyro_noise_std, accel_noise_std,
                       detect_time_bias=0.0, detect_time_noise_std=0.0, detect_rng=None,
-                      min_bounce_speed=0.5, max_bounces=5):
+                      bounce_cfg=BounceConfig()):
     """Ordinary error-state EKF predict (world-perturbation coordinates) with
     the saltation correction at each bounce. Its propagation Jacobian depends
     on the estimate:
@@ -546,14 +560,13 @@ def step_hybrid_world(X, P, gyro, accel, dt, e, g_vec, gyro_noise_std, accel_noi
         e: restitution coefficient
         g_vec: (3,) gravity vector
         gyro_noise_std, accel_noise_std: IMU noise std-devs per sample
-        detect_time_bias, detect_time_noise_std, detect_rng, min_bounce_speed,
-            max_bounces: as step_hybrid_ri
+        detect_time_bias, detect_time_noise_std, detect_rng, bounce_cfg: as step_hybrid_ri
     Returns:
         X, P after dt
         n_bounces: number of bounces resolved in this step
     """
     remaining, n_bounces = dt, 0
-    for _ in range(max_bounces + 1):
+    for _ in range(bounce_cfg.max_bounces + 1):
         tau = crossing_time(X, accel, g_vec)
         impact = tau is not None and tau < remaining
         h = (detected_crossing_time(tau, remaining, detect_time_bias, detect_time_noise_std, detect_rng)
@@ -569,7 +582,7 @@ def step_hybrid_world(X, P, gyro, accel, dt, e, g_vec, gyro_noise_std, accel_noi
         remaining -= h
         if not impact:
             return X, P, n_bounces
-        if abs(X[2, 3]) < min_bounce_speed:
+        if abs(X[2, 3]) < bounce_cfg.min_bounce_speed:
             raise RuntimeError("impact slower than min_bounce_speed; shorten --duration")
         Xi = saltation_matrix_world(X, gyro, accel, e, g_vec)
         X = reset_map(X, e)
@@ -627,7 +640,8 @@ FILTERS = ("invariant_naive", "reset_jacobian", "saltation", "saltation_timing",
 
 def run_filter(name, X_init, P_init, gyro, accel, meas, dt, e, g_vec, landmarks,
                gyro_noise_std, accel_noise_std, meas_noise_std,
-               detect_time_bias=0.0, detect_time_noise_std=0.0, detect_rng=None):
+               detect_time_bias=0.0, detect_time_noise_std=0.0, detect_rng=None,
+               bounce_cfg=BounceConfig()):
     """Runs one of FILTERS over the whole data set. "saltation_timing" assumes
     a detection-time error RMS of hypot(detect_time_bias,
     detect_time_noise_std), i.e. it is tuned to the true detector.
@@ -640,6 +654,7 @@ def run_filter(name, X_init, P_init, gyro, accel, meas, dt, e, g_vec, landmarks,
         dt, e, g_vec, landmarks, *_noise_std: as above
         detect_time_bias, detect_time_noise_std, detect_rng: contact-detection
             error, see detected_crossing_time
+        bounce_cfg: BounceConfig instance with max_bounces and min_bounce_speed
     Returns:
         X_list: list of (5,5) estimates, P_list: list of (9,9) covariances
         bounce_count: (N,) cumulative number of bounces the filter has resolved, per tick
@@ -650,7 +665,7 @@ def run_filter(name, X_init, P_init, gyro, accel, meas, dt, e, g_vec, landmarks,
         if name == "world_saltation":
             X, P, nb = step_hybrid_world(X, P, gyro[k], accel[k], dt, e, g_vec,
                                          gyro_noise_std, accel_noise_std,
-                                         detect_time_bias, detect_time_noise_std, detect_rng)
+                                         detect_time_bias, detect_time_noise_std, detect_rng, bounce_cfg)
             if k + 1 in meas:
                 X, P = update_world(X, P, meas[k + 1], landmarks, meas_noise_std)
         else:
@@ -658,7 +673,8 @@ def run_filter(name, X_init, P_init, gyro, accel, meas, dt, e, g_vec, landmarks,
                                       gyro_noise_std, accel_noise_std, reset_mode=name,
                                       detect_time_bias=detect_time_bias,
                                       detect_time_noise_std=detect_time_noise_std, detect_rng=detect_rng,
-                                      timing_noise_std=np.hypot(detect_time_bias, detect_time_noise_std))
+                                      timing_noise_std=np.hypot(detect_time_bias, detect_time_noise_std),
+                                      bounce_cfg=bounce_cfg)
             if k + 1 in meas:
                 X, P = update_ri(X, P, meas[k + 1], landmarks, meas_noise_std)
         X_list.append(X)
@@ -736,7 +752,7 @@ def true_bounce_counts(impact_ticks, n_ticks):
 
 def run_monte_carlo_consistency(X_true_list, impact_ticks, gyro_true, dt, e, g_vec, landmarks, meas_every,
                                 P0_ri, gyro_noise_std, accel_noise_std, meas_noise_std, n_trials, rng,
-                                detect_time_bias=0.0, detect_time_noise_std=0.0):
+                                detect_time_bias=0.0, detect_time_noise_std=0.0, bounce_cfg=BounceConfig()):
     """Average NEES per tick for every filter, over n_trials independent
     realizations of the IMU noise, measurement noise and initial error on the
     same nominal true trajectory.
@@ -764,6 +780,7 @@ def run_monte_carlo_consistency(X_true_list, impact_ticks, gyro_true, dt, e, g_v
         n_trials: number of trials
         rng: numpy Generator
         detect_time_bias, detect_time_noise_std: contact-detection error
+        bounce_cfg: BounceConfig, see step_hybrid_ri
     Returns:
         avg_nees: dict name -> (N,) average NEES per tick over mode-matched
             trials (nan where no trial is mode-matched)
@@ -785,7 +802,7 @@ def run_monte_carlo_consistency(X_true_list, impact_ticks, gyro_true, dt, e, g_v
         for name in FILTERS:
             X_list, P_list, counts = run_filter(name, X_init, P_init[name], gyro, accel, meas, dt, e, g_vec,
                                                 landmarks, gyro_noise_std, accel_noise_std, meas_noise_std,
-                                                detect_time_bias, detect_time_noise_std, detect_rngs[name])
+                                                detect_time_bias, detect_time_noise_std, detect_rngs[name], bounce_cfg)
             for k in np.flatnonzero(counts == counts_true):
                 sums[name][k] += nees(error_vector(name, X_true_list[k], X_list[k]), P_list[k])
                 valid[name][k] += 1
@@ -852,8 +869,14 @@ def main():
     parser.add_argument("--n-mc-trials", type=int, default=200, help="Monte Carlo consistency trials")
     parser.add_argument("--seed", type=int, default=0, help="RNG seed")
     parser.add_argument("--out", type=str, default=None, help="Save the figure here instead of showing it")
+    parser.add_argument("--max-bounces", type=int, default=5,
+                        help="Safety cap on bounces processed within one step (see BounceConfig)")
+    parser.add_argument("--min-bounce-speed", type=float, default=0.5,
+                        help="Impact speed (m/s) below which a bounce raises RuntimeError "
+                             "(settling phase not modelled; see BounceConfig)")
     args = parser.parse_args()
 
+    bounce_cfg = BounceConfig(max_bounces=args.max_bounces, min_bounce_speed=args.min_bounce_speed)
     rng = np.random.default_rng(args.seed)
     g_vec = np.array([0.0, 0.0, -args.gravity])
     landmarks = default_landmarks()
@@ -879,14 +902,15 @@ def main():
         (X_list, P_list, _), t_step, mem = measure_performance(
             run_filter, name, X_init, P_init[name], gyro, accel, meas, args.dt, args.restitution, g_vec,
             landmarks, args.gyro_noise_std, args.accel_noise_std, args.meas_noise_std, *detect, detect_rngs[name],
-            n_steps=n_steps)
+            n_steps=n_steps, bounce_cfg=bounce_cfg)
         results[name] = X_list
         perf[name] = (t_step, mem)
 
     print(f"Running Monte Carlo consistency check ({args.n_mc_trials} trials)...")
     avg_nees, mismatch = run_monte_carlo_consistency(
         X_true, impact_ticks, body_rate, args.dt, args.restitution, g_vec, landmarks, args.meas_every, P0_ri,
-        args.gyro_noise_std, args.accel_noise_std, args.meas_noise_std, args.n_mc_trials, rng, *detect)
+        args.gyro_noise_std, args.accel_noise_std, args.meas_noise_std, args.n_mc_trials, rng, *detect,
+        bounce_cfg=bounce_cfg)
 
     print("\nRMS errors (single run):")
     errs = {}

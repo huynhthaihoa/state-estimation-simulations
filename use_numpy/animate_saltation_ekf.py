@@ -28,10 +28,10 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 from matplotlib.patches import Ellipse
 
-from saltation_matrix_ekf_v2 import HybridEKF, generate_ground_truth_and_data, detect_bounce_ticks
+from saltation_matrix_ekf_v2 import HybridEKF, generate_ground_truth_and_data, detect_bounce_ticks, BounceConfig
 
 
-def run_filters(x_true, z, x_init, P_init, dt, e, g, accel_noise_std, impact_noise_std, R):
+def run_filters(x_true, z, x_init, P_init, dt, e, g, accel_noise_std, impact_noise_std, R, bounce_cfg):
     """Steps a naive and a saltation-corrected HybridEKF in lockstep over the
     same measurements.
     Returns:
@@ -40,7 +40,7 @@ def run_filters(x_true, z, x_init, P_init, dt, e, g, accel_noise_std, impact_noi
     """
     out = {}
     for use_saltation in (False, True):
-        ekf = HybridEKF(x_init, P_init, dt, e, g, accel_noise_std, impact_noise_std, R, use_saltation)
+        ekf = HybridEKF(x_init, P_init, dt, e, g, accel_noise_std, impact_noise_std, R, use_saltation, bounce_cfg=bounce_cfg)
         x, P = ekf.get_state()
         xs, Ps = [x], [P]
         for k in range(len(x_true) - 1):
@@ -86,12 +86,19 @@ def main():
     parser.add_argument("--fps", type=int, default=20, help="GIF frames per second (one frame per filter tick)")
     parser.add_argument("--dpi", type=int, default=80, help="GIF resolution")
     parser.add_argument("--out", type=str, default="saltation_matrix_ekf.gif", help="Output GIF path")
+    
+    parser.add_argument("--max-bounces", type=int, default=20, help="Safety cap on bounces processed within one step "
+                             "(see BounceConfig)")
+    parser.add_argument("--min-bounce-speed", type=float, default=1e-3, help="Impact speed (m/s) below which the point mass is treated as "
+                             "at rest (see BounceConfig and flow_resting)")
+    
     args = parser.parse_args()
 
+    bounce_cfg = BounceConfig(max_bounces=args.max_bounces, min_bounce_speed=args.min_bounce_speed)
     e, g, dt = args.restitution, args.gravity, args.dt
     rng = np.random.default_rng(args.seed)
     x_true, z = generate_ground_truth_and_data(args.duration, dt, e, g, args.drop_height,
-                                               args.init_horizontal_vel, args.pos_noise_std, rng)
+                                               args.init_horizontal_vel, args.pos_noise_std, rng, bounce_cfg)
     x_true = np.array(x_true)
     init_std = np.array([args.init_pos_noise_std] * 3 + [args.init_vel_noise_std] * 3)
     x_init = x_true[0] + rng.normal(0.0, 1.0, 6) * init_std
@@ -99,7 +106,7 @@ def main():
     R = args.pos_noise_std ** 2 * np.eye(3)
 
     hist = run_filters(x_true, z, x_init, P_init, dt, e, g, args.process_noise_std,
-                       args.impact_noise_std, R)
+                       args.impact_noise_std, R, bounce_cfg)
     bounces = detect_bounce_ticks(list(x_true))
     t = np.arange(len(x_true)) * dt
     dist = lambda X: np.hypot(X[:, 0], X[:, 1])  # horizontal distance travelled from the start

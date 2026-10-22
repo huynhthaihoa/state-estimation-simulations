@@ -334,8 +334,7 @@ class BounceConfig:
 
 
 def step_hybrid(x, P, dt, e, g, accel_noise_std, use_saltation, impact_noise_std=0.0,
-                 bounce_cfg=BounceConfig(),
-                 detect_time_bias=0.0, detect_time_noise_std=0.0, detect_rng=None):
+                 detect_time_bias=0.0, detect_time_noise_std=0.0, detect_rng=None, bounce_cfg=BounceConfig()):
     """Predicts (x, P) forward by one fixed interval dt through the hybrid
     free-fall/bounce dynamics, splitting the step at every ground-contact
     event it contains: propagate the continuous flow exactly up to each
