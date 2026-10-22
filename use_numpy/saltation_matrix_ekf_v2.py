@@ -91,6 +91,7 @@ see its own docstring.
 
 import argparse
 import os
+from dataclasses import dataclass
 import sys
 
 import numpy as np
@@ -127,7 +128,7 @@ def flow_resting(x, dt):
     """Fallback dynamics for a point mass already at rest on the ground
     (p_z = v_z = 0 held fixed): only horizontal motion continues, as a
     frictionless slide. Used inside step_hybrid once a bounce's impact speed
-    drops below min_bounce_speed, to avoid the classic "Zeno" pathology of a
+    drops below BounceConfig.min_bounce_speed, to avoid the classic "Zeno" pathology of a
     lossy bounce (e < 1) producing infinitely many, ever-faster bounces in a
     finite time. Not a general contact-mode model -- a deliberately simple
     fallback for a rare edge case, not the object of this script's comparison.
@@ -320,8 +321,20 @@ def process_noise_covariance(h, accel_noise_std):
     return Q
 
 
+@dataclass(frozen=True)
+class BounceConfig:
+    """Settings that bound how step_hybrid resolves bounces within one step.
+    Fields:
+        max_bounces: safety cap on bounces processed within one step
+        min_bounce_speed: impact speed (m/s) below which the point mass is
+            treated as having come to rest (see flow_resting)
+    """
+    max_bounces: int = 20
+    min_bounce_speed: float = 1e-3
+
+
 def step_hybrid(x, P, dt, e, g, accel_noise_std, use_saltation, impact_noise_std=0.0,
-                 min_bounce_speed=1e-3, max_bounces=20,
+                 bounce_cfg=BounceConfig(),
                  detect_time_bias=0.0, detect_time_noise_std=0.0, detect_rng=None):
     """Predicts (x, P) forward by one fixed interval dt through the hybrid
     free-fall/bounce dynamics, splitting the step at every ground-contact
@@ -370,8 +383,8 @@ def step_hybrid(x, P, dt, e, g, accel_noise_std, use_saltation, impact_noise_std
     function had before this parameter existed.
 
     Once the pre-impact vertical speed at a crossing falls below
-    min_bounce_speed, the point mass is treated as having come to rest
-    (v_z clamped to 0, remaining time integrated via flow_resting) rather
+    bounce_cfg.min_bounce_speed, the point mass is treated as having come to
+    rest (v_z clamped to 0, remaining time integrated via flow_resting) rather
     than continuing to resolve ever-smaller, ever-faster bounces.
     Arguments:
         x: state [p(3), v(3)] (6,)
@@ -384,9 +397,9 @@ def step_hybrid(x, P, dt, e, g, accel_noise_std, use_saltation, impact_noise_std
             the saltation matrix; if False, use reset_jacobian(e) alone
         impact_noise_std: std-dev of the isotropic regularizing floor added
             to P at each bounce (both branches)
-        min_bounce_speed: impact speed (m/s) below which the point mass is
-            treated as at rest
-        max_bounces: safety cap on bounces processed within one step
+        bounce_cfg: BounceConfig (max_bounces, min_bounce_speed) -- the
+            step's bounce cap and the impact speed below which the point
+            mass is treated as at rest
         detect_time_bias: systematic offset (s) applied to the detected
             crossing time relative to the true one (positive = late detection)
         detect_time_noise_std: std-dev (s) of Gaussian jitter added on top of
@@ -399,7 +412,7 @@ def step_hybrid(x, P, dt, e, g, accel_noise_std, use_saltation, impact_noise_std
     """
     remaining = dt
     at_rest = False
-    for _ in range(max_bounces):
+    for _ in range(bounce_cfg.max_bounces):
         if remaining <= 0.0:
             break
         if at_rest:
@@ -424,7 +437,7 @@ def step_hybrid(x, P, dt, e, g, accel_noise_std, use_saltation, impact_noise_std
         P = Phi @ P @ Phi.T + process_noise_covariance(tau_detect, accel_noise_std)
         remaining -= tau_detect
 
-        if abs(x[5]) < min_bounce_speed:
+        if abs(x[5]) < bounce_cfg.min_bounce_speed:
             x[5] = 0.0
             at_rest = True
             continue
@@ -437,7 +450,7 @@ def step_hybrid(x, P, dt, e, g, accel_noise_std, use_saltation, impact_noise_std
 
 
 def generate_ground_truth_and_data(duration, dt, e, g, drop_height, init_horizontal_vel,
-                                    pos_noise_std, rng):
+                                    pos_noise_std, rng, bounce_cfg=BounceConfig()):
     """Builds the true multi-bounce trajectory (exact, deterministic -- no
     process noise in the true dynamics themselves) and noisy position
     measurements a tracker would actually receive.
@@ -450,6 +463,8 @@ def generate_ground_truth_and_data(duration, dt, e, g, drop_height, init_horizon
         init_horizontal_vel: initial horizontal velocity [vx, vy] (m/s)
         pos_noise_std: std-dev of Gaussian noise added to position measurements (m)
         rng: numpy random number generator
+        bounce_cfg: BounceConfig -- the same bounce settings the filters use,
+            so the truth and the filters agree on when the mass comes to rest
     Returns:
         x_true: list of true states (6,) at each tick (including t=0)
         z: (n_steps+1, 3) array of noisy position measurements
@@ -459,14 +474,15 @@ def generate_ground_truth_and_data(duration, dt, e, g, drop_height, init_horizon
 
     x_true = [x0]
     for _ in range(n_steps):
-        x_next, _ = step_hybrid(x_true[-1], np.zeros((6, 6)), dt, e, g, 0.0, use_saltation=True)
+        x_next, _ = step_hybrid(x_true[-1], np.zeros((6, 6)), dt, e, g, 0.0, use_saltation=True,
+                               bounce_cfg=bounce_cfg)
         x_true.append(x_next)
 
     z = np.array([x[0:3] for x in x_true]) + rng.normal(0.0, pos_noise_std, (n_steps + 1, 3))
     return x_true, z
 
 
-def run_dead_reckoning(x_init, dt, n_steps, e, g):
+def run_dead_reckoning(x_init, dt, n_steps, e, g, bounce_cfg=BounceConfig()):
     """Prior-only baseline: propagate the exact deterministic dynamics from
     the (uncertain) initial guess, never looking at position measurements.
     Arguments:
@@ -475,12 +491,14 @@ def run_dead_reckoning(x_init, dt, n_steps, e, g):
         n_steps: number of steps
         e: restitution coefficient
         g: gravitational acceleration magnitude (m/s^2)
+        bounce_cfg: BounceConfig -- see step_hybrid's docstring
     Returns:
         x_list: list of predicted states (6,)
     """
     x_list = [x_init]
     for _ in range(n_steps):
-        x_next, _ = step_hybrid(x_list[-1], np.zeros((6, 6)), dt, e, g, 0.0, use_saltation=True)
+        x_next, _ = step_hybrid(x_list[-1], np.zeros((6, 6)), dt, e, g, 0.0, use_saltation=True,
+                               bounce_cfg=bounce_cfg)
         x_list.append(x_next)
     return x_list
 
@@ -495,7 +513,8 @@ class HybridEKF:
 
     def __init__(self, x_init, P_init, dt, e, g, accel_noise_std, impact_noise_std,
                  R, use_saltation,
-                 detect_time_bias=0.0, detect_time_noise_std=0.0, detect_rng=None):
+                 detect_time_bias=0.0, detect_time_noise_std=0.0, detect_rng=None,
+                 bounce_cfg=BounceConfig()):
         """
         Arguments:
             x_init: initial state estimate (6,)
@@ -512,6 +531,7 @@ class HybridEKF:
             detect_time_bias, detect_time_noise_std, detect_rng: contact-detection
                 timing-uncertainty parameters, passed straight through to
                 step_hybrid -- see its docstring
+            bounce_cfg: BounceConfig -- see step_hybrid's docstring
         """
         if detect_time_noise_std > 0.0 and detect_rng is None:
             raise ValueError("detect_time_noise_std > 0 requires detect_rng")
@@ -527,6 +547,7 @@ class HybridEKF:
         self.detect_time_bias = detect_time_bias
         self.detect_time_noise_std = detect_time_noise_std
         self.detect_rng = detect_rng
+        self.bounce_cfg = bounce_cfg
 
     def predict(self):
         """Propagate one tick forward through the hybrid dynamics, without a
@@ -538,7 +559,8 @@ class HybridEKF:
                                      self.impact_noise_std,
                                      detect_time_bias=self.detect_time_bias,
                                      detect_time_noise_std=self.detect_time_noise_std,
-                                     detect_rng=self.detect_rng)
+                                     detect_rng=self.detect_rng,
+                                     bounce_cfg=self.bounce_cfg)
 
     def update(self, z):
         """Linear-Gaussian EKF update against a direct noisy position observation
@@ -570,7 +592,8 @@ class HybridEKF:
 
 
 def run_ekf(x_init, P_init, z, dt, n_steps, e, g, accel_noise_std, impact_noise_std, R, use_saltation,
-            detect_time_bias=0.0, detect_time_noise_std=0.0, detect_rng=None):
+            detect_time_bias=0.0, detect_time_noise_std=0.0, detect_rng=None,
+            bounce_cfg=BounceConfig()):
     """Recursive EKF alternating step_hybrid's hybrid predict with
     measurement_update. Shared by run_ekf_naive/run_ekf_saltation below --
     they differ only in the use_saltation flag, so any difference in their
@@ -593,13 +616,15 @@ def run_ekf(x_init, P_init, z, dt, n_steps, e, g, accel_noise_std, impact_noise_
         detect_time_bias, detect_time_noise_std, detect_rng: contact-detection
             timing-uncertainty parameters, passed straight through to
             step_hybrid -- see its docstring
+        bounce_cfg: BounceConfig -- see step_hybrid's docstring
     Returns:
         x_list: list of estimated states (6,)
         P_list: list of estimated covariances (6,6)
     """
     ekf = HybridEKF(x_init, P_init, dt, e, g, accel_noise_std, impact_noise_std, R,
                     use_saltation, detect_time_bias=detect_time_bias,
-                    detect_time_noise_std=detect_time_noise_std, detect_rng=detect_rng)
+                    detect_time_noise_std=detect_time_noise_std, detect_rng=detect_rng,
+                    bounce_cfg=bounce_cfg)
     x, P = ekf.get_state()
     x_list, P_list = [x], [P]
     for k in range(n_steps):
@@ -611,19 +636,23 @@ def run_ekf(x_init, P_init, z, dt, n_steps, e, g, accel_noise_std, impact_noise_
 
 
 def run_ekf_naive(x_init, P_init, z, dt, n_steps, e, g, accel_noise_std, impact_noise_std, R,
-                   detect_time_bias=0.0, detect_time_noise_std=0.0, detect_rng=None):
+                   detect_time_bias=0.0, detect_time_noise_std=0.0, detect_rng=None,
+                   bounce_cfg=BounceConfig()):
     """run_ekf with use_saltation=False -- see run_ekf's docstring."""
     return run_ekf(x_init, P_init, z, dt, n_steps, e, g, accel_noise_std, impact_noise_std, R,
                     use_saltation=False, detect_time_bias=detect_time_bias,
-                    detect_time_noise_std=detect_time_noise_std, detect_rng=detect_rng)
+                    detect_time_noise_std=detect_time_noise_std, detect_rng=detect_rng,
+                    bounce_cfg=bounce_cfg)
 
 
 def run_ekf_saltation(x_init, P_init, z, dt, n_steps, e, g, accel_noise_std, impact_noise_std, R,
-                       detect_time_bias=0.0, detect_time_noise_std=0.0, detect_rng=None):
+                       detect_time_bias=0.0, detect_time_noise_std=0.0, detect_rng=None,
+                   bounce_cfg=BounceConfig()):
     """run_ekf with use_saltation=True -- see run_ekf's docstring."""
     return run_ekf(x_init, P_init, z, dt, n_steps, e, g, accel_noise_std, impact_noise_std, R,
                     use_saltation=True, detect_time_bias=detect_time_bias,
-                    detect_time_noise_std=detect_time_noise_std, detect_rng=detect_rng)
+                    detect_time_noise_std=detect_time_noise_std, detect_rng=detect_rng,
+                    bounce_cfg=bounce_cfg)
 
 
 def state_errors(x_true_list, x_est_list):
@@ -664,7 +693,8 @@ def detect_bounce_ticks(x_true_list, height_threshold=0.2):
 
 def run_monte_carlo_consistency(x_true_list, dt, e, g, accel_noise_std, impact_noise_std,
                                  pos_noise_std, init_pos_noise_std, init_vel_noise_std,
-                                 n_trials, rng, detect_time_bias=0.0, detect_time_noise_std=0.0):
+                                 n_trials, rng, detect_time_bias=0.0, detect_time_noise_std=0.0,
+                                 bounce_cfg=BounceConfig()):
     """Repeats run_ekf_naive/run_ekf_saltation over n_trials independent
     noise realizations of the same nominal true trajectory (fresh
     initial-condition error and fresh measurement noise each trial),
@@ -696,6 +726,7 @@ def run_monte_carlo_consistency(x_true_list, dt, e, g, accel_noise_std, impact_n
         detect_time_bias, detect_time_noise_std: contact-detection
             timing-uncertainty parameters, passed to both filter variants
             identically -- see step_hybrid's docstring
+        bounce_cfg: BounceConfig -- see step_hybrid's docstring
     Returns:
         nees_naive: (N,) average NEES per step, naive covariance handling
         nees_saltation: (N,) average NEES per step, saltation-corrected
@@ -720,12 +751,14 @@ def run_monte_carlo_consistency(x_true_list, dt, e, g, accel_noise_std, impact_n
                                           accel_noise_std, impact_noise_std, R,
                                           detect_time_bias=detect_time_bias,
                                           detect_time_noise_std=detect_time_noise_std,
-                                          detect_rng=detect_rng_naive)
+                                          detect_rng=detect_rng_naive,
+                                          bounce_cfg=bounce_cfg)
         x_salt, P_salt = run_ekf_saltation(x_init, P_init, z_trial, dt, n_steps, e, g,
                                             accel_noise_std, impact_noise_std, R,
                                             detect_time_bias=detect_time_bias,
                                             detect_time_noise_std=detect_time_noise_std,
-                                            detect_rng=detect_rng_salt)
+                                            detect_rng=detect_rng_salt,
+                                            bounce_cfg=bounce_cfg)
 
         for k in range(n_pts):
             sum_naive[k] += nees(x_true_list[k] - x_naive[k], P_naive[k])
@@ -787,14 +820,19 @@ def main():
 
     parser.add_argument("--seed", type=int, default=0, help="RNG seed")
     parser.add_argument("--out", type=str, default=None, help="Save the figure to this path instead of showing it")
+    parser.add_argument("--max-bounces", type=int, default=20, help="Safety cap on bounces processed within one step "
+                             "(see BounceConfig)")
+    parser.add_argument("--min-bounce-speed", type=float, default=1e-3, help="Impact speed (m/s) below which the point mass is treated as "
+                             "at rest (see BounceConfig and flow_resting)")
 
     args = parser.parse_args()
 
+    bounce_cfg = BounceConfig(max_bounces=args.max_bounces, min_bounce_speed=args.min_bounce_speed)
     rng = np.random.default_rng(args.seed)
 
     x_true, z = generate_ground_truth_and_data(
         args.duration, args.dt, args.restitution, args.gravity, args.drop_height,
-        args.init_horizontal_vel, args.pos_noise_std, rng)
+        args.init_horizontal_vel, args.pos_noise_std, rng, bounce_cfg=bounce_cfg)
     n_steps = len(x_true) - 1
 
     init_std = np.array([args.init_pos_noise_std] * 3 + [args.init_vel_noise_std] * 3)
@@ -804,7 +842,8 @@ def main():
 
     print("Running dead-reckoning baseline (exact dynamics, no measurement correction)...")
     x_dr, time_dr, mem_dr = measure_performance(
-        run_dead_reckoning, x_init, args.dt, n_steps, args.restitution, args.gravity, n_steps=n_steps)
+        run_dead_reckoning, x_init, args.dt, n_steps, args.restitution, args.gravity,
+        n_steps=n_steps, bounce_cfg=bounce_cfg)
 
     # Independent detection-jitter streams per filter variant -- see
     # run_monte_carlo_consistency's docstring for why naive/saltation don't share one.
@@ -816,20 +855,21 @@ def main():
         run_ekf_naive, x_init, P_init, z, args.dt, n_steps, args.restitution, args.gravity,
         args.process_noise_std, args.impact_noise_std, R, n_steps=n_steps,
         detect_time_bias=args.detect_time_bias, detect_time_noise_std=args.detect_time_noise_std,
-        detect_rng=detect_rng_naive)
+        detect_rng=detect_rng_naive, bounce_cfg=bounce_cfg)
 
     print("Running EKF with saltation-corrected bounce-covariance handling...")
     (x_salt, P_salt), time_salt, mem_salt = measure_performance(
         run_ekf_saltation, x_init, P_init, z, args.dt, n_steps, args.restitution, args.gravity,
         args.process_noise_std, args.impact_noise_std, R, n_steps=n_steps,
         detect_time_bias=args.detect_time_bias, detect_time_noise_std=args.detect_time_noise_std,
-        detect_rng=detect_rng_salt)
+        detect_rng=detect_rng_salt, bounce_cfg=bounce_cfg)
 
     print(f"Running Monte Carlo consistency check ({args.n_mc_trials} trials)...")
     nees_naive, nees_salt = run_monte_carlo_consistency(
         x_true, args.dt, args.restitution, args.gravity, args.process_noise_std, args.impact_noise_std,
         args.pos_noise_std, args.init_pos_noise_std, args.init_vel_noise_std, args.n_mc_trials, rng,
-        detect_time_bias=args.detect_time_bias, detect_time_noise_std=args.detect_time_noise_std)
+        detect_time_bias=args.detect_time_bias, detect_time_noise_std=args.detect_time_noise_std,
+        bounce_cfg=bounce_cfg)
 
     pos_err_dr, vel_err_dr = state_errors(x_true, x_dr)
     pos_err_naive, vel_err_naive = state_errors(x_true, x_naive)
