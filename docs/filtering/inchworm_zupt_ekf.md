@@ -391,6 +391,8 @@ The same default run, animated. The panels share the time axis and show the velo
 #### Takeaway
 When the anchor can slip, "the schedule says anchor" is no longer enough to justify $`v = 0`$. A sensor that can vote against the schedule removes most of the damage (slip-window NEES from about 47 to 3.5). The threshold has to sit well below the cruise speed, or the gate becomes `always`. A gate that replaces the schedule instead of checking it admits the ZUPT at the ends of the extend phase.
 
+Follow-up: [inchworm_two_pad_ekf.md](inchworm_two_pad_ekf.md) drops this toy's simplifications (two pads, a sensor read only on the anchored pad, turning, no position measurement). Without position measurements, a veto no longer recovers from slip, and only fusing the reading does.
+
 ---
 
 ## 7. References

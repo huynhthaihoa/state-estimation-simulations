@@ -576,6 +576,94 @@ def fig_inchworm_slip_gate_ekf():
            "matched process noise; seed 0", bottom=0.02)
 
 
+def fig_inchworm_two_pad_ekf():
+    """inchworm_two_pad_ekf.py: top view, anchored-pad sensor, midpoint error and NEES per policy, at the
+    script defaults (same draw order as its main())."""
+    import inchworm_two_pad_ekf as m
+    from utils import averaged_nees_bounds
+
+    dt, dur, t_phase, t_ramp, n_mc = 0.05, 20.0, 1.0, 0.2, 500
+    micro, sens = 0.01, 0.0005
+    n_steps, n_phases = int(round(dur / dt)), int(np.ceil(dur / t_phase))
+    noise = dict(micro_slip=micro, free=0.1, sensor=sens, move=0.02, gyro=0.02, closure=0.001, closure_lat=0.001,
+                 d_thr=3.0 * np.hypot(sens, micro * dt))
+    init_std = np.array([0.005] * 4 + [0.02])
+    P_init = np.diag(init_std ** 2)
+    cols = {"never": PRIOR, "schedule": C["blue"], "schedule_and_sensor": C["purple"], "pad_fused": C["green"]}
+    labels = {"never": "never (loose anchor)", "schedule": "schedule: anchored = still",
+              "schedule_and_sensor": "schedule + sensor veto", "pad_fused": "pad reading fused"}
+
+    rng = np.random.default_rng(SEED)
+    episodes = m.draw_slip_episodes(n_phases, t_phase, 0.6, 0.5, rng)
+    is_slip, _ = m.window_flags(n_steps, dt, t_phase, episodes)
+    sim_args = (n_steps, dt, t_phase, t_ramp, 0.1, 0.15, 0.3, episodes, 0.08, micro, 0.02, sens, 0.001, 0.001)
+
+    def one_trial(r):
+        x_true, gyro, d, z, back = m.simulate(*sim_args, r)
+        return x_true, gyro, d, z, back, x_true[0] + r.normal(0.0, 1.0, m.STATE_DIM) * init_std
+
+    x_true, gyro, d, z, back, x_init = one_trial(rng)
+    ests = {k: m.run_ekf(x_init, P_init, gyro, d, z, back, dt, k, noise)[0] for k in m.POLICIES}
+    sums = {k: np.zeros(n_steps + 1) for k in m.POLICIES}
+    for _ in range(n_mc):
+        xt, g, dd, zz, bb, xi = one_trial(rng)
+        for k in m.POLICIES:
+            xe, Pe = m.run_ekf(xi, P_init, g, dd, zz, bb, dt, k, noise)
+            err = m.state_error(xt, xe)
+            sums[k] += [err[i] @ np.linalg.solve(Pe[i], err[i]) for i in range(n_steps + 1)]
+    nees = {k: s / n_mc for k, s in sums.items()}
+    for k in nees:
+        print(f"    {k:<20s} NEES overall {np.mean(nees[k]):.2f}")
+    lo, hi = averaged_nees_bounds(m.STATE_DIM, n_mc)
+    t = np.arange(n_steps + 1) * dt
+    mid = lambda x: 0.5 * (x[:, m.B] + x[:, m.F])  # noqa: E731
+    mid_true = mid(x_true)
+
+    def shade_slip(ax):
+        for _, a, b in episodes:
+            ax.axvspan(a, b, color=C["orange"], alpha=0.22, lw=0)
+
+    def below(ax):
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.2), fontsize=8.5)
+
+    fig, axes = plt.subplots(2, 2, figsize=(12.5, 10.5))
+    ax_top, ax_d, ax_e, ax_n = axes.ravel()
+
+    ax_top.plot(*mid_true.T, color=TRUTH, lw=2.4, label="true body midpoint")
+    for k in m.POLICIES:
+        ax_top.plot(*mid(ests[k]).T, color=cols[k], lw=1.2, label=labels[k])
+    for i in range(0, n_steps + 1, 40):
+        ax_top.plot([x_true[i, 0], x_true[i, 2]], [x_true[i, 1], x_true[i, 3]], color=TRUTH, lw=3, alpha=0.35)
+    ax_top.set(title="Top view (one run; grey bars = the true body every 2 s)", xlabel="x (m)", ylabel="y (m)",
+               aspect="equal")
+    below(ax_top)
+
+    ax_d.plot(t[1:], np.linalg.norm(d, axis=1) * 1e3, color=C["orange"], lw=1.1, label="|anchored-pad reading|")
+    ax_d.axhline(noise["d_thr"] * 1e3, color=C["red"], lw=1, ls="--", label="veto threshold")
+    shade_slip(ax_d)
+    ax_d.set(title="Anchored-pad sensor (shaded = slip pulses)", xlabel="time (s)",
+             ylabel="displacement per tick (mm)")
+    below(ax_d)
+
+    for k in m.POLICIES:
+        ax_e.plot(t, np.linalg.norm(mid_true - mid(ests[k]), axis=1) * 1e3, color=cols[k], lw=1.2, label=labels[k])
+    shade_slip(ax_e)
+    ax_e.set(title="Midpoint position error (one run)", xlabel="time (s)", ylabel="error (mm)")
+    below(ax_e)
+
+    for k in m.POLICIES:
+        ax_n.plot(t, nees[k], color=cols[k], lw=1.3, label=f"{labels[k]} (mean {np.mean(nees[k]):.1f})")
+    ax_n.axhspan(lo, hi, color=TRUTH, alpha=0.10, lw=0)
+    ax_n.axhline(m.STATE_DIM, color=TRUTH, lw=1, label=f"consistent filter: {m.STATE_DIM} (state dimension)")
+    shade_slip(ax_n)
+    ax_n.set(yscale="log", title=f"NEES, {n_mc} runs", xlabel="time (s)", ylabel="NEES")
+    plain_log_ticks(ax_n)
+    below(ax_n)
+    finish(fig, "inchworm_two_pad_ekf", "Two-pad inchworm: trusting the anchored pad without a position fix",
+           "planar [back pad, front pad, heading], gyro + kinematic closure, slip pulses in "
+           f"{len(episodes)} of {n_phases} phases, no absolute position; seed 0", bottom=0.02)
+
+
 def fig_inchworm_zupt_zaru_ekf():
     """inchworm_zupt_zaru_ekf.py: heading and NEES under ZUPT + ZARU gating, at the script defaults
     (assumed accelerations under-sized) and at the matched noise level (0.5 m/s^2, 1.5 rad/s^2)."""
@@ -2465,6 +2553,7 @@ FIGURES = {
     "inchworm_zupt_ekf": fig_inchworm_zupt_ekf,
     "inchworm_zupt_zaru_ekf": fig_inchworm_zupt_zaru_ekf,
     "inchworm_slip_gate_ekf": fig_inchworm_slip_gate_ekf,
+    "inchworm_two_pad_ekf": fig_inchworm_two_pad_ekf,
     "friction_anisotropic_ekf": fig_friction_anisotropic_ekf,
     "imu_integration_comparison": fig_imu_integration_comparison,
     "pose_graph_incremental": fig_pose_graph_incremental,

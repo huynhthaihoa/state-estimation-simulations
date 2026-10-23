@@ -4,7 +4,7 @@ A suggested reading-and-running order through this repo, for newcomers. Each pha
 
 Before starting, follow [README.md § D. Installation](README.md#d-installation) to get `uv sync` working. Every script below runs as `uv run python use_numpy/<script>.py [flags]`. The full flag list for each lives in [README.md § E. Library guideline](README.md#e-library-guideline); this guide links to the relevant numbered entry instead of repeating it.
 
-After all nine phases, [`docs/README.md`](docs/README.md) is the fuller index for non-sequential reference, and [`docs/slam_mental_map.md`](docs/slam_mental_map.md) shows where each phase sits in the overall picture.
+After all nine phases (and, optionally, [Track L](#track-l---hybrid-and-bio-inspired-locomotion-optional) for hybrid and legged motion), [`docs/README.md`](docs/README.md) is the fuller index for non-sequential reference, and [`docs/slam_mental_map.md`](docs/slam_mental_map.md) shows where each phase sits in the overall picture.
 
 ---
 
@@ -42,20 +42,7 @@ After all nine phases, [`docs/README.md`](docs/README.md) is the fuller index fo
 
 **Then read:** [`docs/filtering/pointcloud_pose_tracking_empirical_note.md`](docs/filtering/pointcloud_pose_tracking_empirical_note.md) - deliberately *after* running the script, since it explains that script's output after the fact: why EKF/IEKF agree to round-off, why UKF differs mainly during the initial correction, and why vanilla KF stays millimeters away.
 
-**Side quest:** [`docs/filtering/hybrid_saltation_ekf.md`](docs/filtering/hybrid_saltation_ekf.md) + [README.md §11](README.md#11-saltation-matrix-ekf-tracking-a-point-mass-through-discrete-ground-contact-events) - [`use_numpy/saltation_matrix_ekf.py`](use_numpy/saltation_matrix_ekf.py). Everything above assumes smooth motion between measurements; this script does not. A point mass bounces off the ground mid-trajectory, and the question is how to propagate the *covariance* (not just the mean) through that discrete reset.
-- **Read** the doc's derivation section first. It includes a formula that is correct for a different comparison than this filter needs; finite-difference checks show which one applies.
-- **Run** the script and check the Monte Carlo NEES plot. Contrary to the expectation that the naive update is overconfident, with exact contact detection both filters are *under*confident after a bounce (post-bounce NEES about 2.4 and 2.5 against a consistent 6), the two are close, and which one is nearer 6 depends on the tuning.
-- **Then** the doc's §8 quantifies what happens once contact *detection* timing itself is uncertain (`--detect-time-bias`/`--detect-time-noise-std`): both filters become overconfident as jitter grows, and the saltation-corrected one more so (about 1.4-1.6× the naive filter's NEES), a modest gap rather than a blow-up.
-
-- **Next**, the same bounce on a Lie group: [`docs/filtering/invariant_saltation_ekf.md`](docs/filtering/invariant_saltation_ekf.md) + [README.md §15](README.md#15-invariant-ekf-on-se_23-through-a-bounce) - [`use_numpy/invariant_saltation_ekf.py`](use_numpy/invariant_saltation_ekf.py) (or its [`use_manif/`](use_manif/invariant_saltation_ekf.py) twin). Read it after this phase's invariant-EKF material ([`docs/filtering/left_right_invariant.md`](docs/filtering/left_right_invariant.md) and README §4). It combines the right-invariant error with the saltation matrix, and shows that the bounce breaks the invariant filter's [trajectory independence](docs/glossary.md#group-affine-dynamics-trajectory-independence).
-
-**Three more side quests, same "hybrid/switched locomotion" theme, each isolating one further bio-inspired-locomotion question:**
-- [`docs/filtering/inchworm_zupt_ekf.md`](docs/filtering/inchworm_zupt_ekf.md) + [README.md §12](README.md#12-inchworm-zupt-exploiting-a-known-anchordwell-schedule) - [`use_numpy/inchworm_zupt_ekf.py`](use_numpy/inchworm_zupt_ekf.py). Not a discontinuous reset like the bounce above, but an ordinary switched-linear system. The question is on the *measurement* side: using the free zero-velocity information of a known anchor/dwell phase correctly, always, or never.
-  - **Then**, the doc's §5 side extension, [`use_numpy/inchworm_zupt_zaru_ekf.py`](use_numpy/inchworm_zupt_zaru_ekf.py): the same gait in the plane with a heading, where ZARU (zero angular rate) joins ZUPT on anchor ticks and keeps the unobserved heading from drifting at rest.
-  - **And**, the doc's §6 side extension, [`use_numpy/inchworm_slip_gate_ekf.py`](use_numpy/inchworm_slip_gate_ekf.py): the anchor can slip, and a pad displacement sensor can veto the schedule's "v = 0".
-- [`docs/filtering/friction_anisotropic_ekf.md`](docs/filtering/friction_anisotropic_ekf.md) + [README.md §13](README.md#13-friction-anisotropic-process-noise-fixed-vs-heading-aware-q) - [`use_numpy/friction_anisotropic_ekf.py`](use_numpy/friction_anisotropic_ekf.py). Applies the isotropic/anisotropic and rotating-frame argument of `pointcloud_pose_tracking_empirical_note.md` to *process* noise instead of measurement noise, on a crawling unicycle over a friction-anisotropic pad.
-- [`docs/filtering/hexapod_gait_ekf.md`](docs/filtering/hexapod_gait_ekf.md) + [README.md §16](README.md#16-hexapod-leg-odometry-what-the-gait-changes) - [`use_numpy/hexapod_gait_ekf.py`](use_numpy/hexapod_gait_ekf.py). From one anchored segment to six legs: every stance foot is a velocity sensor, the gait decides how many there are, and a per-foot test catches a slipping leg.
-  - **Next**, the same hexapod in 3D with an IMU: [`docs/filtering/hexapod_contact_inekf.md`](docs/filtering/hexapod_contact_inekf.md) + [README.md §17](README.md#17-contact-aided-invariant-ekf-on-a-hexapod-which-filter-knows-yaw-is-unobservable) - [`use_numpy/hexapod_contact_inekf.py`](use_numpy/hexapod_contact_inekf.py). Read it after `invariant_saltation_ekf.md` above. Each stance foot's position joins the state ($`SE_{K+2}(3)`$, Hartley et al.'s contact-aided invariant EKF), and a world-frame EKF on the same data shows why the invariant error matters: yaw is unobservable, and only the invariant EKF's covariance keeps it so.
+**Optional next:** [Track L - Hybrid and bio-inspired locomotion](#track-l---hybrid-and-bio-inspired-locomotion-optional) (after Phase 8). Everything above assumes smooth motion between measurements; Track L drops that assumption: bounces, anchored crawling, and legs. It needs only this phase, so it can also be done right now.
 
 ## Phase 5 - Graph-based batch smoothing
 
@@ -97,6 +84,43 @@ After all nine phases, [`docs/README.md`](docs/README.md) is the fuller index fo
 - Full-batch system size grows linearly (dense-matrix memory quadratically).
 - The sliding window's size caps flat once the window first fills.
 - Accuracy ties by construction (the optimum of a pure odometry chain is the dead-reckoned trajectory), so the memory bound is the real result.
+
+## Track L - Hybrid and bio-inspired locomotion (optional)
+
+**Needs:** Phase 4. Every script here is a filter for motion that is *not* smooth between measurements: something switches (a bounce, an anchor, a foot touching down), and the question is what the filter may assume at that switch. The groups go from one contact event, to one anchor, to many legs; within a group, go top to bottom.
+
+### L1 - Contact events: a reset in the motion
+
+| Step | Read + run | The question | Builds on |
+| --- | --- | --- | --- |
+| L1.1 | [`hybrid_saltation_ekf.md`](docs/filtering/hybrid_saltation_ekf.md) + [README.md §11](README.md#11-saltation-matrix-ekf-tracking-a-point-mass-through-discrete-ground-contact-events) - [`saltation_matrix_ekf.py`](use_numpy/saltation_matrix_ekf.py) | A point mass bounces off the ground: how to carry the *covariance* (not just the mean) through that discrete reset | Phase 4 |
+| L1.2 | [`invariant_saltation_ekf.md`](docs/filtering/invariant_saltation_ekf.md) + [README.md §15](README.md#15-invariant-ekf-on-se_23-through-a-bounce) - [`invariant_saltation_ekf.py`](use_numpy/invariant_saltation_ekf.py) (or its [`use_manif/`](use_manif/invariant_saltation_ekf.py) twin) | The same bounce on a Lie group: the right-invariant error with the saltation matrix, and why the bounce breaks the invariant filter's [trajectory independence](docs/glossary.md#group-affine-dynamics-trajectory-independence) | L1.1, plus [`left_right_invariant.md`](docs/filtering/left_right_invariant.md) and README §4 |
+
+How to work through L1.1:
+- **Read** the doc's derivation section first. It includes a formula that is correct for a different comparison than this filter needs; finite-difference checks show which one applies.
+- **Run** the script and check the Monte Carlo NEES plot. Contrary to the expectation that the naive update is overconfident, with exact contact detection both filters are *under*confident after a bounce (post-bounce NEES about 2.4 and 2.5 against a consistent 6), the two are close, and which one is nearer 6 depends on the tuning.
+- **Then** the doc's §8 quantifies what happens once contact *detection* timing itself is uncertain (`--detect-time-bias`/`--detect-time-noise-std`): both filters become overconfident as jitter grows, and the saltation-corrected one more so (about 1.4-1.6× the naive filter's NEES), a modest gap rather than a blow-up.
+
+### L2 - Anchors: crawling on a held contact
+
+Not a discontinuous reset like L1, but an ordinary switched-linear system: the question moves to the *measurement* side.
+
+| Step | Read + run | The question | Builds on |
+| --- | --- | --- | --- |
+| L2.1 | [`inchworm_zupt_ekf.md`](docs/filtering/inchworm_zupt_ekf.md) §1-§4 + [README.md §12](README.md#12-inchworm-zupt-exploiting-a-known-anchordwell-schedule) - [`inchworm_zupt_ekf.py`](use_numpy/inchworm_zupt_ekf.py) | Using the free zero-velocity information (ZUPT) of a known anchor/dwell phase: correctly, always, or never | Phase 4 |
+| L2.2 | Same doc, §5 - [`inchworm_zupt_zaru_ekf.py`](use_numpy/inchworm_zupt_zaru_ekf.py) | The gait in the plane with a heading: ZARU (zero angular rate) joins ZUPT on anchor ticks and keeps the unobserved heading from drifting at rest | L2.1 |
+| L2.3 | Same doc, §6 - [`inchworm_slip_gate_ekf.py`](use_numpy/inchworm_slip_gate_ekf.py) | The anchor can slip, and a pad displacement sensor can veto the schedule's "v = 0" | L2.1 |
+| L2.4 | [`inchworm_two_pad_ekf.md`](docs/filtering/inchworm_two_pad_ekf.md) + [README.md §19](README.md#19-two-pad-inchworm-trusting-the-anchored-pad-without-a-position-fix) - [`inchworm_two_pad_ekf.py`](use_numpy/inchworm_two_pad_ekf.py) | Two pads, turning, no position fix: a slip the filter does not track is never corrected, so only fusing the anchored pad's measured displacement keeps the estimate accurate and consistent | L2.3 |
+| L2.5 | [`friction_anisotropic_ekf.md`](docs/filtering/friction_anisotropic_ekf.md) + [README.md §13](README.md#13-friction-anisotropic-process-noise-fixed-vs-heading-aware-q) - [`friction_anisotropic_ekf.py`](use_numpy/friction_anisotropic_ekf.py) | A crawler on a friction-anisotropic pad: the isotropic/anisotropic and rotating-frame argument of `pointcloud_pose_tracking_empirical_note.md`, applied to *process* noise instead of measurement noise | Phase 4 |
+
+### L3 - Legs: many contacts at once
+
+| Step | Read + run | The question | Builds on |
+| --- | --- | --- | --- |
+| L3.1 | [`hexapod_gait_ekf.md`](docs/filtering/hexapod_gait_ekf.md) + [README.md §16](README.md#16-hexapod-leg-odometry-what-the-gait-changes) - [`hexapod_gait_ekf.py`](use_numpy/hexapod_gait_ekf.py) | From one anchored segment to six legs: every stance foot is a velocity sensor, the gait decides how many there are, and a per-foot test catches a slipping leg | L2.1 |
+| L3.2 | [`hexapod_contact_inekf.md`](docs/filtering/hexapod_contact_inekf.md) + [README.md §17](README.md#17-contact-aided-invariant-ekf-on-a-hexapod-which-filter-knows-yaw-is-unobservable) - [`hexapod_contact_inekf.py`](use_numpy/hexapod_contact_inekf.py) | The same hexapod in 3D with an IMU: each stance foot's position joins the state ($`SE_{K+2}(3)`$, Hartley et al.'s contact-aided invariant EKF), and a world-frame EKF on the same data shows why the invariant error matters: yaw is unobservable, and only the invariant EKF's covariance keeps it so | L3.1, L1.2 |
+
+A new locomotion type goes in the group whose question it shares, or in a new group (L4, ...) if it raises a new one.
 
 ---
 
