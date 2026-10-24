@@ -120,7 +120,13 @@ Not a discontinuous reset like L1, but an ordinary switched-linear system: the q
 | L3.1 | [`hexapod_gait_ekf.md`](docs/filtering/hexapod_gait_ekf.md) + [README.md §16](README.md#16-hexapod-leg-odometry-what-the-gait-changes) - [`hexapod_gait_ekf.py`](use_numpy/hexapod_gait_ekf.py) | From one anchored segment to six legs: every stance foot is a velocity sensor, the gait decides how many there are, and a per-foot test catches a slipping leg | L2.1 |
 | L3.2 | [`hexapod_contact_inekf.md`](docs/filtering/hexapod_contact_inekf.md) + [README.md §17](README.md#17-contact-aided-invariant-ekf-on-a-hexapod-which-filter-knows-yaw-is-unobservable) - [`hexapod_contact_inekf.py`](use_numpy/hexapod_contact_inekf.py) | The same hexapod in 3D with an IMU: each stance foot's position joins the state ($`SE_{K+2}(3)`$, Hartley et al.'s contact-aided invariant EKF), and a world-frame EKF on the same data shows why the invariant error matters: yaw is unobservable, and only the invariant EKF's covariance keeps it so | L3.1, L1.2 |
 
-A new locomotion type goes in the group whose question it shares, or in a new group (L4, ...) if it raises a new one.
+### L4 - Gait timing: when does a foot land?
+
+| Step | Read + run | The question | Builds on |
+| --- | --- | --- | --- |
+| L4.1 | [`gait_phase_ekf.md`](docs/filtering/gait_phase_ekf.md) + [README.md §20](README.md#20-gait-phase-which-feet-are-on-the-ground-when-touchdowns-are-uncertain) - [`gait_phase_ekf.py`](use_numpy/gait_phase_ekf.py) | The hexapod's liftoffs are commanded but its touchdowns are not: which feet may the body filter read when a foot can land late and a detector can fire falsely? A schedule and a raw detector both read swinging feet; a learned touchdown offset or a small Kalman filter rejects triggers that come too early, if its acceptance window is the right width | L3.1 |
+
+A new locomotion type goes in the group whose question it shares, or in a new group (L5, ...) if it raises a new one.
 
 ---
 

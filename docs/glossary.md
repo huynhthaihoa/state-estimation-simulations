@@ -286,7 +286,14 @@ A hybrid system making infinitely many jumps in a finite time, e.g. a lossy ball
 
 ---
 
-## 8. References
+## 8. Gait and contact
+
+### CPG (central pattern generator)
+An internal rhythm generator that produces a gait's repeating leg motion on its own, without a rhythmic input, like a metronome for the legs: a neural circuit in animals, usually coupled oscillators in robots. Sensor feedback such as touchdowns can pull its rhythm into sync with the actual walking (**entrainment**). This repo's `cpg` approach keeps only one idea from it: learning at which point of the rhythm contact usually comes. See [gait_phase_ekf.md §1.3](filtering/gait_phase_ekf.md#13-four-ways-to-set-the-stance-flags).
+
+---
+
+## 9. References
 
 1. Solà, J., Deray, J., & Atchuthan, D. (2018). *A micro Lie theory for state estimation in robotics*. arXiv:1812.01537. https://doi.org/10.48550/arXiv.1812.01537 - the $SO(3)$/$`SE(3)`$, Exp/Log and hat conventions behind §1.
 2. Thrun, S., Burgard, W., & Fox, D. (2005). *Probabilistic Robotics*. MIT Press. - the probabilistic and filtering vocabulary behind §2 and §6.
@@ -298,4 +305,5 @@ A hybrid system making infinitely many jumps in a finite time, e.g. a lossy ball
 8. Forster, C., Carlone, L., Dellaert, F., & Scaramuzza, D. (2017). *On-Manifold Preintegration for Real-Time Visual-Inertial Odometry*. IEEE Transactions on Robotics, 33(1), 1–21. https://doi.org/10.1109/TRO.2016.2597321 - IMU preintegration (§5).
 9. Umeyama, S. (1991). *Least-Squares Estimation of Transformation Parameters Between Two Point Patterns*. IEEE Transactions on Pattern Analysis and Machine Intelligence, 13(4), 376–380. https://doi.org/10.1109/34.88573 - Umeyama alignment (§5).
 10. Solà, J. (2017). *Quaternion kinematics for the error-state Kalman filter*. arXiv:1711.02508. https://doi.org/10.48550/arXiv.1711.02508 - the ESKF (§6).
+11. Ijspeert, A. J. (2008). *Central pattern generators for locomotion control in animals and robots: A review*. Neural Networks, 21(4), 642–653. https://doi.org/10.1016/j.neunet.2008.03.014 - CPGs and entrainment (§8).
 11. Kong, N. J., Payne, J. J., Zhu, J., & Johnson, A. M. (2024). *Saltation Matrices: The Essential Tool for Linearizing Hybrid Dynamical Systems*. Proceedings of the IEEE, 112(6), 585–608. https://doi.org/10.1109/JPROC.2024.3440211 (preprint: arXiv:2306.06862) - the saltation matrix (§7, its Definition 2).

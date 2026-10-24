@@ -664,6 +664,98 @@ def fig_inchworm_two_pad_ekf():
            f"{len(episodes)} of {n_phases} phases, no absolute position; seed 0", bottom=0.02)
 
 
+def fig_gait_phase_ekf():
+    """gait_phase_ekf.py: stance flags of the blocked leg, touchdown-offset estimates, Monte Carlo NEES per
+    approach at the defaults (same draw order as its main()), and NEES vs terrain spread for the two
+    acceptance rules (CPG window, phase-EKF sigma gate)."""
+    import gait_phase_ekf as m
+    from utils import averaged_nees_bounds
+
+    args = m.build_parser().parse_args([])
+    dt, n_mc = args.dt, args.n_mc_trials
+    cols = {"schedule": C["blue"], "detector": C["red"], "cpg": C["purple"], "phase_ekf": C["green"], "oracle": TRUTH}
+    labels = {"schedule": "schedule", "detector": "detector", "cpg": "CPG (0.1 s window)",
+              "phase_ekf": "phase EKF (3σ gate)", "oracle": "true stance"}
+
+    rng = np.random.default_rng(args.seed)
+    x_true, x_init, r, z, flags, info = m.simulate_trial(args, rng)
+    mc = m.run_monte_carlo(args, n_mc, rng)
+    for k in m.ROWS:
+        print(f"    {k:<10s} NEES {np.mean(mc[k]['nees']):.2f}, swing read/trial {mc[k]['swing']:.1f}")
+    lo, hi = averaged_nees_bounds(6, n_mc)
+    t = np.arange(len(x_true)) * dt
+    leg = m.LEG_NAMES.index(args.blocked_leg)
+
+    def below(ax):
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.2), fontsize=8.5, ncol=2)
+
+    fig, axes = plt.subplots(2, 2, figsize=(12.5, 10.5))
+    ax_g, ax_l, ax_n, ax_s = axes.ravel()
+
+    rows = ("oracle", "schedule", "detector", "cpg", "phase_ekf")
+    true_leg = flags["oracle"][:, leg]
+    for y, a in enumerate(rows[::-1]):
+        f = flags[a][:, leg]
+        ax_g.fill_between(t, y - 0.35, y + 0.35, where=f, step="post", color=cols[a], alpha=0.75, lw=0)
+        ax_g.fill_between(t, y - 0.35, y + 0.35, where=f & ~true_leg, step="post", color=C["gold"], lw=0)
+    for (i, up, d, nxt), fk in zip(info["steps"], info["false_ticks"]):
+        if i == leg and fk is not None:
+            ax_g.plot(fk * dt, 2, "x", color=TRUTH, ms=7, mew=1.6)
+    ax_g.axvspan(args.blocked_start, args.blocked_end, color=C["orange"], alpha=0.15, lw=0)
+    ax_g.set_yticks(range(len(rows)), [labels[a] for a in rows[::-1]])
+    ax_g.set_xlim(args.blocked_start - 3.0, args.blocked_end + 5.5)
+    ax_g.set(title=f"Stance flags of leg {args.blocked_leg} (one run)", xlabel="time (s)")
+    ax_g.grid(False)
+    ax_g.plot([], [], "s", color=C["gold"], label="swinging foot read as planted")
+    ax_g.plot([], [], "x", color=TRUTH, label="false trigger (detector row)")
+    ax_g.fill_between([], [], color=C["orange"], alpha=0.3, label="blocked window")
+    below(ax_g)
+
+    td_t = np.array([d for (_, _, d, _) in info["steps"]]) * dt
+    ax_l.plot(td_t, 1e3 * info["tau"], ".", color=PRIOR, ms=3, label="true offset τ of each step")
+    ax_l.plot(td_t, 1e3 * info["lag"], color=TRUTH, lw=2, label="true systematic lag")
+    for a in ("cpg", "phase_ekf"):
+        ax_l.plot(td_t, 1e3 * info["lag_est"][a], color=cols[a], lw=1.2, label=f"{labels[a]} estimate")
+    ax_l.fill_between(td_t, 1e3 * (info["lag_est"]["phase_ekf"] - 2 * info["ekf_std"]),
+                      1e3 * (info["lag_est"]["phase_ekf"] + 2 * info["ekf_std"]), color=cols["phase_ekf"],
+                      alpha=0.15, lw=0, label="phase EKF ±2σ")
+    ax_l.set(title="Touchdown offset after the commanded time (one run)", xlabel="time (s)", ylabel="offset (ms)")
+    below(ax_l)
+
+    for a in m.ROWS:
+        ax_n.plot(t, mc[a]["nees"], color=cols[a], lw=1.3, label=f"{labels[a]} (mean {np.mean(mc[a]['nees']):.1f})")
+    ax_n.axhspan(lo, hi, color=TRUTH, alpha=0.10, lw=0)
+    ax_n.axhline(6.0, color=TRUTH, lw=1)
+    ax_n.set(yscale="log", title=f"Body NEES, {n_mc} runs (consistent: 6)", xlabel="time (s)", ylabel="NEES")
+    plain_log_ticks(ax_n)
+    below(ax_n)
+
+    terrain = [0.0, 0.03, 0.06, 0.1]
+    n_sw = 30
+    curves = {"cpg window 0.1 s": [], "phase EKF 3σ": [], "phase EKF 2σ": []}
+    for ts in terrain:
+        for gate in (3.0, 2.0):
+            a2 = m.build_parser().parse_args([])
+            a2.terrain_std, a2.ekf_gate = ts, gate
+            res = m.run_monte_carlo(a2, n_sw, np.random.default_rng(SEED + 1), rows=("cpg", "phase_ekf"))
+            curves[f"phase EKF {gate:.0f}σ"].append(np.mean(res["phase_ekf"]["nees"]))
+            if gate == 3.0:
+                curves["cpg window 0.1 s"].append(np.mean(res["cpg"]["nees"]))
+    styles = {"cpg window 0.1 s": (cols["cpg"], "o-"), "phase EKF 3σ": (cols["phase_ekf"], "s-"),
+              "phase EKF 2σ": (cols["phase_ekf"], "s--")}
+    for k, v in curves.items():
+        print(f"    terrain sweep {k}: " + ", ".join(f"{x:.2f}" for x in v))
+        ax_s.plot(1e3 * np.array(terrain), v, styles[k][1], color=styles[k][0], lw=1.4, label=k)
+    ax_s.axhline(6.0, color=TRUTH, lw=1)
+    ax_s.set(yscale="log", title=f"Acceptance width vs rougher ground ({n_sw} runs/point)",
+             xlabel="terrain spread of touchdown times (ms)", ylabel="body NEES")
+    plain_log_ticks(ax_s)
+    below(ax_s)
+    finish(fig, "gait_phase_ekf", "Gait phase: which feet are on the ground, when touchdowns are uncertain",
+           "planar hexapod, tripod gait, known liftoffs; touchdowns lag (to 120 ms), spread 30 ms, one blocked leg, "
+           "false triggers on 10% of steps; seed 0", bottom=0.02)
+
+
 def fig_inchworm_zupt_zaru_ekf():
     """inchworm_zupt_zaru_ekf.py: heading and NEES under ZUPT + ZARU gating, at the script defaults
     (assumed accelerations under-sized) and at the matched noise level (0.5 m/s^2, 1.5 rad/s^2)."""
@@ -2554,6 +2646,7 @@ FIGURES = {
     "inchworm_zupt_zaru_ekf": fig_inchworm_zupt_zaru_ekf,
     "inchworm_slip_gate_ekf": fig_inchworm_slip_gate_ekf,
     "inchworm_two_pad_ekf": fig_inchworm_two_pad_ekf,
+    "gait_phase_ekf": fig_gait_phase_ekf,
     "friction_anisotropic_ekf": fig_friction_anisotropic_ekf,
     "imu_integration_comparison": fig_imu_integration_comparison,
     "pose_graph_incremental": fig_pose_graph_incremental,

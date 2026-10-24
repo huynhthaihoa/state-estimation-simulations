@@ -34,8 +34,8 @@ Planar motion; pads are points that never lift off; the body is a straight segme
 | Part | What it does | Default |
 | --- | --- | --- |
 | **Gait** | Alternating phases of length $`t_{\text{phase}}`$. **Extend:** back pad anchored, body length $`l`$ grows. **Contract:** front pad anchored, $`l`$ shrinks back. The stroke rate $`\dot l`$ is a trapezoid (peak $`v_{\text{stroke}}`$, ramps $`t_{\text{ramp}}`$), as in the 1D toy | 1 s phases, 0.1 m/s, 0.2 s ramps, $`l_{\min}`$ = 0.15 m |
-| **Turning** | During extend only, the heading $`\theta`$ (direction from back pad to front pad) turns at $`\dot\theta = \dot l \tan\phi / l_{\min}`$: bicycle-style steering, where $`\phi`$ is the steering angle and $`l_{\min}`$ plays the wheelbase. The paper uses the same idea, with turn radius $`R = L / \tan\phi`$ for a wheelbase $`L`$ | $`\phi`$ = 0.3 rad |
-| **Micro-slip** | The anchored pad is never perfectly still: it creeps by small random steps (white noise on its velocity). This is the "approximately still" of the 1D doc's caveats | 0.01 m/s per axis |
+| **Turning** | During extend only, the heading $`\theta`$ (direction from back pad to front pad) turns at $`\dot\theta = \dot l \tan\phi / l_{\min}`$: bicycle-style steering, where $`\phi`$ is the steering angle and $`l_{\min}`$ plays the **wheelbase** (on a bicycle, the distance between the axles). The paper uses the same idea, with turn radius $`R = L / \tan\phi`$ for a wheelbase $`L`$ | $`\phi`$ = 0.3 rad |
+| **Micro-slip** | The anchored pad is never perfectly still: it creeps by small random steps (**white noise** on its velocity: a random value, independent from tick to tick). This is the "approximately still" of the 1D doc's caveats | 0.01 m/s per axis |
 | **Slip pulse** | With probability $`p_{\text{slip}}`$ per phase, the anchored pad slides backward along the body in one trapezoidal pulse (same shape as inchworm §6). The rest of the body slides with it | 0.5, peak 0.08 m/s, 0.6 s |
 
 The slip pulses are drawn once per seed and held fixed over the [Monte Carlo trials](../glossary.md#monte-carlo-trials), as in inchworm §6. Everything else, including the micro-slip, is redrawn every trial, so the noise under test is resampled.
@@ -46,7 +46,7 @@ The slip pulses are drawn once per seed and held fixed over the [Monte Carlo tri
 | --- | --- | --- |
 | **Gyro** | Body turn rate $`\dot\theta`$ | 0.02 rad/s |
 | **Pad sensor** | The anchored pad's displacement over the tick, in the **body frame** (x along the body, y across), $`d_k`$ | 0.5 mm per axis |
-| **Kinematic closure** | Where the front pad is relative to the back pad, in the body frame, from the motor encoders: ideally $`[l, 0]`$ | 1 mm along, 1 mm across |
+| **Kinematic closure** | Where the front pad is relative to the back pad, in the body frame, from the **motor encoders** (sensors that count how far each motor has turned): ideally $`[l, 0]`$ | 1 mm along, 1 mm across |
 
 **Kinematic closure** means: the motors know how long the body is, so they give the front pad's position relative to the back pad, along the body. That "closes the loop" between the two pads. They say nothing about the heading in the world, which comes only from the gyro. It is the only measurement that says anything about the moving pad, because its own sensor is not used.
 
@@ -55,6 +55,8 @@ The slip pulses are drawn once per seed and held fixed over the [Monte Carlo tri
 **State** $`x = [b_x, b_y, f_x, f_y, \theta]`$: back pad position $`(b_x, b_y)`$ and front pad position $`(f_x, f_y)`$ in meters (world frame), and heading $`\theta`$ in radians. Five numbers, so a consistent filter has NEES ≈ 5.
 
 #### Predict: one tick of length $`\Delta t`$
+
+**Process noise** is the uncertainty each prediction adds ([glossary](../glossary.md#predict-and-update-steps)); the last column gives its standard deviation.
 
 | State part | Prediction | Process noise (std) |
 | --- | --- | --- |
@@ -115,7 +117,7 @@ Defaults (`p_slip` 0.5), 500 trials per seed. "Final error" is the single run's 
 
 *Each cell: overall Monte Carlo NEES / final error.*
 
-The heading RMSE is the same for all four policies in every seed (0.008-0.037 rad): the heading comes only from the gyro, and no policy changes it.
+The heading [RMSE](../glossary.md#rmse-root-mean-square-error) is the same for all four policies in every seed (0.008-0.037 rad): the heading comes only from the gyro, and no policy changes it.
 
 #### One slip, in numbers
 Before the four mechanisms below, one pulse: seed 0's first slip (1.0-1.6 s, a 3.2 cm backward slide), averaged over 300 trials. "Error" is the body midpoint's mean error along the body axis just after the pulse; "reported σ" is the filter's own standard deviation in that direction. Before the pulse every policy is within about 5-7 mm. (Computed with the script's functions; not part of its printout.)
@@ -178,8 +180,8 @@ The veto has two knobs: **how loose it makes the pad** (`--free-noise-std`) and 
 ## 6. What this toy does not show
 
 - **The moving pad's sensor.** In a sliding gait the moving pad stays on the ground, so its sensor could measure that end's motion too: direct odometry of the moving end, on top of the encoders. The paper reads only the anchored pad, and so does this toy. This is the planned next step.
-- **A motion model for the moving pad** from the encoder stroke rate and the steering angle. Here it is a loose random walk placed by the closure update (§4 shows where that matters).
-- **Real sensor behavior.** The paper's sensor reads every 10 ms at 1200 counts per inch and has a surface-quality output. This toy has white Gaussian noise every 50 ms, no quantization, no dropout and no lift-off.
+- **A motion model for the moving pad** from the encoder stroke rate and the steering angle. Here it is a loose **random walk** (it drifts by independent random steps) placed by the closure update (§4 shows where that matters).
+- **Real sensor behavior.** The paper's sensor reads every 10 ms at 1200 counts per inch and has a surface-quality output. This toy has white Gaussian noise every 50 ms, no quantization (rounding to whole counts), no dropout (missed readings) and no lift-off.
 - **Slip physics.** Slip is a prescribed backward pulse along the body; the robot's real friction scales (3D-printed flaps that grip backward and slide forward) slip by amounts that depend on load and terrain.
 - **Gyro bias** and estimating it.
 

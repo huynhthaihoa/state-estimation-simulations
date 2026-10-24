@@ -167,7 +167,8 @@ def simulate_body_trajectory(n_steps, dt, twist0, lin_accel_std, ang_accel_std, 
     return x_true
 
 
-def simulate_feet(x_true, dt, ticks_per_cycle, gait, nominal_speed, slip=None, drift=None):
+def simulate_feet(x_true, dt, ticks_per_cycle, gait, nominal_speed, slip=None, drift=None,
+                  stance=None):
     """Footholds and true foot velocities relative to the body, per tick.
     A foot lands at its nominal offset shifted forward by half a stride, then
     stays fixed in the world for the rest of its stance (unless slipping or
@@ -195,6 +196,11 @@ def simulate_feet(x_true, dt, ticks_per_cycle, gait, nominal_speed, slip=None, d
             slip_vel_body (body frame, m/s) instead of staying planted
         drift: None, or (N, 6, 2) body-frame velocities (m/s): every stance
             foot also slides by drift[k, i] on tick k (random foot drift)
+        stance: None (default) for the fixed gait schedule, or an (N, 6) bool
+            array of true stance flags to use instead (e.g. touchdowns that
+            land early or late, gait_phase_ekf.py); footholds and swing paths
+            follow it. Its first tick should match the schedule, since the
+            initial foot placement assumes it.
     Returns:
         stance: (N, 6) bool array
         r: (N, 6, 2) body-frame foot offsets
@@ -202,7 +208,7 @@ def simulate_feet(x_true, dt, ticks_per_cycle, gait, nominal_speed, slip=None, d
     """
     n_pts = len(x_true)
     duty, _ = GAITS[gait]
-    stance = stance_mask(n_pts, ticks_per_cycle, gait)
+    stance = stance_mask(n_pts, ticks_per_cycle, gait) if stance is None else stance
     psi = gait_phase(n_pts, ticks_per_cycle, gait)
     stride = nominal_speed * duty * ticks_per_cycle * dt
     touchdown = NOMINAL_FOOT_OFFSETS + np.array([stride / 2.0, 0.0])

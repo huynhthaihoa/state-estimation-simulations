@@ -229,6 +229,8 @@ Three filters, same draws: **trust** the detected flags; the **per-foot gate** o
 
 *Figure: `use_numpy/hexapod_gait_ekf.py` at its defaults (seed 0, 100 trials), plotted by `uv run python assets/make_figures.py hexapod_gait_ekf_extensions` (about 3 minutes). Panel (a) is §4's drift experiment.*
 
+Follow-up: [gait_phase_ekf.md](gait_phase_ekf.md) drops the known touchdown times (only liftoff is known) and compares stance flags from the commanded schedule, a contact detector, a learned offset in the style of a central pattern generator (CPG) and a phase EKF.
+
 ---
 
 ## 6. Takeaway
