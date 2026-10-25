@@ -664,6 +664,99 @@ def fig_inchworm_two_pad_ekf():
            f"{len(episodes)} of {n_phases} phases, no absolute position; seed 0", bottom=0.02)
 
 
+def fig_inchworm_two_pad_fusion_ekf():
+    """inchworm_two_pad_fusion_ekf.py: both pad readings with the faults (one run), midpoint RMSE and NEES per
+    variant over the Monte Carlo runs at the script defaults (same draw order as its main()), plus a sweep of
+    the moving sensor's noise."""
+    import inchworm_two_pad_fusion_ekf as m
+    from utils import averaged_nees_bounds
+
+    args = m.build_parser().parse_args([])
+    rng = np.random.default_rng(SEED)
+    setup = m.build_setup(args, rng)
+    n_steps, episodes, noise = setup["n_steps"], setup["episodes"], setup["noise"]
+    trial = m.simulate_trial(args, setup, rng)
+    stats, _ = m.run_monte_carlo(args, setup, args.n_mc_trials, rng)
+    for v in m.VARIANTS:
+        print(f"    {v:<14s} NEES overall {np.mean(stats[v]['nees']):.2f}")
+    lo, hi = averaged_nees_bounds(m.STATE_DIM, args.n_mc_trials)
+
+    sweep_std, sweep_vars, n_sweep = [0.0005, 0.001, 0.002, 0.005], ("random_walk", "moving_sensor", "cross_check"), 100
+    sweep = {v: [] for v in sweep_vars}
+    for std in sweep_std:
+        a = m.build_parser().parse_args(["--moving-sensor-noise-std", str(std)])
+        r = np.random.default_rng(SEED)
+        setup_a = m.build_setup(a, r)
+        m.simulate_trial(a, setup_a, r)  # same draw order as the script's main()
+        st, _ = m.run_monte_carlo(a, setup_a, n_sweep, r, variants=sweep_vars)
+        for v in sweep_vars:
+            sweep[v].append(np.mean(st[v]["nees"]))
+
+    cols = {"random_walk": PRIOR, "encoder_model": C["blue"], "moving_sensor": C["orange"], "both": C["purple"],
+            "cross_check": C["green"]}
+    labels = {"random_walk": "anchored sensor only", "encoder_model": "+ encoder model",
+              "moving_sensor": "+ moving sensor", "both": "+ both, combined", "cross_check": "+ both, cross-checked"}
+    t = np.arange(n_steps + 1) * args.dt
+    def shade_slip(ax):
+        for _, a, b in episodes:
+            ax.axvspan(a, b, color=C["gold"], alpha=0.3, lw=0)
+
+    def below(ax):
+        ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.2), fontsize=8.5, ncol=2)
+
+    fig, axes = plt.subplots(2, 2, figsize=(12.5, 10.5))
+    ax_d, ax_e, ax_n, ax_s = axes.ravel()
+
+    s = np.where(trial["back"], 1.0, -1.0)[:, None]
+    stroke = np.array([m.commanded_change(trial["e_cmd"][k], trial["z"][k][0]) for k in range(n_steps)])
+    ax_d.plot(t[1:], np.linalg.norm(trial["d_a"], axis=1) * 1e3, color=C["orange"], lw=1.1,
+              label="|anchored reading|")
+    ax_d.plot(t[1:], np.linalg.norm(trial["d_m"] - s * stroke, axis=1) * 1e3, color=C["blue"], lw=1.1,
+              label="|moving reading − commanded stroke|")
+    ax_d.axhline(noise["d_thr"] * 1e3, color=TRUTH, lw=1, ls="--", label="slip threshold")
+    top = 1.05 * max(np.max(np.linalg.norm(trial["d_a"], axis=1)), np.max(np.linalg.norm(trial["d_m"] - s * stroke,
+                                                                                     axis=1))) * 1e3
+    for pad, kind, a, b, _ in trial["faults"]:
+        ax_d.axvspan(a, b, ymin=0.92, ymax=1.0, color=C["red"] if kind == m.SPIKE else PRIOR, lw=0)
+    ax_d.fill_between([], [], color=C["red"], label="spike (either sensor)")
+    ax_d.fill_between([], [], color=PRIOR, label="dropout (either sensor)")
+    ax_d.fill_between([], [], color=C["gold"], alpha=0.5, label="slip pulse")
+    shade_slip(ax_d)
+    ax_d.set(title="Both pad sensors (one run; top strip = sensor faults)", xlabel="time (s)",
+             ylabel="per tick (mm)", ylim=(0, top / 0.9))
+    below(ax_d)
+
+    for v in m.VARIANTS:
+        ax_e.plot(t, stats[v]["pos_rmse"] * 1e3, color=cols[v], lw=1.2, label=labels[v])
+    shade_slip(ax_e)
+    ax_e.set(title=f"Midpoint position RMSE, {args.n_mc_trials} runs", xlabel="time (s)", ylabel="RMSE (mm)")
+    below(ax_e)
+
+    for v in m.VARIANTS:
+        ax_n.plot(t, stats[v]["nees"], color=cols[v], lw=1.3, label=f"{labels[v]} (mean {np.mean(stats[v]['nees']):.1f})")
+    ax_n.axhspan(lo, hi, color=TRUTH, alpha=0.10, lw=0)
+    ax_n.axhline(m.STATE_DIM, color=TRUTH, lw=1, label=f"consistent filter: {m.STATE_DIM}")
+    shade_slip(ax_n)
+    ax_n.set(yscale="log", title=f"NEES, {args.n_mc_trials} runs", xlabel="time (s)", ylabel="NEES")
+    plain_log_ticks(ax_n)
+    below(ax_n)
+
+    x_mm = np.array(sweep_std) * 1e3
+    for v in sweep_vars:
+        ax_s.plot(x_mm, sweep[v], "o-", color=cols[v], lw=1.5, label=labels[v])
+    ax_s.axhline(m.STATE_DIM, color=TRUTH, lw=1, label=f"consistent filter: {m.STATE_DIM}")
+    ax_s.set(xscale="log", yscale="log", title=f"Noisier moving sensor ({n_sweep} runs each)",
+             xlabel="moving sensor noise (mm per reading)", ylabel="NEES (run average)")
+    ax_s.set_xticks(x_mm)
+    ax_s.xaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:g}"))
+    ax_s.xaxis.set_minor_formatter(FuncFormatter(lambda v, _: ""))
+    plain_log_ticks(ax_s)
+    below(ax_s)
+    finish(fig, "inchworm_two_pad_fusion_ekf", "Two-pad inchworm: reading both pad sensors",
+           f"slip pulses in {len(episodes)} of {setup['n_phases']} phases, sensor faults on "
+           f"{100 * args.p_fault:.0f}% of phases per sensor, 5% stroke error; seed 0", bottom=0.02)
+
+
 def fig_gait_phase_ekf():
     """gait_phase_ekf.py: stance flags of the blocked leg, touchdown-offset estimates, Monte Carlo NEES per
     approach at the defaults (same draw order as its main()), and NEES vs terrain spread for the two
@@ -2646,6 +2739,7 @@ FIGURES = {
     "inchworm_zupt_zaru_ekf": fig_inchworm_zupt_zaru_ekf,
     "inchworm_slip_gate_ekf": fig_inchworm_slip_gate_ekf,
     "inchworm_two_pad_ekf": fig_inchworm_two_pad_ekf,
+    "inchworm_two_pad_fusion_ekf": fig_inchworm_two_pad_fusion_ekf,
     "gait_phase_ekf": fig_gait_phase_ekf,
     "friction_anisotropic_ekf": fig_friction_anisotropic_ekf,
     "imu_integration_comparison": fig_imu_integration_comparison,

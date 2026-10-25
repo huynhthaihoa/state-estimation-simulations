@@ -179,7 +179,7 @@ The veto has two knobs: **how loose it makes the pad** (`--free-noise-std`) and 
 
 ## 6. What this toy does not show
 
-- **The moving pad's sensor.** In a sliding gait the moving pad stays on the ground, so its sensor could measure that end's motion too: direct odometry of the moving end, on top of the encoders. The paper reads only the anchored pad, and so does this toy. This is the planned next step.
+- **The moving pad's sensor.** In a sliding gait the moving pad stays on the ground, so its sensor could measure that end's motion too: direct odometry of the moving end, on top of the encoders. The paper reads only the anchored pad, and so does this toy. [inchworm_two_pad_fusion_ekf.md](inchworm_two_pad_fusion_ekf.md) adds it.
 - **A motion model for the moving pad** from the encoder stroke rate and the steering angle. Here it is a loose **random walk** (it drifts by independent random steps) placed by the closure update (§4 shows where that matters).
 - **Real sensor behavior.** The paper's sensor reads every 10 ms at 1200 counts per inch and has a surface-quality output. This toy has white Gaussian noise every 50 ms, no quantization (rounding to whole counts), no dropout (missed readings) and no lift-off.
 - **Slip physics.** Slip is a prescribed backward pulse along the body; the robot's real friction scales (3D-printed flaps that grip backward and slide forward) slip by amounts that depend on load and terrain.
