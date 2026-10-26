@@ -1,16 +1,18 @@
 import numpy as np
 import pytest
 manif = pytest.importorskip("manifpy")
+from state_estimation_simulations.use_manif import pose_graph as _pose_graph  # noqa: E402
+from state_estimation_simulations.use_manif import pose_graph_incremental as _pose_graph_incremental  # noqa: E402
 
 
 @pytest.fixture
-def pose_graph(import_module, use_manif_dir):
-    return import_module(use_manif_dir, "pose_graph")
+def pose_graph():
+    return _pose_graph
 
 
 @pytest.fixture
-def pose_graph_incremental(import_module, use_manif_dir):
-    return import_module(use_manif_dir, "pose_graph_incremental")
+def pose_graph_incremental():
+    return _pose_graph_incremental
 
 
 def _noisy_scenario(pose_graph, seed, nodes_per_side=4, side_length=2.0,

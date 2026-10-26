@@ -2,10 +2,12 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
+from state_estimation_simulations.use_numpy import imu_integration_comparison as _imu_integration_comparison
+
 
 @pytest.fixture
-def imu_integration_comparison(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "imu_integration_comparison")
+def imu_integration_comparison():
+    return _imu_integration_comparison
 
 
 @pytest.mark.parametrize("rpy", [

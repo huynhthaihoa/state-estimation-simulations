@@ -2,11 +2,12 @@ import numpy as np
 import pytest
 
 manif = pytest.importorskip("manifpy")
+from state_estimation_simulations.use_manif import bundle_adjustment as _bundle_adjustment  # noqa: E402
 
 
 @pytest.fixture
-def bundle_adjustment(import_module, use_manif_dir):
-    return import_module(use_manif_dir, "bundle_adjustment")
+def bundle_adjustment():
+    return _bundle_adjustment
 
 
 K = (800.0, 800.0, 320.0, 240.0)

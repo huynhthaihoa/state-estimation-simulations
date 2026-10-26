@@ -33,12 +33,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation
 
-import _paths  # noqa: F401  (puts use_numpy/ and the repo root on sys.path)
-from bundle_adjustment import (
+from state_estimation_simulations.use_numpy.bundle_adjustment import (
     generate_ground_truth_scene, build_observations, perturb_initial_guess,
     run_ba_landmarks_only, run_ba_poses_only, run_bundle_adjustment,
     align_reconstruction_to_ground_truth, reprojection_rms, camera_project)
-from lie_utils import se3_exp, se3_log, se3_inv, compute_se3_inv_right_jacobian
+from state_estimation_simulations.use_numpy.lie_utils import se3_exp, se3_log, se3_inv, compute_se3_inv_right_jacobian
 
 
 def run_bundle_adjustment_recorded(T_init, P_init, observations, K, pose_noise_std, pixel_noise_std,

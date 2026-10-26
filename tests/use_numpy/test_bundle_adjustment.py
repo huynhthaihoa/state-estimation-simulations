@@ -1,10 +1,12 @@
 import numpy as np
 import pytest
 
+from state_estimation_simulations.use_numpy import bundle_adjustment as _bundle_adjustment
+
 
 @pytest.fixture
-def ba(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "bundle_adjustment")
+def ba():
+    return _bundle_adjustment
 
 
 K = (800.0, 800.0, 320.0, 240.0)

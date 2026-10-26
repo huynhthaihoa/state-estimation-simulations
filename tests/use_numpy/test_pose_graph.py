@@ -1,15 +1,18 @@
 import numpy as np
 import pytest
 
-
-@pytest.fixture
-def pose_graph(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "pose_graph")
+from state_estimation_simulations.use_numpy import pose_graph as _pose_graph
+from state_estimation_simulations.use_numpy import lie_utils as _lie_utils
 
 
 @pytest.fixture
-def lie_utils(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "lie_utils")
+def pose_graph():
+    return _pose_graph
+
+
+@pytest.fixture
+def lie_utils():
+    return _lie_utils
 
 
 def test_generate_ground_truth_trajectory_corners_only(pose_graph):

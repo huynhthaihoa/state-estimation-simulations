@@ -21,20 +21,17 @@ basin, 3 degeneracy, 4 planes as landmarks; see the use_numpy script.
 '''
 
 import argparse
-import os
-import sys
 
 import numpy as np
 import manifpy as manif
 from scipy.spatial.transform import Rotation
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lidar_utils import (METHODS, RELATIVE_MOTION, ExtractionConfig, LidarConfig, RegistrationConfig,  # noqa: F401
+from state_estimation_simulations.lidar_utils import (METHODS, RELATIVE_MOTION, ExtractionConfig, LidarConfig, RegistrationConfig,  # noqa: F401
                          Scan, associate_planes, print_basin, print_degeneracy, print_extraction, print_landmarks,
                          corridor_scene, inlier_threshold, l_corridor_scene, l_corridor_trajectory,
                          match_primitives, pair_gate, plane_fit_information, prepare_scan, random_perturbation,
                          random_sensor_pose, run_extraction_experiment, s2_basis, s2_exp, simulate_scan)
-from utils import umeyama_alignment
+from state_estimation_simulations.utils import umeyama_alignment
 
 
 def make_pose(R, t):

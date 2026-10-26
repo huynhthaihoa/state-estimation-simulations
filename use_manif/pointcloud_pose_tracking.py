@@ -57,17 +57,14 @@ doubles as the batch solver's initial guess.
 '''
 
 import argparse
-import os
-import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 import manifpy as manif
 from scipy.spatial.transform import Rotation
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from manif_utils import pose_errors
-from utils import measure_performance, true_body_rates, unscented_weights, unscented_sigma_offsets
+from state_estimation_simulations.use_manif.manif_utils import pose_errors
+from state_estimation_simulations.utils import measure_performance, true_body_rates, unscented_weights, unscented_sigma_offsets
 
 def make_body_point_cloud(n_points, rng, half_extent=0.5):
     """A fixed, non-degenerate set of body-frame landmark points (the object's
@@ -194,6 +191,45 @@ def run_dead_reckoning(T_init, u_meas, dt):
     return T_list
 
 
+def ekf_predict(T, P, u, dt, Q_tangent):
+    """One EKF predict step (shared by the invariant EKF): the pose goes through the exact motion model, the 6x6
+    tangent covariance through manif's rplus Jacobians.
+    Arguments:
+        T: current pose estimate (manif.SE3)
+        P: current 6x6 tangent covariance
+        u: noisy body-frame twist [v, omega] driving this step (6,)
+        dt: time step (s)
+        Q_tangent: 6x6 tangent covariance of the motion-model twist increment
+    Returns:
+        T_pred: predicted pose (manif.SE3)
+        P_pred: predicted 6x6 tangent covariance
+    """
+    J_self, J_tau = np.zeros((6, 6)), np.zeros((6, 6))
+    T_pred = motion_model(T, u, dt, J_self, J_tau)
+    P_pred = J_self @ P @ J_self.T + J_tau @ Q_tangent @ J_tau.T
+    return T_pred, P_pred
+
+
+def ekf_update(T_pred, P_pred, z, body_points, R_diag):
+    """One EKF update step: world-frame point residuals, Jacobian re-linearized at the predicted pose.
+    Arguments:
+        T_pred: predicted pose (manif.SE3)
+        P_pred: predicted 6x6 tangent covariance
+        z: noisy point-cloud measurement (M,3), point i observing body point i
+        body_points: (M,3) array of points in the object's body frame
+        R_diag: (3M,3M) point-noise covariance
+    Returns:
+        T: corrected pose (manif.SE3)
+        P: corrected 6x6 tangent covariance
+    """
+    pred, H = observation_model(T_pred, body_points, with_jacobian=True)
+    r = (z - pred).reshape(-1)
+    S = H @ P_pred @ H.T + R_diag
+    K = P_pred @ H.T @ np.linalg.inv(S)
+    delta = K @ r
+    return T_pred.rplus(manif.SE3Tangent(delta)), (np.eye(6) - K @ H) @ P_pred
+
+
 def run_ekf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_std):
     """Recursive EKF: alternates a motion-model predict step (mean + 6x6
     tangent covariance) with a point-cloud observation-model update step.
@@ -216,24 +252,46 @@ def run_ekf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_s
     T_est, P = T_init, P_init.copy()
     T_list = [T_est]
     for k in range(len(u_meas)):
-        # --- Predict ---
-        J_self, J_tau = np.zeros((6, 6)), np.zeros((6, 6))
-        T_pred = motion_model(T_est, u_meas[k], dt, J_self, J_tau)
-        P_pred = J_self @ P @ J_self.T + J_tau @ Q_tangent @ J_tau.T
-
-        # --- Update ---
-        pred, H = observation_model(T_pred, body_points, with_jacobian=True)
-        r = (z[k + 1] - pred).reshape(-1)
-        S = H @ P_pred @ H.T + R_diag
-        K = P_pred @ H.T @ np.linalg.inv(S)
-        delta = K @ r
-
-        T_est = T_pred.rplus(manif.SE3Tangent(delta))
-        P = (np.eye(6) - K @ H) @ P_pred
-
+        T_pred, P_pred = ekf_predict(T_est, P, u_meas[k], dt, Q_tangent)
+        T_est, P = ekf_update(T_pred, P_pred, z[k + 1], body_points, R_diag)
         T_list.append(T_est)
 
     return T_list
+
+
+def iekf_measurement_jacobian(body_points):
+    """The invariant EKF's state-independent measurement Jacobian [I | -hat(p_i)] for every body point, built once.
+    Arguments:
+        body_points: (M,3) array of points in the object's body frame
+    Returns:
+        H: (3M,6) measurement Jacobian
+    """
+    H = np.zeros((3 * len(body_points), 6))
+    for i, p in enumerate(body_points):
+        H[3 * i:3 * i + 3, :] = np.hstack([np.eye(3), -manif.SO3Tangent(p).hat()])
+    return H
+
+
+def iekf_update(T_pred, P_pred, z, body_points, R_diag, H):
+    """One invariant-EKF update step: residuals in the predicted body frame, fixed Jacobian (predict = `ekf_predict`).
+    Arguments:
+        T_pred: predicted pose (manif.SE3)
+        P_pred: predicted 6x6 tangent covariance
+        z: noisy point-cloud measurement (M,3), point i observing body point i
+        body_points: (M,3) array of points in the object's body frame
+        R_diag: (3M,3M) point-noise covariance
+        H: (3M,6) fixed Jacobian from `iekf_measurement_jacobian`
+    Returns:
+        T: corrected pose (manif.SE3)
+        P: corrected 6x6 tangent covariance
+    """
+    T_pred_inv = T_pred.inverse()
+    z_body = np.array([T_pred_inv.act(p) for p in z])
+    r_body = (z_body - body_points).reshape(-1)
+    S = H @ P_pred @ H.T + R_diag
+    K = P_pred @ H.T @ np.linalg.inv(S)
+    delta = K @ r_body
+    return T_pred.rplus(manif.SE3Tangent(delta)), (np.eye(6) - K @ H) @ P_pred
 
 
 def run_iekf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_std):
@@ -268,33 +326,81 @@ def run_iekf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_
     n_points = len(body_points)
     R_diag = point_noise_std ** 2 * np.eye(3 * n_points)
 
-    # Precompute the state-independent measurement Jacobian (body-frame)
-    H = np.zeros((3 * n_points, 6))
-    for i, p in enumerate(body_points):
-        H[3 * i:3 * i + 3, :] = np.hstack([np.eye(3), -manif.SO3Tangent(p).hat()])
+    H = iekf_measurement_jacobian(body_points)
 
     T_est, P = T_init, P_init.copy()
     T_list = [T_est]
     for k in range(len(u_meas)):
-        # --- Predict ---
-        J_self, J_tau = np.zeros((6, 6)), np.zeros((6, 6))
-        T_pred = motion_model(T_est, u_meas[k], dt, J_self, J_tau)
-        P_pred = J_self @ P @ J_self.T + J_tau @ Q_tangent @ J_tau.T
-
-        # --- Update ---
-        T_pred_inv = T_pred.inverse()
-        z_body = np.array([T_pred_inv.act(p) for p in z[k + 1]])
-        r_body = (z_body - body_points).reshape(-1)
-        S = H @ P_pred @ H.T + R_diag
-        K = P_pred @ H.T @ np.linalg.inv(S)
-        delta = K @ r_body
-
-        T_est = T_pred.rplus(manif.SE3Tangent(delta))
-        P = (np.eye(6) - K @ H) @ P_pred
-
+        T_pred, P_pred = ekf_predict(T_est, P, u_meas[k], dt, Q_tangent)
+        T_est, P = iekf_update(T_pred, P_pred, z[k + 1], body_points, R_diag, H)
         T_list.append(T_est)
 
     return T_list
+
+
+def ukf_predict(T, P, u, dt, Q_tangent, lambda_, w_c):
+    """One UKF predict step: sigma points around T go through the exact motion model; the predicted mean is the
+    central sigma point's propagation and the spread is measured with rminus() around it (see `run_ukf`).
+    Arguments:
+        T: current pose estimate (manif.SE3)
+        P: current 6x6 tangent covariance
+        u: noisy body-frame twist [v, omega] driving this step (6,)
+        dt: time step (s)
+        Q_tangent: 6x6 tangent covariance of the motion-model twist increment
+        lambda_, w_c: unscented scaling and covariance weights from `unscented_weights`
+    Returns:
+        T_pred: predicted pose (manif.SE3)
+        P_pred: predicted 6x6 tangent covariance
+    """
+    n = 6
+    offsets = unscented_sigma_offsets(P, lambda_)
+    T_pred_mean = motion_model(T, u, dt)
+
+    xi_pred = np.zeros((2 * n + 1, n))
+    for i in range(1, 2 * n + 1):
+        T_sigma = T.rplus(manif.SE3Tangent(offsets[i]))
+        T_pred_sigma = motion_model(T_sigma, u, dt)
+        xi_pred[i] = T_pred_sigma.rminus(T_pred_mean).coeffs()
+
+    P_pred = Q_tangent.copy()
+    for i in range(2 * n + 1):
+        P_pred += w_c[i] * np.outer(xi_pred[i], xi_pred[i])
+    return T_pred_mean, P_pred
+
+
+def ukf_update(T_pred, P_pred, z, body_points, R_diag, lambda_, w_m, w_c):
+    """One UKF update step: fresh sigma points around the predicted mean go through the exact observation model.
+    Arguments:
+        T_pred: predicted pose (manif.SE3)
+        P_pred: predicted 6x6 tangent covariance
+        z: noisy point-cloud measurement (M,3), point i observing body point i
+        body_points: (M,3) array of points in the object's body frame
+        R_diag: (3M,3M) point-noise covariance
+        lambda_, w_m, w_c: unscented scaling, mean and covariance weights from `unscented_weights`
+    Returns:
+        T: corrected pose (manif.SE3)
+        P: corrected 6x6 tangent covariance
+    """
+    n = 6
+    offsets_upd = unscented_sigma_offsets(P_pred, lambda_)
+    z_sigma = np.zeros((2 * n + 1, R_diag.shape[0]))
+    for i in range(2 * n + 1):
+        T_upd_sigma = T_pred.rplus(manif.SE3Tangent(offsets_upd[i]))
+        z_sigma_i, _ = observation_model(T_upd_sigma, body_points)
+        z_sigma[i] = z_sigma_i.reshape(-1)
+
+    z_hat = w_m @ z_sigma
+    P_zz = R_diag.copy()
+    P_xz = np.zeros((n, R_diag.shape[0]))
+    for i in range(2 * n + 1):
+        dz = z_sigma[i] - z_hat
+        P_zz += w_c[i] * np.outer(dz, dz)
+        P_xz += w_c[i] * np.outer(offsets_upd[i], dz)
+
+    r = z.reshape(-1) - z_hat
+    K = P_xz @ np.linalg.inv(P_zz)
+    delta = K @ r
+    return T_pred.rplus(manif.SE3Tangent(delta)), P_pred - K @ P_zz @ K.T
 
 
 def run_ukf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_std,
@@ -334,51 +440,15 @@ def run_ukf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_s
     Returns:
         T_list: list of estimated poses (manif.SE3)
     """
-    n = 6
     n_points = len(body_points)
     R_diag = point_noise_std ** 2 * np.eye(3 * n_points)
-    lambda_, w_m, w_c = unscented_weights(n, ukf_alpha, ukf_beta, ukf_kappa)
+    lambda_, w_m, w_c = unscented_weights(6, ukf_alpha, ukf_beta, ukf_kappa)
 
     T_est, P = T_init, P_init.copy()
     T_list = [T_est]
     for k in range(len(u_meas)):
-        # --- Predict ---
-        offsets = unscented_sigma_offsets(P, lambda_)
-        T_pred_mean = motion_model(T_est, u_meas[k], dt)
-
-        xi_pred = np.zeros((2 * n + 1, n))
-        for i in range(1, 2 * n + 1):
-            T_sigma = T_est.rplus(manif.SE3Tangent(offsets[i]))
-            T_pred_sigma = motion_model(T_sigma, u_meas[k], dt)
-            xi_pred[i] = T_pred_sigma.rminus(T_pred_mean).coeffs()
-
-        P_pred = Q_tangent.copy()
-        for i in range(2 * n + 1):
-            P_pred += w_c[i] * np.outer(xi_pred[i], xi_pred[i])
-
-        # --- Update (fresh sigma points around the predicted mean) ---
-        offsets_upd = unscented_sigma_offsets(P_pred, lambda_)
-        z_sigma = np.zeros((2 * n + 1, 3 * n_points))
-        for i in range(2 * n + 1):
-            T_upd_sigma = T_pred_mean.rplus(manif.SE3Tangent(offsets_upd[i]))
-            z_sigma_i, _ = observation_model(T_upd_sigma, body_points)
-            z_sigma[i] = z_sigma_i.reshape(-1)
-
-        z_hat = w_m @ z_sigma
-        P_zz = R_diag.copy()
-        P_xz = np.zeros((n, 3 * n_points))
-        for i in range(2 * n + 1):
-            dz = z_sigma[i] - z_hat
-            P_zz += w_c[i] * np.outer(dz, dz)
-            P_xz += w_c[i] * np.outer(offsets_upd[i], dz)
-
-        r = z[k + 1].reshape(-1) - z_hat
-        K = P_xz @ np.linalg.inv(P_zz)
-        delta = K @ r
-
-        T_est = T_pred_mean.rplus(manif.SE3Tangent(delta))
-        P = P_pred - K @ P_zz @ K.T
-
+        T_pred, P_pred = ukf_predict(T_est, P, u_meas[k], dt, Q_tangent, lambda_, w_c)
+        T_est, P = ukf_update(T_pred, P_pred, z[k + 1], body_points, R_diag, lambda_, w_m, w_c)
         T_list.append(T_est)
 
     return T_list
@@ -438,6 +508,84 @@ def vanilla_kf_transition_matrix(twist, dt):
     return A
 
 
+def vanilla_kf_measurement_matrix(body_points):
+    """The vanilla KF's fixed, exact measurement matrix: pred = H @ x for x = [vec(R), t], built once.
+    Arguments:
+        body_points: (M,3) array of points in the object's body frame
+    Returns:
+        H: (3M,12) measurement matrix
+    """
+    H = np.zeros((3 * len(body_points), 12))
+    for i, p in enumerate(body_points):
+        H[3 * i, 0:3], H[3 * i, 9] = p, 1.0
+        H[3 * i + 1, 3:6], H[3 * i + 1, 10] = p, 1.0
+        H[3 * i + 2, 6:9], H[3 * i + 2, 11] = p, 1.0
+    return H
+
+
+def vanilla_kf_init(T_init, P_init):
+    """Lifts an initial pose and its 6x6 tangent covariance into the vanilla KF's 12-dim ambient state.
+    Arguments:
+        T_init: initial pose (manif.SE3)
+        P_init: initial 6x6 tangent covariance
+    Returns:
+        x: ambient state [vec(R) (9,), t (3,)]
+        P: 12x12 ambient covariance
+    """
+    R0, t0 = T_init.rotation(), T_init.translation()
+    J0 = se3_tangent_to_ambient_jacobian(R0)
+    return np.concatenate([R0.flatten(), t0]), J0 @ P_init @ J0.T
+
+
+def vanilla_kf_predict(x, P, u, dt, Q_tangent):
+    """One vanilla-KF predict step with the first-order transition matrix (`vanilla_kf_transition_matrix`).
+    Arguments:
+        x: ambient state [vec(R), t] (12,)
+        P: 12x12 ambient covariance
+        u: noisy body-frame twist [v, omega] driving this step (6,)
+        dt: time step (s)
+        Q_tangent: 6x6 tangent covariance of the motion-model twist increment
+    Returns:
+        x_pred: predicted ambient state (12,)
+        P_pred: predicted 12x12 ambient covariance
+    """
+    R_prev = x[0:9].reshape(3, 3)
+    A = vanilla_kf_transition_matrix(u, dt)
+    J = se3_tangent_to_ambient_jacobian(R_prev)
+    Q12 = J @ Q_tangent @ J.T
+    return A @ x, A @ P @ A.T + Q12
+
+
+def vanilla_kf_update(x_pred, P_pred, z, H, R_diag):
+    """One vanilla-KF update step, followed by the SVD re-projection of R onto SO(3).
+    Arguments:
+        x_pred: predicted ambient state (12,)
+        P_pred: predicted 12x12 ambient covariance
+        z: noisy point-cloud measurement (M,3), point i observing body point i
+        H: (3M,12) matrix from `vanilla_kf_measurement_matrix`
+        R_diag: (3M,3M) point-noise covariance
+    Returns:
+        x: corrected ambient state with R back on SO(3) (12,)
+        P: corrected 12x12 ambient covariance
+    """
+    r = z.reshape(-1) - H @ x_pred
+    S = H @ P_pred @ H.T + R_diag
+    K = P_pred @ H.T @ np.linalg.inv(S)
+    x_upd = x_pred + K @ r
+    P = (np.eye(12) - K @ H) @ P_pred
+
+    U, _, Vt = np.linalg.svd(x_upd[0:9].reshape(3, 3))
+    sign = 1.0 if np.linalg.det(U @ Vt) >= 0.0 else -1.0
+    R_fixed = U @ np.diag([1.0, 1.0, sign]) @ Vt
+    return np.concatenate([R_fixed.flatten(), x_upd[9:12]]), P
+
+
+def vanilla_kf_pose(x):
+    """The pose (manif.SE3) held by an ambient state [vec(R), t]; scipy gives the [x,y,z,w] quaternion (see
+    `run_vanilla_kf`)."""
+    return manif.SE3(x[9:12], Rotation.from_matrix(x[0:9].reshape(3, 3)).as_quat())
+
+
 def run_vanilla_kf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_std):
     """Vanilla (linear) KF: reparameterizes the pose as a redundant 12-dim ambient state
     x = [vec(R) (9,), t (3,)] instead of the minimal 6-dim SE(3) tangent state used by every
@@ -485,43 +633,14 @@ def run_vanilla_kf(T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_
     R_diag = point_noise_std ** 2 * np.eye(3 * n_points)
 
     # Fixed, exact, state-independent measurement matrix: pred = H @ x, never rebuilt.
-    H = np.zeros((3 * n_points, 12))
-    for i, p in enumerate(body_points):
-        H[3 * i, 0:3], H[3 * i, 9] = p, 1.0
-        H[3 * i + 1, 3:6], H[3 * i + 1, 10] = p, 1.0
-        H[3 * i + 2, 6:9], H[3 * i + 2, 11] = p, 1.0
-
-    R0, t0 = T_init.rotation(), T_init.translation()
-    x_est = np.concatenate([R0.flatten(), t0])
-    J0 = se3_tangent_to_ambient_jacobian(R0)
-    P = J0 @ P_init @ J0.T
+    H = vanilla_kf_measurement_matrix(body_points)
+    x_est, P = vanilla_kf_init(T_init, P_init)
 
     T_list = [T_init]
     for k in range(len(u_meas)):
-        # --- Predict ---
-        R_prev = x_est[0:9].reshape(3, 3)
-        A = vanilla_kf_transition_matrix(u_meas[k], dt)
-        J = se3_tangent_to_ambient_jacobian(R_prev)
-        Q12 = J @ Q_tangent @ J.T
-
-        x_pred = A @ x_est
-        P_pred = A @ P @ A.T + Q12
-
-        # --- Update ---
-        r = z[k + 1].reshape(-1) - H @ x_pred
-        S = H @ P_pred @ H.T + R_diag
-        K = P_pred @ H.T @ np.linalg.inv(S)
-        x_upd = x_pred + K @ r
-        P = (np.eye(12) - K @ H) @ P_pred
-
-        # --- Re-orthogonalize R (SO(3) projection) ---
-        U, _, Vt = np.linalg.svd(x_upd[0:9].reshape(3, 3))
-        sign = 1.0 if np.linalg.det(U @ Vt) >= 0.0 else -1.0
-        R_fixed = U @ np.diag([1.0, 1.0, sign]) @ Vt
-        x_est = np.concatenate([R_fixed.flatten(), x_upd[9:12]])
-
-        T_est = manif.SE3(x_est[9:12], Rotation.from_matrix(R_fixed).as_quat())
-        T_list.append(T_est)
+        x_pred, P_pred = vanilla_kf_predict(x_est, P, u_meas[k], dt, Q_tangent)
+        x_est, P = vanilla_kf_update(x_pred, P_pred, z[k + 1], H, R_diag)
+        T_list.append(vanilla_kf_pose(x_est))
 
     return T_list
 

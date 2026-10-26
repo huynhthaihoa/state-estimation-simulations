@@ -4,10 +4,12 @@ manif = pytest.importorskip("manifpy")
 
 from scipy.spatial.transform import Rotation
 
+from state_estimation_simulations.use_manif import imu_integration_comparison as _imu_integration_comparison  # noqa: E402
+
 
 @pytest.fixture
-def imu_integration_comparison(import_module, use_manif_dir):
-    return import_module(use_manif_dir, "imu_integration_comparison")
+def imu_integration_comparison():
+    return _imu_integration_comparison
 
 
 @pytest.mark.parametrize("rpy", [

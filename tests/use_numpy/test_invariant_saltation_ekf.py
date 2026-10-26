@@ -2,10 +2,12 @@ import numpy as np
 import pytest
 from scipy.linalg import expm
 
+from state_estimation_simulations.use_numpy import invariant_saltation_ekf as _invariant_saltation_ekf
+
 
 @pytest.fixture
-def ise(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "invariant_saltation_ekf")
+def ise():
+    return _invariant_saltation_ekf
 
 
 G_VEC = np.array([0.0, 0.0, -9.81])

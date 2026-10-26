@@ -29,8 +29,8 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-from lie_utils import se3_exp, se3_log, se3_inv, se3_adjoint, compute_se3_inv_right_jacobian
-from numpy_utils import pose_errors
+from state_estimation_simulations.use_numpy.lie_utils import se3_exp, se3_log, se3_inv, se3_adjoint, compute_se3_inv_right_jacobian
+from state_estimation_simulations.use_numpy.numpy_utils import pose_errors
 
 def generate_ground_truth_trajectory(side_length, nodes_per_side=1):
     """A closed square loop in the XY plane (start -> +X -> +Y -> -X), with an

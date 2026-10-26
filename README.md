@@ -126,17 +126,17 @@ The other 13 scripts are NumPy-only:
 ### [generator/](generator/) - Scripts that draw the figures, GIFs and SVGs
 
 - [make_figures.py](generator/make_figures.py): one illustrative PNG per simulation in `assets/`, from the simulations' own output (same defaults, seed and draw order as each script's `main()`, so the numbers match what the script prints); `uv run python generator/make_figures.py [name]`.
-- `animate_*.py` ([animate_saltation_ekf.py](generator/animate_saltation_ekf.py), [animate_inchworm_zupt_ekf.py](generator/animate_inchworm_zupt_ekf.py), [animate_inchworm_zupt_zaru_ekf.py](generator/animate_inchworm_zupt_zaru_ekf.py), [animate_inchworm_slip_gate_ekf.py](generator/animate_inchworm_slip_gate_ekf.py), [animate_inchworm_two_pad_ekf.py](generator/animate_inchworm_two_pad_ekf.py), [animate_inchworm_two_pad_fusion_ekf.py](generator/animate_inchworm_two_pad_fusion_ekf.py), [animate_friction_anisotropic_ekf.py](generator/animate_friction_anisotropic_ekf.py), [animate_bundle_adjustment.py](generator/animate_bundle_adjustment.py), [animate_sliding_window_marginalization.py](generator/animate_sliding_window_marginalization.py), [animate_invariant_saltation_ekf.py](generator/animate_invariant_saltation_ekf.py), [animate_hexapod_gait_ekf.py](generator/animate_hexapod_gait_ekf.py), [animate_gait_phase_ekf.py](generator/animate_gait_phase_ekf.py), [animate_hexapod_contact_inekf.py](generator/animate_hexapod_contact_inekf.py), [animate_lidar_primitives.py](generator/animate_lidar_primitives.py)): each re-runs one simulation's default case and writes an animated GIF (the simulated system itself plus the quantity that separates the methods, e.g. reported uncertainty or NEES). The GIFs live in `assets/` and are embedded in the matching doc next to its static figure. They import the simulation's own functions through [_paths.py](generator/_paths.py) (the saltation one uses `saltation_matrix_ekf_v2.py`'s `HybridEKF`), take its scene/noise flags plus `--fps`, `--dpi` and `--out`, and need no `ffmpeg` (matplotlib's Pillow writer). The four earlier inchworm ones and the friction one re-run the 500-trial Monte Carlo and the invariant-saltation one the 200-trial one, about 1-1.5 min each; the two-pad fusion one re-runs a 300-trial Monte Carlo (about 2 min); the hexapod gait one animates a single run with the slip switched on (about 40 s), the gait phase one a single run (about 30 s), and the contact-aided InEKF one a single run with a 0.1 rad initial rotation error (seed 4, about 50 s). `tests/` does not cover them.
+- `animate_*.py` ([animate_saltation_ekf.py](generator/animate_saltation_ekf.py), [animate_inchworm_zupt_ekf.py](generator/animate_inchworm_zupt_ekf.py), [animate_inchworm_zupt_zaru_ekf.py](generator/animate_inchworm_zupt_zaru_ekf.py), [animate_inchworm_slip_gate_ekf.py](generator/animate_inchworm_slip_gate_ekf.py), [animate_inchworm_two_pad_ekf.py](generator/animate_inchworm_two_pad_ekf.py), [animate_inchworm_two_pad_fusion_ekf.py](generator/animate_inchworm_two_pad_fusion_ekf.py), [animate_friction_anisotropic_ekf.py](generator/animate_friction_anisotropic_ekf.py), [animate_bundle_adjustment.py](generator/animate_bundle_adjustment.py), [animate_sliding_window_marginalization.py](generator/animate_sliding_window_marginalization.py), [animate_invariant_saltation_ekf.py](generator/animate_invariant_saltation_ekf.py), [animate_hexapod_gait_ekf.py](generator/animate_hexapod_gait_ekf.py), [animate_gait_phase_ekf.py](generator/animate_gait_phase_ekf.py), [animate_hexapod_contact_inekf.py](generator/animate_hexapod_contact_inekf.py), [animate_lidar_primitives.py](generator/animate_lidar_primitives.py)): each re-runs one simulation's default case and writes an animated GIF (the simulated system itself plus the quantity that separates the methods, e.g. reported uncertainty or NEES). The GIFs live in `assets/` and are embedded in the matching doc next to its static figure. They import the simulation's own functions from the installed package, `state_estimation_simulations.use_numpy` (the saltation one uses `saltation_matrix_ekf_v2.py`'s `HybridEKF`), take its scene/noise flags plus `--fps`, `--dpi` and `--out`, and need no `ffmpeg` (matplotlib's Pillow writer). The four earlier inchworm ones and the friction one re-run the 500-trial Monte Carlo and the invariant-saltation one the 200-trial one, about 1-1.5 min each; the two-pad fusion one re-runs a 300-trial Monte Carlo (about 2 min); the hexapod gait one animates a single run with the slip switched on (about 40 s), the gait phase one a single run (about 30 s), and the contact-aided InEKF one a single run with a 0.1 rad initial rotation error (seed 4, about 50 s). `tests/` does not cover them.
 - [make_frontend_backend_svgs.py](generator/make_frontend_backend_svgs.py): draws the two figures of [docs/frontend_backend.md](docs/frontend_backend.md) (`docs/images/frontend_backend.svg` and `frontend_backend_loop_closure.svg`); every label fits its box in the widest fallback font, checked when the script runs.
 - [make_factor_graph_svgs.py](generator/make_factor_graph_svgs.py): draws the two figures of [docs/optimization/factor_graph.md](docs/optimization/factor_graph.md) (`docs/images/factor_graph.svg` and `factor_graph_vs_pose_graph.svg`); same label-fit check as above.
 - [make_banner_svg.py](generator/make_banner_svg.py): draws `assets/banner.svg`, the banner at the top of this README.
-- [_paths.py](generator/_paths.py): imported by the animation scripts; puts `use_numpy/` and the repo root on `sys.path`.
 
 [generator/README.md](generator/README.md) lists what draws what. The SVG generators reproduce their files byte for byte.
 
 ### Root
 
-- [pyproject.toml](pyproject.toml): uv project file. `manifpy` is an optional dependency (the `manif` extra) sourced from the local sibling checkout `../manif` (see Installation below).
+- [pyproject.toml](pyproject.toml): uv project file. `manifpy` is an optional dependency (the `manif` extra) sourced from the local sibling checkout `../manif` (see Installation below). It also makes the repo an installable Python package, `state_estimation_simulations`: the root (with `utils.py`, `lidar_utils.py`) is the package and `use_numpy/`, `use_manif/` are its subpackages, so scripts import each other as `from state_estimation_simulations.use_numpy.lie_utils import skew` and stay where they are.
+- [\_\_init\_\_.py](__init__.py) (also in `use_numpy/`, `use_manif/`): one-line package markers.
 
 ## D. Installation
 
@@ -149,6 +149,12 @@ The other 13 scripts are NumPy-only:
 - The [use_manif/](use_manif/) scripts additionally need `manifpy`, which isn't on PyPI: this project's `pyproject.toml` points `uv` at a local sibling checkout (`../manif`) and builds it automatically (requires a working Eigen3 + CMake toolchain) when you request the `manif` extra: `uv sync --extra manif`.
 - Run any script with `uv run` from this repository's root directory, e.g.:
   `uv run python use_numpy/imu_integration_comparison.py`
+- To use the code from another project, e.g. a ROS 2 Humble workspace (Python 3.10 or newer), install it in editable mode into that project's environment and import the package:
+  ```
+  uv pip install -e path/to/state-estimation-simulations   # or: pip install -e path/to/state-estimation-simulations
+  python -c "from state_estimation_simulations.use_numpy import pointcloud_pose_tracking"
+  ```
+- If your shell sources ROS 2 (`source /opt/ros/<distro>/setup.bash`), its `PYTHONPATH` leaks into this project's environment: `uv run pytest` then loads ROS's pytest plugins and fails (e.g. `No module named 'yaml'`). Run this repo's commands with it unset: `env -u PYTHONPATH uv run ...`.
 
 ### Running the tests
 
@@ -156,6 +162,12 @@ The other 13 scripts are NumPy-only:
 
 ```
 uv run pytest tests/ -v
+```
+
+On a machine with little memory, run one test file per process instead:
+
+```
+for f in $(find tests -name 'test_*.py' | sort); do uv run pytest -q "$f"; done
 ```
 
 ## E. Library guideline

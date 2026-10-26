@@ -1,10 +1,12 @@
 import numpy as np
 import pytest
 
+from state_estimation_simulations.use_numpy import inchworm_zupt_ekf as _inchworm_zupt_ekf
+
 
 @pytest.fixture
-def inchworm_zupt_ekf(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "inchworm_zupt_ekf")
+def inchworm_zupt_ekf():
+    return _inchworm_zupt_ekf
 
 
 # --- is_anchor_phase / true_velocity on a hand-picked schedule ---

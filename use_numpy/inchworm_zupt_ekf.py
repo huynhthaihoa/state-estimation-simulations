@@ -62,14 +62,11 @@ docs/filtering/inchworm_zupt_ekf.md §3. Verified stable across seeds 0-3.
 '''
 
 import argparse
-import os
-import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import measure_performance, averaged_nees_bounds, nees  # noqa: E402
+from state_estimation_simulations.utils import measure_performance, averaged_nees_bounds, nees  # noqa: E402
 
 
 def is_anchor_phase(t, t_anchor, t_extend):

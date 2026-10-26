@@ -45,14 +45,11 @@ no dynamic variable reordering.
 '''
 
 import argparse
-import os
-import sys
 
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import symbolic_eliminate, bayes_tree_affected_path
-from pose_graph import generate_ground_truth_trajectory
+from state_estimation_simulations.utils import symbolic_eliminate, bayes_tree_affected_path
+from state_estimation_simulations.use_numpy.pose_graph import generate_ground_truth_trajectory
 
 
 def ring_edges(n_poses):

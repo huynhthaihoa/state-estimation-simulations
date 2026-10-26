@@ -29,7 +29,6 @@ Writes a GIF with matplotlib's pillow writer (no ffmpeg needed).
 '''
 
 import argparse
-import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -37,9 +36,8 @@ from matplotlib import animation
 
 from matplotlib.gridspec import GridSpec
 
-import _paths  # noqa: F401  (puts use_numpy/ and the repo root on sys.path)
 
-from lidar_primitives import (METHODS, ExtractionConfig, LidarConfig, RegistrationConfig, corridor_scene,
+from state_estimation_simulations.use_numpy.lidar_primitives import (METHODS, ExtractionConfig, LidarConfig, RegistrationConfig, corridor_scene,
                               inlier_threshold, make_scan_pair, pose_error, random_perturbation, register, se3_exp)
 
 LABELS = {"point_to_point": "point-to-point ICP", "point_to_plane": "point-to-plane ICP",

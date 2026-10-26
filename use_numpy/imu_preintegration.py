@@ -10,7 +10,7 @@ correction without re-running the integration loop.
 import numpy as np
 import argparse
 
-from lie_utils import so3_exp, so3_right_jacobian, skew
+from state_estimation_simulations.use_numpy.lie_utils import so3_exp, so3_right_jacobian, skew
 
 
 class PreintegratedIMUBundle:

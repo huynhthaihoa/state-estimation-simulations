@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
-from utils import (
+from state_estimation_simulations.utils import (
     pair_key,
     look_at_rotation,
     forward_facing_rotation,

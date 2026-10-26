@@ -1,15 +1,18 @@
 import numpy as np
 import pytest
 
-
-@pytest.fixture
-def pose_graph(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "pose_graph")
+from state_estimation_simulations.use_numpy import pose_graph as _pose_graph
+from state_estimation_simulations.use_numpy import sliding_window_marginalization as _sliding_window_marginalization
 
 
 @pytest.fixture
-def swm(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "sliding_window_marginalization")
+def pose_graph():
+    return _pose_graph
+
+
+@pytest.fixture
+def swm():
+    return _sliding_window_marginalization
 
 
 def _chain_scenario(pose_graph, seed, n_poses=3, side_length=2.0, pos_noise_std=0.05,

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from lidar_utils import (
+from state_estimation_simulations.lidar_utils import (
     Cylinder,
     ExtractionConfig,
     LidarConfig,

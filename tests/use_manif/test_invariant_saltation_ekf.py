@@ -1,16 +1,18 @@
 import numpy as np
 import pytest
 manif = pytest.importorskip("manifpy")
+from state_estimation_simulations.use_manif import invariant_saltation_ekf as _invariant_saltation_ekf  # noqa: E402
+from state_estimation_simulations.use_numpy import invariant_saltation_ekf as _invariant_saltation_ekf_np  # noqa: E402
 
 
 @pytest.fixture
-def ise(import_module, use_manif_dir):
-    return import_module(use_manif_dir, "invariant_saltation_ekf")
+def ise():
+    return _invariant_saltation_ekf
 
 
 @pytest.fixture
-def ise_np(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "invariant_saltation_ekf")
+def ise_np():
+    return _invariant_saltation_ekf_np
 
 
 G_VEC = np.array([0.0, 0.0, -9.81])

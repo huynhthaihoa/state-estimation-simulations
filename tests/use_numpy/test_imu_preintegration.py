@@ -1,15 +1,18 @@
 import numpy as np
 import pytest
 
-
-@pytest.fixture
-def imu_preintegration(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "imu_preintegration")
+from state_estimation_simulations.use_numpy import imu_preintegration as _imu_preintegration
+from state_estimation_simulations.use_numpy import lie_utils as _lie_utils
 
 
 @pytest.fixture
-def lie_utils(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "lie_utils")
+def imu_preintegration():
+    return _imu_preintegration
+
+
+@pytest.fixture
+def lie_utils():
+    return _lie_utils
 
 
 def test_straight_line_motion_matches_closed_form(imu_preintegration):

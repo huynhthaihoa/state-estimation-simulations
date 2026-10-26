@@ -1,10 +1,12 @@
 import numpy as np
 import pytest
 
+from state_estimation_simulations.use_numpy import hexapod_gait_ekf as _hexapod_gait_ekf
+
 
 @pytest.fixture
-def hexapod_gait_ekf(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "hexapod_gait_ekf")
+def hexapod_gait_ekf():
+    return _hexapod_gait_ekf
 
 
 DT = 0.02
@@ -153,7 +155,7 @@ def test_trial_shares_truth_and_noise_across_gaits(hexapod_gait_ekf):
 
 def test_monte_carlo_consistent_without_slip(hexapod_gait_ekf):
     m = hexapod_gait_ekf
-    from utils import averaged_nees_bounds
+    from state_estimation_simulations.utils import averaged_nees_bounds
     n_trials = 30
     acc = m.run_monte_carlo(n_trials, 300, DT, TICKS_PER_CYCLE, ["tripod"], np.array([0.1, 0.0, 0.2]),
                             0.05, 0.1, 0.02, np.full(6, 0.01), 0.1, np.random.default_rng(0))

@@ -3,17 +3,19 @@ import pytest
 
 manif = pytest.importorskip("manifpy")
 
-from lidar_utils import ExtractionConfig, LidarConfig, RegistrationConfig, corridor_scene  # noqa: E402
+from state_estimation_simulations.lidar_utils import ExtractionConfig, LidarConfig, RegistrationConfig, corridor_scene  # noqa: E402
+from state_estimation_simulations.use_manif import lidar_primitives as _lidar_primitives  # noqa: E402
+from state_estimation_simulations.use_numpy import lidar_primitives as _lidar_primitives_np  # noqa: E402
 
 
 @pytest.fixture
-def lm(import_module, use_manif_dir):
-    return import_module(use_manif_dir, "lidar_primitives")
+def lm():
+    return _lidar_primitives
 
 
 @pytest.fixture
-def ln(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "lidar_primitives")
+def ln():
+    return _lidar_primitives_np
 
 
 EPS = 1e-6

@@ -25,8 +25,6 @@ already set by use_manif/bundle_adjustment.py.
 '''
 
 import argparse
-import os
-import sys
 import time
 from collections import defaultdict
 
@@ -34,9 +32,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import manifpy as manif
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from manif_utils import camera_project
-from utils import pair_key, forward_facing_rotation, rotation_matrix_to_quaternion_xyzw
+from state_estimation_simulations.use_manif.manif_utils import camera_project
+from state_estimation_simulations.utils import pair_key, forward_facing_rotation, rotation_matrix_to_quaternion_xyzw
 
 
 def generate_ground_truth_trajectory(n_keyframes, path_radius, arc_span_deg):

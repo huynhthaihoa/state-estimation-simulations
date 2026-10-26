@@ -1,9 +1,11 @@
 import pytest
 
+from state_estimation_simulations.use_numpy import bayes_tree_construction as _bayes_tree_construction
+
 
 @pytest.fixture
-def bayes_tree_construction(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "bayes_tree_construction")
+def bayes_tree_construction():
+    return _bayes_tree_construction
 
 
 def test_ring_edges_known_small_case(bayes_tree_construction):

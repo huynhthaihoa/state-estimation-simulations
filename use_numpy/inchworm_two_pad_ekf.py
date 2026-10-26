@@ -54,14 +54,11 @@ without a slip pulse), `slip` (ticks inside a pulse), and overall.
 '''
 
 import argparse
-import os
-import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import measure_performance, averaged_nees_bounds, nees  # noqa: E402
+from state_estimation_simulations.utils import measure_performance, averaged_nees_bounds, nees  # noqa: E402
 
 STATE_DIM = 5
 B, F, TH = slice(0, 2), slice(2, 4), 4

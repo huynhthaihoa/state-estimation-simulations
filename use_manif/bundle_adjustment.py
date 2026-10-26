@@ -42,16 +42,13 @@ imu_integration_comparison.py's `euler_to_quat_xyzw` helper.
 '''
 
 import argparse
-import os
-import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 import manifpy as manif
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from manif_utils import camera_project, pose_errors
-from utils import look_at_rotation, umeyama_alignment, landmark_errors, rotation_matrix_to_quaternion_xyzw
+from state_estimation_simulations.use_manif.manif_utils import camera_project, pose_errors
+from state_estimation_simulations.utils import look_at_rotation, umeyama_alignment, landmark_errors, rotation_matrix_to_quaternion_xyzw
 
 
 def generate_ground_truth_scene(n_cameras, n_landmarks, camera_radius, arc_span_deg, landmark_spread, rng):

@@ -1,11 +1,12 @@
 import numpy as np
 import pytest
 manif = pytest.importorskip("manifpy")
+from state_estimation_simulations.use_manif import robot_imu_simulation as _robot_imu_simulation  # noqa: E402
 
 
 @pytest.fixture
-def robot_imu_simulation(import_module, use_manif_dir):
-    return import_module(use_manif_dir, "robot_imu_simulation")
+def robot_imu_simulation():
+    return _robot_imu_simulation
 
 
 def _default_pos_info(pos_noise_std=0.05):

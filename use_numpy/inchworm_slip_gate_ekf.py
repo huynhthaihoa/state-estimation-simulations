@@ -40,15 +40,12 @@ in the overall average.
 '''
 
 import argparse
-import os
-import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import measure_performance, averaged_nees_bounds, nees  # noqa: E402
-from inchworm_zupt_ekf import (  # noqa: E402
+from state_estimation_simulations.utils import measure_performance, averaged_nees_bounds, nees  # noqa: E402
+from state_estimation_simulations.use_numpy.inchworm_zupt_ekf import (  # noqa: E402
     is_anchor_phase, is_cruise_phase, true_velocity, predict, measurement_update_position,
     measurement_update_zupt, state_errors, _kf_update)
 

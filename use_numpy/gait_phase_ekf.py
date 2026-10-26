@@ -58,15 +58,12 @@ false alarms, and the lag-estimate error of cpg and phase_ekf.
 '''
 
 import argparse
-import os
-import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import averaged_nees_bounds, nees  # noqa: E402
-from hexapod_gait_ekf import (  # noqa: E402
+from state_estimation_simulations.utils import averaged_nees_bounds, nees  # noqa: E402
+from state_estimation_simulations.use_numpy.hexapod_gait_ekf import (  # noqa: E402
     LEG_NAMES, GAITS, stance_mask, simulate_body_trajectory, simulate_feet, process_noise_covariance,
     run_ekf, state_errors)
 

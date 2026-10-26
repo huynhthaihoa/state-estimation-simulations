@@ -35,11 +35,10 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 from matplotlib.lines import Line2D
 
-import _paths  # noqa: F401  (puts use_numpy/ and the repo root on sys.path)
-from inchworm_two_pad_fusion_ekf import (B, F, SPIKE, STATE_DIM, VARIANTS, build_parser, build_setup,
+from state_estimation_simulations.use_numpy.inchworm_two_pad_fusion_ekf import (B, F, SPIKE, STATE_DIM, VARIANTS, build_parser, build_setup,
                                          commanded_change, run_monte_carlo, run_trial, simulate_trial,
                                          window_flags)
-from utils import averaged_nees_bounds
+from state_estimation_simulations.utils import averaged_nees_bounds
 
 SHOWN = ("random_walk", "moving_sensor", "cross_check")
 

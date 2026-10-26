@@ -199,7 +199,6 @@ def loop_closure(path):
     def pix(p, ox, oy):
         return ox + p[0] * K, oy - p[1] * K
 
-    names = ["x0 (A)", "x1 (B)", "x2 (C)", "x3 (D)", "x4 (A′)"]
     for panel, (px0, title) in enumerate(((24, "Before: the drifted estimate"),
                                           (616, "After: the drift spread over the steps"))):
         s.box(px0, 20, 560, 470, GREY, op=".05")
@@ -208,9 +207,9 @@ def loop_closure(path):
         d = [pix(p, ox, oy) for p in drift]
         f = [pix(p, ox, oy) for p in fixed]
         if panel == 0:
-            path_pts, col, lab = d, GREY, names
+            path_pts, col = d, GREY
         else:
-            path_pts, col, lab = f, BLUE, names
+            path_pts, col = f, BLUE
             ghost = " ".join(f"{x:.1f},{y:.1f}" for x, y in d)
             s.raw(f'<polyline points="{ghost}" fill="none" stroke="{GREY}" stroke-opacity=".45" stroke-width="2" '
                   f'stroke-dasharray="5 4"/>')
@@ -247,7 +246,7 @@ def loop_closure(path):
             s.text(f"{ox + 40:.1f}", f"{oy + 98:.1f}", "(relative pose ≈ identity)", 14, fill=ORANGE)
         else:
             for k in range(1, 5):
-                (xa, ya), (xb, yb) = d[k], f[k]
+                (_, ya), (xb, yb) = d[k], f[k]
                 if k == 3:
                     s.text(f"{xb - 14:.1f}", f"{(ya + yb) / 2 + 12:.1f}", f"{0.1 * k:.1f} m", 14, fill=GREEN, anchor="end")
                 else:

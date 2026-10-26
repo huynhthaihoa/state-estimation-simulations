@@ -39,15 +39,12 @@ NEES uses all 5 states with the heading error wrapped to (-pi, pi].
 '''
 
 import argparse
-import os
-import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import measure_performance, averaged_nees_bounds, nees  # noqa: E402
-from inchworm_zupt_ekf import is_anchor_phase, is_cruise_phase, true_velocity  # noqa: E402
+from state_estimation_simulations.utils import measure_performance, averaged_nees_bounds, nees  # noqa: E402
+from state_estimation_simulations.use_numpy.inchworm_zupt_ekf import is_anchor_phase, is_cruise_phase, true_velocity  # noqa: E402
 
 GATING_MODES = ("never", "always", "phase_conditional", "phase_conditional_zupt_only")
 STATE_DIM = 5  # [px, py, theta, v, omega]

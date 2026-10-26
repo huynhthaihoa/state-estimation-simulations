@@ -106,18 +106,15 @@ with bundle_adjustment.py, pointcloud_pose_tracking.py and pose_graph.py.
 '''
 
 import argparse
-import os
-import sys
 import time
 from collections import defaultdict
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lie_utils import se3_exp, se3_inv, rotation_geodesic_error
-from numpy_utils import camera_project
-from utils import pair_key, forward_facing_rotation
+from state_estimation_simulations.use_numpy.lie_utils import se3_exp, se3_inv, rotation_geodesic_error
+from state_estimation_simulations.use_numpy.numpy_utils import camera_project
+from state_estimation_simulations.utils import pair_key, forward_facing_rotation
 
 
 def generate_ground_truth_trajectory(n_keyframes, path_radius, arc_span_deg):

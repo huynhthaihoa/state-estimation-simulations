@@ -2,10 +2,12 @@ import numpy as np
 import pytest
 from scipy.spatial.transform import Rotation
 
+from state_estimation_simulations.use_numpy import lie_utils as _lie_utils
+
 
 @pytest.fixture
-def lie_utils(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "lie_utils")
+def lie_utils():
+    return _lie_utils
 
 
 # A few representative omega/xi magnitudes: exactly zero, deep inside the

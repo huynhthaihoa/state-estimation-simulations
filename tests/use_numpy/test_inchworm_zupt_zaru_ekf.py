@@ -1,10 +1,12 @@
 import numpy as np
 import pytest
 
+from state_estimation_simulations.use_numpy import inchworm_zupt_zaru_ekf as _inchworm_zupt_zaru_ekf
+
 
 @pytest.fixture
-def zaru(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "inchworm_zupt_zaru_ekf")
+def zaru():
+    return _inchworm_zupt_zaru_ekf
 
 
 def _setup(m, seed=0, omega_extend=0.3, accel_std=0.15, ang_accel_std=0.45):

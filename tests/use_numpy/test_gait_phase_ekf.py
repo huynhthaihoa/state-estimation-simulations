@@ -1,21 +1,17 @@
 import numpy as np
 import pytest
 
+from state_estimation_simulations.use_numpy import gait_phase_ekf as _gait_phase_ekf
+
 DT = 0.02
 TICKS_PER_CYCLE = 60
 SWING_TICKS = 30  # tripod, default cycle period: half of 60 ticks
 SWING_TIME = SWING_TICKS * DT
 
 
-_MODULE = {}
-
-
 @pytest.fixture
-def gait(import_module, use_numpy_dir):
-    # imported once per file: each isolated import re-loads matplotlib (~1 s)
-    if "m" not in _MODULE:
-        _MODULE["m"] = import_module(use_numpy_dir, "gait_phase_ekf")
-    return _MODULE["m"]
+def gait():
+    return _gait_phase_ekf
 
 
 def _args(m, **overrides):

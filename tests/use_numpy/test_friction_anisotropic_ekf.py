@@ -1,10 +1,12 @@
 import numpy as np
 import pytest
 
+from state_estimation_simulations.use_numpy import friction_anisotropic_ekf as _friction_anisotropic_ekf
+
 
 @pytest.fixture
-def friction_anisotropic_ekf(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "friction_anisotropic_ekf")
+def friction_anisotropic_ekf():
+    return _friction_anisotropic_ekf
 
 
 # --- rotation_2d / exact_arc_step on hand-computable cases ---

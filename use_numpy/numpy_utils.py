@@ -1,6 +1,6 @@
 import numpy as np
 
-from lie_utils import skew, rotation_geodesic_error
+from state_estimation_simulations.use_numpy.lie_utils import skew, rotation_geodesic_error
 
 
 def camera_project(T, P, K, with_jacobians=False):

@@ -1,6 +1,8 @@
 import numpy as np
 import pytest
 
+from state_estimation_simulations.use_numpy import inchworm_two_pad_ekf as _inchworm_two_pad_ekf
+
 DT = 0.05
 T_PHASE = 1.0
 T_RAMP = 0.2
@@ -9,8 +11,8 @@ L_MIN = 0.15
 
 
 @pytest.fixture
-def two(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "inchworm_two_pad_ekf")
+def two():
+    return _inchworm_two_pad_ekf
 
 
 def _noise(micro_slip=0.01, sensor=0.0005, gate_sigmas=3.0):

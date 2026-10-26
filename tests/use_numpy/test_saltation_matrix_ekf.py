@@ -1,10 +1,12 @@
 import numpy as np
 import pytest
 
+from state_estimation_simulations.use_numpy import saltation_matrix_ekf as _saltation_matrix_ekf
+
 
 @pytest.fixture
-def saltation_matrix_ekf(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "saltation_matrix_ekf")
+def saltation_matrix_ekf():
+    return _saltation_matrix_ekf
 
 
 # --- flow / crossing_time on a hand-computable case ---

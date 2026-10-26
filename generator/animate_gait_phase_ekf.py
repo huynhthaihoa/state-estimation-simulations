@@ -40,10 +40,9 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Polygon, Rectangle
 from matplotlib.ticker import MultipleLocator
 
-import _paths  # noqa: F401  (puts use_numpy/ and the repo root on sys.path)
-import gait_phase_ekf as gp
-from gait_phase_ekf import LEG_NAMES
-from hexapod_gait_ekf import NOMINAL_FOOT_OFFSETS, rot
+from state_estimation_simulations.use_numpy import gait_phase_ekf as gp
+from state_estimation_simulations.use_numpy.gait_phase_ekf import LEG_NAMES
+from state_estimation_simulations.use_numpy.hexapod_gait_ekf import NOMINAL_FOOT_OFFSETS, rot
 
 COLORS = {"schedule": "tab:blue", "detector": "tab:red", "cpg": "tab:purple", "phase_ekf": "tab:green",
           "oracle": "black"}

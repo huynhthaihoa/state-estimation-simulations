@@ -62,18 +62,14 @@ random walk). See docs/filtering/hexapod_contact_inekf.md.
 '''
 
 import argparse
-import os
-import sys
 from dataclasses import dataclass, replace
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from utils import measure_performance, averaged_nees_bounds, nees  # noqa: E402
-from lie_utils import skew, so3_exp, so3_log, sek3_make, sek3_exp, sek3_log, sek3_inv, sek3_adjoint  # noqa: E402
-from hexapod_gait_ekf import GAITS, LEG_NAMES, NOMINAL_FOOT_OFFSETS, gait_phase, stance_mask  # noqa: E402
+from state_estimation_simulations.utils import measure_performance, averaged_nees_bounds, nees  # noqa: E402
+from state_estimation_simulations.use_numpy.lie_utils import skew, so3_exp, so3_log, sek3_make, sek3_exp, sek3_log, sek3_inv, sek3_adjoint  # noqa: E402
+from state_estimation_simulations.use_numpy.hexapod_gait_ekf import GAITS, LEG_NAMES, NOMINAL_FOOT_OFFSETS, gait_phase, stance_mask  # noqa: E402
 
 
 G_VEC = np.array([0.0, 0.0, -9.81])

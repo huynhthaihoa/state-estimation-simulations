@@ -44,16 +44,13 @@ lie_utils.py, shared with pointcloud_pose_tracking.py and pose_graph.py.
 '''
 
 import argparse
-import os
-import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lie_utils import se3_exp, se3_log, se3_inv, compute_se3_inv_right_jacobian
-from numpy_utils import camera_project, pose_errors
-from utils import look_at_rotation, umeyama_alignment, landmark_errors
+from state_estimation_simulations.use_numpy.lie_utils import se3_exp, se3_log, se3_inv, compute_se3_inv_right_jacobian
+from state_estimation_simulations.use_numpy.numpy_utils import camera_project, pose_errors
+from state_estimation_simulations.utils import look_at_rotation, umeyama_alignment, landmark_errors
 
 
 def generate_ground_truth_scene(n_cameras, n_landmarks, camera_radius, arc_span_deg, landmark_spread, rng):

@@ -66,15 +66,12 @@ Appendix:
 '''
 
 import argparse
-import os
-import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 import manifpy as manif
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import true_body_rates
+from state_estimation_simulations.utils import true_body_rates
 
 
 def euler_to_quat_xyzw(rpy):

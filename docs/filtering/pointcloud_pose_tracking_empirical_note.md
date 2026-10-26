@@ -84,6 +84,15 @@ EKF and IEKF share the predict step and differ only in the frame the update is l
 
 This section maps each piece of math to the function in [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/pointcloud_pose_tracking.py) that computes it. Lie-group helpers live in [`use_numpy/lie_utils.py`](../../use_numpy/lie_utils.py), and the UKF helpers live in [`utils.py`](../../utils.py). The `use_manif` version implements the same math with the `manif` library.
 
+Each recursive filter's `run_*` loop calls one predict and one update function per step; code that receives one measurement at a time (e.g. a ROS node) calls them directly:
+
+| Filter | Built once | Predict | Update |
+| --- | --- | --- | --- |
+| EKF | - | `ekf_predict` | `ekf_update` |
+| IEKF | `iekf_measurement_jacobian` | `ekf_predict` | `iekf_update` |
+| UKF | `unscented_weights` | `ukf_predict` | `ukf_update` |
+| Vanilla KF | `vanilla_kf_measurement_matrix`, `vanilla_kf_init` | `vanilla_kf_predict` | `vanilla_kf_update`, then `vanilla_kf_pose` for the pose |
+
 #### Conventions
 
 A pose $T$ is a $4\times4$ matrix with rotation $R$ and translation $t$. A tangent vector is $`\xi = [v, \omega]`$, translation first. $\mathrm{Exp}$/$`\mathrm{Log}`$ are `se3_exp`/`se3_log`, and $a^\wedge$ is `skew(a)`. Every method except the vanilla KF perturbs and corrects on the right: $`T \leftarrow T\,\mathrm{Exp}(\delta)`$. `se3_log` returns zero rotation when the angle is below $10^{-6}$ rad (its small-angle branch). Superscripts mark the step: $T^-$, $P^-$ are the predicted pose and covariance ($T_{\text{pred}}$ in §1), and $T^+$, $P^+$ are the corrected ones.

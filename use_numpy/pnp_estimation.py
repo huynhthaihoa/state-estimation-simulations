@@ -37,8 +37,8 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-from lie_utils import skew, so3_exp, se3_exp, rotation_geodesic_error
-from numpy_utils import camera_project
+from state_estimation_simulations.use_numpy.lie_utils import skew, so3_exp, se3_exp, rotation_geodesic_error
+from state_estimation_simulations.use_numpy.numpy_utils import camera_project
 
 
 def generate_scene(n_points, K, rng):

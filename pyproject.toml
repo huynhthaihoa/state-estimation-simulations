@@ -3,12 +3,24 @@ name = "state-estimation-simulations"
 version = "0.1.0"
 description = "A collection of simulations for state estimation."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "numpy",
     "scipy",
     "matplotlib",
 ]
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+# Importable as `state_estimation_simulations`: the repo root is the package (utils.py, lidar_utils.py) and
+# use_numpy/ and use_manif/ are its subpackages, so no file moves and every script path in the docs stays valid.
+[tool.setuptools]
+packages = ["state_estimation_simulations", "state_estimation_simulations.use_numpy", "state_estimation_simulations.use_manif"]
+
+[tool.setuptools.package-dir]
+state_estimation_simulations = "."
 
 [project.optional-dependencies]
 manif = ["manifpy"]

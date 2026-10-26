@@ -24,7 +24,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import manifpy as manif
-from manif_utils import pose_errors
+from state_estimation_simulations.use_manif.manif_utils import pose_errors
 
 
 def generate_ground_truth_trajectory(side_length, nodes_per_side=1):

@@ -49,17 +49,14 @@ this codebase.
 import argparse
 import contextlib
 import io
-import os
-import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.linalg import solve_triangular
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import qr_insert_row, measure_performance
-from lie_utils import se3_exp, se3_log, se3_inv, se3_adjoint, compute_se3_inv_right_jacobian
-from pose_graph import (generate_ground_truth_trajectory, simulate_noisy_edges, run_dead_reckoning,
+from state_estimation_simulations.utils import qr_insert_row, measure_performance
+from state_estimation_simulations.use_numpy.lie_utils import se3_exp, se3_log, se3_inv, se3_adjoint, compute_se3_inv_right_jacobian
+from state_estimation_simulations.use_numpy.pose_graph import (generate_ground_truth_trajectory, simulate_noisy_edges, run_dead_reckoning,
                          run_pose_graph_optimization, pose_errors)
 
 

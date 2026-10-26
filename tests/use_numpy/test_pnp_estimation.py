@@ -1,10 +1,12 @@
 import numpy as np
 import pytest
 
+from state_estimation_simulations.use_numpy import pnp_estimation as _pnp_estimation
+
 
 @pytest.fixture
-def pnp_estimation(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "pnp_estimation")
+def pnp_estimation():
+    return _pnp_estimation
 
 
 def test_linear_pnp_dlt_zero_noise_recovers_ground_truth(pnp_estimation):

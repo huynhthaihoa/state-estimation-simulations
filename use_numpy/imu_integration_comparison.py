@@ -56,15 +56,12 @@ Appendix:
 '''
 
 import argparse
-import os
-import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lie_utils import so3_exp, rotation_geodesic_error
-from utils import true_body_rates
+from state_estimation_simulations.use_numpy.lie_utils import so3_exp, rotation_geodesic_error
+from state_estimation_simulations.utils import true_body_rates
 
 
 def euler_to_R(rpy):

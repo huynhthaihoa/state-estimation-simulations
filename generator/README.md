@@ -9,7 +9,6 @@ Scripts that draw the figures, GIFs and SVGs of this repo. Run everything from t
 | [make_frontend_backend_svgs.py](make_frontend_backend_svgs.py) | `docs/images/frontend_backend.svg`, `docs/images/frontend_backend_loop_closure.svg` | [docs/frontend_backend.md](../docs/frontend_backend.md) |
 | [make_factor_graph_svgs.py](make_factor_graph_svgs.py) | `docs/images/factor_graph.svg`, `docs/images/factor_graph_vs_pose_graph.svg` | [docs/optimization/factor_graph.md](../docs/optimization/factor_graph.md) |
 | [make_banner_svg.py](make_banner_svg.py) | `assets/banner.svg` | the top of [README.md](../README.md) |
-| [_paths.py](_paths.py) | nothing: imported by the animation scripts to put `use_numpy/` and the repo root on `sys.path` | |
 
 ```bash
 uv run python generator/make_figures.py                          # all PNG figures, or name one: pose_graph

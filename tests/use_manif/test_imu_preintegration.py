@@ -1,11 +1,12 @@
 import numpy as np
 import pytest
 manif = pytest.importorskip("manifpy")
+from state_estimation_simulations.use_manif import imu_preintegration as _imu_preintegration  # noqa: E402
 
 
 @pytest.fixture
-def imu_preintegration(import_module, use_manif_dir):
-    return import_module(use_manif_dir, "imu_preintegration")
+def imu_preintegration():
+    return _imu_preintegration
 
 
 def test_straight_line_motion_matches_closed_form(imu_preintegration):

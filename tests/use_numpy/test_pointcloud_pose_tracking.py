@@ -1,31 +1,19 @@
-import importlib
-import sys
-
 import numpy as np
 import pytest
 
+from state_estimation_simulations.use_numpy import pointcloud_pose_tracking as _pointcloud_pose_tracking
+
 
 @pytest.fixture
-def pointcloud_pose_tracking(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "pointcloud_pose_tracking")
+def pointcloud_pose_tracking():
+    return _pointcloud_pose_tracking
 
 
 @pytest.fixture(scope="module")
-def scenario(use_numpy_dir):
+def scenario():
     # Built once (module scope) and shared across the scenario tests below --
     # run_batch_gn alone takes ~1s, so recomputing per-test would be wasteful.
-    # `import_module` is function-scoped (by design, see conftest.py), so it
-    # can't be depended on here; replicate its isolated-import logic directly.
-    directory = str(use_numpy_dir)
-    modules_before = set(sys.modules)
-    sys.path.insert(0, directory)
-    try:
-        importlib.invalidate_caches()
-        m = importlib.import_module("pointcloud_pose_tracking")
-    finally:
-        sys.path.remove(directory)
-        for name in set(sys.modules) - modules_before:
-            del sys.modules[name]
+    m = _pointcloud_pose_tracking
 
     rng = np.random.default_rng(0)
     duration, dt, n_points = 5.0, 0.1, 20
@@ -54,6 +42,7 @@ def scenario(use_numpy_dir):
         "m": m, "T_true": T_true,
         "T_dr": T_dr, "T_ekf": T_ekf, "T_iekf": T_iekf, "T_ukf": T_ukf, "T_gn": T_gn,
         "T_vkf": T_vkf,
+        "inputs": (T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_std),
     }
 
 
@@ -261,3 +250,32 @@ def test_pose_errors_zero_for_identical_trajectories(pointcloud_pose_tracking):
     rot_err, pos_err = m.pose_errors(T_list, T_list)
     assert np.allclose(rot_err, 0.0, atol=1e-8)
     assert np.allclose(pos_err, 0.0, atol=1e-10)
+
+
+def test_step_functions_reproduce_run_loops(scenario):
+    # Each run_* is a loop of one predict + one update call per tick; calling the step
+    # functions by hand (as a ROS node does, one message at a time) must give exactly
+    # the same poses, bit for bit.
+    m = scenario["m"]
+    T_init, P_init, u_meas, z, body_points, dt, Q_tangent, point_noise_std = scenario["inputs"]
+    def pose(T):
+        return T
+    R_diag = point_noise_std ** 2 * np.eye(3 * len(body_points))
+    lambda_, w_m, w_c = m.unscented_weights(6, 1.0, 2.0, -3.0)
+    H_iekf = m.iekf_measurement_jacobian(body_points)
+    H_vkf = m.vanilla_kf_measurement_matrix(body_points)
+
+    (T_e, P_e), (T_i, P_i), (T_u, P_u) = [(T_init, P_init.copy()) for _ in range(3)]
+    x_v, P_v = m.vanilla_kf_init(T_init, P_init)
+    for k in range(len(u_meas)):
+        T_e, P_e = m.ekf_update(*m.ekf_predict(T_e, P_e, u_meas[k], dt, Q_tangent), z[k + 1], body_points, R_diag)
+        T_i, P_i = m.iekf_update(*m.ekf_predict(T_i, P_i, u_meas[k], dt, Q_tangent), z[k + 1], body_points, R_diag,
+                                 H_iekf)
+        T_u, P_u = m.ukf_update(*m.ukf_predict(T_u, P_u, u_meas[k], dt, Q_tangent, lambda_, w_c), z[k + 1],
+                                body_points, R_diag, lambda_, w_m, w_c)
+        x_v, P_v = m.vanilla_kf_update(*m.vanilla_kf_predict(x_v, P_v, u_meas[k], dt, Q_tangent), z[k + 1], H_vkf,
+                                       R_diag)
+        assert np.array_equal(pose(T_e), pose(scenario["T_ekf"][k + 1]))
+        assert np.array_equal(pose(T_i), pose(scenario["T_iekf"][k + 1]))
+        assert np.array_equal(pose(T_u), pose(scenario["T_ukf"][k + 1]))
+        assert np.array_equal(pose(m.vanilla_kf_pose(x_v)), pose(scenario["T_vkf"][k + 1]))

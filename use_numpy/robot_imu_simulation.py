@@ -8,7 +8,7 @@ imperfect IMU's dead-reckoned twist propagation.
 import numpy as np
 import argparse
 
-from lie_utils import se3_exp
+from state_estimation_simulations.use_numpy.lie_utils import se3_exp
 
 
 def position_observation_jacobian(T_est):

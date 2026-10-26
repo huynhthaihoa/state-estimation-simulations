@@ -1,15 +1,18 @@
 import numpy as np
 import pytest
 
-
-@pytest.fixture
-def pose_graph(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "pose_graph")
+from state_estimation_simulations.use_numpy import pose_graph as _pose_graph
+from state_estimation_simulations.use_numpy import pose_graph_incremental as _pose_graph_incremental
 
 
 @pytest.fixture
-def pose_graph_incremental(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "pose_graph_incremental")
+def pose_graph():
+    return _pose_graph
+
+
+@pytest.fixture
+def pose_graph_incremental():
+    return _pose_graph_incremental
 
 
 def _noisy_scenario(pose_graph, seed, nodes_per_side=4, side_length=2.0,

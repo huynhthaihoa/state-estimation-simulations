@@ -32,15 +32,12 @@ except where a random draw is shaped by the layout (`initial_estimate`).
 '''
 
 import argparse
-import os
-import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 import manifpy as manif
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import measure_performance, averaged_nees_bounds, nees
+from state_estimation_simulations.utils import measure_performance, averaged_nees_bounds, nees
 
 # Blocks of a 9-vector in manif's SE_2_3 tangent order.
 POS, ROT, VEL = slice(0, 3), slice(3, 6), slice(6, 9)

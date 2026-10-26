@@ -1,11 +1,12 @@
 import numpy as np
 import pytest
 manif = pytest.importorskip("manifpy")
+from state_estimation_simulations.use_manif import pose_graph as _pose_graph  # noqa: E402
 
 
 @pytest.fixture
-def pose_graph(import_module, use_manif_dir):
-    return import_module(use_manif_dir, "pose_graph")
+def pose_graph():
+    return _pose_graph
 
 
 def test_generate_ground_truth_trajectory_corners_only(pose_graph):

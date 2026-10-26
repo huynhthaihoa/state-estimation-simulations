@@ -68,14 +68,11 @@ docs/filtering/hexapod_gait_ekf.md.
 '''
 
 import argparse
-import os
-import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import measure_performance, averaged_nees_bounds, nees  # noqa: E402
+from state_estimation_simulations.utils import measure_performance, averaged_nees_bounds, nees  # noqa: E402
 
 
 LEG_NAMES = ["L1", "L2", "L3", "R1", "R2", "R3"]  # 1 = front, 3 = rear

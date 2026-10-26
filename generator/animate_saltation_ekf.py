@@ -28,8 +28,7 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 from matplotlib.patches import Ellipse
 
-import _paths  # noqa: F401  (puts use_numpy/ and the repo root on sys.path)
-from saltation_matrix_ekf_v2 import HybridEKF, generate_ground_truth_and_data, detect_bounce_ticks, BounceConfig
+from state_estimation_simulations.use_numpy.saltation_matrix_ekf_v2 import HybridEKF, generate_ground_truth_and_data, detect_bounce_ticks, BounceConfig
 
 
 def run_filters(x_true, z, x_init, P_init, dt, e, g, accel_noise_std, impact_noise_std, R, bounce_cfg):

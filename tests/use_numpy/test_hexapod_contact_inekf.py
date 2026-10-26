@@ -1,10 +1,12 @@
 import numpy as np
 import pytest
 
+from state_estimation_simulations.use_numpy import hexapod_contact_inekf as _hexapod_contact_inekf
+
 
 @pytest.fixture
-def hexapod_contact_inekf(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "hexapod_contact_inekf")
+def hexapod_contact_inekf():
+    return _hexapod_contact_inekf
 
 
 EPS = 1e-6

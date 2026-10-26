@@ -1,15 +1,18 @@
 import numpy as np
 import pytest
 
-
-@pytest.fixture
-def slip(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "inchworm_slip_gate_ekf")
+from state_estimation_simulations.use_numpy import inchworm_slip_gate_ekf as _inchworm_slip_gate_ekf
+from state_estimation_simulations.use_numpy import inchworm_zupt_ekf as _inchworm_zupt_ekf
 
 
 @pytest.fixture
-def base(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "inchworm_zupt_ekf")
+def slip():
+    return _inchworm_slip_gate_ekf
+
+
+@pytest.fixture
+def base():
+    return _inchworm_zupt_ekf
 
 
 def _setup(m, seed=0, p_slip=0.5, v_slip=0.08, sensor_noise_std=0.0005, duration=20.0):

@@ -34,8 +34,7 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 from matplotlib.colors import ListedColormap
 
-import _paths  # noqa: F401  (puts use_numpy/ and the repo root on sys.path)
-from sliding_window_marginalization import (
+from state_estimation_simulations.use_numpy.sliding_window_marginalization import (
     assemble_window_system, solve_to_convergence, marginalize_oldest,
     run_sliding_window_pose_graph, generate_ground_truth_trajectory, simulate_noisy_edges)
 

@@ -78,17 +78,13 @@ is slower than `min_bounce_speed`, instead of modeling the settling phase).
 '''
 
 import argparse
-import os
-import sys
 from dataclasses import dataclass
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from utils import measure_performance, averaged_nees_bounds, nees
-from lie_utils import skew, so3_exp, so3_log, se23_make, se23_parts, se23_inv, se23_exp, se23_log, se23_adjoint
+from state_estimation_simulations.utils import measure_performance, averaged_nees_bounds, nees
+from state_estimation_simulations.use_numpy.lie_utils import skew, so3_exp, so3_log, se23_make, se23_parts, se23_inv, se23_exp, se23_log, se23_adjoint
 
 # --- Continuous dynamics, guard and reset -------------------------------------
 

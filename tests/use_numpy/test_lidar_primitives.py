@@ -1,12 +1,13 @@
 import numpy as np
 import pytest
 
-from lidar_utils import ExtractionConfig, LidarConfig, corridor_scene
+from state_estimation_simulations.lidar_utils import ExtractionConfig, LidarConfig, corridor_scene
+from state_estimation_simulations.use_numpy import lidar_primitives as _lidar_primitives
 
 
 @pytest.fixture
-def lp(import_module, use_numpy_dir):
-    return import_module(use_numpy_dir, "lidar_primitives")
+def lp():
+    return _lidar_primitives
 
 
 _PAIRS = {}
@@ -183,7 +184,7 @@ def test_between_factor_jacobians_match_finite_differences(lp):
 def test_plane_fit_information_matches_the_scatter_of_noisy_fits(lp):
     """Monte Carlo: the covariance of (normal tangent, offset) over many noisy
     fits of the same patch matches the inverse of the predicted information."""
-    from lidar_utils import fit_plane, s2_log
+    from state_estimation_simulations.lidar_utils import fit_plane, s2_log
     rng = np.random.default_rng(7)
     n, d, noise = np.array([0.0, 0.0, 1.0]), 1.2, 0.01
     xy = rng.uniform(-2, 2, (300, 2))
@@ -232,7 +233,7 @@ def test_noise_free_plane_graph_recovers_the_truth(lp):
 def test_l_corridor_trajectory_scans_see_every_plane_once(lp):
     """Scene sanity: at the corner the sensor sees floor, ceiling and all four walls
     (the two floor rectangles are one plane)."""
-    from lidar_utils import l_corridor_scene, l_corridor_trajectory, simulate_scan, extract_primitives
+    from state_estimation_simulations.lidar_utils import l_corridor_scene, l_corridor_trajectory, simulate_scan, extract_primitives
     scene, traj = l_corridor_scene(), l_corridor_trajectory()
     assert len(traj) == 40
     R, t = traj[19]

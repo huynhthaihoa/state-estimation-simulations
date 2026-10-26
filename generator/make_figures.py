@@ -27,8 +27,6 @@ from matplotlib.patches import Ellipse, FancyArrowPatch, Rectangle
 from matplotlib.ticker import FuncFormatter, LogLocator
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, "use_numpy"))
-sys.path.insert(0, ROOT)
 
 OUT_DIR = os.path.join(ROOT, "assets")
 SEED = 0
@@ -89,8 +87,8 @@ def xy_of(T_list):
 
 def fig_pose_tracking():
     """pointcloud_pose_tracking.py: six estimators on one point-cloud tracking run."""
-    import pointcloud_pose_tracking as m
-    from lie_utils import se3_exp
+    from state_estimation_simulations.use_numpy import pointcloud_pose_tracking as m
+    from state_estimation_simulations.use_numpy.lie_utils import se3_exp
 
     duration, dt, n_points = 5.0, 0.1, 20
     vel_std, gyro_std, point_std, init_std = 0.05, 0.02, 0.03, 0.1
@@ -130,7 +128,7 @@ def fig_pose_tracking():
 
 def fig_robot_imu_tracking():
     """robot_imu_simulation.py: 100 Hz IMU dead reckoning + 1 Hz position-only Gauss-Newton fix."""
-    import robot_imu_simulation as m
+    from state_estimation_simulations.use_numpy import robot_imu_simulation as m
 
     seconds, pos_std = 10, 0.05
     args = (0.01, None, 4, 1e-6, 10, 1.0, 0.5, pos_std, np.eye(3) / pos_std ** 2)
@@ -178,7 +176,7 @@ def fig_robot_imu_tracking():
 
 def fig_imu_preintegration():
     """imu_preintegration.py: one bundle of 100 samples, then a bias update applied to first order."""
-    import imu_preintegration as m
+    from state_estimation_simulations.use_numpy import imu_preintegration as m
 
     hz = 100
     b_g, b_a = np.array([0.01, -0.01, 0.02]), np.array([0.05, 0.0, -0.05])
@@ -231,7 +229,7 @@ def fig_imu_preintegration():
 
 def fig_pose_graph():
     """pose_graph.py: square loop, odometry drift, one loop closure, Levenberg-Marquardt relaxation."""
-    import pose_graph as m
+    from state_estimation_simulations.use_numpy import pose_graph as m
 
     rng = np.random.default_rng(SEED)
     gt = m.generate_ground_truth_trajectory(2.0)
@@ -275,7 +273,7 @@ def fig_pose_graph():
 
 def fig_bundle_adjustment():
     """bundle_adjustment.py: landmarks-only vs poses-only vs joint BA."""
-    import bundle_adjustment as m
+    from state_estimation_simulations.use_numpy import bundle_adjustment as m
 
     rng = np.random.default_rng(SEED)
     K = (800.0, 800.0, 320.0, 240.0)
@@ -326,7 +324,7 @@ def fig_bundle_adjustment():
 
 def fig_bundle_adjustment_advanced():
     """bundle_adjustment_advanced.py: incremental Local BA, with and without periodic Global BA."""
-    import bundle_adjustment_advanced as m
+    from state_estimation_simulations.use_numpy import bundle_adjustment_advanced as m
 
     K = (800.0, 800.0, 320.0, 240.0)
     n_kf = 50
@@ -371,7 +369,7 @@ def fig_bundle_adjustment_advanced():
 
 def fig_saltation_matrix_ekf():
     """saltation_matrix_ekf.py: naive (DR) vs saltation-corrected (Xi) covariance update at each bounce."""
-    import saltation_matrix_ekf as m
+    from state_estimation_simulations.use_numpy import saltation_matrix_ekf as m
 
     dt, e, g = 0.02, 0.85, 9.81
     pos_std, proc_std, imp_std, i_pos, i_vel, n_mc = 0.03, 0.3, 0.005, 0.1, 0.2, 500
@@ -426,7 +424,7 @@ def fig_saltation_matrix_ekf():
 
 def fig_inchworm_zupt_ekf():
     """inchworm_zupt_ekf.py: never / always / phase-conditional zero-velocity updates."""
-    import inchworm_zupt_ekf as m
+    from state_estimation_simulations.use_numpy import inchworm_zupt_ekf as m
 
     dt, t_a, t_e, t_r, v_e = 0.05, 1.0, 1.0, 0.2, 0.1
     pos_std, proc_std, zupt_std, i_pos, i_vel, n_mc = 0.02, 0.15, 0.01, 0.05, 0.05, 500
@@ -485,7 +483,7 @@ def fig_inchworm_zupt_ekf():
 def fig_inchworm_slip_gate_ekf():
     """inchworm_slip_gate_ekf.py: anchor slip, the pad sensor, velocity estimates and NEES per policy, at the
     matched process noise (0.5 m/s^2), plus a gate-threshold sweep of the slip-window and cruise-window NEES."""
-    import inchworm_slip_gate_ekf as m
+    from state_estimation_simulations.use_numpy import inchworm_slip_gate_ekf as m
 
     dt, t_a, t_e, t_r, v_e, dur = 0.05, 1.0, 1.0, 0.2, 0.1, 20.0
     pos_std, zupt_std, sens_std, n_mc = 0.02, 0.01, 0.0005, 500
@@ -511,7 +509,7 @@ def fig_inchworm_slip_gate_ekf():
         print(f"    {k:<20s} NEES clean {np.mean(nees[k][is_clean]):.2f}, slip {np.mean(nees[k][is_slip]):.2f}, "
               f"cruise {np.mean(nees[k][is_cruise]):.2f}")
     t = np.arange(len(x_true)) * dt
-    from utils import averaged_nees_bounds
+    from state_estimation_simulations.utils import averaged_nees_bounds
     lo, hi = averaged_nees_bounds(2, n_mc)
 
     def below(ax):
@@ -579,8 +577,8 @@ def fig_inchworm_slip_gate_ekf():
 def fig_inchworm_two_pad_ekf():
     """inchworm_two_pad_ekf.py: top view, anchored-pad sensor, midpoint error and NEES per policy, at the
     script defaults (same draw order as its main())."""
-    import inchworm_two_pad_ekf as m
-    from utils import averaged_nees_bounds
+    from state_estimation_simulations.use_numpy import inchworm_two_pad_ekf as m
+    from state_estimation_simulations.utils import averaged_nees_bounds
 
     dt, dur, t_phase, t_ramp, n_mc = 0.05, 20.0, 1.0, 0.2, 500
     micro, sens = 0.01, 0.0005
@@ -668,8 +666,8 @@ def fig_inchworm_two_pad_fusion_ekf():
     """inchworm_two_pad_fusion_ekf.py: both pad readings with the faults (one run), midpoint RMSE and NEES per
     variant over the Monte Carlo runs at the script defaults (same draw order as its main()), plus a sweep of
     the moving sensor's noise."""
-    import inchworm_two_pad_fusion_ekf as m
-    from utils import averaged_nees_bounds
+    from state_estimation_simulations.use_numpy import inchworm_two_pad_fusion_ekf as m
+    from state_estimation_simulations.utils import averaged_nees_bounds
 
     args = m.build_parser().parse_args([])
     rng = np.random.default_rng(SEED)
@@ -761,8 +759,8 @@ def fig_gait_phase_ekf():
     """gait_phase_ekf.py: stance flags of the blocked leg, touchdown-offset estimates, Monte Carlo NEES per
     approach at the defaults (same draw order as its main()), and NEES vs terrain spread for the two
     acceptance rules (CPG window, phase-EKF sigma gate)."""
-    import gait_phase_ekf as m
-    from utils import averaged_nees_bounds
+    from state_estimation_simulations.use_numpy import gait_phase_ekf as m
+    from state_estimation_simulations.utils import averaged_nees_bounds
 
     args = m.build_parser().parse_args([])
     dt, n_mc = args.dt, args.n_mc_trials
@@ -852,7 +850,7 @@ def fig_gait_phase_ekf():
 def fig_inchworm_zupt_zaru_ekf():
     """inchworm_zupt_zaru_ekf.py: heading and NEES under ZUPT + ZARU gating, at the script defaults
     (assumed accelerations under-sized) and at the matched noise level (0.5 m/s^2, 1.5 rad/s^2)."""
-    import inchworm_zupt_zaru_ekf as m
+    from state_estimation_simulations.use_numpy import inchworm_zupt_zaru_ekf as m
 
     dt, t_a, t_e, t_r, v_e, om_e = 0.05, 1.0, 1.0, 0.2, 0.1, 0.3
     pos_std, zupt_std, zaru_std, n_mc = 0.02, 0.01, 0.02, 500
@@ -911,7 +909,7 @@ def fig_inchworm_zupt_zaru_ekf():
 
 def fig_friction_anisotropic_ekf():
     """friction_anisotropic_ekf.py: isotropic / fixed-anisotropic / heading-aware process noise."""
-    import friction_anisotropic_ekf as m
+    from state_estimation_simulations.use_numpy import friction_anisotropic_ekf as m
 
     duration, dt, v_cmd = 20.0, 0.05, 0.2
     omega = 2.0 * np.pi / duration
@@ -972,7 +970,7 @@ def fig_friction_anisotropic_ekf():
 
 def fig_imu_integration_comparison():
     """imu_integration_comparison.py: naive Euler-angle vs SO(3) exp-map integration of the same noisy IMU."""
-    import imu_integration_comparison as m
+    from state_estimation_simulations.use_numpy import imu_integration_comparison as m
 
     t, rot_naive, rot_exp, pos_naive, pos_exp = m.run_simulation(20.0, 0.005, 0.02, 0.05, SEED)
     print(f"    final rot error naive {rot_naive[-1]:.3f} deg, exp {rot_exp[-1]:.3f} deg; "
@@ -994,8 +992,8 @@ def fig_imu_integration_comparison():
 
 def fig_pose_graph_incremental():
     """pose_graph_incremental.py: batch re-solve per node vs incremental square-root SAM (Givens QR updates)."""
-    import pose_graph_incremental as m
-    from utils import measure_performance
+    from state_estimation_simulations.use_numpy import pose_graph_incremental as m
+    from state_estimation_simulations.utils import measure_performance
 
     rng = np.random.default_rng(SEED)
     gt = m.generate_ground_truth_trajectory(2.0, 16)
@@ -1045,8 +1043,8 @@ def fig_pose_graph_incremental():
 
 def fig_bayes_tree_construction():
     """bayes_tree_construction.py: affected region of an odometry edge vs the loop-closure edge."""
-    import bayes_tree_construction as m
-    from utils import symbolic_eliminate, bayes_tree_affected_path
+    from state_estimation_simulations.use_numpy import bayes_tree_construction as m
+    from state_estimation_simulations.utils import symbolic_eliminate, bayes_tree_affected_path
 
     n = len(m.generate_ground_truth_trajectory(side_length=2.0, nodes_per_side=4))
     odom, loop = m.ring_edges(n)
@@ -1077,7 +1075,7 @@ def fig_bayes_tree_construction():
 
 def fig_pnp_estimation():
     """pnp_estimation.py: linear DLT initial guess vs Gauss-Newton refinement of a camera pose."""
-    import pnp_estimation as m
+    from state_estimation_simulations.use_numpy import pnp_estimation as m
 
     rng = np.random.default_rng(SEED)
     K = (800.0, 800.0, 320.0, 240.0)
@@ -1125,8 +1123,8 @@ def fig_pnp_estimation():
 
 def fig_sliding_window_marginalization():
     """sliding_window_marginalization.py: bounded sliding window vs full batch re-solve, over trajectory length."""
-    import sliding_window_marginalization as m
-    from utils import measure_performance
+    from state_estimation_simulations.use_numpy import sliding_window_marginalization as m
+    from state_estimation_simulations.utils import measure_performance
 
     rng = np.random.default_rng(SEED)
     info, window = np.eye(6), 10
@@ -1180,7 +1178,7 @@ def arrow(ax, p, q, color, lw=1.6, style="-|>", ms=12, **kw):
 
 def fig_friction_anisotropic_ekf_concept():
     """friction_anisotropic_ekf.py: the slip ellipse is body-fixed, so it turns with the robot."""
-    import friction_anisotropic_ekf as m
+    from state_estimation_simulations.use_numpy import friction_anisotropic_ekf as m
 
     duration, dt, v_cmd = 20.0, 0.05, 0.2
     omega = 2.0 * np.pi / duration  # script default: exactly one loop over the run
@@ -1273,7 +1271,7 @@ def fig_friction_anisotropic_ekf_concept():
 
 def fig_inchworm_zupt_ekf_concept():
     """inchworm_zupt_ekf.py: known anchor/extend schedule, and when each variant applies ZUPT."""
-    import inchworm_zupt_ekf as m
+    from state_estimation_simulations.use_numpy import inchworm_zupt_ekf as m
 
     dt, t_a, t_e, t_r, v_e = 0.05, 1.0, 1.0, 0.2, 0.1
     duration = 6.0  # 3 gait cycles of the default schedule (the script runs 10 s)
@@ -1351,7 +1349,7 @@ def fig_inchworm_zupt_ekf_concept():
 
 def bounce_path(x0, e, g, t_end, n=2000):
     """Dense exact samples of the hybrid flow via the script's own flow/crossing_time/reset_map."""
-    import saltation_matrix_ekf as m
+    from state_estimation_simulations.use_numpy import saltation_matrix_ekf as m
     ts = np.linspace(0, t_end, n)
     out, events = [], []
     x, t0 = x0.copy(), 0.0
@@ -1370,7 +1368,7 @@ def bounce_path(x0, e, g, t_end, n=2000):
 
 def fig_saltation_matrix_ekf_concept():
     """saltation_matrix_ekf.py: the hybrid system, and why the reset Jacobian alone misses the timing shift."""
-    import saltation_matrix_ekf as m
+    from state_estimation_simulations.use_numpy import saltation_matrix_ekf as m
 
     # (a)/(b): the script's default true trajectory
     duration, e, g, h0, vh = 5.0, 0.85, 9.81, 5.0, [1.0, 0.5]
@@ -1459,7 +1457,7 @@ def fig_saltation_matrix_ekf_concept():
 
 def fig_imu_preintegration_concept():
     """imu_preintegration.py: why preintegrate - fewer factors (problem A) and cheap bias updates (problem B)."""
-    import imu_preintegration as m
+    from state_estimation_simulations.use_numpy import imu_preintegration as m
 
     hz = 100
     b_g, b_a = np.array([0.01, -0.01, 0.02]), np.array([0.05, 0.0, -0.05])
@@ -1516,7 +1514,7 @@ def fig_imu_preintegration_concept():
 
 def fig_robot_imu_tracking_concept():
     """robot_imu_simulation.py: the 1 Hz fix reads position only, so its Jacobian cannot touch orientation."""
-    import robot_imu_simulation as m
+    from state_estimation_simulations.use_numpy import robot_imu_simulation as m
 
     seconds, pos_std = 10, 0.05
     T_true, T_est, pre, post = quiet(m.run_simulation, 0.01, seconds, 4, 1e-6, 10, 1.0, 0.5, pos_std,
@@ -1560,8 +1558,8 @@ def fig_robot_imu_tracking_concept():
 
 def fig_pose_tracking_dt_sweep():
     """pointcloud_pose_tracking.py: max gap of UKF and vanilla KF to the EKF trajectory vs the time step dt."""
-    import pointcloud_pose_tracking as m
-    from lie_utils import se3_exp, rotation_geodesic_error
+    from state_estimation_simulations.use_numpy import pointcloud_pose_tracking as m
+    from state_estimation_simulations.use_numpy.lie_utils import se3_exp, rotation_geodesic_error
 
     duration, n_points = 5.0, 20
     vel_std, gyro_std, point_std, init_std = 0.05, 0.02, 0.03, 0.1
@@ -1616,8 +1614,8 @@ def fig_pose_tracking_dt_sweep():
 
 def fig_pose_tracking_concept():
     """pointcloud_pose_tracking.py: one rigid point cloud, observed as z = T·p + noise; world vs body residual."""
-    import pointcloud_pose_tracking as m
-    from lie_utils import se3_exp
+    from state_estimation_simulations.use_numpy import pointcloud_pose_tracking as m
+    from state_estimation_simulations.use_numpy.lie_utils import se3_exp
 
     duration, dt, n_points = 5.0, 0.1, 20
     vel_std, gyro_std, point_std, init_std = 0.05, 0.02, 0.03, 0.1
@@ -1741,7 +1739,7 @@ def fig_ekf_linearization_concept():
 
 def fig_bundle_adjustment_concept():
     """bundle_adjustment.py: one landmark's bundle of rays, before and after joint BA."""
-    import bundle_adjustment as m
+    from state_estimation_simulations.use_numpy import bundle_adjustment as m
 
     rng = np.random.default_rng(SEED)
     K = (800.0, 800.0, 320.0, 240.0)
@@ -1786,7 +1784,7 @@ def fig_bundle_adjustment_concept():
 
 def fig_bundle_adjustment_advanced_concept():
     """bundle_adjustment_advanced.py: the covisibility graph and one Local BA window, as the solver built them."""
-    import bundle_adjustment_advanced as m
+    from state_estimation_simulations.use_numpy import bundle_adjustment_advanced as m
 
     K = (800.0, 800.0, 320.0, 240.0)
     n_kf, k_show = 50, 30
@@ -1860,8 +1858,8 @@ def fig_bundle_adjustment_advanced_concept():
 
 def fig_pose_graph_incremental_concept():
     """pose_graph_incremental.py: what one Givens row insertion touches in R, odometry edge vs loop closure."""
-    import pose_graph_incremental as m
-    from utils import qr_insert_row
+    from state_estimation_simulations.use_numpy import pose_graph_incremental as m
+    from state_estimation_simulations.utils import qr_insert_row
 
     rng = np.random.default_rng(SEED)
     gt = m.generate_ground_truth_trajectory(2.0, 2)  # 8-pose square: small enough to read R entry by entry
@@ -1920,7 +1918,7 @@ def fig_pose_graph_incremental_concept():
 
 def fig_sliding_window_marginalization_concept():
     """sliding_window_marginalization.py: the window slides, and each dropped pose becomes one prior block."""
-    import sliding_window_marginalization as m
+    from state_estimation_simulations.use_numpy import sliding_window_marginalization as m
 
     info, window = np.eye(6), 10
     gt = m.generate_ground_truth_trajectory(2.0, nodes_per_side=4)
@@ -1983,15 +1981,15 @@ def fig_sliding_window_marginalization_concept():
 
 def fig_pnp_estimation_concept():
     """pnp_estimation.py + bundle_adjustment_advanced.py: triangulation and PnP as mirror-image ray problems."""
-    import bundle_adjustment_advanced as ba
-    import pnp_estimation as m
+    from state_estimation_simulations.use_numpy import bundle_adjustment_advanced as ba
+    from state_estimation_simulations.use_numpy import pnp_estimation as m
 
     K = (800.0, 800.0, 320.0, 240.0)
 
     # (a) triangulation: known cameras, unknown point -- bundle_adjustment_advanced.py's triangulate_landmark /
     # refine_landmark_gn on bundle_adjustment.py's wide-baseline arc (its forward-moving corridor has rays too
     # close to parallel to read in a top view)
-    import bundle_adjustment as bscene
+    from state_estimation_simulations.use_numpy import bundle_adjustment as bscene
     rng_a = np.random.default_rng(SEED)
     T_cam, P_all = bscene.generate_ground_truth_scene(8, 60, 5.0, 180.0, 2.0, rng_a)
     P_true, obs = bscene.build_observations(T_cam, P_all, K, 1.0, 2, rng_a)
@@ -2054,7 +2052,7 @@ HEX_GAIT_COLORS = {"tripod": C["red"], "ripple": C["orange"], "wave": C["blue"]}
 def hexapod_body(ax, center=(0.0, 0.0), down=None, scale=1.0, label_legs=True):
     """Draws the hexapod body (heading +x) and its six feet at NOMINAL_FOOT_OFFSETS.
     Feet in `down` are filled (stance), the others hollow (swing). Returns foot positions."""
-    import hexapod_gait_ekf as m
+    from state_estimation_simulations.use_numpy import hexapod_gait_ekf as m
     c = np.asarray(center)
     feet = c + scale * m.NOMINAL_FOOT_OFFSETS
     ax.add_patch(Ellipse(c, scale * 0.42, scale * 0.24, fc="#e8eef6", ec="#5b6b7f", lw=1.4, zorder=2))
@@ -2072,7 +2070,7 @@ def hexapod_body(ax, center=(0.0, 0.0), down=None, scale=1.0, label_legs=True):
 
 def fig_hexapod_gait_ekf_concept():
     """hexapod_gait_ekf.py: the three gait schedules, what each stance foot measures, and stance geometry."""
-    import hexapod_gait_ekf as m
+    from state_estimation_simulations.use_numpy import hexapod_gait_ekf as m
 
     dt, period = 0.02, 1.2
     tpc = int(round(period / dt))
@@ -2150,7 +2148,7 @@ def fig_hexapod_gait_ekf_concept():
 
 def fig_hexapod_gait_ekf_extensions():
     """hexapod_gait_ekf.py: random foot drift (doc §4) and contact-timing jitter (doc §5)."""
-    import hexapod_gait_ekf as m
+    from state_estimation_simulations.use_numpy import hexapod_gait_ekf as m
 
     dt, period, n_steps, n_mc = 0.02, 1.2, 600, 100
     tpc = int(round(period / dt))
@@ -2240,7 +2238,7 @@ def fig_hexapod_gait_ekf_extensions():
 
 def fig_hexapod_gait_ekf():
     """hexapod_gait_ekf.py: gait effect on twist RMSE (vs. the (q r)^(1/4) estimate) and one slipping leg."""
-    import hexapod_gait_ekf as m
+    from state_estimation_simulations.use_numpy import hexapod_gait_ekf as m
 
     dt, period, n_steps, n_mc = 0.02, 1.2, 600, 100
     tpc = int(round(period / dt))
@@ -2296,8 +2294,8 @@ def fig_hexapod_gait_ekf():
 def fig_hexapod_contact_inekf():
     """hexapod_contact_inekf.py: yaw consistency (InEKF vs world EKF) and one slipping leg."""
     from dataclasses import replace
-    import hexapod_contact_inekf as m
-    from utils import averaged_nees_bounds
+    from state_estimation_simulations.use_numpy import hexapod_contact_inekf as m
+    from state_estimation_simulations.utils import averaged_nees_bounds
 
     cfg, n_mc = m.Config(), 50
     colors = {"inekf": C["blue"], "world": C["red"]}
@@ -2356,8 +2354,8 @@ def fig_hexapod_contact_inekf():
 
 def fig_lidar_primitives_concept():
     """lidar_primitives.py: what the extraction sees in one scan, and the L-corridor of experiment 4."""
-    import lidar_primitives as m
-    from lidar_utils import (ExtractionConfig, LidarConfig, corridor_scene, inlier_threshold, l_corridor_scene,
+    from state_estimation_simulations.use_numpy import lidar_primitives as m
+    from state_estimation_simulations.lidar_utils import (ExtractionConfig, LidarConfig, corridor_scene, inlier_threshold, l_corridor_scene,
                              l_corridor_trajectory)
 
     noise = 0.01
@@ -2407,8 +2405,8 @@ def fig_lidar_primitives_concept():
 
 def fig_lidar_primitives_extraction():
     """lidar_primitives.py experiment 1: radius bias of the two cylinder fits, and detection vs. point density."""
-    import lidar_primitives as m
-    from lidar_utils import corridor_scene
+    from state_estimation_simulations.use_numpy import lidar_primitives as m
+    from state_estimation_simulations.lidar_utils import corridor_scene
 
     noise_levels, az = [0.005, 0.01, 0.02, 0.04], [180, 360, 720]
     out = m.run_extraction_experiment(corridor_scene(pillars=True), noise_levels, az, 10, SEED, min_points=150)
@@ -2444,8 +2442,8 @@ def fig_lidar_primitives_extraction():
 
 def fig_lidar_primitives():
     """lidar_primitives.py experiments 2-4: convergence basin, degeneracy, planes as landmarks."""
-    import lidar_primitives as m
-    from lidar_utils import METHODS
+    from state_estimation_simulations.use_numpy import lidar_primitives as m
+    from state_estimation_simulations.lidar_utils import METHODS
 
     labels = {"point_to_point": "point-to-point", "point_to_plane": "point-to-plane", "primitive": "primitives"}
     cols = {"point_to_point": C["red"], "point_to_plane": C["blue"], "primitive": C["green"]}
@@ -2598,8 +2596,8 @@ def fig_lm_gradient_descent():
 
 def fig_sparse_fill_in_orderings():
     """sparse_cholesky_factorization.md §5-§9: ordering vs fill-in for a BA-like Hessian."""
-    import bundle_adjustment as m
-    from utils import symbolic_eliminate
+    from state_estimation_simulations.use_numpy import bundle_adjustment as m
+    from state_estimation_simulations.utils import symbolic_eliminate
 
     rng = np.random.default_rng(SEED)
     K = (800.0, 800.0, 320.0, 240.0)

@@ -67,18 +67,15 @@ codebase's [vx,vy,vz,wx,wy,wz] convention throughout.
 import argparse
 import contextlib
 import io
-import os
-import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils import measure_performance
-from lie_utils import se3_exp, se3_log, se3_inv, compute_se3_inv_right_jacobian
-from pose_graph import (generate_ground_truth_trajectory, simulate_noisy_edges, run_dead_reckoning,
+from state_estimation_simulations.utils import measure_performance
+from state_estimation_simulations.use_numpy.lie_utils import se3_exp, se3_log, se3_inv, compute_se3_inv_right_jacobian
+from state_estimation_simulations.use_numpy.pose_graph import (generate_ground_truth_trajectory, simulate_noisy_edges, run_dead_reckoning,
                          run_pose_graph_optimization, pose_errors)
-from pose_graph_incremental import linearize_edge
+from state_estimation_simulations.use_numpy.pose_graph_incremental import linearize_edge
 
 
 def assemble_window_system(x_window, prior_ref, prior_info, edges_window, info_matrix):

@@ -63,16 +63,12 @@ gains, faults and all noise are redrawn every trial.
 '''
 
 import argparse
-import os
-import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from utils import measure_performance, averaged_nees_bounds, nees  # noqa: E402
-from inchworm_two_pad_ekf import (STATE_DIM, B, F, TH, rot, drot, trapezoid, back_is_anchored,  # noqa: E402
+from state_estimation_simulations.utils import measure_performance, averaged_nees_bounds, nees  # noqa: E402
+from state_estimation_simulations.use_numpy.inchworm_two_pad_ekf import (STATE_DIM, B, F, TH, rot, drot, trapezoid, back_is_anchored,  # noqa: E402
                                   draw_slip_episodes, slip_speed, update_closure, state_error,
                                   window_flags)
 
