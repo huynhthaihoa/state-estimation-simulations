@@ -23,6 +23,7 @@ FONT_DIR = os.path.join(matplotlib.get_data_path(), "fonts", "ttf")   # DejaVu s
 REG, BLD = os.path.join(FONT_DIR, "DejaVuSans.ttf"), os.path.join(FONT_DIR, "DejaVuSans-Bold.ttf")
 INK, MUTED = "#e2e8f0", "#94a3b8"
 YEL, BLUE, GREEN, PURP, GREY = "#facc15", "#38bdf8", "#34d399", "#a78bfa", "#94a3b8"
+ORANGE = "#d38e34"   # loop closure: kept apart from the back-end green
 
 
 def width(s, size, bold=False, ls=0.0):
@@ -137,10 +138,21 @@ def pipeline(path):
         s.box(x, top + 118, w, 32, GREEN, op=".16", sw=1.5, rx=10)
         s.text(x + 10, top + 139, c, 14, maxw=w - 14)
         x += w + 10
-    fx = bx + 18
-    w1 = s.text(fx, top + 178, "all are nonlinear least squares:  min ½ Σ ‖ r", 15, maxw=396)
-    s.raw(f'<text x="{fx + w1:.1f}" y="{top + 183}" {FONT} font-size="11" fill="{INK}">i</text>')
-    s.text(fx + w1 + 6, top + 178, "(x) ‖²", 15)
+    # the formula of §2, min_x ½ Σ_i ‖r_i(x)‖² (x bold: all variables stacked); (text, subscript?, bold?) pieces
+    pieces = [("all are nonlinear least squares:  min", False, False), ("x", True, True), (" ½ Σ", False, False),
+              ("i", True, False), (" ‖r", False, False), ("i", True, False), ("(", False, False), ("x", False, True),
+              (")‖²", False, False)]
+    # the pieces flow one after another (only dy shifts), so spacing follows whatever font the viewer renders
+    w, spans, low = 0.0, [], False
+    for txt, sub, bold in pieces:
+        size = 11 if sub else 15
+        weight = ' font-weight="700"' if bold else ""
+        dy = f' dy="{5 if sub else -5}"' if sub != low else ""
+        spans.append(f'<tspan font-size="{size}"{weight}{dy}>{escape(txt)}</tspan>')
+        w += width(txt, size, bold)
+        low = sub
+    assert w <= 396, f"formula too wide: {w:.0f}"
+    s.raw(f'<text x="{bx + 18}" y="{top + 178}" {FONT} font-size="15" fill="{INK}">{"".join(spans)}</text>')
     s.text(bx + 18, top + 214, "How we solve it (solvers)", 14, True, MUTED, maxw=396)
     s.text(bx + 18, top + 236, "Gauss-Newton · Levenberg-Marquardt", 15, maxw=396)
     s.text(bx + 18, top + 258, "iSAM: incremental re-solving", 15, maxw=396)
@@ -151,8 +163,8 @@ def pipeline(path):
 
     # loop closure band
     ly0 = top + hh + 26
-    s.box(24, ly0, 1152, 146, GREEN, dash=True, op=".06")
-    s.text(42, ly0 + 30, "LOOP CLOSURE", 14, True, GREEN, ls=1.5)
+    s.box(24, ly0, 1152, 146, ORANGE, dash=True, op=".06")
+    s.text(42, ly0 + 30, "LOOP CLOSURE", 14, True, ORANGE, ls=1.5)
     s.text(196, ly0 + 30, "spans both stages", 14, fill=MUTED)
     s.text(42, ly0 + 60, "Front-end: detects it", 15, True, BLUE, maxw=440)
     s.text(42, ly0 + 82, "Place recognition matches the current view against", 14, maxw=440)
@@ -161,8 +173,8 @@ def pipeline(path):
     s.text(bx + 18, ly0 + 82, "Checks it against the other constraints (robust", 14, maxw=396)
     s.text(bx + 18, ly0 + 102, "costs down-weight a bad one) and folds it into", 14, maxw=396)
     s.text(bx + 18, ly0 + 122, "the global optimization.", 14, maxw=396)
-    s.arrow(500, ly0 + 92, 738, ly0 + 92, green=True)
-    s.text(619, ly0 + 82, "loop-closure candidate", 14, fill=GREEN, anchor="middle", maxw=220)
+    s.arrow(500, ly0 + 92, 738, ly0 + 92)
+    s.text(619, ly0 + 82, "loop-closure candidate", 14, fill=MUTED, anchor="middle", maxw=220)
 
     # online/offline footer
     s.text(600, ly0 + 146 + 34, "Front-end ≠ real-time, back-end ≠ offline: both stages can run online (while data arrives).",
@@ -211,7 +223,7 @@ def loop_closure(path):
         s.raw(f'<polyline points="{pts}" fill="none" stroke="{col}" stroke-width="2.5"/>')
         if panel == 0:
             (x0, y0), (x4, y4) = d[0], d[4]
-            s.raw(f'<path d="M{x0:.1f} {y0:.1f} L{x4:.1f} {y4:.1f}" stroke="{GREEN}" stroke-width="3" '
+            s.raw(f'<path d="M{x0:.1f} {y0:.1f} L{x4:.1f} {y4:.1f}" stroke="{ORANGE}" stroke-width="3" '
                   f'stroke-dasharray="6 4" fill="none"/>')
         for k, (x, y) in enumerate(path_pts):
             if panel == 1 and k == 4:
@@ -220,7 +232,7 @@ def loop_closure(path):
         # labels
         (x0, y0), (x1, y1), (x2, y2), (x3, y3), (x4, y4) = path_pts
         if panel == 1:
-            s.raw(f'<circle cx="{x0:.1f}" cy="{y0:.1f}" r="6" fill="#0b1222" stroke="{GREEN}" stroke-width="2.5"/>')
+            s.raw(f'<circle cx="{x0:.1f}" cy="{y0:.1f}" r="6" fill="#0b1222" stroke="{ORANGE}" stroke-width="2.5"/>')
             s.text(f"{x0 - 12:.1f}", f"{y0 - 14:.1f}", "x0 = x4", 14, anchor="end")
         else:
             s.text(f"{x0 - 12:.1f}", f"{y0 - 12:.1f}", "x0 (A)", 14, anchor="end")
@@ -229,10 +241,10 @@ def loop_closure(path):
         s.text(f"{x2 + 14:.1f}", f"{y2 + 5:.1f}", "x2 (C)", 14)
         s.text(f"{x3 - 12:.1f}", f"{y3 + (5 if panel else 20):.1f}", "x3 (D)", 14, anchor="end")
         if panel == 0:
-            s.text(f"{x4 + 14:.1f}", f"{y4 - 12:.1f}", "0.4 m", 14, fill=GREEN)
-            s.text(f"{ox + 40:.1f}", f"{oy + 58:.1f}", "loop closure:", 14, fill=GREEN)
-            s.text(f"{ox + 40:.1f}", f"{oy + 78:.1f}", "x4 should sit at x0", 14, fill=GREEN)
-            s.text(f"{ox + 40:.1f}", f"{oy + 98:.1f}", "(relative pose ≈ identity)", 14, fill=GREEN)
+            s.text(f"{x4 + 14:.1f}", f"{y4 - 12:.1f}", "0.4 m", 14, fill=ORANGE)
+            s.text(f"{ox + 40:.1f}", f"{oy + 58:.1f}", "loop closure:", 14, fill=ORANGE)
+            s.text(f"{ox + 40:.1f}", f"{oy + 78:.1f}", "x4 should sit at x0", 14, fill=ORANGE)
+            s.text(f"{ox + 40:.1f}", f"{oy + 98:.1f}", "(relative pose ≈ identity)", 14, fill=ORANGE)
         else:
             for k in range(1, 5):
                 (xa, ya), (xb, yb) = d[k], f[k]
@@ -253,7 +265,7 @@ def loop_closure(path):
     s.text(70, ly + 5, "odometry step (drifted)", 14, fill=MUTED)
     s.raw(f'<polyline points="270,{ly} 302,{ly}" fill="none" stroke="{BLUE}" stroke-width="2.5"/>')
     s.text(310, ly + 5, "corrected", 14, fill=MUTED)
-    s.raw(f'<path d="M410 {ly} L442 {ly}" stroke="{GREEN}" stroke-width="3" stroke-dasharray="6 4" fill="none"/>')
+    s.raw(f'<path d="M410 {ly} L442 {ly}" stroke="{ORANGE}" stroke-width="3" stroke-dasharray="6 4" fill="none"/>')
     s.text(450, ly + 5, "loop-closure constraint", 14, fill=MUTED)
     s.arrow(660, ly, 692, ly, green=True, sw=2.2)
     s.text(700, ly + 5, "correction of a pose", 14, fill=MUTED)
