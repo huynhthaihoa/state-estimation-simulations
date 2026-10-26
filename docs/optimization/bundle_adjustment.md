@@ -169,7 +169,7 @@ We can think of BA as adjusting the **bundle of rays** and the camera poses toge
 
 ![Two top-view panels from bundle_adjustment.py's defaults: rays back-projected through one landmark's measured pixels from all eight cameras, scattered at the noisy initial guess and meeting at one point after joint bundle adjustment](../../assets/bundle_adjustment_concept.png)
 
-*Figure: the bundle of rays for one landmark in `use_numpy/bundle_adjustment.py`'s default scene (seed 0), plotted by `uv run python assets/make_figures.py bundle_adjustment_concept`.*
+*Figure: the bundle of rays for one landmark in `use_numpy/bundle_adjustment.py`'s default scene (seed 0), plotted by `uv run python generator/make_figures.py bundle_adjustment_concept`.*
 
 ---
 
@@ -213,13 +213,13 @@ Real implementations usually wrap the squared reprojection error in a **robust l
 
 ![Two panels from bundle_adjustment.py: a top-down view of cameras on an arc around a landmark cluster (ground truth, noisy initial guess, joint BA), and log-scale RMSE for the noisy initial guess, landmarks-only, poses-only and joint bundle adjustment](../../assets/bundle_adjustment.png)
 
-*Figure: `use_numpy/bundle_adjustment.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py bundle_adjustment`.*
+*Figure: `use_numpy/bundle_adjustment.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py bundle_adjustment`.*
 
 The same run, animated over its Gauss-Newton iterations. Optimizing poses and landmarks jointly brings the reprojection error from 127.7 px to 1.2 px within three iterations, while the one-sided solvers, which hold either the landmarks or the poses at their noisy guess, stop at 100.1 px and 53.9 px.
 
 ![Animation of bundle_adjustment.py: left, a top-down view of cameras and landmarks moving from the noisy initial guess onto ground truth over the Gauss-Newton iterations; right, the reprojection RMSE falling to about 1.2 px on a log scale, below the landmarks-only (100 px) and poses-only (54 px) levels](../../assets/bundle_adjustment.gif)
 
-*Animation: `use_numpy/animate_bundle_adjustment.py` at its defaults (seed 0), rendered by `uv run python use_numpy/animate_bundle_adjustment.py --out assets/bundle_adjustment.gif`. Each iterate is aligned to ground truth for display (**[gauge freedom](../glossary.md#gauge-freedom):** the whole scene can shift, rotate or rescale without changing any reprojection error), and the motion between the 7 iterates is interpolated.*
+*Animation: `generator/animate_bundle_adjustment.py` at its defaults (seed 0), rendered by `uv run python generator/animate_bundle_adjustment.py --out assets/bundle_adjustment.gif`. Each iterate is aligned to ground truth for display (**[gauge freedom](../glossary.md#gauge-freedom):** the whole scene can shift, rotate or rescale without changing any reprojection error), and the motion between the 7 iterates is interpolated.*
 
 #### Projection and Jacobians
 
@@ -474,7 +474,7 @@ The right measure of coupling falls out of §12:
 
 ![Three panels from bundle_adjustment_advanced.py's defaults: the Local BA window when keyframe 30 arrives, with its new keyframe, five covisible neighbours, seven fixed anchors and five active landmarks; the banded covisibility matrix of shared landmark counts; and the window size per Local BA call staying bounded while the whole map grows](../../assets/bundle_adjustment_advanced_concept.png)
 
-*Figure: windows recorded from `use_numpy/bundle_adjustment_advanced.py`'s own `build_active_window` calls at its defaults (seed 0), plotted by `uv run python assets/make_figures.py bundle_adjustment_advanced_concept`.*
+*Figure: windows recorded from `use_numpy/bundle_adjustment_advanced.py`'s own `build_active_window` calls at its defaults (seed 0), plotted by `uv run python generator/make_figures.py bundle_adjustment_advanced_concept`.*
 
 - **Active keyframes:** the new keyframe plus its neighbors in the covisibility graph.
 - **Active points:** every 3D point observed by an active keyframe.
@@ -528,7 +528,7 @@ Use **Global BA** for offline reconstruction - meshes, NeRF/Gaussian-Splatting i
 
 ![Three panels from bundle_adjustment_advanced.py: the keyframe path through a landmark corridor with the Local-only and Local plus Global estimates, solve time per call for the bounded Local BA window versus Global BA, and trailing trajectory RMSE over keyframes for both modes](../../assets/bundle_adjustment_advanced.png)
 
-*Figure: `use_numpy/bundle_adjustment_advanced.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py bundle_adjustment_advanced`.*
+*Figure: `use_numpy/bundle_adjustment_advanced.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py bundle_adjustment_advanced`.*
 
 
 **What it confirms:** the "Scaling" row above. In the default run (one BLAS thread), the measured wall-clock solve time of the local window stays bounded (8-470 ms, set by how many landmarks the window holds, with no trend in map size), while Global BA's grows from 0.36 s at keyframe 8 to about 1.4-1.9 s at keyframes 40-49.

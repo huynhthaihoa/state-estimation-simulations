@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 540" width="1100" height="540" role="img" aria-labelledby="t d">
+<title id="t">A factor graph with every factor kind</title>
+<desc id="d">Poses x0 to x3 in a row, joined in pairs by odometry factors (squares). An IMU factor runs in parallel to the odometry factor between x1 and x2. Landmark l0 is joined to x1 and x2 by camera factors. A loop-closure factor joins x0 and x3. A prior factor touches x0 only and a GPS factor touches x3 only. Variables are circles, factors are squares, and every edge joins a circle to a square.</desc>
+<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16213b"/><stop offset="1" stop-color="#0b1222"/></linearGradient><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#94a3b8"/></marker><marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#34d399"/></marker></defs>
+<rect width="1100" height="540" rx="18" fill="url(#bg)"/>
+<path d="M160.0,168.0 L160.0,250.0" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linejoin="round"/>
+<path d="M940.0,168.0 L940.0,250.0" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linejoin="round"/>
+<path d="M160.0,250.0 L420.0,250.0" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linejoin="round"/>
+<path d="M420.0,250.0 L680.0,250.0" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linejoin="round"/>
+<path d="M680.0,250.0 L940.0,250.0" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linejoin="round"/>
+<path d="M420.0,250.0 L420.0,315.0 L680.0,315.0 L680.0,250.0" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linejoin="round"/>
+<path d="M160.0,250.0 L160.0,395.0 L940.0,395.0 L940.0,250.0" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linejoin="round"/>
+<path d="M550.0,85.0 L420.0,250.0" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linejoin="round"/>
+<path d="M550.0,85.0 L680.0,250.0" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-linejoin="round"/>
+<circle cx="160" cy="250" r="26" fill="#0b1222"/>
+<g><circle cx="160" cy="250" r="26" fill="#0b1222" stroke="#38bdf8" stroke-width="2.5"/><circle cx="160" cy="250" r="26" fill="#38bdf8" fill-opacity=".18"/></g>
+<text x="160" y="255.5" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#e2e8f0" text-anchor="middle">x0</text>
+<circle cx="420" cy="250" r="26" fill="#0b1222"/>
+<g><circle cx="420" cy="250" r="26" fill="#0b1222" stroke="#38bdf8" stroke-width="2.5"/><circle cx="420" cy="250" r="26" fill="#38bdf8" fill-opacity=".18"/></g>
+<text x="420" y="255.5" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#e2e8f0" text-anchor="middle">x1</text>
+<circle cx="680" cy="250" r="26" fill="#0b1222"/>
+<g><circle cx="680" cy="250" r="26" fill="#0b1222" stroke="#38bdf8" stroke-width="2.5"/><circle cx="680" cy="250" r="26" fill="#38bdf8" fill-opacity=".18"/></g>
+<text x="680" y="255.5" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#e2e8f0" text-anchor="middle">x2</text>
+<circle cx="940" cy="250" r="26" fill="#0b1222"/>
+<g><circle cx="940" cy="250" r="26" fill="#0b1222" stroke="#38bdf8" stroke-width="2.5"/><circle cx="940" cy="250" r="26" fill="#38bdf8" fill-opacity=".18"/></g>
+<text x="940" y="255.5" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#e2e8f0" text-anchor="middle">x3</text>
+<circle cx="550" cy="85" r="26" fill="#0b1222"/>
+<g><circle cx="550" cy="85" r="26" fill="#0b1222" stroke="#a78bfa" stroke-width="2.5"/><circle cx="550" cy="85" r="26" fill="#a78bfa" fill-opacity=".18"/></g>
+<text x="550" y="90.5" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#e2e8f0" text-anchor="middle">l0</text>
+<rect x="148" y="156" width="24" height="24" rx="3" fill="#0b1222"/>
+<g><rect x="148" y="156" width="24" height="24" rx="3" fill="#0b1222" stroke="#facc15" stroke-width="2.5"/><rect x="148" y="156" width="24" height="24" rx="3" fill="#facc15" fill-opacity=".35"/></g>
+<text x="160.0" y="144.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="middle">prior</text>
+<rect x="928" y="156" width="24" height="24" rx="3" fill="#0b1222"/>
+<g><rect x="928" y="156" width="24" height="24" rx="3" fill="#0b1222" stroke="#facc15" stroke-width="2.5"/><rect x="928" y="156" width="24" height="24" rx="3" fill="#facc15" fill-opacity=".35"/></g>
+<text x="940.0" y="144.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="middle">GPS</text>
+<rect x="278.0" y="238.0" width="24" height="24" rx="3" fill="#0b1222"/>
+<g><rect x="278.0" y="238.0" width="24" height="24" rx="3" fill="#0b1222" stroke="#34d399" stroke-width="2.5"/><rect x="278.0" y="238.0" width="24" height="24" rx="3" fill="#34d399" fill-opacity=".35"/></g>
+<text x="290.0" y="228.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="middle">odometry</text>
+<rect x="538.0" y="238.0" width="24" height="24" rx="3" fill="#0b1222"/>
+<g><rect x="538.0" y="238.0" width="24" height="24" rx="3" fill="#0b1222" stroke="#34d399" stroke-width="2.5"/><rect x="538.0" y="238.0" width="24" height="24" rx="3" fill="#34d399" fill-opacity=".35"/></g>
+<text x="550.0" y="228.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="middle">odometry</text>
+<rect x="798.0" y="238.0" width="24" height="24" rx="3" fill="#0b1222"/>
+<g><rect x="798.0" y="238.0" width="24" height="24" rx="3" fill="#0b1222" stroke="#34d399" stroke-width="2.5"/><rect x="798.0" y="238.0" width="24" height="24" rx="3" fill="#34d399" fill-opacity=".35"/></g>
+<text x="810.0" y="228.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="middle">odometry</text>
+<rect x="538" y="303" width="24" height="24" rx="3" fill="#0b1222"/>
+<g><rect x="538" y="303" width="24" height="24" rx="3" fill="#0b1222" stroke="#34d399" stroke-width="2.5"/><rect x="538" y="303" width="24" height="24" rx="3" fill="#34d399" fill-opacity=".35"/></g>
+<text x="550.0" y="349.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="middle">IMU</text>
+<rect x="538" y="383" width="24" height="24" rx="3" fill="#0b1222"/>
+<g><rect x="538" y="383" width="24" height="24" rx="3" fill="#0b1222" stroke="#34d399" stroke-width="2.5"/><rect x="538" y="383" width="24" height="24" rx="3" fill="#34d399" fill-opacity=".35"/></g>
+<text x="550.0" y="429.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="middle">loop closure</text>
+<rect x="473.0" y="155.5" width="24" height="24" rx="3" fill="#0b1222"/>
+<g><rect x="473.0" y="155.5" width="24" height="24" rx="3" fill="#0b1222" stroke="#34d399" stroke-width="2.5"/><rect x="473.0" y="155.5" width="24" height="24" rx="3" fill="#34d399" fill-opacity=".35"/></g>
+<text x="465.0" y="172.5" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="end">camera</text>
+<rect x="603.0" y="155.5" width="24" height="24" rx="3" fill="#0b1222"/>
+<g><rect x="603.0" y="155.5" width="24" height="24" rx="3" fill="#0b1222" stroke="#34d399" stroke-width="2.5"/><rect x="603.0" y="155.5" width="24" height="24" rx="3" fill="#34d399" fill-opacity=".35"/></g>
+<text x="635.0" y="172.5" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">camera</text>
+<circle cx="130" cy="480" r="10" fill="#0b1222" stroke="#38bdf8" stroke-width="2.5"/><circle cx="130" cy="480" r="10" fill="#38bdf8" fill-opacity=".18"/>
+<text x="150" y="485" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">pose</text>
+<circle cx="227.359375" cy="480" r="10" fill="#0b1222" stroke="#a78bfa" stroke-width="2.5"/><circle cx="227.359375" cy="480" r="10" fill="#a78bfa" fill-opacity=".18"/>
+<text x="247.359375" y="485" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">landmark</text>
+<rect x="347.671875" y="470" width="20" height="20" rx="3" fill="#0b1222" stroke="#34d399" stroke-width="2.5"/><rect x="347.671875" y="470" width="20" height="20" rx="3" fill="#34d399" fill-opacity=".35"/>
+<text x="377.671875" y="485" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">binary factor: joins two variables</text>
+<rect x="641.0" y="470" width="20" height="20" rx="3" fill="#0b1222" stroke="#facc15" stroke-width="2.5"/><rect x="641.0" y="470" width="20" height="20" rx="3" fill="#facc15" fill-opacity=".35"/>
+<text x="671.0" y="485" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">unary factor: joins one variable</text>
+<text x="550" y="518" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="middle">Every edge joins a circle to a square: variables and factors alternate (a bipartite graph).</text>
+</svg>

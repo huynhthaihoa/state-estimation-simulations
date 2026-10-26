@@ -392,7 +392,7 @@ Partially. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_constructio
 
 ![Two rows from bayes_tree_construction.py: the 16-variable elimination chain, where a new odometry edge affects 2 variables and the loop-closure edge affects all 16](../../assets/bayes_tree_construction.png)
 
-*Figure: `use_numpy/bayes_tree_construction.py` at its defaults, plotted by `uv run python assets/make_figures.py bayes_tree_construction` (root x15 at the left).*
+*Figure: `use_numpy/bayes_tree_construction.py` at its defaults, plotted by `uv run python generator/make_figures.py bayes_tree_construction` (root x15 at the left).*
 
 The data structure has a runnable counterpart here. The rest of [iSAM2](isam2_optimization.md) (dynamic reordering, fluid relinearization integrated with a solve) exists only conceptually.
 

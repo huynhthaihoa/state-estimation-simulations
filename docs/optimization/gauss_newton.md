@@ -183,7 +183,7 @@ Take §6's example: the residual $r(x) = x^2 - 4$ is a curve, and we're looking 
 
 ![Two panels for Gauss-Newton on the residual x squared minus 4 starting from x = 3: the curve with the tangent at x = 3, which crosses zero at 2.1667, and the next tangent at 2.1667, which crosses zero at 2.0064, next to the true root at 2; and the residual magnitude at iterations 0 to 3 on a log axis, falling from 5 to 4.1e-05](../../assets/gauss_newton_tangent.png)
 
-*Figure: the one-residual example of §6, plotted by `uv run python assets/make_figures.py gauss_newton_tangent`. Left: the curve, the tangent at the starting guess and the tangent at the next guess; each tangent's zero is the next iterate. Right: the residual magnitude per iteration on a log axis (5, 0.694, 0.0257, 4.1e-05), which shrinks faster each step.*
+*Figure: the one-residual example of §6, plotted by `uv run python generator/make_figures.py gauss_newton_tangent`. Left: the curve, the tangent at the starting guess and the tangent at the next guess; each tangent's zero is the next iterate. Right: the residual magnitude per iteration on a log axis (5, 0.694, 0.0257, 4.1e-05), which shrinks faster each step.*
 
 It moves to where that line says the residual is zero: from $x = 3$ to $x \approx 2.167$. The real curve bends, so that isn't the true root ($x = 2$), but it's much closer. A new tangent at $x \approx 2.167$ makes the next jump land even closer.
 

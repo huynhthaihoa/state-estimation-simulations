@@ -26,7 +26,7 @@ We work through the simplest concrete version, using [`friction_anisotropic_ekf.
 
 ![Three panels from friction_anisotropic_ekf.py's defaults: the robot's body frame with the pad's grip axis along the heading and its slip axis sideways; one full circular loop in the world frame, where the true slip ellipse turns with the heading while a fixed_anisotropic ellipse stays at the initial heading; and the isotropic, fixed_anisotropic and heading_aware process-noise ellipses against the true slip covariance at a 90° heading](../../assets/friction_anisotropic_ekf_concept.png)
 
-*Figure: the setup at `use_numpy/friction_anisotropic_ekf.py`'s defaults, plotted by `uv run python assets/make_figures.py friction_anisotropic_ekf_concept`. Ellipses are enlarged to be visible; their 5:1 axis ratio is exact.*
+*Figure: the setup at `use_numpy/friction_anisotropic_ekf.py`'s defaults, plotted by `uv run python generator/make_figures.py friction_anisotropic_ekf_concept`. Ellipses are enlarged to be visible; their 5:1 axis ratio is exact.*
 
 ### Relation to the point-cloud note
 This applies an argument the repo already made, on the other side of the filter:
@@ -173,7 +173,7 @@ Two consequences follow directly from these formulas:
 
 ![Two panels from friction_anisotropic_ekf.py: the circular path with the per-step slip covariance ellipse turning with the heading, and Monte Carlo NEES over one full turn for isotropic, frozen anisotropic and heading-aware process noise](../../assets/friction_anisotropic_ekf.png)
 
-*Figure: `use_numpy/friction_anisotropic_ekf.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py friction_anisotropic_ekf`.*
+*Figure: `use_numpy/friction_anisotropic_ekf.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py friction_anisotropic_ekf`.*
 
 The same run, animated over one loop. The position tracks overlap, so the left panel shows the process-noise ellipse each policy assumes at the robot, magnified 30 times:
 - `isotropic` is a fixed circle.
@@ -184,7 +184,7 @@ The right panel shows the Monte Carlo NEES. `fixed_anisotropic` climbs to a per-
 
 ![Animation of one loop: left, the robot on its circular path with the true slip ellipse and the isotropic, fixed_anisotropic and heading_aware process-noise ellipses, magnified 30 times; right, each policy's Monte Carlo averaged NEES over time on a log scale, with the fixed ellipse's misalignment from the heading](../../assets/friction_anisotropic_ekf.gif)
 
-*Animation: `use_numpy/animate_friction_anisotropic_ekf.py` at its defaults (seed 0, 500 trials, every third tick), rendered by `uv run python use_numpy/animate_friction_anisotropic_ekf.py --out assets/friction_anisotropic_ekf.gif`. The ellipses come from one run; the NEES curves are the Monte Carlo average.*
+*Animation: `generator/animate_friction_anisotropic_ekf.py` at its defaults (seed 0, 500 trials, every third tick), rendered by `uv run python generator/animate_friction_anisotropic_ekf.py --out assets/friction_anisotropic_ekf.gif`. The ellipses come from one run; the NEES curves are the Monte Carlo average.*
 
 | Rotation away from reference | `isotropic` | `fixed_anisotropic` | `heading_aware` |
 | --- | --- | --- | --- |

@@ -184,7 +184,7 @@ Visually, near the current point the curve is replaced by its tangent line, the 
 
 ![Two panels for Gauss-Newton on the residual x squared minus 4 starting from x = 3: the curve with the tangent at x = 3, which crosses zero at 2.1667, and the next tangent at 2.1667, which crosses zero at 2.0064, next to the true root at 2; and the residual magnitude at iterations 0 to 3 on a log axis, falling from 5 to 4.1e-05](../../assets/gauss_newton_tangent.png)
 
-*Figure: a nonlinear function and its tangent line, as drawn in gauss_newton.md §9 and plotted by `uv run python assets/make_figures.py gauss_newton_tangent`. Left: the curve with two tangents. Right: the residual magnitude per iteration.*
+*Figure: a nonlinear function and its tangent line, as drawn in gauss_newton.md §9 and plotted by `uv run python generator/make_figures.py gauss_newton_tangent`. Left: the curve with two tangents. Right: the residual magnitude per iteration.*
 
 We're saying:
 

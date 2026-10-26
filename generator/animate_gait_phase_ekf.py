@@ -40,6 +40,7 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Polygon, Rectangle
 from matplotlib.ticker import MultipleLocator
 
+import _paths  # noqa: F401  (puts use_numpy/ and the repo root on sys.path)
 import gait_phase_ekf as gp
 from gait_phase_ekf import LEG_NAMES
 from hexapod_gait_ekf import NOMINAL_FOOT_OFFSETS, rot

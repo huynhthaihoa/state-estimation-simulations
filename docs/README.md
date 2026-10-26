@@ -57,4 +57,4 @@ Conceptual notes on the state-estimation and SLAM ideas behind the code in [`use
 
 ## [`images/`](images/)
 
-Diagrams referenced by the docs above, named `<doc>_<n>.jpg`. Each image's source is checked in its owning doc's "Image sources" section.
+Diagrams referenced by the docs above. The four SVGs (`frontend_backend.svg`, `frontend_backend_loop_closure.svg`, `factor_graph.svg`, `factor_graph_vs_pose_graph.svg`) are drawn for this repo by [`generator/make_frontend_backend_svgs.py`](../generator/make_frontend_backend_svgs.py) and [`generator/make_factor_graph_svgs.py`](../generator/make_factor_graph_svgs.py) and have no external source. `frontend_backend_1.jpg` to `frontend_backend_4.jpg` and `factor_graph_1.jpg` to `factor_graph_5.jpg` are third-party sketches that no doc uses any more.

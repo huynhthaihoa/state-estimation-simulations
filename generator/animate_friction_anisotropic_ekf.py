@@ -36,6 +36,7 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 from matplotlib.patches import Ellipse
 
+import _paths  # noqa: F401  (puts use_numpy/ and the repo root on sys.path)
 from friction_anisotropic_ekf import (
     generate_ground_truth_and_data, run_ekf_isotropic, run_ekf_fixed_anisotropic,
     run_ekf_heading_aware, run_monte_carlo_consistency, isotropic_Q_pos, anisotropic_Q_pos,

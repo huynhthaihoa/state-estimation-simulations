@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 716" width="1200" height="716" role="img" aria-labelledby="t d">
+<title id="t">Front-end and back-end in SLAM</title>
+<desc id="d">Sensors (camera, IMU, point cloud, wheel or visual odometry, contact and phase signals) feed the front-end (feature detection, matching and tracking, motion estimation, measurements and constraints; also data association, triangulation, PnP, keyframe selection and loop-closure detection; with a LiDAR, scan registration). The front-end hands constraints (relative poses, pixel observations, IMU bundles, priors) to the back-end, which solves a nonlinear least-squares problem (bundle adjustment, pose graph, factor graph) with Gauss-Newton, Levenberg-Marquardt or incremental iSAM solvers and robust costs, producing the optimized trajectory and map. Loop closure spans both stages: the front-end detects a candidate, the back-end verifies and applies it. Both stages can run online.</desc>
+<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16213b"/><stop offset="1" stop-color="#0b1222"/></linearGradient><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#94a3b8"/></marker><marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#34d399"/></marker></defs>
+<rect width="1200" height="716" rx="18" fill="url(#bg)"/>
+<rect x="24" y="20" width="1152" height="46" rx="14" fill="#facc15" fill-opacity=".10" stroke="#facc15" stroke-opacity=".65" stroke-width="2"/>
+<text x="42" y="49" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#facc15" text-anchor="start" letter-spacing="1.5">SENSORS</text>
+<text x="150" y="49" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">camera · IMU · point cloud · wheel / visual odometry · contact / phase</text>
+<path d="M259 68 L259 98" stroke="#94a3b8" stroke-width="2.5" fill="none" marker-end="url(#ah)"/>
+<text x="272" y="88" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">raw sensor data</text>
+<rect x="24" y="102" width="470" height="372" rx="14" fill="#38bdf8" fill-opacity=".10" stroke="#38bdf8" stroke-opacity=".65" stroke-width="2"/>
+<text x="42" y="132" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#38bdf8" text-anchor="start" letter-spacing="1.5">FRONT-END</text>
+<text x="476" y="132" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="end">local · sequential</text>
+<text x="42" y="160" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#94a3b8" text-anchor="start">“What happened between these observations?”</text>
+<rect x="42" y="178" width="280" height="34" rx="10" fill="#38bdf8" fill-opacity=".16" stroke="#38bdf8" stroke-opacity=".65" stroke-width="1.5"/>
+<text x="54" y="201" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">Feature detection</text>
+<path d="M182 214 L182 228" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#ah)"/>
+<rect x="42" y="230" width="280" height="34" rx="10" fill="#38bdf8" fill-opacity=".16" stroke="#38bdf8" stroke-opacity=".65" stroke-width="1.5"/>
+<text x="54" y="253" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">Feature matching / tracking</text>
+<path d="M182 266 L182 280" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#ah)"/>
+<rect x="42" y="282" width="280" height="34" rx="10" fill="#38bdf8" fill-opacity=".16" stroke="#38bdf8" stroke-opacity=".65" stroke-width="1.5"/>
+<text x="54" y="305" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">Motion estimation (visual odometry)</text>
+<path d="M182 318 L182 332" stroke="#94a3b8" stroke-width="2" fill="none" marker-end="url(#ah)"/>
+<rect x="42" y="334" width="280" height="34" rx="10" fill="#38bdf8" fill-opacity=".16" stroke="#38bdf8" stroke-opacity=".65" stroke-width="1.5"/>
+<text x="54" y="357" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">Measurements / constraints</text>
+<text x="338" y="190" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">also front-end:</text>
+<text x="338" y="216" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">data association</text>
+<text x="338" y="238" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">triangulation · PnP</text>
+<text x="338" y="260" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">keyframe selection</text>
+<text x="338" y="282" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">loop-closure</text>
+<text x="338" y="304" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">detection</text>
+<text x="42" y="402" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">With a LiDAR instead of a camera, matching</text>
+<text x="42" y="422" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">and motion estimation become scan registration.</text>
+<rect x="534" y="102" width="170" height="372" rx="14" fill="#94a3b8" fill-opacity=".07" stroke="#94a3b8" stroke-opacity=".65" stroke-width="2"/>
+<text x="552" y="132" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#94a3b8" text-anchor="start" letter-spacing="1.0">CONSTRAINTS</text>
+<text x="552" y="168" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">relative poses</text>
+<text x="552" y="194" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">pixel observations</text>
+<text x="552" y="220" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">IMU bundles</text>
+<text x="552" y="246" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">priors</text>
+<rect x="544" y="288" width="152" height="124" rx="10" fill="#94a3b8" fill-opacity=".05" stroke="#94a3b8" stroke-opacity=".65" stroke-width="1.5" stroke-dasharray="7 5"/>
+<text x="554" y="312" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">IMU bundles come</text>
+<text x="554" y="332" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">from IMU</text>
+<text x="554" y="352" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">preintegration:</text>
+<text x="554" y="372" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">front-end work,</text>
+<text x="554" y="392" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">back-end factor</text>
+<text x="552" y="438" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">constraints, not</text>
+<text x="552" y="456" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">a final answer</text>
+<path d="M496 288 L532 288" stroke="#94a3b8" stroke-width="2.5" fill="none" marker-end="url(#ah)"/>
+<path d="M706 288 L742 288" stroke="#94a3b8" stroke-width="2.5" fill="none" marker-end="url(#ah)"/>
+<rect x="744" y="102" width="432" height="372" rx="14" fill="#34d399" fill-opacity=".10" stroke="#34d399" stroke-opacity=".65" stroke-width="2"/>
+<text x="762" y="132" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#34d399" text-anchor="start" letter-spacing="1.5">BACK-END</text>
+<text x="1158" y="132" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="end">global · accumulated</text>
+<text x="762" y="160" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#94a3b8" text-anchor="start">“Given all observations, what is the most</text>
+<text x="762" y="180" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#94a3b8" text-anchor="start">consistent trajectory and map?”</text>
+<text x="762" y="210" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#94a3b8" text-anchor="start">What we optimize (problem formulations)</text>
+<rect x="762" y="220" width="150" height="32" rx="10" fill="#34d399" fill-opacity=".16" stroke="#34d399" stroke-opacity=".65" stroke-width="1.5"/>
+<text x="772" y="241" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">bundle adjustment</text>
+<rect x="922" y="220" width="108" height="32" rx="10" fill="#34d399" fill-opacity=".16" stroke="#34d399" stroke-opacity=".65" stroke-width="1.5"/>
+<text x="932" y="241" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">pose graph</text>
+<rect x="1040" y="220" width="118" height="32" rx="10" fill="#34d399" fill-opacity=".16" stroke="#34d399" stroke-opacity=".65" stroke-width="1.5"/>
+<text x="1050" y="241" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">factor graph</text>
+<text x="762" y="280" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#e2e8f0" text-anchor="start">all are nonlinear least squares:  min ½ Σ ‖ r</text>
+<text x="1088.3" y="285" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="11" fill="#e2e8f0">i</text>
+<text x="1094.265625" y="280" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#e2e8f0" text-anchor="start">(x) ‖²</text>
+<text x="762" y="316" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#94a3b8" text-anchor="start">How we solve it (solvers)</text>
+<text x="762" y="338" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#e2e8f0" text-anchor="start">Gauss-Newton · Levenberg-Marquardt</text>
+<text x="762" y="360" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#e2e8f0" text-anchor="start">iSAM: incremental re-solving</text>
+<text x="762" y="388" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">Robust costs (Huber · Cauchy · DCS) down-weight</text>
+<text x="762" y="408" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">a constraint that disagrees with the rest.</text>
+<rect x="762" y="424" width="396" height="34" rx="10" fill="#e2e8f0" fill-opacity=".10" stroke="#e2e8f0" stroke-opacity=".65" stroke-width="1.5"/>
+<text x="780" y="446" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#e2e8f0" text-anchor="start">Output: optimized trajectory + map</text>
+<rect x="24" y="500" width="1152" height="146" rx="14" fill="#34d399" fill-opacity=".06" stroke="#34d399" stroke-opacity=".65" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="42" y="530" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#34d399" text-anchor="start" letter-spacing="1.5">LOOP CLOSURE</text>
+<text x="196" y="530" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">spans both stages</text>
+<text x="42" y="560" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#38bdf8" text-anchor="start">Front-end: detects it</text>
+<text x="42" y="582" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">Place recognition matches the current view against</text>
+<text x="42" y="602" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">stored ones and outputs a candidate constraint.</text>
+<text x="762" y="560" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#34d399" text-anchor="start">Back-end: verifies and applies it</text>
+<text x="762" y="582" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">Checks it against the other constraints (robust</text>
+<text x="762" y="602" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">costs down-weight a bad one) and folds it into</text>
+<text x="762" y="622" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">the global optimization.</text>
+<path d="M500 592 L738 592" stroke="#34d399" stroke-width="2.5" fill="none" marker-end="url(#ag)"/>
+<text x="619" y="582" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#34d399" text-anchor="middle">loop-closure candidate</text>
+<text x="600" y="680" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="middle">Front-end ≠ real-time, back-end ≠ offline: both stages can run online (while data arrives).</text>
+</svg>

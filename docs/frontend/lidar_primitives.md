@@ -18,7 +18,7 @@ The price is a narrower **convergence basin** (the set of initial errors a metho
 
 ![Two panels from lidar_primitives.py: one scan of the corridor with pillars seen from above, with points colored by the primitive they were assigned to (two floor/ceiling planes, two wall planes, three cylinders, the rest unassigned); and the L-shaped corridor of experiment 4 with its walls, pillars and 40 sensor poses 1 m apart](../../assets/lidar_primitives_concept.png)
 
-*Figure: one scan of the corridor with pillars as the extraction sees it, and the scene of §6. Plotted by `uv run python assets/make_figures.py lidar_primitives_concept`.*
+*Figure: one scan of the corridor with pillars as the extraction sees it, and the scene of §6. Plotted by `uv run python generator/make_figures.py lidar_primitives_concept`.*
 
 ### Scope
 Simulated scans only: an open-ended corridor (6 m wide, 3 m high), optionally with two staggered rows of floor-to-ceiling pillars (radius 0.25 m, every 8 m), and an L-shaped version of it; a spinning 32-ring LiDAR (±20° is the vertical field of view across the 32 rings; 360 points per ring = 1° azimuth steps; 20 m range) with Gaussian noise of standard deviation σ on the range only. Static scenes, no motion distortion within a scan, no intensity. Run with `uv run python use_numpy/lidar_primitives.py` (several minutes per experiment; `--experiment 1|2|3|4` for one). [`use_manif/lidar_primitives.py`](../../use_manif/lidar_primitives.py) is the same with manif poses. It agrees with the numpy version to round-off, except in runs that pass through a nearly singular step (§4), where round-off decides the outcome: of the experiment 2 starts compared (2 pairs, 2 starts per size), one at 2 m and 30° converges in numpy and fails in manif.
@@ -95,7 +95,7 @@ At 40 mm the range fit cuts the radius bias 2.7-4.4× and the axis error 1.5-2.5
 
 ![Three panels from lidar_primitives.py experiment 1: mean pillar radius error against range noise for the orthogonal and range fits at 180, 360 and 720 points per ring; median pillar axis position error for both fits; and the percentage of pillars detected against range noise for the three densities](../../assets/lidar_primitives_extraction.png)
 
-*Figure: experiment 1 at its defaults, plotted by `uv run python assets/make_figures.py lidar_primitives_extraction` (about 3 minutes).*
+*Figure: experiment 1 at its defaults, plotted by `uv run python generator/make_figures.py lidar_primitives_extraction` (about 3 minutes).*
 
 ---
 
@@ -153,7 +153,7 @@ Point-to-point ICP is slow and stalls: from 0.5 m and 10°, 78% of its starts fa
 
 ![Animation from animate_lidar_primitives.py: two LiDAR scans of the corridor with pillars seen from above, the source scan moved by each method's estimate after each Gauss-Newton iteration from the same start 0.5 m and 10 degrees off; point-to-point ICP stalls at 299.6 mm and 4.59 degrees after 100 iterations, point-to-plane converges to 0.4 mm in 12 iterations and the primitive method to 0.2 mm in 4; a zoom on the nearest pillar shows the point-to-point points off the true outline](../../assets/lidar_primitives.gif)
 
-*Animation: pair 1 of experiment 2, start 2 at 0.5 m and 10°, one Gauss-Newton iteration per frame. `uv run python use_numpy/animate_lidar_primitives.py`.*
+*Animation: pair 1 of experiment 2, start 2 at 0.5 m and 10°, one Gauss-Newton iteration per frame. `uv run python generator/animate_lidar_primitives.py`.*
 
 ---
 
@@ -212,7 +212,7 @@ The landmarks help in all 5 runs (end-point drift 4.4 → 2.4, 5.6 → 4.3, 6.7 
 
 ![Three panels from lidar_primitives.py experiments 2 to 4: success rate against initial error for the three methods; the median error along the corridor axis against the predicted sigma for each method in the planes-only corridor and the corridor with pillars, on a log scale; and the end-point drift and aligned trajectory error of odometry alone versus the plane-landmark graph for five noise realizations](../../assets/lidar_primitives.png)
 
-*Figure: experiments 2-4 at their defaults, plotted by `uv run python assets/make_figures.py lidar_primitives`. The numbers match the script's printout.*
+*Figure: experiments 2-4 at their defaults, plotted by `uv run python generator/make_figures.py lidar_primitives`. The numbers match the script's printout.*
 
 ---
 

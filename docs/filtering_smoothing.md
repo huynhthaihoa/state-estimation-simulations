@@ -185,7 +185,7 @@ So the error can be distributed over all poses. The figure shows this for the re
 
 ![Two panels from pose_graph.py: the four-pose square loop with ground truth, drifting odometry, the optimized estimate and the loop-closure edge, and each pose's position error before and after optimization](../assets/pose_graph.png)
 
-*Figure: `use_numpy/pose_graph.py` at its defaults (seed 0), a four-pose square loop with one loop-closure edge, plotted by `uv run python assets/make_figures.py pose_graph`. The position RMSE drops from 6.6 cm to 5.2 cm: X3 improves most, while X1 and X2 end slightly worse, because the error is shared among all poses.*
+*Figure: `use_numpy/pose_graph.py` at its defaults (seed 0), a four-pose square loop with one loop-closure edge, plotted by `uv run python generator/make_figures.py pose_graph`. The position RMSE drops from 6.6 cm to 5.2 cm: X3 improves most, while X1 and X2 end slightly worse, because the error is shared among all poses.*
 
 The important point is:
 

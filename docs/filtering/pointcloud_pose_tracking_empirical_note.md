@@ -74,11 +74,11 @@ EKF and IEKF share the predict step and differ only in the frame the update is l
 
 ![Three panels from pointcloud_pose_tracking.py's defaults: the same 20-point body cloud carried rigidly along the true trajectory, the world-frame EKF residual between the measured points and the twist-only prediction T_pred·p at t = 1 s, and the same residuals pulled into the body frame as T_pred⁻¹·z − p for the IEKF, with identical lengths](../../assets/pose_tracking_concept.png)
 
-*Figure: the setup and the two residual frames at `use_numpy/pointcloud_pose_tracking.py`'s defaults (seed 0), plotted by `uv run python assets/make_figures.py pose_tracking_concept`.*
+*Figure: the setup and the two residual frames at `use_numpy/pointcloud_pose_tracking.py`'s defaults (seed 0), plotted by `uv run python generator/make_figures.py pose_tracking_concept`.*
 
 ![Two panels from pointcloud_pose_tracking.py at its defaults: the x-y trajectories of ground truth, dead reckoning and five estimators (EKF, invariant EKF, UKF, vanilla KF, batch Gauss-Newton), and each one's position error over time on a log scale](../../assets/pose_tracking.png)
 
-*Figure: `use_numpy/pointcloud_pose_tracking.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py pose_tracking`.*
+*Figure: `use_numpy/pointcloud_pose_tracking.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py pose_tracking`.*
 
 ### 1.1 The filter math, concretely
 
@@ -554,7 +554,7 @@ The figure plots this table and §3.4's together. Vanilla KF's steady-state line
 
 ![Two log-log panels against the time step dt from 0.001 to 0.4 s: the maximum position gap to the EKF trajectory and the maximum rotation gap after the first second, for UKF and vanilla KF. Vanilla KF's steady-state gap rises roughly in proportion to dt; UKF's is U-shaped with its minimum at dt = 0.02; the first-second gaps stay high and irregular](../../assets/pose_tracking_dt_sweep.png)
 
-*Figure: §3.4's and §4.4's sweeps (seed 0, 5 s, defaults, fresh data per Δt), plotted by `uv run python assets/make_figures.py pose_tracking_dt_sweep`.*
+*Figure: §3.4's and §4.4's sweeps (seed 0, 5 s, defaults, fresh data per Δt), plotted by `uv run python generator/make_figures.py pose_tracking_dt_sweep`.*
 
 ### 4.5 A different cost trade-off
 

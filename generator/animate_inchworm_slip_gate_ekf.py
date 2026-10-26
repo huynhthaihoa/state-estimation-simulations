@@ -40,6 +40,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation
 
+import _paths  # noqa: F401  (puts use_numpy/ and the repo root on sys.path)
 from inchworm_slip_gate_ekf import (GATING_MODES, STATE_DIM, generate_ground_truth_and_data, run_ekf,
                                     run_monte_carlo_consistency)
 from utils import averaged_nees_bounds

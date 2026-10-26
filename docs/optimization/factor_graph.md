@@ -11,31 +11,12 @@ It is a **bipartite** graph (edges join only nodes of different kinds) with two 
 - **Variables** = things we don't know: robot poses, [landmarks](../glossary.md#landmark), sensor biases, etc.
 - **Factors** = measurements/constraints: [odometry](../glossary.md#odometry), camera observations (each measures the [reprojection error](../glossary.md#reprojection-error): the pixel gap between where a landmark was seen and where the estimates project it), [IMU](../glossary.md#imu-inertial-measurement-unit), GPS, [loop closures](../glossary.md#loop-closure), etc.
 
-![A bipartite factor graph for a SLAM-style problem: robot poses x0..xn connected by odometry-measurement factors u1..un, with landmarks l1, l2 connected to poses via landmark-measurement factors m1..m4, plus a small "variable node/factor node" legend](../images/factor_graph_1.jpg)
+![Factor graph with poses x0 to x3 in a row joined by three odometry factors, an IMU factor in parallel between x1 and x2, a loop-closure factor between x0 and x3, camera factors from x1 and x2 to landmark l0, a prior factor on x0 and a GPS factor on x3. Variables are circles, factors are squares.](../images/factor_graph.svg)
 
-*Image 1: the two node kinds (variable = circle, factor = small dot on the edges it joins), with a [prior factor](../glossary.md#prior-unary-factor) (a factor on a single variable) on the first pose, odometry factors between poses and landmark measurements.*
+*Figure: the poses and loop closure of §2, plus a landmark and each other kind of factor listed in §6. The IMU factor is drawn on one pair of poses only (§5 draws one per consecutive pair). Regenerate with `uv run python generator/make_factor_graph_svgs.py`.*
 
-![A pose-graph diagram (legend partly in Korean) with keyframe poses P0..P6, a black PriorFactor on P0, blue BetweenFactors along the chain, a red BetweenFactor (loop closure) between P0 and P5, and green UnaryFactors on P5](../images/factor_graph_2.jpg)
-
-*Image 2: GTSAM factor names: a prior, between factors (red = loop closure) and unary factors, drawn as coloured edges and stubs instead of nodes.*
-
-![Two stacked example factor graphs from a mapping survey: a pose-only graph (top) with pose parameters X linked by odometry factors Tx and a loop-closure factor Tx, and a pose+landmark graph (bottom) that adds observation factors H connecting poses X to landmark parameters L](../images/factor_graph_3.jpg)
-
-*Image 3: a pose-only graph (top) versus a pose-plus-landmark graph (bottom), with factors drawn as squares.*
-
-![A small factor graph with poses x0, x1, x2, x3 in a chain and landmarks l7, l16, l78, l71, l82 each connected to one or two poses](../images/factor_graph_4.jpg)
-
-*Image 4: landmarks seen by only one or two poses; no legend, factors are the dots.*
-
-![A four-layer factor graph for 2D robot localization: landmarks L0-L2 at top connected via bearing factors to poses P0-P2, which are in turn chained together by odometry factors](../images/factor_graph_5.jpg)
-
-*Image 5: bearing factors (a bearing is the direction to a landmark) from poses to landmarks plus odometry factors between poses, laid out in four layers.*
-
-*These diagrams are illustrative sketches from different tutorials/papers; [Image sources](#image-sources) lists which attributions are confirmed and which source is unidentified.*
-
-- The circles are **variables**.
-- Each **factor** joins the variables it touches. A **binary factor** touches two variables.
-- Most of the images above draw factors as their own nodes (dots or squares); the pose-graph figure (`factor_graph_2`) draws them as coloured edges and stubs. A unary factor, such as a prior or GPS fix, touches just one variable.
+- The circles are **variables**: poses (blue) and a landmark (purple).
+- The squares are **factors**, each joined to the variables it touches. A **binary factor** touches two variables. A **unary factor**, such as a [prior](../glossary.md#prior-unary-factor) or GPS fix, touches just one.
 
 ---
 
@@ -133,19 +114,19 @@ The factor answers:
 
 ## 4. Optimization means minimizing all those errors
 
-Suppose we have:
+Suppose we have the example of §2:
 
 ```text
-x0 ── odometry ── x1 ── odometry ── x2
- │                                  │
- └──────────── loop closure ────────┘
+x0 ── odometry ── x1 ── odometry ── x2 ── odometry ── x3
+│                                                      │
+└──────────────────── loop closure ────────────────────┘
 ```
 
-We have three errors, $`e_{01}(x_0,x_1)`$, $`e_{12}(x_1,x_2)`$ and $`e_{02}(x_0,x_2)`$, and the optimizer looks for poses that minimize:
+We have four errors, $`e_{01}(x_0,x_1)`$, $`e_{12}(x_1,x_2)`$, $`e_{23}(x_2,x_3)`$ and $`e_{03}(x_0,x_3)`$, and the optimizer looks for poses that minimize:
 
 ```math
 \boxed{
-\min_{x_0,x_1,x_2}
+\min_{x_0,x_1,x_2,x_3}
 \sum_k \|e_k\|^2
 }
 ```
@@ -270,6 +251,10 @@ x0 ●──IMU──●──IMU──● x2
 ```
 
 IMU factors link consecutive poses, and each camera factor links a pose to the landmark it observes. A pose graph would keep only the poses and the relative-pose factors between them.
+
+![Top: the factor graph of §1 with the parts a pose graph leaves out faded (landmark l0, camera and GPS factors). Bottom: the pose graph, with poses x0 to x3 and the factors between them drawn as edges: three odometry edges, an IMU edge between x1 and x2 and a loop-closure edge, with x0 anchored by its prior.](../images/factor_graph_vs_pose_graph.svg)
+
+*Figure: the graph of §1 as a factor graph (top) and as a pose graph (bottom). A pose graph keeps the poses and the factors between them (here odometry, IMU and loop closure) and draws them as edges; the landmark and the camera and GPS factors are left out. The prior stays as an anchor on x0, which removes the [gauge freedom](../glossary.md#gauge-freedom). Regenerate with `uv run python generator/make_factor_graph_svgs.py`.*
 
 It can represent:
 
@@ -401,14 +386,5 @@ That is the conceptual bridge connecting the optimization-based SLAM topics in t
 
 ## 12. References
 
-1. Kschischang, F. R., Frey, B. J., & Loeliger, H.-A. (2001). *Factor Graphs and the Sum-Product Algorithm*. IEEE Transactions on Information Theory, 47(2), 498–519. https://doi.org/10.1109/18.910572 - the original, general (non-robotics) definition of a factor graph as a bipartite graph of variable nodes and factor nodes, behind §1 and §6's variable/factor terminology. This paper does **not** contain the diagram in `images/factor_graph_1.jpg`; see Image sources below - that image's originally-recorded citation was checked against the paper's actual figures and found to be wrong.
+1. Kschischang, F. R., Frey, B. J., & Loeliger, H.-A. (2001). *Factor Graphs and the Sum-Product Algorithm*. IEEE Transactions on Information Theory, 47(2), 498–519. https://doi.org/10.1109/18.910572 - the original, general (non-robotics) definition of a factor graph as a bipartite graph of variable nodes and factor nodes, behind §1 and §6's variable/factor terminology.
 2. Dellaert, F., & Kaess, M. (2017). *Factor Graphs for Robot Perception*. Foundations and Trends in Robotics, 6(1–2), 1–139. https://doi.org/10.1561/2300000043 - the standard robotics-focused reference for factor graphs in SLAM (poses, landmarks, IMU/camera/loop-closure factors), behind §1, §5, §6, and §7's pose-graph-vs-factor-graph distinction.
-3. Racinskis, P., Arents, J., & Greitans, M. (2023). *Constructing Maps for Autonomous Robotics: An Introductory Conceptual Overview*. Electronics, 12(13), 2925. https://doi.org/10.3390/electronics12132925 - Figure 1 of this paper is the confirmed source of the diagram in `images/factor_graph_3.jpg` (see Image sources below).
-
-### Image sources
-
-1. `images/factor_graph_1.jpg` - **source unidentified.** It was originally cited as IEEE document 910572 (Reference 1 above), but that citation is incorrect: none of the paper's figures (abstract coding-theory factor graphs, Tanner graphs, trellises, a scalar Kalman-filter derivation) show robot poses, landmarks or this legend. Dellaert & Kaess's SLAM tutorials use similar "Odometry measurement"/"Landmark measurement" wording but with photographs, so they did not match either. Do not cite IEEE 910572 for this image.
-2. `images/factor_graph_2.jpg` - originally cited as https://engcang.github.io/gtsam_tutorial.html, match for the second pose-graph figure on that page (image file `/assets/img/posts/230715_gtsam/graph2.png`), a Korean-language GTSAM tutorial blog post by Eungchang Mason Lee (page title "GTSAM 튜토리얼 | Eungchang Mason Lee").
-3. `images/factor_graph_3.jpg` - originally cited as https://www.mdpi.com/2079-9292/12/13/2925, match for Figure 1 of Reference 3 above (downloaded directly from MDPI's own PDF host, since the MDPI article page itself returns HTTP 403 to automated fetches).
-4. `images/factor_graph_4.jpg` - originally cited as https://cmsc426.github.io/gtsam/, match for the image `/assets/sfm/gtsam9.png` embedded on that page, part of the University of Maryland CMSC426 (Computer Vision) course's "Structure from Motion" lecture notes.
-5. `images/factor_graph_5.jpg` - originally cited as https://symforce.org/, match for the image `docs/static/images/robot_2d_localization/factor_graph.png` embedded on that page - the diagram from SymForce's (Skydio's symbolic-computation library for robotics) "Robot 2D Localization" example/tutorial, https://symforce.org/examples/robot_2d_localization/README.html.

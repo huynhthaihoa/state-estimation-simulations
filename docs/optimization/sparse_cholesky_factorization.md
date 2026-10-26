@@ -169,7 +169,7 @@ The figure below applies this to a real bundle-adjustment problem, with the same
 
 ![Two rows of three sparsity plots for one bundle-adjustment problem. Top row: the lower triangle of H with poses first, landmarks first and interleaved, each with 5712 nonzeros. Bottom row: the Cholesky factor L for the same three orders, with fill-in drawn in red. Poses first gives a large red triangle over the landmark block, landmarks first gives a small red block at the end, interleaved gives red regions spread under the first columns.](../../assets/sparse_fill_in_orderings.png)
 
-*Sparsity of the Hessian (top row, lower triangle) and of its Cholesky factor (bottom row, red = fill-in) for one bundle-adjustment problem under three elimination orders. Produced by `uv run python assets/make_figures.py sparse_fill_in_orderings`.*
+*Sparsity of the Hessian (top row, lower triangle) and of its Cholesky factor (bottom row, red = fill-in) for one bundle-adjustment problem under three elimination orders. Produced by `uv run python generator/make_figures.py sparse_fill_in_orderings`.*
 
 - **Scene:** the defaults of `bundle_adjustment.py` (seed 0): 8 cameras with 6 unknowns each, 48 landmarks with 3 each (192 scalar unknowns), 292 camera-landmark observations.
 - **Orders:** **poses first** (all cameras, then all landmarks), **landmarks first**, and **interleaved** (each camera followed by the landmarks it is the first to see).

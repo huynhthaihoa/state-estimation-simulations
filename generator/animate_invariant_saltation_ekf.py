@@ -31,6 +31,7 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
+import _paths  # noqa: F401  (puts use_numpy/ and the repo root on sys.path)
 from invariant_saltation_ekf import (FILTERS, LABELS, COLORS, LINESTYLES, se23_make, se23_parts, so3_exp,
                                      generate_ground_truth_and_data, initial_estimate, child_detect_rngs,
                                      run_filter, run_monte_carlo_consistency,

@@ -16,7 +16,7 @@ A foot on the ground is in **stance**; for the rest of the cycle it is in **swin
 
 ![Three panels from hexapod_gait_ekf.py: gait diagrams of stance and swing per leg for the tripod, ripple and wave gaits over two cycles; the hexapod body turning left with an arrow on each foot showing its measured velocity relative to the body, six different readings; and two three-foot stance layouts, a tripod triangle and three feet on one side, with their one-tick standard deviations of forward speed and turn rate](../../assets/hexapod_gait_ekf_concept.png)
 
-*Figure: the gait schedules and stance geometry of `use_numpy/hexapod_gait_ekf.py`, plotted by `uv run python assets/make_figures.py hexapod_gait_ekf_concept`.*
+*Figure: the gait schedules and stance geometry of `use_numpy/hexapod_gait_ekf.py`, plotted by `uv run python generator/make_figures.py hexapod_gait_ekf_concept`.*
 
 Four questions, answered with [`hexapod_gait_ekf.py`](../../use_numpy/hexapod_gait_ekf.py):
 
@@ -132,7 +132,7 @@ One tick's readings pin down the body velocity to about $`\sigma/\sqrt{n}`$; tur
 
 ![Three panels from hexapod_gait_ekf.py: bar charts of forward-speed and turn-rate RMSE for the tripod, ripple and wave gaits, each with its (q s^2)^(1/4) steady-state estimate drawn as a line; and the sideways-velocity RMSE over time with leg L2 slipping between 4 and 8 s, for the tripod and wave gaits, trusting every foot versus the per-foot chi-squared gate](../../assets/hexapod_gait_ekf.png)
 
-*Figure: `use_numpy/hexapod_gait_ekf.py` at its defaults (seed 0, 100 trials), plotted by `uv run python assets/make_figures.py hexapod_gait_ekf`. The right panel is §3's slip experiment.*
+*Figure: `use_numpy/hexapod_gait_ekf.py` at its defaults (seed 0, 100 trials), plotted by `uv run python generator/make_figures.py hexapod_gait_ekf`. The right panel is §3's slip experiment.*
 
 ---
 
@@ -173,7 +173,7 @@ The same experiment, one run (seed 0, tripod gait), animated. The top-down view 
 
 ![Animation of one tripod-gait run: left, a top-down view of the hexapod walking its curved path with stance feet at their footholds, leg L2 turning red while it slides, and the estimated paths of the filter that trusts every foot and the gated filter; right, the true sideways body velocity and both estimates over time, with the slip window shaded](../../assets/hexapod_gait_ekf.gif)
 
-*Animation: `use_numpy/animate_hexapod_gait_ekf.py` at its defaults, rendered by `uv run python use_numpy/animate_hexapod_gait_ekf.py --out assets/hexapod_gait_ekf.gif`.*
+*Animation: `generator/animate_hexapod_gait_ekf.py` at its defaults, rendered by `uv run python generator/animate_hexapod_gait_ekf.py --out assets/hexapod_gait_ekf.gif`.*
 
 ---
 
@@ -227,7 +227,7 @@ Three filters, same draws: **trust** the detected flags; the **per-foot gate** o
 
 ![Three panels from hexapod_gait_ekf.py: twist NEES bars for the tripod and wave gaits when every foot drifts, ignoring versus modeling the drift, against the consistent value 3; foot speed over one swing for the tripod (30 ticks, peak 0.30 m/s) and wave (10 ticks, peak 0.85 m/s) gaits, with the readings one and two ticks before touchdown marked; and twist NEES on log axes against contact-detection jitter from 0.02 to 0.1 s for trusting the detected times, the per-foot chi-squared gate and trimming, for both gaits](../../assets/hexapod_gait_ekf_extensions.png)
 
-*Figure: `use_numpy/hexapod_gait_ekf.py` at its defaults (seed 0, 100 trials), plotted by `uv run python assets/make_figures.py hexapod_gait_ekf_extensions` (about 3 minutes). Panel (a) is §4's drift experiment.*
+*Figure: `use_numpy/hexapod_gait_ekf.py` at its defaults (seed 0, 100 trials), plotted by `uv run python generator/make_figures.py hexapod_gait_ekf_extensions` (about 3 minutes). Panel (a) is §4's drift experiment.*
 
 Follow-up: [gait_phase_ekf.md](gait_phase_ekf.md) drops the known touchdown times (only liftoff is known) and compares stance flags from the commanded schedule, a contact detector, a learned offset in the style of a central pattern generator (CPG) and a phase EKF.
 

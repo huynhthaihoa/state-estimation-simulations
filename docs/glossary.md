@@ -153,7 +153,7 @@ A bipartite graph with **variable nodes** (the unknowns) and **factor nodes** (m
 One error term connecting the variables it involves, e.g. odometry between two poses, or a camera observing a landmark. See [factor_graph.md §3](optimization/factor_graph.md#3-a-factor-is-basically-an-error-function).
 
 ### Pose graph
-A factor graph whose variables are only poses, linked by relative-pose factors (odometry and loop closures). See [factor_graph.md §7](optimization/factor_graph.md#7-factor-graph-vs-pose-graph).
+A factor graph whose variables are only poses, linked by relative-pose factors (e.g. odometry and loop closures). See [factor_graph.md §7](optimization/factor_graph.md#7-factor-graph-vs-pose-graph).
 
 ### Sparsity
 Most entries of $J$ and $H$ are zero, because each measurement involves only a few variables. Efficient solvers depend on it. See [sparse_cholesky_factorization.md §1](optimization/sparse_cholesky_factorization.md#1-why-does-sparsity-matter).

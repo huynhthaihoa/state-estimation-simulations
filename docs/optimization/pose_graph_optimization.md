@@ -114,7 +114,7 @@ The scripts' four-pose square shows this: the optimizer spreads the loop error o
 
 ![Two panels from pose_graph.py: the four-pose square loop with ground truth, drifting odometry, the optimized estimate and the loop-closure edge, and each pose's position error before and after optimization](../../assets/pose_graph.png)
 
-*Figure: `use_numpy/pose_graph.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py pose_graph` (the same figure is used in §15.7). Error at the loop-closure node 0.1035 m to 0.0494 m; RMS position error 6.6 cm to 5.2 cm. X1 and X2 get slightly worse while X3 improves.*
+*Figure: `use_numpy/pose_graph.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py pose_graph` (the same figure is used in §15.7). Error at the loop-closure node 0.1035 m to 0.0494 m; RMS position error 6.6 cm to 5.2 cm. X1 and X2 get slightly worse while X3 improves.*
 
 ---
 
@@ -521,7 +521,7 @@ The whole solver is `run_pose_graph_optimization` in [`use_numpy/pose_graph.py`]
 
 ![Two panels from pose_graph.py: the four-pose square loop with ground truth, drifting odometry, the optimized estimate and the loop-closure edge, and each pose's position error before and after optimization](../../assets/pose_graph.png)
 
-*Figure: `use_numpy/pose_graph.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py pose_graph`. Error at the loop-closure node 0.1035 m to 0.0494 m; RMS position error 6.6 cm to 5.2 cm. The optimizer spreads the loop error over the chain, so X1 and X2 get slightly worse while X3 improves.*
+*Figure: `use_numpy/pose_graph.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py pose_graph`. Error at the loop-closure node 0.1035 m to 0.0494 m; RMS position error 6.6 cm to 5.2 cm. The optimizer spreads the loop error over the chain, so X1 and X2 get slightly worse while X3 improves.*
 
 **Measurements** (`simulate_noisy_edges`): each edge is the true relative pose with right-multiplied noise. The loop-closure edge scales both std-devs by `--loop-noise-scale` (default 0.5):
 
@@ -653,7 +653,7 @@ s_{ij} = \min\left(1, \; \frac{2 \Phi}{\Phi + e_{ij}^2}\right)
 
 ![Left panel: weight on the information matrix against residual magnitude on a log axis for plain least squares, Huber, Cauchy, Geman-McClure and DCS, with the square root of the DCS threshold marked. Right panel: DCS scale and its square against squared error, with the threshold marked where the scale starts to drop](../../assets/robust_kernel_weights.png)
 
-*Figure: weight applied to an edge's information matrix for the kernels of §16 (left, log axis) and the DCS scale with its square (right), plotted by `uv run python assets/make_figures.py robust_kernel_weights`. Formulas from §16, no repo solver implements robust kernels.*
+*Figure: weight applied to an edge's information matrix for the kernels of §16 (left, log axis) and the DCS scale with its square (right), plotted by `uv run python generator/make_figures.py robust_kernel_weights`. Formulas from §16, no repo solver implements robust kernels.*
 
 At $\Phi = 12.59$, $s_{ij}$ is $1$ up to $e_{ij}^2 = \Phi$, then $0.7726$ at $e_{ij}^2 = 20$, $0.2236$ at $100$ and $0.002515$ at $10^4$. At residual magnitude $e = 10$ the plotted weights are Huber $0.1$, Cauchy $0.0099$, Geman-McClure $9.8 \times 10^{-5}$ and DCS $s^2 = 0.05$: DCS keeps full weight up to $e = \sqrt{\Phi} \approx 3.55$ and decays gently at first, so its "Very High" rating in §16.4 refers to the far tail.
 

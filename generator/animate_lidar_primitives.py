@@ -29,15 +29,15 @@ Writes a GIF with matplotlib's pillow writer (no ffmpeg needed).
 '''
 
 import argparse
-import os
 import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from matplotlib.gridspec import GridSpec
+
+import _paths  # noqa: F401  (puts use_numpy/ and the repo root on sys.path)
 
 from lidar_primitives import (METHODS, ExtractionConfig, LidarConfig, RegistrationConfig, corridor_scene,
                               inlier_threshold, make_scan_pair, pose_error, random_perturbation, register, se3_exp)

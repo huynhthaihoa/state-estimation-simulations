@@ -35,6 +35,7 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 from matplotlib.lines import Line2D
 
+import _paths  # noqa: F401  (puts use_numpy/ and the repo root on sys.path)
 from inchworm_two_pad_ekf import (B, F, POLICIES, STATE_DIM, TH, draw_slip_episodes, run_ekf, simulate,
                                   state_error, window_flags)
 from utils import averaged_nees_bounds

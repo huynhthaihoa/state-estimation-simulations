@@ -153,7 +153,7 @@ This is what `filtering_smoothing.md §10`'s "fixed-lag smoothing" box and its M
 
 ![Three panels from sliding_window_marginalization.py on a 16-pose square with a 10-pose window: window membership after each new pose, the window's block-tridiagonal information matrix with the oldest pose's block about to be eliminated, and the next window's matrix where that information lands as one prior block on the new oldest pose](../../assets/sliding_window_marginalization_concept.png)
 
-*Figure: windows and information matrices recorded from `use_numpy/sliding_window_marginalization.py`'s own `run_sliding_window_pose_graph` calls (16 poses, window 10, seed 0), plotted by `uv run python assets/make_figures.py sliding_window_marginalization_concept`.*
+*Figure: windows and information matrices recorded from `use_numpy/sliding_window_marginalization.py`'s own `run_sliding_window_pose_graph` calls (16 poses, window 10, seed 0), plotted by `uv run python generator/make_figures.py sliding_window_marginalization_concept`.*
 
 ---
 
@@ -241,13 +241,13 @@ Two measurements, only one of them deterministic:
 
 ![Three panels from sliding_window_marginalization.py: largest information-matrix size, time per new pose and position RMSE against trajectory length from 8 to 256 poses, for a full batch re-solve and a 10-pose sliding window](../../assets/sliding_window_marginalization.png)
 
-*Figure: `use_numpy/sliding_window_marginalization.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py sliding_window_marginalization`.*
+*Figure: `use_numpy/sliding_window_marginalization.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py sliding_window_marginalization`.*
 
 The same streaming, animated for a 64-pose run with a 10-pose window. The window's system size stops at 60 unknowns while a full batch re-solve keeps growing as 6 unknowns per pose, reaching 384 at the last pose. The path drifts and does not close the square because there are only odometry edges, so both solvers return the dead-reckoned path.
 
 ![Animation of a 64-pose odometry-only square path streaming in: top, the live 10-pose window in blue, marginalized poses frozen in gray and the pose being marginalized circled in red; bottom left, the system size of a full batch re-solve growing with the number of poses against the sliding window capped at 60 unknowns; bottom right, the window's block-tridiagonal information matrix with the prior block on its oldest pose](../../assets/sliding_window_marginalization.gif)
 
-*Animation: `use_numpy/animate_sliding_window_marginalization.py` at its defaults (seed 0), rendered by `uv run python use_numpy/animate_sliding_window_marginalization.py --out assets/sliding_window_marginalization.gif`. The batch curve is computed (6 unknowns per pose), not re-solved.*
+*Animation: `generator/animate_sliding_window_marginalization.py` at its defaults (seed 0), rendered by `uv run python generator/animate_sliding_window_marginalization.py --out assets/sliding_window_marginalization.gif`. The batch curve is computed (6 unknowns per pose), not re-solved.*
 
 **Accuracy is identical here, but that's guaranteed by the setup, not evidence that marginalization loses nothing.**
 - Final position [RMSE](../glossary.md#rmse-root-mean-square-error) is the same for full-batch and sliding-window at every trajectory length.

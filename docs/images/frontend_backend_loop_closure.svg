@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 610" width="1200" height="610" role="img" aria-labelledby="t d">
+<title id="t">Loop closure: spreading the drift over the trajectory</title>
+<desc id="d">Toy case: a robot walks a square, poses x0 (A), x1 (B), x2 (C), x3 (D) and x4 (A prime). Odometry drift leaves the final pose x4 0.4 m away from x0. The front-end detects the loop closure, a constraint that x4 coincides with x0. The back-end spreads the 0.4 m over the 4 odometry steps, so x1, x2, x3 and x4 move back by 0.1, 0.2, 0.3 and 0.4 m.</desc>
+<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16213b"/><stop offset="1" stop-color="#0b1222"/></linearGradient><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#94a3b8"/></marker><marker id="ag" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#34d399"/></marker></defs>
+<rect width="1200" height="610" rx="18" fill="url(#bg)"/>
+<rect x="24" y="20" width="560" height="470" rx="14" fill="#94a3b8" fill-opacity=".05" stroke="#94a3b8" stroke-opacity=".65" stroke-width="2"/>
+<text x="42" y="50" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#e2e8f0" text-anchor="start">Before: the drifted estimate</text>
+<polyline points="174.0,112.0 421.0,124.1 417.9,386.2 164.9,398.4 161.9,160.5" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<path d="M174.0 112.0 L161.9 160.5" stroke="#34d399" stroke-width="3" stroke-dasharray="6 4" fill="none"/>
+<circle cx="174.0" cy="112.0" r="6" fill="#0b1222" stroke="#94a3b8" stroke-width="2.5"/>
+<circle cx="421.0" cy="124.1" r="6" fill="#0b1222" stroke="#94a3b8" stroke-width="2.5"/>
+<circle cx="417.9" cy="386.2" r="6" fill="#0b1222" stroke="#94a3b8" stroke-width="2.5"/>
+<circle cx="164.9" cy="398.4" r="6" fill="#0b1222" stroke="#94a3b8" stroke-width="2.5"/>
+<circle cx="161.9" cy="160.5" r="6" fill="#0b1222" stroke="#94a3b8" stroke-width="2.5"/>
+<text x="162.0" y="100.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="end">x0 (A)</text>
+<text x="149.9" y="178.5" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="end">x4 (A′)</text>
+<text x="425.0" y="110.1" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">x1 (B)</text>
+<text x="431.9" y="391.2" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">x2 (C)</text>
+<text x="152.9" y="418.4" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="end">x3 (D)</text>
+<text x="175.9" y="148.5" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#34d399" text-anchor="start">0.4 m</text>
+<text x="214.0" y="170.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#34d399" text-anchor="start">loop closure:</text>
+<text x="214.0" y="190.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#34d399" text-anchor="start">x4 should sit at x0</text>
+<text x="214.0" y="210.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#34d399" text-anchor="start">(relative pose ≈ identity)</text>
+<text x="42" y="440" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#38bdf8" text-anchor="start">Front-end: place recognition detects the loop and</text>
+<text x="42" y="460" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#38bdf8" text-anchor="start">outputs a constraint between x0 and x4.</text>
+<rect x="616" y="20" width="560" height="470" rx="14" fill="#94a3b8" fill-opacity=".05" stroke="#94a3b8" stroke-opacity=".65" stroke-width="2"/>
+<text x="634" y="50" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#e2e8f0" text-anchor="start">After: the drift spread over the steps</text>
+<polyline points="766.0,112.0 1013.0,124.1 1009.9,386.2 756.9,398.4 753.9,160.5" fill="none" stroke="#94a3b8" stroke-opacity=".45" stroke-width="2" stroke-dasharray="5 4"/>
+<circle cx="1013.0" cy="124.1" r="4" fill="none" stroke="#94a3b8" stroke-opacity=".5" stroke-width="1.5"/>
+<circle cx="1009.9" cy="386.2" r="4" fill="none" stroke="#94a3b8" stroke-opacity=".5" stroke-width="1.5"/>
+<circle cx="756.9" cy="398.4" r="4" fill="none" stroke="#94a3b8" stroke-opacity=".5" stroke-width="1.5"/>
+<circle cx="753.9" cy="160.5" r="4" fill="none" stroke="#94a3b8" stroke-opacity=".5" stroke-width="1.5"/>
+<path d="M1013.0 124.1 L1016.0 112.0" stroke="#34d399" stroke-width="2.2" fill="none" marker-end="url(#ag)"/>
+<path d="M1009.9 386.2 L1016.0 362.0" stroke="#34d399" stroke-width="2.2" fill="none" marker-end="url(#ag)"/>
+<path d="M756.9 398.4 L766.0 362.0" stroke="#34d399" stroke-width="2.2" fill="none" marker-end="url(#ag)"/>
+<path d="M753.9 160.5 L766.0 112.0" stroke="#34d399" stroke-width="2.2" fill="none" marker-end="url(#ag)"/>
+<polyline points="766.0,112.0 1016.0,112.0 1016.0,362.0 766.0,362.0 766.0,112.0" fill="none" stroke="#38bdf8" stroke-width="2.5"/>
+<circle cx="766.0" cy="112.0" r="6" fill="#0b1222" stroke="#38bdf8" stroke-width="2.5"/>
+<circle cx="1016.0" cy="112.0" r="6" fill="#0b1222" stroke="#38bdf8" stroke-width="2.5"/>
+<circle cx="1016.0" cy="362.0" r="6" fill="#0b1222" stroke="#38bdf8" stroke-width="2.5"/>
+<circle cx="766.0" cy="362.0" r="6" fill="#0b1222" stroke="#38bdf8" stroke-width="2.5"/>
+<circle cx="766.0" cy="112.0" r="6" fill="#0b1222" stroke="#34d399" stroke-width="2.5"/>
+<text x="754.0" y="98.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="end">x0 = x4</text>
+<text x="1020.0" y="98.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">x1 (B)</text>
+<text x="1030.0" y="367.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="start">x2 (C)</text>
+<text x="754.0" y="367.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#e2e8f0" text-anchor="end">x3 (D)</text>
+<text x="1028.0" y="136.1" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#34d399" text-anchor="start">0.1 m</text>
+<text x="1028.0" y="392.1" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#34d399" text-anchor="start">0.2 m</text>
+<text x="752.0" y="392.2" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#34d399" text-anchor="end">0.3 m</text>
+<text x="778.0" y="154.2" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#34d399" text-anchor="start">0.4 m</text>
+<text x="634" y="440" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#34d399" text-anchor="start">Back-end: the 0.4 m is spread over the 4 odometry</text>
+<text x="634" y="460" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#34d399" text-anchor="start">steps, 0.1 m each; later poses move more.</text>
+<polyline points="30,520 62,520" fill="none" stroke="#94a3b8" stroke-width="2.5"/>
+<text x="70" y="525" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">odometry step (drifted)</text>
+<polyline points="270,520 302,520" fill="none" stroke="#38bdf8" stroke-width="2.5"/>
+<text x="310" y="525" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">corrected</text>
+<path d="M410 520 L442 520" stroke="#34d399" stroke-width="3" stroke-dasharray="6 4" fill="none"/>
+<text x="450" y="525" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">loop-closure constraint</text>
+<path d="M660 520 L692 520" stroke="#34d399" stroke-width="2.2" fill="none" marker-end="url(#ag)"/>
+<text x="700" y="525" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">correction of a pose</text>
+<text x="30" y="558" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">Toy case from the text: translation only, x0 anchored, equal odometry weights, loop closure exact. Distances: 125 px = 1 m; the</text>
+<text x="30" y="578" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="400" fill="#94a3b8" text-anchor="start">2 m square is an arbitrary choice, and the drift direction is schematic.</text>
+</svg>

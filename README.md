@@ -61,7 +61,7 @@ printers. `docs/frontend/lidar_primitives.md`.
 
 ### [use_numpy/](use_numpy/) - Plain numpy, hand-rolled Lie-group math
 
-- [lie_utils.py](use_numpy/lie_utils.py): shared module of the hand-rolled Lie-group helpers (`skew`, `rotation_geodesic_error`, `so3_exp`, `so3_right_jacobian`, `se3_exp`, `se3_log`, `se3_inv`, `se3_adjoint`, `se3_ad`, `compute_so3_inv_right_jacobian`, `compute_se3_inv_right_jacobian`, `se3_right_jacobian`; plus `so3_log`, `so3_left_jacobian` the $`SE_2(3)`$ helpers `se23_make`, `se23_parts`, `se23_inv`, `se23_exp`, `se23_log`, `se23_adjoint`, and their $`SE_K(3)`$ generalization (any number of columns) `sek3_make`, `sek3_parts`, `sek3_inv`, `sek3_exp`, `sek3_log`, `sek3_adjoint`; also grouped under short names as static methods of `SO3`/`SE3`/`SE23`/`SEK3`, e.g. `SE3.exp`, `SE3.log`, `SO3.inv_right_jacobian`, `SE23.exp`, `SEK3.adjoint`; these are plain functions on arrays, not an object API like manif's). Imported by 13 of the 23 simulation scripts in this directory (`imu_integration_comparison.py`, `robot_imu_simulation.py`, `imu_preintegration.py`, `pointcloud_pose_tracking.py`, `pose_graph.py`, `pose_graph_incremental.py`, `bundle_adjustment.py`, `bundle_adjustment_advanced.py`, `pnp_estimation.py`, `sliding_window_marginalization.py`, `invariant_saltation_ekf.py`, `hexapod_contact_inekf.py`, and `lidar_primitives.py`); none keeps its own inline copy of the skew/Jacobian helpers. The remaining 10 (`bayes_tree_construction.py`, `friction_anisotropic_ekf.py`, `hexapod_gait_ekf.py`, `gait_phase_ekf.py`, `inchworm_zupt_ekf.py`, `inchworm_zupt_zaru_ekf.py`, `inchworm_slip_gate_ekf.py`, `inchworm_two_pad_ekf.py`, `inchworm_two_pad_fusion_ekf.py`, `saltation_matrix_ekf.py`) don't need Lie-group math for what they do. (These counts exclude the `*_v2.py` and `animate_*.py` scripts below; `pointcloud_pose_tracking_v2.py`, `invariant_saltation_ekf_v2.py` and `animate_bundle_adjustment.py` import `lie_utils.py` too.)
+- [lie_utils.py](use_numpy/lie_utils.py): shared module of the hand-rolled Lie-group helpers (`skew`, `rotation_geodesic_error`, `so3_exp`, `so3_right_jacobian`, `se3_exp`, `se3_log`, `se3_inv`, `se3_adjoint`, `se3_ad`, `compute_so3_inv_right_jacobian`, `compute_se3_inv_right_jacobian`, `se3_right_jacobian`; plus `so3_log`, `so3_left_jacobian` the $`SE_2(3)`$ helpers `se23_make`, `se23_parts`, `se23_inv`, `se23_exp`, `se23_log`, `se23_adjoint`, and their $`SE_K(3)`$ generalization (any number of columns) `sek3_make`, `sek3_parts`, `sek3_inv`, `sek3_exp`, `sek3_log`, `sek3_adjoint`; also grouped under short names as static methods of `SO3`/`SE3`/`SE23`/`SEK3`, e.g. `SE3.exp`, `SE3.log`, `SO3.inv_right_jacobian`, `SE23.exp`, `SEK3.adjoint`; these are plain functions on arrays, not an object API like manif's). Imported by 13 of the 23 simulation scripts in this directory (`imu_integration_comparison.py`, `robot_imu_simulation.py`, `imu_preintegration.py`, `pointcloud_pose_tracking.py`, `pose_graph.py`, `pose_graph_incremental.py`, `bundle_adjustment.py`, `bundle_adjustment_advanced.py`, `pnp_estimation.py`, `sliding_window_marginalization.py`, `invariant_saltation_ekf.py`, `hexapod_contact_inekf.py`, and `lidar_primitives.py`); none keeps its own inline copy of the skew/Jacobian helpers. The remaining 10 (`bayes_tree_construction.py`, `friction_anisotropic_ekf.py`, `hexapod_gait_ekf.py`, `gait_phase_ekf.py`, `inchworm_zupt_ekf.py`, `inchworm_zupt_zaru_ekf.py`, `inchworm_slip_gate_ekf.py`, `inchworm_two_pad_ekf.py`, `inchworm_two_pad_fusion_ekf.py`, `saltation_matrix_ekf.py`) don't need Lie-group math for what they do. (These counts exclude the `*_v2.py` scripts below and the generators in [generator/](generator/); `pointcloud_pose_tracking_v2.py`, `invariant_saltation_ekf_v2.py` and `generator/animate_bundle_adjustment.py` import `lie_utils.py` too.)
 - [numpy_utils.py](use_numpy/numpy_utils.py): shared `camera_project` (pinhole reprojection with pose/point Jacobians) and `pose_errors` (per-pose rotation and position errors), built on `lie_utils.py`. Imported by `bundle_adjustment.py`, `bundle_adjustment_advanced.py`, `pnp_estimation.py`, `pointcloud_pose_tracking.py` (+ `_v2`) and `pose_graph.py`.
 - [imu_integration_comparison.py](use_numpy/imu_integration_comparison.py): naive Euler-angle vs. $SO(3)$ exp-map orientation integration.
 - [robot_imu_simulation.py](use_numpy/robot_imu_simulation.py): high-rate IMU propagation + a low-rate Gauss-Newton position-only correction against a noisy GPS-style fix (the correction's Jacobian has a structurally zero angular block, so the correction never changes orientation; only the IMU [dead-reckons](docs/optimization/factor_graph.md#2-why-do-we-need-it) it), reusing `lie_utils.py`'s $SE(3)$ $Exp$ math.
@@ -100,8 +100,7 @@ printers. `docs/frontend/lidar_primitives.md`.
 - [hexapod_contact_inekf.py](use_numpy/hexapod_contact_inekf.py): the 3D, IMU-driven counterpart ([docs/filtering/hexapod_contact_inekf.md](docs/filtering/hexapod_contact_inekf.md)): the contact-aided invariant EKF of Hartley et al. on $`SE_{K+2}(3)`$, with each stance foot's world position in the state (added at touchdown, marginalized at liftoff) and leg kinematics as the measurement, against a world-frame error-state EKF on the same data; tripod/ripple/wave gaits, a slipping leg with per-foot $`\chi^2`$ gating, and optional IMU bias states. Reuses `hexapod_gait_ekf.py`'s gait schedules.
 - [lidar_primitives.py](use_numpy/lidar_primitives.py): LiDAR scan registration ([docs/frontend/lidar_primitives.md](docs/frontend/lidar_primitives.md)): point-to-point ICP, point-to-plane ICP and matched planes/cylinders (from `lidar_utils.py`'s extraction) as three residuals in one SE(3) Gauss-Newton loop, re-associated every iteration; experiments on extraction accuracy, the convergence basin, the planes-only corridor's degeneracy, and plane landmarks in a Levenberg-Marquardt factor graph.
 - [sliding_window_marginalization.py](use_numpy/sliding_window_marginalization.py): gives [docs/optimization/marginalization.md](docs/optimization/marginalization.md) its accompanying script - streams a pure odometry chain, marginalizes the oldest pose via the Schur complement whenever a `--window-size` cap would be exceeded, and compares the resulting bounded-memory solve against `run_full_batch_growing`'s unbounded re-solve-from-scratch baseline across a sweep of trajectory lengths, reusing `pose_graph.py`/`pose_graph_incremental.py`'s building blocks.
-- `*_v2.py` ([pointcloud_pose_tracking_v2.py](use_numpy/pointcloud_pose_tracking_v2.py), [saltation_matrix_ekf_v2.py](use_numpy/saltation_matrix_ekf_v2.py), [inchworm_zupt_ekf_v2.py](use_numpy/inchworm_zupt_ekf_v2.py), [inchworm_zupt_zaru_ekf_v2.py](use_numpy/inchworm_zupt_zaru_ekf_v2.py), [inchworm_slip_gate_ekf_v2.py](use_numpy/inchworm_slip_gate_ekf_v2.py), [inchworm_two_pad_ekf_v2.py](use_numpy/inchworm_two_pad_ekf_v2.py), [friction_anisotropic_ekf_v2.py](use_numpy/friction_anisotropic_ekf_v2.py), [invariant_saltation_ekf_v2.py](use_numpy/invariant_saltation_ekf_v2.py), [hexapod_gait_ekf_v2.py](use_numpy/hexapod_gait_ekf_v2.py)): class-based versions of those nine scripts. Each recursive filter is a class with `predict`/`measurement_update`/`step`/`state` methods (`hexapod_gait_ekf_v2.py`'s `GaitEKF`: `predict`/`update`/`step`/`get_state`), and its `run_*` function is a short loop over `step()`; `pointcloud_pose_tracking_v2.py`'s batch Gauss-Newton smoother is a `BatchGNSmoother` class instead (`linearize` with one method per factor type, `retract`, `solve`). Everything else is unchanged: same command-line flags, outputs bit-identical to the original. `tests/` and `assets/make_figures.py` use the originals.
-- `animate_*.py` ([animate_saltation_ekf.py](use_numpy/animate_saltation_ekf.py), [animate_inchworm_zupt_ekf.py](use_numpy/animate_inchworm_zupt_ekf.py), [animate_inchworm_zupt_zaru_ekf.py](use_numpy/animate_inchworm_zupt_zaru_ekf.py), [animate_inchworm_slip_gate_ekf.py](use_numpy/animate_inchworm_slip_gate_ekf.py), [animate_inchworm_two_pad_ekf.py](use_numpy/animate_inchworm_two_pad_ekf.py), [animate_inchworm_two_pad_fusion_ekf.py](use_numpy/animate_inchworm_two_pad_fusion_ekf.py), [animate_friction_anisotropic_ekf.py](use_numpy/animate_friction_anisotropic_ekf.py), [animate_bundle_adjustment.py](use_numpy/animate_bundle_adjustment.py), [animate_sliding_window_marginalization.py](use_numpy/animate_sliding_window_marginalization.py), [animate_invariant_saltation_ekf.py](use_numpy/animate_invariant_saltation_ekf.py), [animate_hexapod_gait_ekf.py](use_numpy/animate_hexapod_gait_ekf.py), [animate_gait_phase_ekf.py](use_numpy/animate_gait_phase_ekf.py), [animate_hexapod_contact_inekf.py](use_numpy/animate_hexapod_contact_inekf.py), [animate_lidar_primitives.py](use_numpy/animate_lidar_primitives.py)): each re-runs one simulation's default case and writes an animated GIF (the simulated system itself plus the quantity that separates the methods, e.g. reported uncertainty or NEES). The GIFs live in `assets/` and are embedded in the matching doc next to its static figure. They import the simulation's own functions (the saltation one uses `saltation_matrix_ekf_v2.py`'s `HybridEKF`), take its scene/noise flags plus `--fps`, `--dpi` and `--out`, and need no `ffmpeg` (matplotlib's Pillow writer). The four earlier inchworm ones and the friction one re-run the 500-trial Monte Carlo and the invariant-saltation one the 200-trial one, about 1-1.5 min each; the two-pad fusion one re-runs a 300-trial Monte Carlo (about 2 min); the hexapod gait one animates a single run with the slip switched on (about 40 s), the gait phase one a single run (about 30 s), and the contact-aided InEKF one a single run with a 0.1 rad initial rotation error (seed 4, about 50 s). `tests/` does not cover them.
+- `*_v2.py` ([pointcloud_pose_tracking_v2.py](use_numpy/pointcloud_pose_tracking_v2.py), [saltation_matrix_ekf_v2.py](use_numpy/saltation_matrix_ekf_v2.py), [inchworm_zupt_ekf_v2.py](use_numpy/inchworm_zupt_ekf_v2.py), [inchworm_zupt_zaru_ekf_v2.py](use_numpy/inchworm_zupt_zaru_ekf_v2.py), [inchworm_slip_gate_ekf_v2.py](use_numpy/inchworm_slip_gate_ekf_v2.py), [inchworm_two_pad_ekf_v2.py](use_numpy/inchworm_two_pad_ekf_v2.py), [friction_anisotropic_ekf_v2.py](use_numpy/friction_anisotropic_ekf_v2.py), [invariant_saltation_ekf_v2.py](use_numpy/invariant_saltation_ekf_v2.py), [hexapod_gait_ekf_v2.py](use_numpy/hexapod_gait_ekf_v2.py)): class-based versions of those nine scripts. Each recursive filter is a class with `predict`/`measurement_update`/`step`/`state` methods (`hexapod_gait_ekf_v2.py`'s `GaitEKF`: `predict`/`update`/`step`/`get_state`), and its `run_*` function is a short loop over `step()`; `pointcloud_pose_tracking_v2.py`'s batch Gauss-Newton smoother is a `BatchGNSmoother` class instead (`linearize` with one method per factor type, `retract`, `solve`). Everything else is unchanged: same command-line flags, outputs bit-identical to the original. `tests/` and `generator/make_figures.py` use the originals.
 
 ### [use_manif/](use_manif/) - `manifpy` counterparts (10 of the 23 simulation scripts)
 
@@ -123,6 +122,17 @@ The other 13 scripts are NumPy-only:
 - [bundle_adjustment_advanced.py](use_manif/bundle_adjustment_advanced.py): same Local + Global BA comparison as the `use_numpy` version, with camera-pose Jacobians obtained by chaining `manifpy`'s own `inverse`/`act` Jacobian out-parameters, matching `bundle_adjustment.py`'s own manif version.
 - [invariant_saltation_ekf.py](use_manif/invariant_saltation_ekf.py): same five filters (and contact-detection model) as the `use_numpy` version, with the state a `manif.SE_2_3` object: Exp/Log, composition, `adj()` (IMU noise into the invariant error), `act()` (landmark measurements) and `lplus`/`lminus` (the right-invariant error and correction) come from manif, and mean propagation is the group-affine product $`\Gamma\, f_h(X)\, \Upsilon`$. The transition matrix $`\Phi`$, the world-to-invariant map $`T(X)`$, the saltation matrix and $`H`$ stay hand-derived (manif has no notion of them). All matrices use manif's tangent order (position, rotation, velocity) instead of the `use_numpy` order (rotation, velocity, position). Given the same data and initial estimate, both versions give the same estimates and the same covariances once reordered, to about $`10^{-14}`$ (checked in the tests).
 - [lidar_primitives.py](use_manif/lidar_primitives.py): same registration methods, factor graph and experiments as the `use_numpy` version, with poses as `manif.SE3`: retraction, Log and composition from manif, and the odometry and plane factors' pose Jacobians from manif's `compose`/`rminus` and `SO3.inverse`/`act` out-parameters. The point residuals (about 10k points per iteration) read `T.rotation()`/`T.translation()` once and apply the point-action Jacobian vectorized, checked against `T.act`'s. Agrees with the `use_numpy` version to round-off, except in runs through a nearly singular step, where round-off decides the outcome (see the doc's Scope).
+
+### [generator/](generator/) - Scripts that draw the figures, GIFs and SVGs
+
+- [make_figures.py](generator/make_figures.py): one illustrative PNG per simulation in `assets/`, from the simulations' own output (same defaults, seed and draw order as each script's `main()`, so the numbers match what the script prints); `uv run python generator/make_figures.py [name]`.
+- `animate_*.py` ([animate_saltation_ekf.py](generator/animate_saltation_ekf.py), [animate_inchworm_zupt_ekf.py](generator/animate_inchworm_zupt_ekf.py), [animate_inchworm_zupt_zaru_ekf.py](generator/animate_inchworm_zupt_zaru_ekf.py), [animate_inchworm_slip_gate_ekf.py](generator/animate_inchworm_slip_gate_ekf.py), [animate_inchworm_two_pad_ekf.py](generator/animate_inchworm_two_pad_ekf.py), [animate_inchworm_two_pad_fusion_ekf.py](generator/animate_inchworm_two_pad_fusion_ekf.py), [animate_friction_anisotropic_ekf.py](generator/animate_friction_anisotropic_ekf.py), [animate_bundle_adjustment.py](generator/animate_bundle_adjustment.py), [animate_sliding_window_marginalization.py](generator/animate_sliding_window_marginalization.py), [animate_invariant_saltation_ekf.py](generator/animate_invariant_saltation_ekf.py), [animate_hexapod_gait_ekf.py](generator/animate_hexapod_gait_ekf.py), [animate_gait_phase_ekf.py](generator/animate_gait_phase_ekf.py), [animate_hexapod_contact_inekf.py](generator/animate_hexapod_contact_inekf.py), [animate_lidar_primitives.py](generator/animate_lidar_primitives.py)): each re-runs one simulation's default case and writes an animated GIF (the simulated system itself plus the quantity that separates the methods, e.g. reported uncertainty or NEES). The GIFs live in `assets/` and are embedded in the matching doc next to its static figure. They import the simulation's own functions through [_paths.py](generator/_paths.py) (the saltation one uses `saltation_matrix_ekf_v2.py`'s `HybridEKF`), take its scene/noise flags plus `--fps`, `--dpi` and `--out`, and need no `ffmpeg` (matplotlib's Pillow writer). The four earlier inchworm ones and the friction one re-run the 500-trial Monte Carlo and the invariant-saltation one the 200-trial one, about 1-1.5 min each; the two-pad fusion one re-runs a 300-trial Monte Carlo (about 2 min); the hexapod gait one animates a single run with the slip switched on (about 40 s), the gait phase one a single run (about 30 s), and the contact-aided InEKF one a single run with a 0.1 rad initial rotation error (seed 4, about 50 s). `tests/` does not cover them.
+- [make_frontend_backend_svgs.py](generator/make_frontend_backend_svgs.py): draws the two figures of [docs/frontend_backend.md](docs/frontend_backend.md) (`docs/images/frontend_backend.svg` and `frontend_backend_loop_closure.svg`); every label fits its box in the widest fallback font, checked when the script runs.
+- [make_factor_graph_svgs.py](generator/make_factor_graph_svgs.py): draws the two figures of [docs/optimization/factor_graph.md](docs/optimization/factor_graph.md) (`docs/images/factor_graph.svg` and `factor_graph_vs_pose_graph.svg`); same label-fit check as above.
+- [make_banner_svg.py](generator/make_banner_svg.py): draws `assets/banner.svg`, the banner at the top of this README.
+- [_paths.py](generator/_paths.py): imported by the animation scripts; puts `use_numpy/` and the repo root on `sys.path`.
+
+[generator/README.md](generator/README.md) lists what draws what. The SVG generators reproduce their files byte for byte.
 
 ### Root
 
@@ -195,7 +205,7 @@ Prints pre/post correction error each second (no plot).
 
 ![Two panels from robot_imu_simulation.py run for 10 s: position error just before and just after each 1 Hz position fix, and orientation error growing throughout because a position-only fix cannot correct rotation](assets/robot_imu_tracking.png)
 
-Figure made by `assets/make_figures.py` (a 10 s run; the default is 3 s); the script itself only prints.
+Figure made by `generator/make_figures.py` (a 10 s run; the default is 3 s); the script itself only prints.
 
 #### Scripts
 
@@ -229,7 +239,7 @@ Prints the preintegrated position change before and after the bias correction (n
 
 ![Two panels from imu_preintegration.py: the preintegrated position change built up sample by sample from keyframe i to keyframe j, and a log-scale bar chart comparing how much a bias update changes each preintegrated quantity with the error of the first-order Jacobian correction against a full re-integration](assets/imu_preintegration.png)
 
-Figure made by `assets/make_figures.py` at the script defaults; the script itself only prints.
+Figure made by `generator/make_figures.py` at the script defaults; the script itself only prints.
 
 #### Scripts
 
@@ -348,7 +358,7 @@ Camera-pose Jacobians come from a hand-derived closed form ($\partial p_c/\parti
 #### Scripts
 
 - [use_numpy/bundle_adjustment.py](use_numpy/bundle_adjustment.py)
-- [use_numpy/animate_bundle_adjustment.py](use_numpy/animate_bundle_adjustment.py): animated GIF of the default run, embedded in [bundle_adjustment.md](docs/optimization/bundle_adjustment.md); render with `uv run python use_numpy/animate_bundle_adjustment.py --out assets/bundle_adjustment.gif`
+- [generator/animate_bundle_adjustment.py](generator/animate_bundle_adjustment.py): animated GIF of the default run, embedded in [bundle_adjustment.md](docs/optimization/bundle_adjustment.md); render with `uv run python generator/animate_bundle_adjustment.py --out assets/bundle_adjustment.gif`
 
 - [use_manif/bundle_adjustment.py](use_manif/bundle_adjustment.py)
 
@@ -571,7 +581,7 @@ Plain $\mathbb{R}^6$ state (position/velocity, no rotation) - no `use_manif/` co
 
 - [use_numpy/saltation_matrix_ekf.py](use_numpy/saltation_matrix_ekf.py)
 - [use_numpy/saltation_matrix_ekf_v2.py](use_numpy/saltation_matrix_ekf_v2.py): class-based version, same output
-- [use_numpy/animate_saltation_ekf.py](use_numpy/animate_saltation_ekf.py): animated GIF of the default run, embedded in [hybrid_saltation_ekf.md](docs/filtering/hybrid_saltation_ekf.md); render with `uv run python use_numpy/animate_saltation_ekf.py --out assets/saltation_matrix_ekf.gif`
+- [generator/animate_saltation_ekf.py](generator/animate_saltation_ekf.py): animated GIF of the default run, embedded in [hybrid_saltation_ekf.md](docs/filtering/hybrid_saltation_ekf.md); render with `uv run python generator/animate_saltation_ekf.py --out assets/saltation_matrix_ekf.gif`
 
 #### Usage
 
@@ -618,13 +628,13 @@ Findings:
 
 - [use_numpy/inchworm_zupt_ekf.py](use_numpy/inchworm_zupt_ekf.py)
 - [use_numpy/inchworm_zupt_ekf_v2.py](use_numpy/inchworm_zupt_ekf_v2.py): class-based version, same output
-- [use_numpy/animate_inchworm_zupt_ekf.py](use_numpy/animate_inchworm_zupt_ekf.py): animated GIF of the default run, embedded in [inchworm_zupt_ekf.md](docs/filtering/inchworm_zupt_ekf.md); render with `uv run python use_numpy/animate_inchworm_zupt_ekf.py --out assets/inchworm_zupt_ekf.gif`
+- [generator/animate_inchworm_zupt_ekf.py](generator/animate_inchworm_zupt_ekf.py): animated GIF of the default run, embedded in [inchworm_zupt_ekf.md](docs/filtering/inchworm_zupt_ekf.md); render with `uv run python generator/animate_inchworm_zupt_ekf.py --out assets/inchworm_zupt_ekf.gif`
 - [use_numpy/inchworm_zupt_zaru_ekf.py](use_numpy/inchworm_zupt_zaru_ekf.py): the planar side extension with heading and ZARU (doc §5); same flags plus `--omega-extend`, `--process-noise-ang-std`, `--zaru-noise-std`, `--init-heading-noise-std`, `--init-omega-noise-std`
 - [use_numpy/inchworm_zupt_zaru_ekf_v2.py](use_numpy/inchworm_zupt_zaru_ekf_v2.py): class-based version, same output
-- [use_numpy/animate_inchworm_zupt_zaru_ekf.py](use_numpy/animate_inchworm_zupt_zaru_ekf.py): animated GIF of the side extension at matched process noise (its defaults, not the script's); render with `uv run python use_numpy/animate_inchworm_zupt_zaru_ekf.py --out assets/inchworm_zupt_zaru_ekf.gif`
+- [generator/animate_inchworm_zupt_zaru_ekf.py](generator/animate_inchworm_zupt_zaru_ekf.py): animated GIF of the side extension at matched process noise (its defaults, not the script's); render with `uv run python generator/animate_inchworm_zupt_zaru_ekf.py --out assets/inchworm_zupt_zaru_ekf.gif`
 - [use_numpy/inchworm_slip_gate_ekf.py](use_numpy/inchworm_slip_gate_ekf.py): anchor slip and the pad-sensor gate (doc §6); flags `--p-slip`, `--v-slip`, `--t-slip`, `--sensor-noise-std`, `--gate-sigmas`, plus the gait and noise flags of `inchworm_zupt_ekf.py`; the default process noise is the matched 0.5 m/s², not 0.15
 - [use_numpy/inchworm_slip_gate_ekf_v2.py](use_numpy/inchworm_slip_gate_ekf_v2.py): class-based version, same output
-- [use_numpy/animate_inchworm_slip_gate_ekf.py](use_numpy/animate_inchworm_slip_gate_ekf.py): animated GIF of the slip-gate extension at its defaults; render with `uv run python use_numpy/animate_inchworm_slip_gate_ekf.py --out assets/inchworm_slip_gate_ekf.gif`
+- [generator/animate_inchworm_slip_gate_ekf.py](generator/animate_inchworm_slip_gate_ekf.py): animated GIF of the slip-gate extension at its defaults; render with `uv run python generator/animate_inchworm_slip_gate_ekf.py --out assets/inchworm_slip_gate_ekf.gif`
 
 #### Usage
 
@@ -664,7 +674,7 @@ uv run python use_numpy/inchworm_zupt_ekf.py --duration 10.0 --dt 0.05 --t-ancho
 
 - [use_numpy/friction_anisotropic_ekf.py](use_numpy/friction_anisotropic_ekf.py)
 - [use_numpy/friction_anisotropic_ekf_v2.py](use_numpy/friction_anisotropic_ekf_v2.py): class-based version, same output
-- [use_numpy/animate_friction_anisotropic_ekf.py](use_numpy/animate_friction_anisotropic_ekf.py): animated GIF of the default run, embedded in [friction_anisotropic_ekf.md](docs/filtering/friction_anisotropic_ekf.md); render with `uv run python use_numpy/animate_friction_anisotropic_ekf.py --out assets/friction_anisotropic_ekf.gif`
+- [generator/animate_friction_anisotropic_ekf.py](generator/animate_friction_anisotropic_ekf.py): animated GIF of the default run, embedded in [friction_anisotropic_ekf.md](docs/filtering/friction_anisotropic_ekf.md); render with `uv run python generator/animate_friction_anisotropic_ekf.py --out assets/friction_anisotropic_ekf.gif`
 
 #### Usage
 
@@ -700,7 +710,7 @@ uv run python use_numpy/friction_anisotropic_ekf.py --duration 20.0 --dt 0.05 --
 #### Scripts
 
 - [use_numpy/sliding_window_marginalization.py](use_numpy/sliding_window_marginalization.py)
-- [use_numpy/animate_sliding_window_marginalization.py](use_numpy/animate_sliding_window_marginalization.py): animated GIF of the default run, embedded in [marginalization.md](docs/optimization/marginalization.md); render with `uv run python use_numpy/animate_sliding_window_marginalization.py --out assets/sliding_window_marginalization.gif`
+- [generator/animate_sliding_window_marginalization.py](generator/animate_sliding_window_marginalization.py): animated GIF of the default run, embedded in [marginalization.md](docs/optimization/marginalization.md); render with `uv run python generator/animate_sliding_window_marginalization.py --out assets/sliding_window_marginalization.gif`
 
 #### Usage
 
@@ -743,7 +753,7 @@ With contact-detection jitter (`--detect-time-noise-std`, doc §7), every filter
 - [use_numpy/invariant_saltation_ekf.py](use_numpy/invariant_saltation_ekf.py)
 - [use_numpy/invariant_saltation_ekf_v2.py](use_numpy/invariant_saltation_ekf_v2.py): class-based version, same output
 - [use_manif/invariant_saltation_ekf.py](use_manif/invariant_saltation_ekf.py)
-- [use_numpy/animate_invariant_saltation_ekf.py](use_numpy/animate_invariant_saltation_ekf.py): animated GIF of the default run, embedded in [invariant_saltation_ekf.md](docs/filtering/invariant_saltation_ekf.md); render with `uv run python use_numpy/animate_invariant_saltation_ekf.py --out assets/invariant_saltation_ekf.gif`
+- [generator/animate_invariant_saltation_ekf.py](generator/animate_invariant_saltation_ekf.py): animated GIF of the default run, embedded in [invariant_saltation_ekf.md](docs/filtering/invariant_saltation_ekf.md); render with `uv run python generator/animate_invariant_saltation_ekf.py --out assets/invariant_saltation_ekf.gif`
 
 #### Usage
 
@@ -784,7 +794,7 @@ uv run python use_numpy/invariant_saltation_ekf.py --duration 5.0 --dt 0.01 --me
 
 - [use_numpy/hexapod_gait_ekf.py](use_numpy/hexapod_gait_ekf.py)
 - [use_numpy/hexapod_gait_ekf_v2.py](use_numpy/hexapod_gait_ekf_v2.py): class-based version, same output
-- [use_numpy/animate_hexapod_gait_ekf.py](use_numpy/animate_hexapod_gait_ekf.py): animated GIF of one run with L2 slipping, embedded in [hexapod_gait_ekf.md](docs/filtering/hexapod_gait_ekf.md); render with `uv run python use_numpy/animate_hexapod_gait_ekf.py --out assets/hexapod_gait_ekf.gif`
+- [generator/animate_hexapod_gait_ekf.py](generator/animate_hexapod_gait_ekf.py): animated GIF of one run with L2 slipping, embedded in [hexapod_gait_ekf.md](docs/filtering/hexapod_gait_ekf.md); render with `uv run python generator/animate_hexapod_gait_ekf.py --out assets/hexapod_gait_ekf.gif`
 
 #### Usage
 
@@ -824,7 +834,7 @@ uv run python use_numpy/hexapod_gait_ekf.py --duration 12.0 --dt 0.02 --cycle-pe
 #### Scripts
 
 - [use_numpy/hexapod_contact_inekf.py](use_numpy/hexapod_contact_inekf.py)
-- [use_numpy/animate_hexapod_contact_inekf.py](use_numpy/animate_hexapod_contact_inekf.py): animated GIF of one run (seed 4, 0.1 rad initial rotation std), embedded in [hexapod_contact_inekf.md](docs/filtering/hexapod_contact_inekf.md); render with `uv run python use_numpy/animate_hexapod_contact_inekf.py --out assets/hexapod_contact_inekf.gif`
+- [generator/animate_hexapod_contact_inekf.py](generator/animate_hexapod_contact_inekf.py): animated GIF of one run (seed 4, 0.1 rad initial rotation std), embedded in [hexapod_contact_inekf.md](docs/filtering/hexapod_contact_inekf.md); render with `uv run python generator/animate_hexapod_contact_inekf.py --out assets/hexapod_contact_inekf.gif`
 
 #### Usage
 
@@ -864,7 +874,7 @@ uv run python use_numpy/hexapod_contact_inekf.py --duration 12.0 --dt 0.02 --cyc
 - [use_numpy/lidar_primitives.py](use_numpy/lidar_primitives.py)
 - [use_manif/lidar_primitives.py](use_manif/lidar_primitives.py): same experiments with manif poses; agrees with the `use_numpy` version to round-off except in nearly singular runs
 - [lidar_utils.py](lidar_utils.py): the shared scene, LiDAR, extraction, matching and landmark-association helpers
-- [use_numpy/animate_lidar_primitives.py](use_numpy/animate_lidar_primitives.py): animated GIF of one registration (pair 1 of experiment 2, 0.5 m and 10° initial error), embedded in [lidar_primitives.md](docs/frontend/lidar_primitives.md); render with `uv run python use_numpy/animate_lidar_primitives.py --out assets/lidar_primitives.gif`
+- [generator/animate_lidar_primitives.py](generator/animate_lidar_primitives.py): animated GIF of one registration (pair 1 of experiment 2, 0.5 m and 10° initial error), embedded in [lidar_primitives.md](docs/frontend/lidar_primitives.md); render with `uv run python generator/animate_lidar_primitives.py --out assets/lidar_primitives.gif`
 
 #### Usage
 
@@ -905,7 +915,7 @@ Findings (seeds 0-3, 500 trials each; a consistent filter has NEES 5):
 
 - [use_numpy/inchworm_two_pad_ekf.py](use_numpy/inchworm_two_pad_ekf.py)
 - [use_numpy/inchworm_two_pad_ekf_v2.py](use_numpy/inchworm_two_pad_ekf_v2.py): class-based version, same output
-- [use_numpy/animate_inchworm_two_pad_ekf.py](use_numpy/animate_inchworm_two_pad_ekf.py): animated GIF of the default run, embedded in [inchworm_two_pad_ekf.md](docs/filtering/inchworm_two_pad_ekf.md); render with `uv run python use_numpy/animate_inchworm_two_pad_ekf.py --out assets/inchworm_two_pad_ekf.gif`
+- [generator/animate_inchworm_two_pad_ekf.py](generator/animate_inchworm_two_pad_ekf.py): animated GIF of the default run, embedded in [inchworm_two_pad_ekf.md](docs/filtering/inchworm_two_pad_ekf.md); render with `uv run python generator/animate_inchworm_two_pad_ekf.py --out assets/inchworm_two_pad_ekf.gif`
 
 #### Usage
 
@@ -960,7 +970,7 @@ Findings (100 trials; a consistent body NEES here is 5.34-6.70):
 #### Scripts
 
 - [use_numpy/gait_phase_ekf.py](use_numpy/gait_phase_ekf.py)
-- [use_numpy/animate_gait_phase_ekf.py](use_numpy/animate_gait_phase_ekf.py): animated GIF of one default run (7-19.5 s, around the blocked window), embedded in [gait_phase_ekf.md](docs/filtering/gait_phase_ekf.md); render with `uv run python use_numpy/animate_gait_phase_ekf.py --out assets/gait_phase_ekf.gif`
+- [generator/animate_gait_phase_ekf.py](generator/animate_gait_phase_ekf.py): animated GIF of one default run (7-19.5 s, around the blocked window), embedded in [gait_phase_ekf.md](docs/filtering/gait_phase_ekf.md); render with `uv run python generator/animate_gait_phase_ekf.py --out assets/gait_phase_ekf.gif`
 
 #### Usage
 
@@ -1017,7 +1027,7 @@ Findings (300 trials; a consistent filter has NEES 5):
 #### Scripts
 
 - [use_numpy/inchworm_two_pad_fusion_ekf.py](use_numpy/inchworm_two_pad_fusion_ekf.py)
-- [use_numpy/animate_inchworm_two_pad_fusion_ekf.py](use_numpy/animate_inchworm_two_pad_fusion_ekf.py): animated GIF of the default run (re-runs the 300-trial Monte Carlo, about 2 min), embedded in [inchworm_two_pad_fusion_ekf.md](docs/filtering/inchworm_two_pad_fusion_ekf.md); render with `uv run python use_numpy/animate_inchworm_two_pad_fusion_ekf.py --out assets/inchworm_two_pad_fusion_ekf.gif`
+- [generator/animate_inchworm_two_pad_fusion_ekf.py](generator/animate_inchworm_two_pad_fusion_ekf.py): animated GIF of the default run (re-runs the 300-trial Monte Carlo, about 2 min), embedded in [inchworm_two_pad_fusion_ekf.md](docs/filtering/inchworm_two_pad_fusion_ekf.md); render with `uv run python generator/animate_inchworm_two_pad_fusion_ekf.py --out assets/inchworm_two_pad_fusion_ekf.gif`
 
 #### Usage
 

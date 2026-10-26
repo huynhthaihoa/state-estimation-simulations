@@ -21,7 +21,7 @@ Short answer: both are about equally *accurate*, but the world-frame EKF gains s
 
 ![Three panels from hexapod_contact_inekf.py: yaw error over 12 s with an initial rotation std of 0.1 rad, where the invariant EKF's actual RMSE (6.2 deg) and reported sigma (5.7 deg) stay flat while the world-frame EKF's reported sigma falls to 1.9 deg below its actual 6.8 deg; average NEES bars for initial rotation std 0.02, 0.1 and 0.3 rad, invariant EKF 9.3, 9.3, 9.4 and world-frame EKF 9.6, 18.2, 481, against the 95% band for 9 DoF; and velocity RMSE of the invariant EKF over time with leg L2 slipping between 4 and 8 s, for the tripod and wave gaits, trusting every foot versus the per-foot chi-squared gate](../../assets/hexapod_contact_inekf.png)
 
-*Figure: `use_numpy/hexapod_contact_inekf.py` at its defaults (seed 0, 50 trials), plotted by `uv run python assets/make_figures.py hexapod_contact_inekf` (about 2 minutes). The numbers match the script's printout.*
+*Figure: `use_numpy/hexapod_contact_inekf.py` at its defaults (seed 0, 50 trials), plotted by `uv run python generator/make_figures.py hexapod_contact_inekf` (about 2 minutes). The numbers match the script's printout.*
 
 ### Scope
 3D body walking at fixed height on flat ground, with a small roll, pitch and up-down bob at twice the gait frequency; tripod, ripple and wave gaits and their footholds from [`hexapod_gait_ekf.md`](hexapod_gait_ekf.md); the true stance schedule; isotropic noise added directly to the foot's body-frame position (the joint encoders and leg kinematics themselves are not modelled). Each trial starts with a random error in the initial estimate, with std 0.02 rad (1.146°) per rotation axis, 0.05 m/s per velocity axis and 0.01 m per position axis; the filters' initial covariance is set to match. §3 varies the rotation std. Biases are off except in §5. Run with `uv run python use_numpy/hexapod_contact_inekf.py` (about 4 minutes).
@@ -120,7 +120,7 @@ The 0.1 rad case, one run, animated. Seed 4, not the script's seed 0: seed 0 hap
 
 ![Animation of one tripod-gait run with 0.1 rad initial rotation std: left, a top-down view of the hexapod walking a curved path, its true stance feet and each filter's estimated body outline and estimated feet, with the true and both estimated paths; right, each filter's yaw error over time with its shaded plus-minus two sigma band, the world-frame EKF's band shrinking below its error, and each filter's position error over time](../../assets/hexapod_contact_inekf.gif)
 
-*Animation: `uv run python use_numpy/animate_hexapod_contact_inekf.py --out assets/hexapod_contact_inekf.gif` (seed 4 by default). Swing legs are drawn at fixed default positions relative to the body; the script does not simulate swing feet.*
+*Animation: `uv run python generator/animate_hexapod_contact_inekf.py --out assets/hexapod_contact_inekf.gif` (seed 4 by default). Swing legs are drawn at fixed default positions relative to the body; the script does not simulate swing feet.*
 
 ---
 

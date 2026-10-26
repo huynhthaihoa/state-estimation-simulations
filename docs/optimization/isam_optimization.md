@@ -267,11 +267,11 @@ For the Bayes tree itself, see [`bayes_tree.md`](bayes_tree.md); for the full iS
 
 ![Three matrix panels from pose_graph_incremental.py on an 8-pose square: the square-root factor R after 7 poses, the few entries a Givens insertion of the next odometry edge changes, and what inserting the loop-closure edge the same way would do: it changes almost every existing nonzero and fills x7's block column](../../assets/pose_graph_incremental_concept.png)
 
-*Figure: `full_relinearize`, `edge_whitened_block` and `utils.qr_insert_row` on an 8-pose square (seed 0), plotted by `uv run python assets/make_figures.py pose_graph_incremental_concept`. The script itself runs a full relinearization at the loop closure; panel (c) shows what inserting that edge's rows would touch.*
+*Figure: `full_relinearize`, `edge_whitened_block` and `utils.qr_insert_row` on an 8-pose square (seed 0), plotted by `uv run python generator/make_figures.py pose_graph_incremental_concept`. The script itself runs a full relinearization at the loop closure; panel (c) shows what inserting that edge's rows would touch.*
 
 ![Two panels from pose_graph_incremental.py: a 64-pose square loop with ground truth, odometry, and the batch and incremental estimates lying on top of each other, and the average wall-clock cost per streamed node with the number of full solves each approach ran](../../assets/pose_graph_incremental.png)
 
-*Figure: `use_numpy/pose_graph_incremental.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py pose_graph_incremental`.*
+*Figure: `use_numpy/pose_graph_incremental.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py pose_graph_incremental`.*
 
 ### 14.1 The incremental math, concretely
 

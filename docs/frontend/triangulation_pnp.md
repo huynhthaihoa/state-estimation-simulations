@@ -31,7 +31,7 @@ Only then can back-end optimization ([bundle_adjustment.md](../optimization/bund
 
 ![Two panels: triangulation, where rays from eight known cameras through their measured pixels meet at one unknown point, and PnP, where rays from 20 known 3D points converge on the unknown camera centre recovered by the linear DLT and Gauss-Newton](../../assets/pnp_estimation_concept.png)
 
-*Figure: (a) `triangulate_landmark`/`refine_landmark_gn` from `use_numpy/bundle_adjustment_advanced.py`, run on `use_numpy/bundle_adjustment.py`'s wide-baseline scene (Gauss-Newton minimizes reprojection (pixel) error, not distance to the true point, so on one noisy point it can land slightly farther from the truth than the closed form); (b) `use_numpy/pnp_estimation.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py pnp_estimation_concept`.*
+*Figure: (a) `triangulate_landmark`/`refine_landmark_gn` from `use_numpy/bundle_adjustment_advanced.py`, run on `use_numpy/bundle_adjustment.py`'s wide-baseline scene (Gauss-Newton minimizes reprojection (pixel) error, not distance to the true point, so on one noisy point it can land slightly farther from the truth than the closed form); (b) `use_numpy/pnp_estimation.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py pnp_estimation_concept`.*
 
 ---
 
@@ -176,7 +176,7 @@ In practice, PnP commonly runs inside **RANSAC** (random sample consensus: fit t
 
 ![Two panels from pnp_estimation.py: the image plane with observed pixels and 20-times-magnified reprojection residuals for the linear DLT pose and the Gauss-Newton-refined pose, and bars of rotation, position and reprojection error for both](../../assets/pnp_estimation.png)
 
-*Figure: `use_numpy/pnp_estimation.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py pnp_estimation`.*
+*Figure: `use_numpy/pnp_estimation.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py pnp_estimation`.*
 
 ---
 

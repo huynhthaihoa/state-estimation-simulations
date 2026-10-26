@@ -8,15 +8,9 @@ Think of them as:
 
 > **Back-end: "Given all observations, what is the most consistent trajectory and map?"**
 
-![Front-end (visual odometry: feature extraction, data association) feeding a back-end optimization stage that produces a mapped point-cloud trajectory, with loop closure looping back into the front-end](images/frontend_backend_1.jpg)
+![Pipeline: sensors feed the front-end (feature detection, matching and tracking, motion estimation, measurements and constraints; also data association, triangulation, PnP, keyframe selection and loop-closure detection), which hands constraints (relative poses, pixel observations, IMU bundles, priors) to the back-end (nonlinear least squares: bundle adjustment, pose graph, factor graph; Gauss-Newton, Levenberg-Marquardt and iSAM solvers; robust costs), which outputs the optimized trajectory and map. Loop closure spans both stages: the front-end detects a candidate, the back-end verifies and applies it. Both stages can run online.](images/frontend_backend.svg)
 
-![A tracking/window-optimization visual-odometry pipeline feeding a front-end manager (location awareness, loop-closure constraint) into back-end pose-map optimization, alongside a keyframe/point-cloud/vocabulary dataset](images/frontend_backend_2.jpg)
-
-![A "Front End SLAM" block (feature extraction, submaps, sensor processing, motion estimation) producing a pose, and a separate "Backend SLAM" block (loop closure, graph optimization, global map optimization) producing a map](images/frontend_backend_3.jpg)
-
-![A "Frontend (online processing)" block (scene tracking, pose estimation) and "Backend (offline processing)" block (pose graph, mapping, loop closure, optimization over a cost landscape) producing an optimized trajectory](images/frontend_backend_4.jpg)
-
-*These four diagrams are illustrative sketches - they don't fully agree with each other, or with the sections below, on exactly which stage owns loop-closure detection vs. correction, or on the online/offline framing. See §3 and §5 for that nuance. The fourth diagram's own label reads "Pose Grpah" (sic: pose graph).*
+*Figure: the two stages and what passes between them, drawn from §1-§5 (regenerate with `uv run python generator/make_frontend_backend_svgs.py`). The back-end is drawn through its optimization form (§2); filtering is the other back-end strategy ([filtering_smoothing.md](filtering_smoothing.md)). **IMU bundles** are preintegrated IMU measurements between keyframes ([glossary](glossary.md#imu-preintegration)), front-end work whose output is a back-end factor; **priors** are single-variable constraints such as one that pins the first pose ([glossary](glossary.md#prior-unary-factor)). **PnP** is Perspective-n-Point, **iSAM** incremental smoothing and mapping, **DCS** dynamic covariance scaling (a robust cost).*
 
 ---
 
@@ -86,6 +80,8 @@ and [landmark](glossary.md#landmark) observations such as:
 $$z_{11},\ z_{12},\ z_{21},\ \ldots$$
 
 where $z_{ij}$ is the pixel measurement of landmark $j$ from pose $i$ (the bundle-adjustment $z_{ij}$, not the relative-pose $z_{ij}$ of the pose-graph docs).
+
+Two more kinds of constraint reach the back-end: **IMU bundles** (preintegrated IMU measurements between keyframes) and **priors** (single-variable constraints, such as one that pins the first pose).
 
 The back-end asks:
 
@@ -162,13 +158,13 @@ The **back-end then optimizes the entire trajectory** so that all constraints ar
 - That 0.4 m is spread over the 4 odometry steps, 0.1 m per step.
 - So $x_1, x_2, x_3, x_4$ move back by 0.1, 0.2, 0.3, 0.4 m. Later poses carry more of the drift, so they move more.
 
+![Loop-closure toy case: on the left the drifted square x0 to x4 with x4 0.4 m from x0 and the dashed loop-closure constraint between them; on the right the same poses after the correction, with x1, x2, x3 and x4 moved back by 0.1, 0.2, 0.3 and 0.4 m so that x4 coincides with x0](images/frontend_backend_loop_closure.svg)
+
+*Figure: the toy case above, to scale in the drift and the corrections (the 2 m square and the drift direction are arbitrary); same generator as the figure in the introduction.*
+
 In practice, "loop closure" spans both stages. The front-end place-recognition module (which matches the current view against stored ones) detects the candidate match. The back-end checks it against the other constraints (robust costs down-weight a closure that disagrees strongly with them; see [§4](#4-front-end-vs-back-end)) and folds it into the global optimization.
 
-This is why the diagrams above disagree:
-
-- The third and fourth put "loop closure" inside the back-end.
-- The second sends a loop-closure constraint out of the front-end.
-- The first draws it as a feedback box from the back-end to the front-end.
+So loop closure belongs fully to neither stage, and a diagram can draw it in either one.
 
 ---
 
@@ -191,8 +187,6 @@ If data association or motion estimation is wrong, a plain least-squares optimiz
 
 The front-end **doesn't necessarily mean "real-time"**, and the back-end **doesn't necessarily mean "offline."** (Offline means run after all the data is collected; online means run while data arrives.)
 
-(The fourth diagram above labels the front-end "online processing" and the back-end "offline processing".)
-
 In modern SLAM systems, both stages can operate online (see the pipeline in §1).
 
 ---
@@ -203,23 +197,3 @@ In modern SLAM systems, both stages can operate online (see the pipeline in §1)
 2. Grisetti, G., Kümmerle, R., Stachniss, C., & Burgard, W. (2010). *A Tutorial on Graph-Based SLAM*. IEEE Intelligent Transportation Systems Magazine, 2(4), 31–43. https://doi.org/10.1109/MITS.2010.939925 - the back-end/pose-graph optimization tutorial behind §2 and §4.
 3. Mur-Artal, R., Montiel, J. M. M., & Tardós, J. D. (2015). *ORB-SLAM: A Versatile and Accurate Monocular SLAM System*. IEEE Transactions on Robotics, 31(5), 1147–1163. https://doi.org/10.1109/TRO.2015.2463671 - a concrete system using ORB features, local BA and pose-graph loop closing; its Tracking / Local Mapping / Loop Closing threads only roughly follow the front-end/back-end split. Relevant to §1's ORB mention and as a worked loop-closure example for §3.
 4. Gálvez-López, D., & Tardós, J. D. (2012). *Bags of Binary Words for Fast Place Recognition in Image Sequences*. IEEE Transactions on Robotics, 28(5), 1188–1197. https://doi.org/10.1109/TRO.2012.2197158 - the DBoW2 place-recognition method, an example of the place-recognition step in §3's account of loop-closure *detection*.
-5. Chen, W., Shang, G., Ji, A., Zhou, C., Wang, X., Xu, C., Li, Z., & Hu, K. (2022). *An Overview on Visual SLAM: From Tradition to Semantic*. Remote Sensing, 14(13), 3010. https://doi.org/10.3390/rs14133010 - the original source of the diagram in `images/frontend_backend_1.jpg` (see Image sources below).
-6. Chen, W., Zhou, C., Shang, G., Wang, X., Li, Z., Xu, C., & Hu, K. (2022). *SLAM Overview: From Single Sensor to Heterogeneous Fusion*. Remote Sensing, 14(23), 6033. https://doi.org/10.3390/rs14236033 - the original source of the diagram in `images/frontend_backend_2.jpg` (see Image sources below).
-7. Duan, R., Feng, Y., & Wen, C.-Y. (2022). *Deep Pose Graph-Matching-Based Loop Closure Detection for Semantic Visual SLAM*. Sustainability, 14(19), 11864. https://doi.org/10.3390/su141911864 - Figure 1 of this paper is the original source of the diagram in `images/frontend_backend_4.jpg` (see Image sources below).
-
-### Image sources
-
-The diagrams above are stored in [`images/`](images/); the original CDN URLs (`images.openai.com`) are kept below for provenance.
-
-1. `images/frontend_backend_1.jpg`
-   - Original CDN URL: https://images.openai.com/static-rsc-4/ohut01r4hXxy0FBo1CUweMJvMR0DsWr7j5TugX3IqHY3ySm7JWT-MdDMc2CRdBXXvXt09Nx7tRO552QRLOCFQVlHDCt1ECQBAvWQ3EM4vtQVfcF4qvfLvULQutQRozc5gRTmOfctTMUsz0aIsbjamEKvI7-cPBEbDYm31qYmsS9bfmdHnOGJdUH9Z1ke9Gg4?purpose=fullsize
-   - Confirmed source: Reference 5 above (Chen et al., 2022, *An Overview on Visual SLAM: From Tradition to Semantic*).
-2. `images/frontend_backend_2.jpg`
-   - Original CDN URL: https://images.openai.com/static-rsc-4/fRJK_NxCUU5MX0xfOKYi4rlB7jQ2LD2ipmlYDd1XKT9PVkvHJ59nZQLTRowQ7zaPmc1Tzewjuf_rumoJ-G38d3DTs4WPCbo0OZ9-qlf_3j4KZgVNfSF75TNlFbV_dW2iWXO4jkKbovsJViao1gfCoFPnqfyO3C6b0bOfIQjQ2wl8FJoT509kwELbxeXlDrRy?purpose=fullsize
-   - Confirmed source: Reference 6 above (Chen et al., 2022, *SLAM Overview: From Single Sensor to Heterogeneous Fusion*).
-<!-- 3. `images/frontend_backend_3.jpg`
-   - Original CDN URL: https://images.openai.com/static-rsc-4/wSKnA5y3wi9kOy12TexCHpO7AOzmAIMkZP2Lubf4gLoaeo0jwVd2DipIoWO0Wl3INhlXLgBCQdyTZDQDPTZ_RdR9zltV7hoG-H7wiRY1Ja5iCt4PRRL85wEpuQhuOsc_bFhxps25YgL-sEyUaeU8fOFDOwQkEP_pkcA_9pUoqBfG5E6skjfrZ_g_hbGjQ_X6?purpose=fullsize
-   - Source: not yet identified - no candidate has been found or confirmed. Do not assume it shares a source with the other three. -->
-4. `images/frontend_backend_4.jpg`
-   - Original CDN URL: https://images.openai.com/static-rsc-4/1oH3r36n4WxtILN9nlK9PXhy52VKoblXYiuWIZXpb-0MKArZ9UwGQ2MPtIRdMgIlUwEwt2pvxyX0Ri8_bukIvSur2fgcoVvciiGxRn3Dqtd1GXQ63CWXEJIAwd1Ua9qad043n0DNKLTnphMUzjYDmzneWRPZPEI_hn9jf-ij253TMJJs6oZh9k7FQ7KgA59-?purpose=fullsize
-   - Confirmed source: Reference 7 above (Duan, Feng, & Wen, 2022, *Deep Pose Graph-Matching-Based Loop Closure Detection for Semantic Visual SLAM*), Figure 1.

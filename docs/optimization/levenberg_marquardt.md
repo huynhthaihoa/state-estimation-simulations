@@ -90,7 +90,7 @@ For example, $f = \tfrac12(x^2 + 100y^2)$ is 100× steeper in $y$, so $\alpha$ m
 
 ![Two panels for gradient descent on f = one half of x squared plus 100 y squared from (10, 1): contours with the zigzag path of step size 0.019, which converges in 361 steps, the growing zigzag of step size 0.021, which diverges, and the single straight Gauss-Newton step to the minimum; and the distance to the minimum per step on a log axis, shrinking for 0.019 and exceeding 1e8 after 194 steps for 0.021](../../assets/lm_gradient_descent.png)
 
-*Figure: the valley example above, plotted by `uv run python assets/make_figures.py lm_gradient_descent`. Left: contours with the three paths (for step size 0.021 only the first 9 steps are drawn). Right: the distance to the minimum per step on a log axis, 361 steps to reach the 0.01 tolerance for 0.019 and growing past 1e8 after 194 steps for 0.021.*
+*Figure: the valley example above, plotted by `uv run python generator/make_figures.py lm_gradient_descent`. Left: contours with the three paths (for step size 0.021 only the first 9 steps are drawn). Right: the distance to the minimum per step on a log axis, 361 steps to reach the 0.01 tolerance for 0.019 and growing past 1e8 after 194 steps for 0.021.*
 
 §5 shows that LM with a large $\lambda$ takes this gradient-descent step with $\alpha = 1/\lambda$, and §10 shows how Marquardt's scaling removes this valley problem when the valley runs along the parameter axes, as it does here.
 

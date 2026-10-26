@@ -1,6 +1,6 @@
 # SLAM mental map
 
-This doc places every other doc in this folder, and every script in [`use_numpy/`](../use_numpy/)/[`use_manif/`](../use_manif/) (except the `*_v2.py` and `animate_*.py` variants, see [§7](#7-every-script-on-the-map)), on one map. It adds no new theory; each node points to the doc section that explains it. For short definitions of the terms used here, see [glossary.md](glossary.md).
+This doc places every other doc in this folder, and every script in [`use_numpy/`](../use_numpy/)/[`use_manif/`](../use_manif/) (except the `*_v2.py` variants, see [§7](#7-every-script-on-the-map)), on one map. It adds no new theory; each node points to the doc section that explains it. For short definitions of the terms used here, see [glossary.md](glossary.md).
 
 Several docs already draw a partial map of their own corner. We treat those as zoom-ins of this one:
 
@@ -357,7 +357,7 @@ Accuracy and covariance calibration are separate properties, and NEES measures t
 
 `lie_utils.py` and `numpy_utils.py` (in `use_numpy/`), `manif_utils.py` (in `use_manif/`), and `utils.py` and `lidar_utils.py` (at the repo root) are shared helpers, not stops on the map; see [README.md §C](../README.md#c-library-structure).
 
-Not on the map: the nine `*_v2.py` files are class-based rewrites of `pointcloud_pose_tracking`, `saltation_matrix_ekf`, the four `inchworm_*` scripts, `friction_anisotropic_ekf`, `invariant_saltation_ekf` and `hexapod_gait_ekf`; the fourteen `animate_*.py` scripts render the GIF embedded in the matching doc (see [README.md §C](../README.md#c-library-structure)). All `Script` names above exist in `use_numpy/`; ten also have a `use_manif/` twin (`imu_integration_comparison`, `robot_imu_simulation`, `imu_preintegration`, `pointcloud_pose_tracking`, `invariant_saltation_ekf`, `pose_graph`, `bundle_adjustment`, `bundle_adjustment_advanced`, `pose_graph_incremental`, `lidar_primitives`), the rest are NumPy-only.
+Not on the map: the nine `*_v2.py` files are class-based rewrites of `pointcloud_pose_tracking`, `saltation_matrix_ekf`, the four `inchworm_*` scripts, `friction_anisotropic_ekf`, `invariant_saltation_ekf` and `hexapod_gait_ekf`; the fourteen `animate_*.py` scripts in [generator/](../generator/) render the GIF embedded in the matching doc (see [README.md §C](../README.md#c-library-structure)). All `Script` names above exist in `use_numpy/`; ten also have a `use_manif/` twin (`imu_integration_comparison`, `robot_imu_simulation`, `imu_preintegration`, `pointcloud_pose_tracking`, `invariant_saltation_ekf`, `pose_graph`, `bundle_adjustment`, `bundle_adjustment_advanced`, `pose_graph_incremental`, `lidar_primitives`), the rest are NumPy-only.
 
 ---
 

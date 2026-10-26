@@ -217,7 +217,7 @@ The measured counterpart from this repo (counts in §19):
 
 ![Two rows from bayes_tree_construction.py: the 16-variable elimination chain, where a new odometry edge affects only a few variables at the root end and the loop-closure edge affects all of them](../../assets/bayes_tree_construction.png)
 
-*Figure: `use_numpy/bayes_tree_construction.py` at its defaults, plotted by `uv run python assets/make_figures.py bayes_tree_construction`. Red marks the variables that must be re-eliminated.*
+*Figure: `use_numpy/bayes_tree_construction.py` at its defaults, plotted by `uv run python generator/make_figures.py bayes_tree_construction`. Red marks the variables that must be re-eliminated.*
 
 ---
 

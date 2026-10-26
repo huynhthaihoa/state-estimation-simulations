@@ -93,7 +93,7 @@ Think of a curved road: we don't need to understand the whole curve, only to app
 
 ![Left: cos θ with its tangent at the estimate θ̂ = 30° and ±5° and ±40° bands; the tangent is 0.3 cm off at +5° and 17.5 cm off at +40°. Right: Monte Carlo distribution of cos θ versus the EKF's Gaussian, matching for σ = 5° and clearly different for σ = 40°](../../assets/ekf_linearization_concept.png)
 
-*Figure: the tangent is an excellent stand-in when the uncertainty is small (σ = 5°: 0.3 cm gap, means 0.863 vs. 0.866 m) and a poor one when it is large (σ = 40°: 17.5 cm gap, true mean 0.678 m vs. the EKF's 0.866 m). Plotted by `uv run python assets/make_figures.py ekf_linearization_concept`.*
+*Figure: the tangent is an excellent stand-in when the uncertainty is small (σ = 5°: 0.3 cm gap, means 0.863 vs. 0.866 m) and a poor one when it is large (σ = 40°: 17.5 cm gap, true mean 0.678 m vs. the EKF's 0.866 m). Plotted by `uv run python generator/make_figures.py ekf_linearization_concept`.*
 
 Concretely, the EKF plugs the Jacobian into §1's same two-step cycle, for $x_k = f(x_{k-1}, u_{k-1}) + w_{k-1}$ and $z_k = h(x_k) + v_k$, where $`f`$ is the nonlinear motion model driven by the control input $`u`$, and $`h`$ is the nonlinear measurement model ([glossary](../glossary.md#ekf-extended-kalman-filter)).
 

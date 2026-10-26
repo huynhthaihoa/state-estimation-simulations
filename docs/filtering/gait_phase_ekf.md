@@ -21,7 +21,7 @@ So the question is **which feet to read on each tick**: the **stance flags**. Th
 
 ![Four panels from gait_phase_ekf.py: stance flags of the blocked leg for the true stance and the four approaches with swinging-foot reads highlighted; true touchdown offsets with the CPG and phase-EKF lag estimates; body NEES over time per approach from 100 Monte Carlo runs; and body NEES against terrain spread for the CPG window and the phase EKF at 2 and 3 sigma](../../assets/gait_phase_ekf.png)
 
-*Figure: `use_numpy/gait_phase_ekf.py` at its defaults (random seed 0, 100 trials), plus a terrain sweep (30 trials per point), plotted by `uv run python assets/make_figures.py gait_phase_ekf` (about 2 minutes).*
+*Figure: `use_numpy/gait_phase_ekf.py` at its defaults (random seed 0, 100 trials), plus a terrain sweep (30 trials per point), plotted by `uv run python generator/make_figures.py gait_phase_ekf` (about 2 minutes).*
 
 ### Scope
 Planar hexapod in a tripod gait, as in `hexapod_gait_ekf.md`; only touchdown times are uncertain. The detector's error rates and the touchdown offsets are this repo's assumptions, not measured values. No paper we found combines a CPG with a Kalman filter on a legged robot, so the two rhythm-model approaches here are this repo's design (§8).
@@ -117,7 +117,7 @@ The same default run, animated:
 
 ![Animation of gait_phase_ekf.py: top view of the hexapod with feet filled in stance and hollow in swing and the blocked leg highlighted; a scrolling gait diagram of the blocked leg for the true stance and the four approaches with swinging-foot reads highlighted and detector triggers marked; and the touchdown offsets with the CPG and phase-EKF lag estimates](../../assets/gait_phase_ekf.gif)
 
-*Animation: `use_numpy/animate_gait_phase_ekf.py` at its defaults (seed 0, one run, 7-19.5 s around the blocked window; L2's false trigger comes at 18.4 s), rendered by `uv run python use_numpy/animate_gait_phase_ekf.py --out assets/gait_phase_ekf.gif`.*
+*Animation: `generator/animate_gait_phase_ekf.py` at its defaults (seed 0, one run, 7-19.5 s around the blocked window; L2's false trigger comes at 18.4 s), rendered by `uv run python generator/animate_gait_phase_ekf.py --out assets/gait_phase_ekf.gif`.*
 
 ---
 

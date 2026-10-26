@@ -20,7 +20,7 @@ CONTRACT:  front pad anchored     ←B━━━━F▓    back pad slides up beh
 
 ![Four panels from inchworm_two_pad_ekf.py at its defaults: top view of the true body midpoint and four estimates, the anchored-pad sensor reading with the veto threshold, the midpoint position error over time, and the Monte Carlo NEES per policy on a log scale against the consistent value 5](../../assets/inchworm_two_pad_ekf.png)
 
-*Figure: `use_numpy/inchworm_two_pad_ekf.py` at its defaults (seed 0, 500 trials), plotted by `uv run python assets/make_figures.py inchworm_two_pad_ekf` (about 2 minutes). The numbers match the script's printout.*
+*Figure: `use_numpy/inchworm_two_pad_ekf.py` at its defaults (seed 0, 500 trials), plotted by `uv run python generator/make_figures.py inchworm_two_pad_ekf` (about 2 minutes). The numbers match the script's printout.*
 
 ### Scope
 Planar motion; pads are points that never lift off; the body is a straight segment between them. Slip is a prescribed pulse, not friction physics. The numbers are illustrative, not the robot's. The paper has no filter; the filter here is this repo's design, built on the idea of a contact point held in the state from [`hexapod_contact_inekf.md`](hexapod_contact_inekf.md).
@@ -149,7 +149,7 @@ The same default run, animated:
 
 ![Animation of the two-pad inchworm over 20 s: top view of the true pads and body with the anchored pad highlighted and each policy's estimated midpoint, the anchored-pad sensor reading with the veto threshold, and the Monte Carlo NEES of the four policies on a log scale against the expected value 5](../../assets/inchworm_two_pad_ekf.gif)
 
-*Animation: `use_numpy/animate_inchworm_two_pad_ekf.py` at its defaults (seed 0, 500 trials), rendered by `uv run python use_numpy/animate_inchworm_two_pad_ekf.py --out assets/inchworm_two_pad_ekf.gif`.*
+*Animation: `generator/animate_inchworm_two_pad_ekf.py` at its defaults (seed 0, 500 trials), rendered by `uv run python generator/animate_inchworm_two_pad_ekf.py --out assets/inchworm_two_pad_ekf.gif`.*
 
 ---
 

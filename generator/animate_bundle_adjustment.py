@@ -33,6 +33,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation
 
+import _paths  # noqa: F401  (puts use_numpy/ and the repo root on sys.path)
 from bundle_adjustment import (
     generate_ground_truth_scene, build_observations, perturb_initial_guess,
     run_ba_landmarks_only, run_ba_poses_only, run_bundle_adjustment,

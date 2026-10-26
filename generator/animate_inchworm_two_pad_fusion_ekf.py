@@ -35,6 +35,7 @@ import matplotlib.pyplot as plt
 from matplotlib import animation
 from matplotlib.lines import Line2D
 
+import _paths  # noqa: F401  (puts use_numpy/ and the repo root on sys.path)
 from inchworm_two_pad_fusion_ekf import (B, F, SPIKE, STATE_DIM, VARIANTS, build_parser, build_setup,
                                          commanded_change, run_monte_carlo, run_trial, simulate_trial,
                                          window_flags)

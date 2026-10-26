@@ -23,7 +23,7 @@ A real slip makes the two sensors **agree**; a faulty sensor makes them **disagr
 
 ![Four panels from inchworm_two_pad_fusion_ekf.py: both pad readings of one run with the slip threshold, slip pulses and sensor faults; the Monte Carlo midpoint position RMSE over time for the five variants; the Monte Carlo NEES of the five variants on a log scale against the consistent value 5; and NEES against the moving sensor's noise for the anchored sensor only, the unchecked moving sensor and the cross-check](../../assets/inchworm_two_pad_fusion_ekf.png)
 
-*Figure: `use_numpy/inchworm_two_pad_fusion_ekf.py` at its defaults (seed 0, 300 trials), plus a sweep of the moving sensor's noise (100 trials per point), plotted by `uv run python assets/make_figures.py inchworm_two_pad_fusion_ekf` (about 2 minutes). The numbers match the script's printout.*
+*Figure: `use_numpy/inchworm_two_pad_fusion_ekf.py` at its defaults (seed 0, 300 trials), plus a sweep of the moving sensor's noise (100 trials per point), plotted by `uv run python generator/make_figures.py inchworm_two_pad_fusion_ekf` (about 2 minutes). The numbers match the script's printout.*
 
 ### Scope
 The two-pad doc's planar toy (point pads, prescribed slip pulses, no position fix), with the additions above. The fault model, the fault rate and the moving sensor's noise are this repo's assumptions: the paper reads only the anchored pad's sensor and gives no reason, so whether a sliding pad's sensor is as reliable as an anchored one is **not verified** (§4 shows how much that matters). The cross-check is this repo's design.
@@ -199,7 +199,7 @@ The same default run, animated:
 
 ![Animation of the two-pad inchworm reading both pad sensors over 20 s: top view of the true pads and body with the anchored pad highlighted, pad outlines marking sensor spikes and dropouts, and three estimated midpoints; the anchored reading and the moving reading minus the commanded stroke with the slip threshold, fault episodes and the cross-check's detections; and the Monte Carlo NEES of the five variants on a log scale against the expected value 5](../../assets/inchworm_two_pad_fusion_ekf.gif)
 
-*Animation: `use_numpy/animate_inchworm_two_pad_fusion_ekf.py` at its defaults (seed 0, 300 trials), rendered by `uv run python use_numpy/animate_inchworm_two_pad_fusion_ekf.py --out assets/inchworm_two_pad_fusion_ekf.gif`.*
+*Animation: `generator/animate_inchworm_two_pad_fusion_ekf.py` at its defaults (seed 0, 300 trials), rendered by `uv run python generator/animate_inchworm_two_pad_fusion_ekf.py --out assets/inchworm_two_pad_fusion_ekf.gif`.*
 
 ---
 

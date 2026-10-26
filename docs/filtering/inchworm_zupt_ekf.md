@@ -36,7 +36,7 @@ We work through the simplest concrete version using [`inchworm_zupt_ekf.py`](../
 
 ![Three rows from inchworm_zupt_ekf.py's defaults over three gait cycles: position as a staircase that holds its value while anchored, velocity as a continuous trapezoid labelled with t_anchor, t_extend, t_ramp and v_extend, and the ticks where the never, always and phase_conditional variants apply a zero-velocity update](../../assets/inchworm_zupt_ekf_concept.png)
 
-*Figure: the gait schedule at `use_numpy/inchworm_zupt_ekf.py`'s defaults, plotted by `uv run python assets/make_figures.py inchworm_zupt_ekf_concept`.*
+*Figure: the gait schedule at `use_numpy/inchworm_zupt_ekf.py`'s defaults, plotted by `uv run python generator/make_figures.py inchworm_zupt_ekf_concept`.*
 
 ### Scope
 This is deliberately a small slice of the real idea.
@@ -167,13 +167,13 @@ One might expect `always` to match `phase_conditional` during genuine anchor tic
 
 ![Two panels from inchworm_zupt_ekf.py: velocity over the anchor/extend gait with the estimates of the three ZUPT policies, and Monte Carlo NEES for never, every-tick and anchor-only ZUPT against the consistent value of 2](../../assets/inchworm_zupt_ekf.png)
 
-*Figure: `use_numpy/inchworm_zupt_ekf.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py inchworm_zupt_ekf`.*
+*Figure: `use_numpy/inchworm_zupt_ekf.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py inchworm_zupt_ekf`.*
 
 The same run, animated over five anchor/extend cycles. The top strip shows the point mass crawling along its track, gold while anchored and green while extending, with a gray footprint at each anchor point and each policy's position estimate below it; `always` falls several centimetres behind (position **RMSE**, [root-mean-square error](../glossary.md#rmse-root-mean-square-error), 0.060 m vs 0.015-0.016 m). The middle panel shows each policy's velocity estimate with its ±2σ band: `always` collapses its band during motion, and `phase_conditional` tightens only on anchor ticks. The bottom panel shows the Monte Carlo NEES (averaged over many randomized runs, [glossary](../glossary.md#monte-carlo-trials)) building up cycle by cycle; `always` climbs to a per-tick peak of about 940, and none of the three is consistent at these defaults.
 
 ![Animation of the inchworm gait over five cycles: top, the point mass crawling along its track with its anchor footprints and the three position estimates; middle, true velocity and the never, always and phase_conditional estimates with their ±2-sigma bands, anchor phases shaded; bottom, each policy's Monte Carlo averaged NEES on a log scale against the expected value 2](../../assets/inchworm_zupt_ekf.gif)
 
-*Animation: `use_numpy/animate_inchworm_zupt_ekf.py` at its defaults (seed 0, 500 trials), rendered by `uv run python use_numpy/animate_inchworm_zupt_ekf.py --out assets/inchworm_zupt_ekf.gif`.*
+*Animation: `generator/animate_inchworm_zupt_ekf.py` at its defaults (seed 0, 500 trials), rendered by `uv run python generator/animate_inchworm_zupt_ekf.py --out assets/inchworm_zupt_ekf.gif`.*
 
 | Variant | anchor-only NEES | cruise-only NEES | velocity RMSE (single run) |
 | --- | --- | --- | --- |
@@ -248,7 +248,7 @@ Seed 0, 500 trials. A consistent 5-DoF filter averages NEES 5, with a 95% interv
 
 ![Four panels from inchworm_zupt_zaru_ekf.py: heading over the gait with the estimates of the four policies, and their Monte Carlo NEES against the consistent value of 5, at the script defaults (top) and at matched process noise (bottom)](../../assets/inchworm_zupt_zaru_ekf.png)
 
-*Figure: `use_numpy/inchworm_zupt_zaru_ekf.py` at its defaults (top) and with `--process-noise-std 0.5 --process-noise-ang-std 1.5` (bottom), seed 0, plotted by `uv run python assets/make_figures.py inchworm_zupt_zaru_ekf`.*
+*Figure: `use_numpy/inchworm_zupt_zaru_ekf.py` at its defaults (top) and with `--process-noise-std 0.5 --process-noise-ang-std 1.5` (bottom), seed 0, plotted by `uv run python generator/make_figures.py inchworm_zupt_zaru_ekf`.*
 
 #### With matched noise, ZARU keeps the heading honest
 Across seeds 0-3, `phase_conditional` has the lowest overall NEES (6.22-6.38) and the lowest heading RMSE (0.159-0.221 rad) of the four policies in every seed. Dropping ZARU (`phase_conditional_zupt_only`) gives NEES 10.19-11.34, and `never` gives 16.79-19.96. Even `phase_conditional` sits slightly above the interval; the next subsection explains why.
@@ -286,7 +286,7 @@ The same matched run, animated. The left panel shows the top view, with the true
 
 ![Animation of the planar inchworm over five cycles: left, top view of the true path and each policy's position and heading arrow; right, true heading and the four estimates with their ±2-sigma bands, anchor phases shaded, and each policy's Monte Carlo averaged NEES on a log scale against the expected value 5](../../assets/inchworm_zupt_zaru_ekf.gif)
 
-*Animation: `use_numpy/animate_inchworm_zupt_zaru_ekf.py` at its defaults (matched noise, seed 0, 500 trials), rendered by `uv run python use_numpy/animate_inchworm_zupt_zaru_ekf.py --out assets/inchworm_zupt_zaru_ekf.gif`.*
+*Animation: `generator/animate_inchworm_zupt_zaru_ekf.py` at its defaults (matched noise, seed 0, 500 trials), rendered by `uv run python generator/animate_inchworm_zupt_zaru_ekf.py --out assets/inchworm_zupt_zaru_ekf.gif`.*
 
 ---
 
@@ -324,7 +324,7 @@ Seed 0, 500 trials, NEES by window. A consistent 2-DoF filter averages NEES 2, w
 
 ![Four panels from inchworm_slip_gate_ekf.py: the pad sensor reading with its quiet band, the velocity estimates of three policies, the Monte Carlo NEES of all five policies, and a sweep of the gate threshold](../../assets/inchworm_slip_gate_ekf.png)
 
-*Figure: `use_numpy/inchworm_slip_gate_ekf.py` at its defaults, seed 0, plotted by `uv run python assets/make_figures.py inchworm_slip_gate_ekf`. Shaded = slip pulses. The threshold-sweep panel uses 200 runs per point and its own Monte Carlo seed (the threshold table below uses 500 runs and seed 0).*
+*Figure: `use_numpy/inchworm_slip_gate_ekf.py` at its defaults, seed 0, plotted by `uv run python generator/make_figures.py inchworm_slip_gate_ekf`. Shaded = slip pulses. The threshold-sweep panel uses 200 runs per point and its own Monte Carlo seed (the threshold table below uses 500 runs and seed 0).*
 
 #### The schedule is blind to slip
 During a pulse `schedule` keeps telling the filter the body is still, with std 0.01 m/s, while it slides back at up to 0.08 m/s. The slip pattern is one draw per seed, so the table below repeats the run for seeds 0-3 (NEES in the window named in each header, 500 trials each, matched process noise 0.5 m/s² as above; "slip ticks" is the number of ticks inside a pulse in that seed):
@@ -386,7 +386,7 @@ The same default run, animated. The panels share the time axis and show the velo
 
 ![Animation of the 1D inchworm over ten cycles with two slip pulses: velocity estimates of four policies, the pad sensor reading with its quiet band, bars marking the ticks on which the three gated policies apply ZUPT, and the Monte Carlo NEES of all five policies on a log scale against the expected value 2](../../assets/inchworm_slip_gate_ekf.gif)
 
-*Animation: `use_numpy/animate_inchworm_slip_gate_ekf.py` at its defaults (seed 0, 500 trials), rendered by `uv run python use_numpy/animate_inchworm_slip_gate_ekf.py --out assets/inchworm_slip_gate_ekf.gif`.*
+*Animation: `generator/animate_inchworm_slip_gate_ekf.py` at its defaults (seed 0, 500 trials), rendered by `uv run python generator/animate_inchworm_slip_gate_ekf.py --out assets/inchworm_slip_gate_ekf.gif`.*
 
 #### Takeaway
 When the anchor can slip, "the schedule says anchor" is no longer enough to justify $`v = 0`$. A sensor that can vote against the schedule removes most of the damage (slip-window NEES from about 47 to 3.5). The threshold has to sit well below the cruise speed, or the gate becomes `always`. A gate that replaces the schedule instead of checking it admits the ZUPT at the ends of the extend phase.

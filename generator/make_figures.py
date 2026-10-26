@@ -10,8 +10,8 @@ exception is a non-default duration where the default is too short to show
 anything, which the figure then states in its subtitle.
 
 Usage:
-    uv run python assets/make_figures.py            # all figures
-    uv run python assets/make_figures.py pose_graph # just one (see FIGURES)
+    uv run python generator/make_figures.py            # all figures
+    uv run python generator/make_figures.py pose_graph # just one (see FIGURES)
 """
 import contextlib
 import io
@@ -30,7 +30,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "use_numpy"))
 sys.path.insert(0, ROOT)
 
-OUT_DIR = os.path.dirname(os.path.abspath(__file__))
+OUT_DIR = os.path.join(ROOT, "assets")
 SEED = 0
 
 TRUTH = "#1f1f1f"

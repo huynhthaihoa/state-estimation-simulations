@@ -32,7 +32,7 @@ The concrete example is the bouncing-point-mass toy problem in [`saltation_matri
 
 ![Three panels from saltation_matrix_ekf.py: height and vertical velocity of the default bouncing run with the guard crossings and velocity resets marked; two balls from the §3 worked example, the second starting 5 cm higher and landing 4.94 ms later; and the change each approach predicts at T = 1 s, where the naive reset Jacobian predicts no velocity change and the saltation matrix matches the re-simulated answer](../../assets/saltation_matrix_ekf_concept.png)
 
-*Figure: the default run of `use_numpy/saltation_matrix_ekf.py` and the [§3](#3-a-worked-example-naive-vs-saltation-in-numbers) worked example, plotted by `uv run python assets/make_figures.py saltation_matrix_ekf_concept`.*
+*Figure: the default run of `use_numpy/saltation_matrix_ekf.py` and the [§3](#3-a-worked-example-naive-vs-saltation-in-numbers) worked example, plotted by `uv run python generator/make_figures.py saltation_matrix_ekf_concept`.*
 
 > **Reading order**
 > - **§1-§3, core idea:** why the reset Jacobian isn't enough, plus a worked example showing it's wrong by a real amount. Enough for a first read.
@@ -330,13 +330,13 @@ So with exact detection there is no case for the naive update:
 
 ![Two panels from saltation_matrix_ekf.py: the height of the bouncing point mass with measurements, ground truth and both EKFs, and Monte Carlo NEES over time for the naive and saltation bounce updates against the consistent value of 6](../../assets/saltation_matrix_ekf.png)
 
-*Figure: `use_numpy/saltation_matrix_ekf.py` at its defaults (seed 0), plotted by `uv run python assets/make_figures.py saltation_matrix_ekf`.*
+*Figure: `use_numpy/saltation_matrix_ekf.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py saltation_matrix_ekf`.*
 
 The same run, animated. The two estimates stay close; what differs is the uncertainty each filter reports after a bounce. In the bottom-right panel, the vertical-velocity standard deviation drops at every bounce from about 0.029 m/s to about 0.025 m/s (naive) and 0.018-0.019 m/s (saltation). Both then recover to about 0.028-0.029 m/s before the next bounce.
 
 ![Animation of the default run: top, the bouncing point mass with measurements and both EKF estimates; bottom left, each filter's height and vertical-velocity error with its 2-sigma ellipse; bottom right, each filter's reported vertical-velocity standard deviation over time, which drops further at every bounce for the saltation update than for the naive one](../../assets/saltation_matrix_ekf.gif)
 
-*Animation: `use_numpy/animate_saltation_ekf.py` at its defaults (seed 0), rendered by `uv run python use_numpy/animate_saltation_ekf.py --out assets/saltation_matrix_ekf.gif`.*
+*Animation: `generator/animate_saltation_ekf.py` at its defaults (seed 0), rendered by `uv run python generator/animate_saltation_ekf.py --out assets/saltation_matrix_ekf.gif`.*
 
 ---
 
