@@ -11,15 +11,15 @@ It builds on two earlier ideas:
 
 ## 1. The problem
 
-An IMU reports angular rate and acceleration at 100-1000 Hz. The keyframes or [loop closures](../glossary.md#loop-closure) that a [pose-graph](../glossary.md#pose-graph) or [bundle-adjustment](../glossary.md#bundle-adjustment-ba) back-end optimizes over arrive at about 1-10 Hz. That gap means tens to hundreds of raw samples per keyframe (100 in the demo), and it causes two problems:
+An IMU reports angular rate and acceleration at 100-1000 Hz. The [keyframes](../glossary.md#keyframe) that a [pose-graph](../glossary.md#pose-graph) or [bundle-adjustment](../glossary.md#bundle-adjustment-ba) back-end optimizes over arrive at about 1-10 Hz. That gap means tens to hundreds of raw samples per keyframe (100 in the demo), and it causes two problems:
 
 - **Problem A - too many samples.** One node per raw sample would add 100+ nodes per second, and the back-end only needs the *net* relative motion between keyframes.
 - **Problem B - bias [relinearization](../glossary.md#relinearization).** The **gyroscope bias $b_g$** and **accelerometer bias $b_a$** are part of the optimized state, and the optimizer changes them at each iteration. Every raw sample was integrated with the *old* bias, so in principle every IMU segment must be re-integrated (100+ samples per segment, every iteration).
 
 Preintegration solves both:
 
-- It folds all samples between two keyframes into one **relative-motion bundle** ($\Delta R$, $\Delta v$, $\Delta p$), which solves **A**.
-- While integrating, it tracks **bias-sensitivity Jacobians**, so the bundle can be corrected for a bias change with one matrix-vector multiply instead of a re-integration, which solves **B**.
+- It folds all samples between two keyframes into one **relative-motion bundle**: the relative orientation change $`\Delta R`$, plus the velocity and position terms $`\Delta v`$ and $`\Delta p`$ built from the IMU readings alone. The start velocity and gravity are not stored in the bundle; the residual adds them back. This solves **A**.
+- While integrating, it tracks **bias-sensitivity Jacobians**, so the bundle can be corrected for a bias change with a few small matrix-vector multiplies (one per Jacobian) instead of a re-integration, which solves **B**.
 
 ![Two panels from imu_preintegration.py's defaults: 100 IMU samples between keyframes i and j integrated once into a single preintegrated factor between x_i and x_j with its rotation, velocity and position change, and a bar chart contrasting re-integrating all 100 samples after a bias update with one first-order Jacobian correction that lands within 2.3e-6 m of it](../../assets/imu_preintegration_concept.png)
 
@@ -138,7 +138,7 @@ After the bundle has absorbed, say, 100 raw samples, the optimizer updates the b
 ```
 
 - **Asymmetry:** $\Delta v'$ and $\Delta p'$ are corrected by plain addition because velocity and position are ordinary vectors. $\Delta R'$ goes back through $\text{Exp}(\cdot)$ and is *composed* onto $\Delta R$, because rotations don't add ([jacobian.md §11.1](../foundations/jacobian.md#111-why-plain-addition-breaks)).
-- **Cost:** one matrix-vector multiply per bias component, independent of how many samples fed the bundle: $O(1)$ instead of $O(N)$.
+- **Cost:** five small matrix-vector multiplies (one per Jacobian: $`J_{R,b_g}`$, $`J_{v,b_g}`$, $`J_{v,b_a}`$, $`J_{p,b_g}`$, $`J_{p,b_a}`$), independent of how many samples fed the bundle: $O(1)$ instead of $O(N)$.
 - **Caveat on the script's claim:** it prints "took less than 1 microsecond to solve, completely bypassing the need to loop through the 100 raw sensor inputs again." That is a hard-coded string, not a measurement; the script never times anything.
 
 ---
@@ -254,7 +254,7 @@ The $10^{-4} I$ damping is required, not cosmetic:
 
 ## 8. One-sentence summary
 
-> **Preintegration turns "re-run 100+ raw IMU samples every time the bias estimate changes" into "one matrix-vector multiply," by tracking, while integrating, the first-order sensitivity of the compressed relative-motion bundle to the bias, using the same right-Jacobian machinery ([jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space)) that converts a tangent-space nudge into a body-frame rotation.**
+> **Preintegration turns "re-run 100+ raw IMU samples every time the bias estimate changes" into "a few small matrix-vector multiplies," by tracking, while integrating, the first-order sensitivity of the compressed relative-motion bundle to the bias, using the same right-Jacobian machinery ([jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space)) that converts a tangent-space nudge into a body-frame rotation.**
 
 ---
 
