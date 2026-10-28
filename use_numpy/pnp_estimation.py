@@ -23,7 +23,7 @@ positive-depth check.
 refine_pose_gn then runs ordinary Gauss-Newton on the true reprojection
 residual, updating the pose via a right-multiplicative SE(3) correction
 (T <- T @ se3_exp(delta)) -- the same style of pose-only GN loop used
-elsewhere in this codebase (e.g. robot_imu_simulation.py's single-pose
+elsewhere in this codebase (e.g. imu_propagation_position_fix.py's single-pose
 correction), just with a reprojection residual instead of a point-cloud one.
 
 Poses are represented as (4,4) numpy homogeneous transforms (camera-to-world,

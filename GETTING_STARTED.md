@@ -26,7 +26,7 @@ After all nine phases (and, optionally, [Track L](#track-l---hybrid-and-bio-insp
 
 **Read:** [`docs/optimization/nonlinear_least_square.md`](docs/optimization/nonlinear_least_square.md), [`docs/optimization/gauss_newton.md`](docs/optimization/gauss_newton.md).
 
-**Run:** [README.md §2](README.md#2-imu-propagation--gauss-newton-position-correction) - [`use_numpy/robot_imu_simulation.py`](use_numpy/robot_imu_simulation.py) - IMU propagation plus a periodic Gauss-Newton correction against a GPS-like fix. A first look at "linearize, solve, retract" in a simple setting.
+**Run:** [README.md §2](README.md#2-imu-propagation--gauss-newton-position-correction) - [`use_numpy/imu_propagation_position_fix.py`](use_numpy/imu_propagation_position_fix.py) - IMU propagation plus a periodic Gauss-Newton correction against a GPS-like fix. A first look at "linearize, solve, retract" in a simple setting.
 
 ## Phase 3 - Compress measurements: preintegration
 

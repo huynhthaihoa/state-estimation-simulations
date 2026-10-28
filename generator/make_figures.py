@@ -126,9 +126,9 @@ def fig_pose_tracking():
            "one run, seed 0, script defaults", bottom=0.14)
 
 
-def fig_robot_imu_tracking():
-    """robot_imu_simulation.py: 100 Hz IMU dead reckoning + 1 Hz position-only Gauss-Newton fix."""
-    from state_estimation_simulations.use_numpy import robot_imu_simulation as m
+def fig_imu_propagation_position_fix():
+    """imu_propagation_position_fix.py: 100 Hz IMU dead reckoning + 1 Hz position-only Gauss-Newton fix."""
+    from state_estimation_simulations.use_numpy import imu_propagation_position_fix as m
 
     seconds, pos_std = 10, 0.05
     args = (0.01, None, 4, 1e-6, 10, 1.0, 0.5, pos_std, np.eye(3) / pos_std ** 2)
@@ -169,7 +169,7 @@ def fig_robot_imu_tracking():
     ax_r.set(title="Orientation error: never corrected", xlabel="time (s)", ylabel="rotation error (deg)")
     ax_r.text(0.03, 0.95, "position-only fix: Jacobian [R | 0],\nso the rotation block gets no correction",
               transform=ax_r.transAxes, va="top", fontsize=9, color="#555555")
-    finish(fig, "robot_imu_tracking", "IMU dead reckoning + GPS-style position fix",
+    finish(fig, "imu_propagation_position_fix", "IMU dead reckoning + GPS-style position fix",
            f"100 Hz noisy body twist on SE(3), 1 Hz position-only measurement; seed 0, --total-seconds {seconds} "
            "(default 3), other settings default")
 
@@ -1512,9 +1512,9 @@ def fig_imu_preintegration_concept():
            f"turn rate {w_cmd[2]} rad/s, then the script's default bias update")
 
 
-def fig_robot_imu_tracking_concept():
-    """robot_imu_simulation.py: the 1 Hz fix reads position only, so its Jacobian cannot touch orientation."""
-    from state_estimation_simulations.use_numpy import robot_imu_simulation as m
+def fig_imu_propagation_position_fix_concept():
+    """imu_propagation_position_fix.py: the 1 Hz fix reads position only, so its Jacobian cannot touch orientation."""
+    from state_estimation_simulations.use_numpy import imu_propagation_position_fix as m
 
     seconds, pos_std = 10, 0.05
     T_true, T_est, pre, post = quiet(m.run_simulation, 0.01, seconds, 4, 1e-6, 10, 1.0, 0.5, pos_std,
@@ -1551,8 +1551,8 @@ def fig_robot_imu_tracking_concept():
     ax_j.set_title("(b) ∂p/∂ξ = [R | 0] at the final estimate")
     ax_j.set_xlabel("R_est (rotation of the estimate)          exactly 0: a GN step can never reach ω", fontsize=9.5)
 
-    finish(fig, "robot_imu_tracking_concept", "Why a position-only fix cannot correct orientation",
-           f"robot_imu_simulation.py: Jacobian from position_observation_jacobian at the final pose of a {seconds} s "
+    finish(fig, "imu_propagation_position_fix_concept", "Why a position-only fix cannot correct orientation",
+           f"imu_propagation_position_fix.py: Jacobian from position_observation_jacobian at the final pose of a {seconds} s "
            "run (seed 0, other settings default); ξ = [v, ω], right perturbation T·Exp(ξ)")
 
 
@@ -2727,7 +2727,7 @@ def fig_robust_kernel_weights():
 
 FIGURES = {
     "pose_tracking": fig_pose_tracking,
-    "robot_imu_tracking": fig_robot_imu_tracking,
+    "imu_propagation_position_fix": fig_imu_propagation_position_fix,
     "imu_preintegration": fig_imu_preintegration,
     "pose_graph": fig_pose_graph,
     "bundle_adjustment": fig_bundle_adjustment,
@@ -2749,7 +2749,7 @@ FIGURES = {
     "inchworm_zupt_ekf_concept": fig_inchworm_zupt_ekf_concept,
     "saltation_matrix_ekf_concept": fig_saltation_matrix_ekf_concept,
     "imu_preintegration_concept": fig_imu_preintegration_concept,
-    "robot_imu_tracking_concept": fig_robot_imu_tracking_concept,
+    "imu_propagation_position_fix_concept": fig_imu_propagation_position_fix_concept,
     "pose_tracking_concept": fig_pose_tracking_concept,
     "ekf_linearization_concept": fig_ekf_linearization_concept,
     "pose_tracking_dt_sweep": fig_pose_tracking_dt_sweep,

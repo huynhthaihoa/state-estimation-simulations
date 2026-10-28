@@ -4,7 +4,7 @@ several timesteps against a genuinely noisy, position-only "Global Position
 Measurement" (GPS-style: it reads translation, never orientation) fused with an
 imperfect IMU's dead-reckoned twist propagation.
 
-Same simulation as robot_imu_simulation.py, but the SE(3) manifold math (Exp/Log
+Same simulation as imu_propagation_position_fix.py, but the SE(3) manifold math (Exp/Log
 maps, right-plus) is delegated to the manif library
 (https://github.com/artivis/manif) instead of hand-rolled numpy formulas.
 

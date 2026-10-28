@@ -162,24 +162,24 @@ A full visual-inertial odometry (VIO) back-end (GTSAM's `CombinedImuFactor`, ORB
 | Script | Input | State propagated | Bias Jacobians | Correction | Default result |
 | --- | --- | --- | --- | --- | --- |
 | `imu_preintegration.py` | accelerometer reading + gyroscope rate (+ bias) | $\Delta R, \Delta v, \Delta p$ | yes, five | $O(1)$ first-order correction after a bias change | 100 samples into 1 bundle; corrected $\Delta p$ within 2.3e-6 m of re-integration |
-| `robot_imu_simulation.py` | 6-D body twist (no accelerometer) | $SE(3)$ pose by chained `se3_exp` | none | 1 Hz damped Gauss-Newton on a GPS-like position fix | 2 Gauss-Newton iterations per second; orientation never corrected |
+| `imu_propagation_position_fix.py` | 6-D body twist (no accelerometer) | $SE(3)$ pose by chained `se3_exp` | none | 1 Hz damped Gauss-Newton on a GPS-like position fix | 2 Gauss-Newton iterations per second; orientation never corrected |
 | `imu_integration_comparison.py` | noisy gyroscope rate + body velocity | naive Euler-angle vs $SO(3)$ Exp-map | none | none | about 70.8° (naive) vs about 0.47° (Exp-map) rotation error after 20 s |
 
 - **`imu_preintegration.py`** (both [`use_numpy/`](../../use_numpy/imu_preintegration.py) and [`use_manif/`](../../use_manif/imu_preintegration.py)) implements §3-§5: compress raw samples into a bundle, track the bias Jacobians, apply the $O(1)$ correction. The two versions are line-for-line equivalent (`use_manif`'s docstring spells out the correspondence: its `rplus()` returns the same `dR`/right-Jacobian pair the numpy version computes by hand). **Neither builds the graph residual of §6**; both stop at compression plus correction.
-- **`robot_imu_simulation.py`** is related but different: it [dead-reckons](factor_graph.md#2-why-do-we-need-it) noisy body-twist readings directly on $SE(3)$ (see [SO(3) and SE(3)](../glossary.md#so3-and-se3)) every micro-step, with no bundle and no bias Jacobians. Its "IMU" reports a 6-D velocity twist, so there is no accelerometer, no bias and no gravity. Every second it runs a small damped [Gauss-Newton](gauss_newton.md) correction against a separate GPS-like position fix. It is about *twist dead reckoning + periodic on-manifold correction*, not preintegration.
+- **`imu_propagation_position_fix.py`** is related but different: it [dead-reckons](factor_graph.md#2-why-do-we-need-it) noisy body-twist readings directly on $SE(3)$ (see [SO(3) and SE(3)](../glossary.md#so3-and-se3)) every micro-step, with no bundle and no bias Jacobians. Its "IMU" reports a 6-D velocity twist, so there is no accelerometer, no bias and no gravity. Every second it runs a small damped [Gauss-Newton](gauss_newton.md) correction against a separate GPS-like position fix. It is about *twist dead reckoning + periodic on-manifold correction*, not preintegration.
 - **`imu_integration_comparison.py`** is also related but different. Like [pointcloud_pose_tracking_empirical_note.md](../filtering/pointcloud_pose_tracking_empirical_note.md), it is an empirical comparison note, not a concept explainer: it plots naive Euler-angle (vector-space) integration against proper $SO(3)$ Exp-map integration. The Exp-map estimate still drifts from gyroscope noise, just far less. In `use_numpy`, each method is scored against its own noise-free ground truth (§7.1); the `use_manif` twin scores both against one shared SE(3) truth and ends at 70.4°. No bias correction is involved.
 
 ![Two panels from imu_preintegration.py: the preintegrated position change built up sample by sample from keyframe i to keyframe j, and a log-scale bar chart comparing how much a bias update changes each preintegrated quantity with the error of the first-order Jacobian correction against a full re-integration](../../assets/imu_preintegration.png)
 
 *Figure: `use_numpy/imu_preintegration.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py imu_preintegration`.*
 
-![Two panels from robot_imu_simulation.py: one second of the timeline, with 100 IMU dead-reckoning steps followed by one position-only Gauss-Newton fix, and the 3-by-6 position Jacobian at the final estimate, whose rotation block equals R and whose three angular columns are exactly zero](../../assets/robot_imu_tracking_concept.png)
+![Two panels from imu_propagation_position_fix.py: one second of the timeline, with 100 IMU dead-reckoning steps followed by one position-only Gauss-Newton fix, and the 3-by-6 position Jacobian at the final estimate, whose rotation block equals R and whose three angular columns are exactly zero](../../assets/imu_propagation_position_fix_concept.png)
 
-*Figure: why the 1 Hz fix in `use_numpy/robot_imu_simulation.py` never corrects orientation (Jacobian from `position_observation_jacobian` at the end of a 10 s run, seed 0), plotted by `uv run python generator/make_figures.py robot_imu_tracking_concept`.*
+*Figure: why the 1 Hz fix in `use_numpy/imu_propagation_position_fix.py` never corrects orientation (Jacobian from `position_observation_jacobian` at the end of a 10 s run, seed 0), plotted by `uv run python generator/make_figures.py imu_propagation_position_fix_concept`.*
 
-![Two panels from robot_imu_simulation.py run for 10 s: position error just before and just after each 1 Hz position fix, and orientation error growing throughout because a position-only fix cannot correct rotation](../../assets/robot_imu_tracking.png)
+![Two panels from imu_propagation_position_fix.py run for 10 s: position error just before and just after each 1 Hz position fix, and orientation error growing throughout because a position-only fix cannot correct rotation](../../assets/imu_propagation_position_fix.png)
 
-*Figure: `use_numpy/robot_imu_simulation.py` at its defaults except a 10 s run (seed 0), plotted by `uv run python generator/make_figures.py robot_imu_tracking`.*
+*Figure: `use_numpy/imu_propagation_position_fix.py` at its defaults except a 10 s run (seed 0), plotted by `uv run python generator/make_figures.py imu_propagation_position_fix`.*
 
 ![Two log-scale panels from imu_integration_comparison.py: rotation error and position error over 20 s for naive Euler-angle integration versus the SO(3) exponential-map update, both fed the same noisy IMU samples](../../assets/imu_integration_comparison.png)
 
@@ -217,7 +217,7 @@ In both, the position step uses the rotation *after* this step's update. That is
 e_R = \arccos\!\left(\frac{\mathrm{tr}(R_{gt}^\top R_{est}) - 1}{2}\right),\qquad e_p = \lVert p_{gt} - p_{est}\rVert
 ```
 
-**`robot_imu_simulation.py`, propagation** (`run_simulation`). The true twist $\xi = [v, \omega]$ (translation first) is drawn once, uniformly per axis from $\pm 1.0$ m/s and $\pm 0.5$ rad/s. Each IMU step ($dt = 0.01$ s, 100 steps per second):
+**`imu_propagation_position_fix.py`, propagation** (`run_simulation`). The true twist $\xi = [v, \omega]$ (translation first) is drawn once, uniformly per axis from $\pm 1.0$ m/s and $\pm 0.5$ rad/s. Each IMU step ($dt = 0.01$ s, 100 steps per second):
 
 ```math
 T_{true} \leftarrow T_{true}\,\text{Exp}(\xi\,dt), \qquad T_{est} \leftarrow T_{est}\,\text{Exp}\big((\xi + n)\,dt\big),\quad n \sim \mathcal{N}(0, 0.02^2 I_6)

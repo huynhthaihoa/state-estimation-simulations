@@ -233,7 +233,7 @@ The bottom row is the solve strategy. GN/LM is the step rule, a separate axis: i
 
 | Topic | Key idea | Doc | Script |
 |---|---|---|---|
-| Gauss-Newton | Linearize, solve the normal equations, repeat | [gauss_newton.md §4](optimization/gauss_newton.md#4-the-optimization-problem), [§8](optimization/gauss_newton.md#8-why-is-this-everywhere-in-slam) | `bundle_adjustment.py`, `pnp_estimation.py`, `robot_imu_simulation.py`, `pointcloud_pose_tracking.py` (batch GN), `pose_graph_incremental.py` (plain GN between relinearizations), `sliding_window_marginalization.py`, `lidar_primitives.py` (registration) |
+| Gauss-Newton | Linearize, solve the normal equations, repeat | [gauss_newton.md §4](optimization/gauss_newton.md#4-the-optimization-problem), [§8](optimization/gauss_newton.md#8-why-is-this-everywhere-in-slam) | `bundle_adjustment.py`, `pnp_estimation.py`, `imu_propagation_position_fix.py`, `pointcloud_pose_tracking.py` (batch GN), `pose_graph_incremental.py` (plain GN between relinearizations), `sliding_window_marginalization.py`, `lidar_primitives.py` (registration) |
 | Levenberg-Marquardt | GN with damping, so a bad linear model can't throw the step; still local | [levenberg_marquardt.md §4](optimization/levenberg_marquardt.md#4-the-damping-idea), [§6](optimization/levenberg_marquardt.md#6-how-does-lm-decide-whether-to-be-cautious) | `pose_graph.py`, `bundle_adjustment_advanced.py`, `lidar_primitives.py` (experiment 4) |
 | Sparse Cholesky | Exploit sparsity; elimination creates new nonzeros ([fill-in](glossary.md#fill-in)), and the elimination [order](glossary.md#variable-ordering) decides how many | [sparse_cholesky_factorization.md §3](optimization/sparse_cholesky_factorization.md#3-the-surprising-part-fill-in), [§5](optimization/sparse_cholesky_factorization.md#5-ordering-becomes-extremely-important), [§7](optimization/sparse_cholesky_factorization.md#7-factor-graph--hessian--sparse-cholesky) | - |
 | Schur complement (BA) | Eliminate landmarks, solve a camera-only system | [bundle_adjustment.md §12](optimization/bundle_adjustment.md#12-block-sparsity-and-the-schur-complement) | - |
@@ -332,7 +332,7 @@ Accuracy and covariance calibration are separate properties, and NEES measures t
 | Script | Layer | Branch/topic | Main doc |
 |---|---|---|---|
 | `imu_integration_comparison.py` | Foundations | Euler-angle vs. $SO(3)$ exp-map integration | [imu_preintegration.md §7](optimization/imu_preintegration.md#7-what-the-accompanying-scripts-actually-do-and-dont) |
-| `robot_imu_simulation.py` | Back-end (toy) | Twist dead reckoning + 1 Hz GN position fix (no accel/bias) | [imu_preintegration.md §7](optimization/imu_preintegration.md#7-what-the-accompanying-scripts-actually-do-and-dont) |
+| `imu_propagation_position_fix.py` | Back-end (toy) | Twist dead reckoning + 1 Hz GN position fix (no accel/bias) | [imu_preintegration.md §7](optimization/imu_preintegration.md#7-what-the-accompanying-scripts-actually-do-and-dont) |
 | `imu_preintegration.py` | Front-end → back-end | Bundle + bias Jacobians + $O(1)$ correction (no graph factor) | [imu_preintegration.md](optimization/imu_preintegration.md) |
 | `pnp_estimation.py` | Front-end | Pose from known 3D points | [triangulation_pnp.md §3](frontend/triangulation_pnp.md#3-pnp-as-the-inverse-problem) |
 | `pointcloud_pose_tracking.py` | Back-end, both branches | EKF/IEKF/UKF/vanilla KF vs. batch GN | [pointcloud_pose_tracking_empirical_note.md](filtering/pointcloud_pose_tracking_empirical_note.md) |
@@ -357,7 +357,7 @@ Accuracy and covariance calibration are separate properties, and NEES measures t
 
 `lie_utils.py` and `numpy_utils.py` (in `use_numpy/`), `manif_utils.py` (in `use_manif/`), and `utils.py` and `lidar_utils.py` (at the repo root) are shared helpers, not stops on the map; see [README.md §C](../README.md#c-library-structure).
 
-Not on the map: the nine `*_v2.py` files are class-based rewrites of `pointcloud_pose_tracking`, `saltation_matrix_ekf`, the four `inchworm_*` scripts, `friction_anisotropic_ekf`, `invariant_saltation_ekf` and `hexapod_gait_ekf`; the fourteen `animate_*.py` scripts in [generator/](../generator/) render the GIF embedded in the matching doc (see [README.md §C](../README.md#c-library-structure)). All `Script` names above exist in `use_numpy/`; ten also have a `use_manif/` twin (`imu_integration_comparison`, `robot_imu_simulation`, `imu_preintegration`, `pointcloud_pose_tracking`, `invariant_saltation_ekf`, `pose_graph`, `bundle_adjustment`, `bundle_adjustment_advanced`, `pose_graph_incremental`, `lidar_primitives`), the rest are NumPy-only.
+Not on the map: the nine `*_v2.py` files are class-based rewrites of `pointcloud_pose_tracking`, `saltation_matrix_ekf`, the four `inchworm_*` scripts, `friction_anisotropic_ekf`, `invariant_saltation_ekf` and `hexapod_gait_ekf`; the fourteen `animate_*.py` scripts in [generator/](../generator/) render the GIF embedded in the matching doc (see [README.md §C](../README.md#c-library-structure)). All `Script` names above exist in `use_numpy/`; ten also have a `use_manif/` twin (`imu_integration_comparison`, `imu_propagation_position_fix`, `imu_preintegration`, `pointcloud_pose_tracking`, `invariant_saltation_ekf`, `pose_graph`, `bundle_adjustment`, `bundle_adjustment_advanced`, `pose_graph_incremental`, `lidar_primitives`), the rest are NumPy-only.
 
 ---
 

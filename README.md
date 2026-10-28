@@ -61,10 +61,10 @@ printers. `docs/frontend/lidar_primitives.md`.
 
 ### [use_numpy/](use_numpy/) - Plain numpy, hand-rolled Lie-group math
 
-- [lie_utils.py](use_numpy/lie_utils.py): shared module of the hand-rolled Lie-group helpers (`skew`, `rotation_geodesic_error`, `so3_exp`, `so3_right_jacobian`, `se3_exp`, `se3_log`, `se3_inv`, `se3_adjoint`, `se3_ad`, `compute_so3_inv_right_jacobian`, `compute_se3_inv_right_jacobian`, `se3_right_jacobian`; plus `so3_log`, `so3_left_jacobian` the $`SE_2(3)`$ helpers `se23_make`, `se23_parts`, `se23_inv`, `se23_exp`, `se23_log`, `se23_adjoint`, and their $`SE_K(3)`$ generalization (any number of columns) `sek3_make`, `sek3_parts`, `sek3_inv`, `sek3_exp`, `sek3_log`, `sek3_adjoint`; also grouped under short names as static methods of `SO3`/`SE3`/`SE23`/`SEK3`, e.g. `SE3.exp`, `SE3.log`, `SO3.inv_right_jacobian`, `SE23.exp`, `SEK3.adjoint`; these are plain functions on arrays, not an object API like manif's). Imported by 13 of the 23 simulation scripts in this directory (`imu_integration_comparison.py`, `robot_imu_simulation.py`, `imu_preintegration.py`, `pointcloud_pose_tracking.py`, `pose_graph.py`, `pose_graph_incremental.py`, `bundle_adjustment.py`, `bundle_adjustment_advanced.py`, `pnp_estimation.py`, `sliding_window_marginalization.py`, `invariant_saltation_ekf.py`, `hexapod_contact_inekf.py`, and `lidar_primitives.py`); none keeps its own inline copy of the skew/Jacobian helpers. The remaining 10 (`bayes_tree_construction.py`, `friction_anisotropic_ekf.py`, `hexapod_gait_ekf.py`, `gait_phase_ekf.py`, `inchworm_zupt_ekf.py`, `inchworm_zupt_zaru_ekf.py`, `inchworm_slip_gate_ekf.py`, `inchworm_two_pad_ekf.py`, `inchworm_two_pad_fusion_ekf.py`, `saltation_matrix_ekf.py`) don't need Lie-group math for what they do. (These counts exclude the `*_v2.py` scripts below and the generators in [generator/](generator/); `pointcloud_pose_tracking_v2.py`, `invariant_saltation_ekf_v2.py` and `generator/animate_bundle_adjustment.py` import `lie_utils.py` too.)
+- [lie_utils.py](use_numpy/lie_utils.py): shared module of the hand-rolled Lie-group helpers (`skew`, `rotation_geodesic_error`, `so3_exp`, `so3_right_jacobian`, `se3_exp`, `se3_log`, `se3_inv`, `se3_adjoint`, `se3_ad`, `compute_so3_inv_right_jacobian`, `compute_se3_inv_right_jacobian`, `se3_right_jacobian`; plus `so3_log`, `so3_left_jacobian` the $`SE_2(3)`$ helpers `se23_make`, `se23_parts`, `se23_inv`, `se23_exp`, `se23_log`, `se23_adjoint`, and their $`SE_K(3)`$ generalization (any number of columns) `sek3_make`, `sek3_parts`, `sek3_inv`, `sek3_exp`, `sek3_log`, `sek3_adjoint`; also grouped under short names as static methods of `SO3`/`SE3`/`SE23`/`SEK3`, e.g. `SE3.exp`, `SE3.log`, `SO3.inv_right_jacobian`, `SE23.exp`, `SEK3.adjoint`; these are plain functions on arrays, not an object API like manif's). Imported by 13 of the 23 simulation scripts in this directory (`imu_integration_comparison.py`, `imu_propagation_position_fix.py`, `imu_preintegration.py`, `pointcloud_pose_tracking.py`, `pose_graph.py`, `pose_graph_incremental.py`, `bundle_adjustment.py`, `bundle_adjustment_advanced.py`, `pnp_estimation.py`, `sliding_window_marginalization.py`, `invariant_saltation_ekf.py`, `hexapod_contact_inekf.py`, and `lidar_primitives.py`); none keeps its own inline copy of the skew/Jacobian helpers. The remaining 10 (`bayes_tree_construction.py`, `friction_anisotropic_ekf.py`, `hexapod_gait_ekf.py`, `gait_phase_ekf.py`, `inchworm_zupt_ekf.py`, `inchworm_zupt_zaru_ekf.py`, `inchworm_slip_gate_ekf.py`, `inchworm_two_pad_ekf.py`, `inchworm_two_pad_fusion_ekf.py`, `saltation_matrix_ekf.py`) don't need Lie-group math for what they do. (These counts exclude the `*_v2.py` scripts below and the generators in [generator/](generator/); `pointcloud_pose_tracking_v2.py`, `invariant_saltation_ekf_v2.py` and `generator/animate_bundle_adjustment.py` import `lie_utils.py` too.)
 - [numpy_utils.py](use_numpy/numpy_utils.py): shared `camera_project` (pinhole reprojection with pose/point Jacobians) and `pose_errors` (per-pose rotation and position errors), built on `lie_utils.py`. Imported by `bundle_adjustment.py`, `bundle_adjustment_advanced.py`, `pnp_estimation.py`, `pointcloud_pose_tracking.py` (+ `_v2`) and `pose_graph.py`.
 - [imu_integration_comparison.py](use_numpy/imu_integration_comparison.py): naive Euler-angle vs. $SO(3)$ exp-map orientation integration.
-- [robot_imu_simulation.py](use_numpy/robot_imu_simulation.py): high-rate IMU propagation + a low-rate Gauss-Newton position-only correction against a noisy GPS-style fix (the correction's Jacobian has a structurally zero angular block, so the correction never changes orientation; only the IMU [dead-reckons](docs/optimization/factor_graph.md#2-why-do-we-need-it) it), reusing `lie_utils.py`'s $SE(3)$ $Exp$ math.
+- [imu_propagation_position_fix.py](use_numpy/imu_propagation_position_fix.py): high-rate IMU propagation + a low-rate Gauss-Newton position-only correction against a noisy GPS-style fix (the correction's Jacobian has a structurally zero angular block, so the correction never changes orientation; only the IMU [dead-reckons](docs/optimization/factor_graph.md#2-why-do-we-need-it) it), reusing `lie_utils.py`'s $SE(3)$ $Exp$ math.
 - [imu_preintegration.py](use_numpy/imu_preintegration.py): IMU preintegration: compresses a burst of high-frequency IMU samples into one relative measurement plus first-order bias Jacobians. When the bias estimate changes, a Taylor-expansion correction updates it instantly, without re-integrating.
 - [pointcloud_pose_tracking.py](use_numpy/pointcloud_pose_tracking.py): tracks a rigid object's pose by fusing a motion-model prior (noisy control inputs) with noisy point-cloud measurements of its known geometry. Compares:
   - a recursive **EKF**;
@@ -113,7 +113,7 @@ The other 13 scripts are NumPy-only:
 
 - [manif_utils.py](use_manif/manif_utils.py): manif versions of `camera_project` and `pose_errors`, shared by `bundle_adjustment.py`, `bundle_adjustment_advanced.py`, `pointcloud_pose_tracking.py` and `pose_graph.py`.
 - [imu_integration_comparison.py](use_manif/imu_integration_comparison.py)
-- [robot_imu_simulation.py](use_manif/robot_imu_simulation.py)
+- [imu_propagation_position_fix.py](use_manif/imu_propagation_position_fix.py)
 - [imu_preintegration.py](use_manif/imu_preintegration.py): same bias-Jacobian preintegration bundle, with the $SO(3)$ $Exp$ map/right Jacobian/skew(hat) math delegated to manif's `rplus` Jacobian out-parameters and `SO3Tangent.hat()` instead of hand-rolled formulas.
 - [pointcloud_pose_tracking.py](use_manif/pointcloud_pose_tracking.py): same six solvers (dead reckoning, EKF, invariant EKF, batch Gauss-Newton, UKF, vanilla KF) as the `use_numpy` version, with `motion_model`/`observation_model` built on `manifpy`'s `rplus`/`rminus`/`act` Jacobian out-parameters instead of `lie_utils.py` (the UKF itself uses only the bare `rplus`/`rminus` group operations, no Jacobian out-parameters). The vanilla KF's ambient-state recursion works directly on `T.rotation()`/`T.translation()` numpy arrays instead - it only touches manif for `SO3Tangent(.).hat()` and reconstructs the final pose via `scipy.spatial.transform.Rotation.from_matrix(...).as_quat()`, since manif's `SE3`/`SO3` expose no rotation-matrix constructor.
 - [pose_graph.py](use_manif/pose_graph.py)
@@ -245,19 +245,19 @@ uv run python use_numpy/imu_integration_comparison.py --duration 20.0 --dt 0.005
 
 **Details:** [imu_preintegration.md §7.1](docs/optimization/imu_preintegration.md#71-the-comparison-and-correction-math-concretely)
 
-![Two panels from robot_imu_simulation.py run for 10 s: position error just before and just after each 1 Hz position fix, and orientation error growing throughout because a position-only fix cannot correct rotation](assets/robot_imu_tracking.png)
+![Two panels from imu_propagation_position_fix.py run for 10 s: position error just before and just after each 1 Hz position fix, and orientation error growing throughout because a position-only fix cannot correct rotation](assets/imu_propagation_position_fix.png)
 
 Figure made by `generator/make_figures.py` (a 10 s run; the default is 3 s); the script itself only prints.
 
 **Scripts:**
 
-- [use_numpy/robot_imu_simulation.py](use_numpy/robot_imu_simulation.py)
-- [use_manif/robot_imu_simulation.py](use_manif/robot_imu_simulation.py)
+- [use_numpy/imu_propagation_position_fix.py](use_numpy/imu_propagation_position_fix.py)
+- [use_manif/imu_propagation_position_fix.py](use_manif/imu_propagation_position_fix.py)
 
 **Run:**
 
 ```
-uv run python use_numpy/robot_imu_simulation.py --dt-imu 0.01 --total-seconds 3 --snapshots-per-second 4 --gn-tol 1e-6 --gn-max-iters 10 --max-linear-vel 1.0 --max-angular-vel 0.5 --pos-noise-std 0.05 --seed 0
+uv run python use_numpy/imu_propagation_position_fix.py --dt-imu 0.01 --total-seconds 3 --snapshots-per-second 4 --gn-tol 1e-6 --gn-max-iters 10 --max-linear-vel 1.0 --max-angular-vel 0.5 --pos-noise-std 0.05 --seed 0
 ```
 
 <details>
