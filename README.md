@@ -170,32 +170,61 @@ On a machine with little memory, run one test file per process instead:
 for f in $(find tests -name 'test_*.py' | sort); do uv run pytest -q "$f"; done
 ```
 
-## E. Library guideline
+## E. Simulations
 
-### 1. Naive vs. exp-map IMU integration
+21 simulations in five groups. Each entry says what the simulation does, lists its scripts, and gives a command that runs it at its defaults; the full flag list is folded under **All flags**.
 
-#### Purpose
+| Group | # | Simulation | What it shows | `use_manif/` twin | Doc |
+|---|---|---|---|---|---|
+| **IMU and manifolds** | 1 | [Naive vs. exp-map IMU integration](#1-naive-vs-exp-map-imu-integration) | The same noisy IMU stream integrated as flat Euler angles and on $SO(3)$: the flat update drifts | yes | [imu_preintegration.md](docs/optimization/imu_preintegration.md) |
+|  | 2 | [IMU + Gauss-Newton position fix](#2-imu-propagation--gauss-newton-position-correction) | IMU dead reckoning corrected each second by Gauss-Newton against a position fix; orientation stays uncorrected | yes | [imu_preintegration.md](docs/optimization/imu_preintegration.md) |
+|  | 3 | [IMU preintegration](#3-imu-preintegration-with-bias-jacobians) | One second of IMU samples compressed into one bundle; a bias update applied by a first-order correction instead of re-integration | yes | [imu_preintegration.md](docs/optimization/imu_preintegration.md) |
+| **Kalman filtering** | 4 | [Point-cloud pose tracking](#4-point-cloud-pose-tracking-ekf-vs-invariant-ekf-vs-batch-gauss-newton-vs-ukf-vs-vanilla-kf) | EKF, invariant EKF, UKF, vanilla KF and batch Gauss-Newton on the same $`SE(3)`$ tracking problem | yes | [pointcloud_pose_tracking_empirical_note.md](docs/filtering/pointcloud_pose_tracking_empirical_note.md) |
+| **Front-end** | 5 | [Perspective-n-Point (PnP)](#5-perspective-n-point-pnp-recovering-a-camera-pose-from-known-3d-2d-correspondences) | A camera pose from known 3D-2D correspondences: closed form, then Gauss-Newton |  | [triangulation_pnp.md](docs/frontend/triangulation_pnp.md) |
+|  | 6 | [LiDAR primitives](#6-lidar-primitives-planes-and-cylinders-for-scan-registration) | Point-to-point vs. point-to-plane ICP against fitted planes and cylinders, and a corridor's degeneracy | yes | [lidar_primitives.md](docs/frontend/lidar_primitives.md) |
+| **Factor graphs and smoothing** | 7 | [3D pose graph](#7-3d-pose-graph-relaxation) | Odometry drift corrected by a loop closure, with gauge fixing | yes | [pose_graph_optimization.md](docs/optimization/pose_graph_optimization.md) |
+|  | 8 | [Bundle adjustment](#8-bundle-adjustment-joint-pose--landmark-refinement) | Landmarks-only and poses-only refinement vs. joint refinement | yes | [bundle_adjustment.md](docs/optimization/bundle_adjustment.md) |
+|  | 9 | [Local + Global bundle adjustment](#9-local--global-bundle-adjustment-bounded-windows-vs-whole-map-re-solves) | Bounded local windows plus periodic whole-map passes | yes | [bundle_adjustment.md](docs/optimization/bundle_adjustment.md) |
+|  | 10 | [Incremental vs. batch pose graph](#10-incremental-square-root-sam-vs-batch-pose-graph-solving) | Square-root SAM updates vs. re-solving the whole graph at every new node | yes | [isam_optimization.md](docs/optimization/isam_optimization.md) |
+|  | 11 | [Bayes tree affected region](#11-bayes-tree-construction-and-affected-region-query) | Which variables a new edge invalidates: a loop closure vs. an ordinary edge |  | [bayes_tree.md](docs/optimization/bayes_tree.md) |
+|  | 12 | [Sliding-window marginalization](#12-sliding-window-marginalization-bounded-memory-pose-graph-smoothing) | A bounded window kept by the Schur complement vs. an unbounded re-solve |  | [marginalization.md](docs/optimization/marginalization.md) |
+| **Non-smooth and legged motion** | 13 | [Saltation-matrix EKF](#13-saltation-matrix-ekf-tracking-a-point-mass-through-discrete-ground-contact-events) | Carrying a point mass's covariance through a bounce |  | [hybrid_saltation_ekf.md](docs/filtering/hybrid_saltation_ekf.md) |
+|  | 14 | [Invariant EKF through a bounce](#14-invariant-ekf-on-se_23-through-a-bounce) | The same bounce with a right-invariant EKF on $`SE_2(3)`$ | yes | [invariant_saltation_ekf.md](docs/filtering/invariant_saltation_ekf.md) |
+|  | 15 | [Inchworm ZUPT](#15-inchworm-zupt-exploiting-a-known-anchordwell-schedule) | Zero-velocity updates on a known anchor schedule: at the right ticks, always, or never |  | [inchworm_zupt_ekf.md](docs/filtering/inchworm_zupt_ekf.md) |
+|  | 16 | [Two-pad inchworm](#16-two-pad-inchworm-trusting-the-anchored-pad-without-a-position-fix) | No position fix: fusing the anchored pad's measured displacement keeps the estimate accurate through slips |  | [inchworm_two_pad_ekf.md](docs/filtering/inchworm_two_pad_ekf.md) |
+|  | 17 | [Two-pad inchworm, both sensors](#17-two-pad-inchworm-reading-both-pad-sensors) | Cross-checking the two pad sensors before fusing removes most sensor faults |  | [inchworm_two_pad_fusion_ekf.md](docs/filtering/inchworm_two_pad_fusion_ekf.md) |
+|  | 18 | [Friction-anisotropic process noise](#18-friction-anisotropic-process-noise-fixed-vs-heading-aware-q) | Fixed vs. heading-aware process noise for a pad that slips more sideways than forward |  | [friction_anisotropic_ekf.md](docs/filtering/friction_anisotropic_ekf.md) |
+|  | 19 | [Hexapod leg odometry](#19-hexapod-leg-odometry-what-the-gait-changes) | Stance feet as velocity sensors: what the gait changes, and a per-foot slip test |  | [hexapod_gait_ekf.md](docs/filtering/hexapod_gait_ekf.md) |
+|  | 20 | [Contact-aided invariant EKF](#20-contact-aided-invariant-ekf-on-a-hexapod-which-filter-knows-yaw-is-unobservable) | Stance feet in the state; only the invariant EKF keeps yaw unobservable |  | [hexapod_contact_inekf.md](docs/filtering/hexapod_contact_inekf.md) |
+|  | 21 | [Gait phase](#21-gait-phase-which-feet-are-on-the-ground-when-touchdowns-are-uncertain) | Which feet to read when touchdowns are late or detectors fire falsely |  | [gait_phase_ekf.md](docs/filtering/gait_phase_ekf.md) |
 
-Integrates the same noisy gyro + body-velocity stream two ways, to isolate the error that the flat vector-space approximation introduces on its own:
- 1. Attitude kept as a **flat Euler-angle vector** (`euler += omega*dt`)
- 2. Attitude kept on **$SO(3)$ and updated via the exponential map**
+### IMU and manifolds
 
-In the `use_numpy` version each method is scored against its own noise-free ground truth (the noise-free rates integrated with that method's own update rule), not a shared exp-map one; the `use_manif` version scores both against one shared $`SE(3)`$ truth. The two scoring choices change the naive error (~70°) by only ~0.36°. Plots rotation and position error (log scale) over time.
+#### 1. Naive vs. exp-map IMU integration
+
+**Purpose:** Integrates the same noisy gyro and body-velocity stream with a flat Euler-angle update and with the $`SO(3)`$ exponential map. Isolates the error caused by treating rotation as a flat vector.
+
+| Input | Output |
+|---|---|
+| Noisy gyro rates and body velocities from a known motion | Plots rotation and position error over time (log scale) for both methods |
+
+**Details:** [imu_preintegration.md §7](docs/optimization/imu_preintegration.md#7-what-the-accompanying-scripts-actually-do-and-dont)
 
 ![Two log-scale panels from imu_integration_comparison.py: rotation error and position error over 20 s for naive Euler-angle integration versus the SO(3) exponential-map update, both fed the same noisy IMU samples](assets/imu_integration_comparison.png)
 
-#### Scripts
+**Scripts:**
 
 - [use_numpy/imu_integration_comparison.py](use_numpy/imu_integration_comparison.py)
-
 - [use_manif/imu_integration_comparison.py](use_manif/imu_integration_comparison.py)
 
-
-#### Usage
+**Run:**
 
 ```
 uv run python use_numpy/imu_integration_comparison.py --duration 20.0 --dt 0.005 --gyro-noise-std 0.02 --vel-noise-std 0.05 --seed 0 --out out.png
 ```
+
+<details>
+<summary>All flags</summary>
 
 - `--duration`: simulation length in seconds (default `20.0`)
 - `--dt`: IMU sample interval in seconds (default `0.005`)
@@ -204,32 +233,35 @@ uv run python use_numpy/imu_integration_comparison.py --duration 20.0 --dt 0.005
 - `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
 
-### 2. IMU propagation + Gauss-Newton position correction
+</details>
 
-#### Purpose
+#### 2. IMU propagation + Gauss-Newton position correction
 
-Simulates a robot with a 100 Hz IMU (noisy body twist) and a 1 Hz noisy global position fix (e.g. GPS). Each second:
-- **Propagate:** the pose estimate goes through 100 noisy IMU micro-steps on $SE(3)$.
-- **Correct:** Gauss-Newton against the noisy position-only fix, until the step norm drops below `--gn-tol` or `--gn-max-iters` is hit.
-- **Why orientation is untouched:** the measurement's Jacobian wrt a right perturbation is $[R_{\text{est}} \mid 0]$, so the angular block is exactly zero and no weighting can make it correct orientation. Orientation is left to the IMU's dead reckoning between corrections.
+**Purpose:** Propagates a pose with a 100 Hz IMU and corrects it once per second with Gauss-Newton against a noisy position-only fix. Shows that such a fix cannot correct orientation.
 
-Prints pre/post correction error each second (no plot).
+| Input | Output |
+|---|---|
+| A robot with constant body twist; noisy 100 Hz IMU twist and noisy 1 Hz position fix | Prints position error before and after each correction (no plot) |
+
+**Details:** [imu_preintegration.md §7.1](docs/optimization/imu_preintegration.md#71-the-comparison-and-correction-math-concretely)
 
 ![Two panels from robot_imu_simulation.py run for 10 s: position error just before and just after each 1 Hz position fix, and orientation error growing throughout because a position-only fix cannot correct rotation](assets/robot_imu_tracking.png)
 
 Figure made by `generator/make_figures.py` (a 10 s run; the default is 3 s); the script itself only prints.
 
-#### Scripts
+**Scripts:**
 
 - [use_numpy/robot_imu_simulation.py](use_numpy/robot_imu_simulation.py)
-
 - [use_manif/robot_imu_simulation.py](use_manif/robot_imu_simulation.py)
 
-#### Usage
+**Run:**
 
 ```
 uv run python use_numpy/robot_imu_simulation.py --dt-imu 0.01 --total-seconds 3 --snapshots-per-second 4 --gn-tol 1e-6 --gn-max-iters 10 --max-linear-vel 1.0 --max-angular-vel 0.5 --pos-noise-std 0.05 --seed 0
 ```
+
+<details>
+<summary>All flags</summary>
 
 - `--dt-imu`: IMU update interval in seconds (default `0.01`, i.e. 100 Hz)
 - `--total-seconds`: total simulation duration in seconds (default `3`)
@@ -241,69 +273,80 @@ uv run python use_numpy/robot_imu_simulation.py --dt-imu 0.01 --total-seconds 3 
 - `--pos-noise-std`: per-axis std-dev (m) of the Global Position Measurement's Gaussian noise (default `0.05`)
 - `--seed`: RNG seed (default `0`)
 
-### 3. IMU preintegration with bias Jacobians
+</details>
 
-#### Purpose
+#### 3. IMU preintegration with bias Jacobians
 
-Streams 1 second of high-frequency IMU samples into a single `PreintegratedIMUBundle` (compressed relative rotation/velocity/position, plus their Jacobians wrt gyroscope/accelerometer bias). Then simulates a graph-SLAM-style bias update and applies it to the bundle via a first-order Taylor correction - instant, versus re-running the whole integration loop.
+**Purpose:** Compresses one second of IMU samples into a single preintegrated bundle with bias Jacobians. Then applies a bias update by a first-order correction instead of re-integrating.
 
-Prints the preintegrated position change before and after the bias correction (no plot).
+| Input | Output |
+|---|---|
+| Noise-free IMU samples offset by estimated biases, plus a second set of "optimized" biases | Prints the preintegrated position change before and after the correction (no plot) |
+
+**Details:** [imu_preintegration.md](docs/optimization/imu_preintegration.md)
 
 ![Two panels from imu_preintegration.py: the preintegrated position change built up sample by sample from keyframe i to keyframe j, and a log-scale bar chart comparing how much a bias update changes each preintegrated quantity with the error of the first-order Jacobian correction against a full re-integration](assets/imu_preintegration.png)
 
 Figure made by `generator/make_figures.py` at the script defaults; the script itself only prints.
 
-#### Scripts
+**Scripts:**
 
 - [use_numpy/imu_preintegration.py](use_numpy/imu_preintegration.py)
-
 - [use_manif/imu_preintegration.py](use_manif/imu_preintegration.py)
 
-#### Usage
+**Run:**
 
 ```
 uv run python use_numpy/imu_preintegration.py --frequency-hz 100 --gyro-bias 0.01 -0.01 0.02 --accel-bias 0.05 0.00 -0.05 --linear-vel 1.0 0.1 0.0 --angular-vel 0.0 0.0 0.5 --optimized-gyro-bias 0.008 -0.009 0.018 --optimized-accel-bias 0.045 0.002 -0.048
 ```
+
+<details>
+<summary>All flags</summary>
 
 - `--frequency-hz`: IMU sampling frequency integrated over 1 simulated second (default `100`)
 - `--gyro-bias`, `--accel-bias`: initial estimated sensor biases (default `0.01 -0.01 0.02` rad/s, `0.05 0.00 -0.05` $\text{m/s}^2$)
 - `--linear-vel`, `--angular-vel`: true commanded body-frame acceleration and angular rate (default `1.0 0.1 0.0` m/s², `0.0 0.0 0.5` rad/s). Despite its name, `--linear-vel` feeds the accelerometer channel and is integrated twice
 - `--optimized-gyro-bias`, `--optimized-accel-bias`: post-optimization corrected biases to apply via the Taylor correction
 
-### 4. Point-cloud pose tracking: EKF vs. invariant EKF vs. batch Gauss-Newton vs. UKF vs. vanilla KF
+</details>
 
-#### Purpose
+### Kalman filtering
 
-Tracks a rigid object's $SE(3)$ pose from a combination of a motion-model prior (noisy control-input twist) and noisy point-cloud measurements of the object's known body-frame geometry ($z_i = T\cdot p_i + \text{noise}$). Two shared, documented functions - `motion_model` and `observation_model`, both with analytical Jacobians (hand-rolled $SE(3)$ $Exp$/$`Log`$/adjoint math via `lie_utils.py` in the `use_numpy` version; `manifpy`'s `rplus`/`rminus`/`act` out-parameters in the `use_manif` version) - feed six solvers:
- 1. A **prior-only dead-reckoning baseline**
- 2. A recursive **EKF** (constant-size state, online)
- 3. A recursive **invariant EKF** (same predict step, but the update expresses the residual in the estimate's body frame, making the measurement Jacobian state-independent instead of relinearized around the current rotation every step; for this problem's [isotropic](docs/glossary.md#isotropic-and-anisotropic) point-noise model this is provably equivalent to the plain EKF's corrections at every step, so the practical win here is a fixed, precomputed Jacobian rather than different accuracy)
- 4. A **batch Gauss-Newton** smoother that jointly optimizes the whole trajectory at once against prior/motion/measurement factors
- 5. A recursive **UKF** (sigma points sampled around the current estimate, retracted onto $SE(3)$ and pushed through the exact, non-linearized `motion_model`/`observation_model` - no Jacobians at all, unlike the EKF, invariant EKF and batch Gauss-Newton)
- 6. A recursive **vanilla (linear) KF** - reparameterizes the pose as a redundant 12-dim ambient state $[\text{vec}(R),\ t]$ instead of the minimal 6-dim $SE(3)$ tangent state. This makes the point-cloud observation model exactly linear (a fixed $H$, no Jacobian at all), at the cost of two compromises the manifold-aware methods avoid:
-    - the motion model needs a first-order (small-angle) truncation of $\exp(\omega^\wedge)$ - a real, growing source of mean error the EKF's exact group composition doesn't have, most visible at larger per-step rotation (e.g. larger `--dt`);
-    - nothing constrains $R$ to stay in $SO(3)$, so it's explicitly re-projected back onto $SO(3)$ via SVD after every update.
+#### 4. Point-cloud pose tracking: EKF vs. invariant EKF vs. batch Gauss-Newton vs. UKF vs. vanilla KF
 
-    Its core recursion steps outside $SE(3)$ in both versions (plain numpy arrays from `T[0:3,0:3]`/`T[0:3,3]` in `use_numpy`, `T.rotation()`/`T.translation()` in `use_manif`). The `use_manif` version only touches manif for `SO3Tangent(.).hat()` and rebuilds the final pose via `scipy`'s `Rotation.from_matrix(...).as_quat()`, since manif exposes no rotation-matrix constructor.
+**Purpose:** Tracks a rigid object's $`SE(3)`$ pose from a noisy motion prior and noisy point-cloud measurements. Compares six solvers that share the same motion and observation models.
 
-How the solvers compare, and why, is explained in [docs/filtering/pointcloud_pose_tracking_empirical_note.md](docs/filtering/pointcloud_pose_tracking_empirical_note.md): EKF and invariant EKF corrections and covariance agree to round-off (~1e-14), the UKF differs mainly during the initial correction and agrees to micrometers once converged, and the vanilla KF stays millimeters away after convergence, with a gap roughly proportional to `--dt`. Batch Gauss-Newton matches the filters at the final pose but is more accurate earlier, because as a smoother it also uses later measurements for earlier poses, most visibly at the initial pose, which the filters never revise.
+| Input | Output |
+|---|---|
+| A rigid object with known body-frame points; noisy twist control input and noisy point measurements | Prints final errors, RMSE, time and memory per method; plots rotation error, position error and x-y trajectories |
 
-Prints final rotation+position error and RMSE per method, plus each method's empirical average per-step wall-clock time and peak memory (`measure_performance`, via `time.perf_counter` + `tracemalloc`), and plots rotation error, position error, and the x-y trajectory of all seven (ground truth included).
+| Solver | Meaning |
+|---|---|
+| Dead reckoning | Prior only: chains the noisy twists, no measurement correction |
+| **EKF** | Recursive filter, linearized with Jacobians |
+| **Invariant EKF** | EKF with the residual in the body frame; same corrections here |
+| **Batch Gauss-Newton** | Smoother optimizing the whole trajectory at once |
+| **UKF** | Recursive filter using sigma points, no Jacobians |
+| **Vanilla KF** | Linear filter on a redundant 12-dim state `[vec(R), t]` |
+
+**Details:** [pointcloud_pose_tracking_empirical_note.md](docs/filtering/pointcloud_pose_tracking_empirical_note.md)
 
 ![Two panels from pointcloud_pose_tracking.py at its defaults: the x-y trajectories of ground truth, dead reckoning and five estimators (EKF, invariant EKF, UKF, vanilla KF, batch Gauss-Newton), and each one's position error over time on a log scale](assets/pose_tracking.png)
 
-#### Scripts
+**Scripts:**
 
 - [use_numpy/pointcloud_pose_tracking.py](use_numpy/pointcloud_pose_tracking.py)
 - [use_numpy/pointcloud_pose_tracking_v2.py](use_numpy/pointcloud_pose_tracking_v2.py): class-based version, same output
-
 - [use_manif/pointcloud_pose_tracking.py](use_manif/pointcloud_pose_tracking.py)
 
-#### Usage
+**Run:**
 
 ```
 uv run python use_numpy/pointcloud_pose_tracking.py --duration 5.0 --dt 0.1 --n-points 20 --vel-noise-std 0.05 --gyro-noise-std 0.02 --point-noise-std 0.03 --init-pose-noise-std 0.1 --gn-tol 1e-6 --gn-max-iters 20 --ukf-alpha 1.0 --ukf-beta 2.0 --ukf-kappa -3.0 --seed 0 --out out.png
 ```
+
+<details>
+<summary>All flags</summary>
 
 - `--duration`: simulation length in seconds (default `5.0`)
 - `--dt`: motion/measurement step interval in seconds (default `0.1`)
@@ -318,28 +361,119 @@ uv run python use_numpy/pointcloud_pose_tracking.py --duration 5.0 --dt 0.1 --n-
 - `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
 
-### 5. 3D pose-graph relaxation
+</details>
 
-#### Purpose
+### Front-end
 
-A robot drives a closed 4-node square loop, accumulating drift from noisy relative-pose ("odometry") edges between consecutive nodes, then detects it has returned to the start and adds one loop-closure edge back to node 0.
-- **Solver:** all node poses are jointly refined by Levenberg-Marquardt against every edge's residual $e_{ij} = \log(Z_{ij}^{-1} X_i^{-1} X_j)$.
-- **Jacobians:** analytical `compose`/`rminus` Jacobians chained together (hand-rolled $SE(3)$ $Exp$/$`Log`$/adjoint math via `lie_utils.py` in `use_numpy`; `manifpy`'s out-parameters in `use_manif`). This is the same motion-factor Jacobian-chaining pattern as `run_batch_gn` in `pointcloud_pose_tracking.py`, generalized from a twist-based motion model to a directly-measured relative pose.
-- **Output:** per-iteration [chi-squared](docs/glossary.md#chi-square-distribution) error plus final rotation+position error and RMSE (uncorrected odometry vs. optimized), and an XY trajectory plot against ground truth.
+#### 5. Perspective-n-Point (PnP): recovering a camera pose from known 3D-2D correspondences
+
+**Purpose:** Recovers a camera pose from known 3D points and their observed pixels, the reverse of triangulation. A closed-form linear guess (DLT) is refined by Gauss-Newton.
+
+| Input | Output |
+|---|---|
+| A random camera and 3D points projected to noisy pixels | Prints pose errors for the DLT and refined poses; plots a 3D view of the points and camera poses |
+
+**Details:** [triangulation_pnp.md](docs/frontend/triangulation_pnp.md)
+
+![Two panels from pnp_estimation.py: the image plane with observed pixels and 20-times-magnified reprojection residuals for the linear DLT pose and the Gauss-Newton-refined pose, and bars of rotation, position and reprojection error for both](assets/pnp_estimation.png)
+
+Figure made by `generator/make_figures.py` at the script defaults (seed 0).
+
+**Scripts:**
+
+- [use_numpy/pnp_estimation.py](use_numpy/pnp_estimation.py)
+
+**Run:**
+
+```
+uv run python use_numpy/pnp_estimation.py --n-points 20 --pixel-noise-std 1.0 --seed 0 --out out.png
+```
+
+<details>
+<summary>All flags</summary>
+
+- `--n-points`: number of 3D-2D correspondences (default `20`)
+- `--image-width`/`--image-height`/`--focal-length`: pinhole intrinsics (defaults `640`/`480`/`800.0`)
+- `--pixel-noise-std`: std-dev of Gaussian pixel noise added to each observation (px, default `1.0`)
+- `--gn-tol`/`--gn-max-iters`: Gauss-Newton convergence tolerance and iteration cap (defaults `1e-8`/`20`)
+- `--seed`: RNG seed (default `0`)
+- `--out`: save the figure to this path instead of showing it (default: show)
+
+</details>
+
+#### 6. LiDAR primitives: planes and cylinders for scan registration
+
+**Purpose:** Registers two simulated LiDAR scans three ways in one $`SE(3)`$ Gauss-Newton loop, after fitting planes and cylinders to each scan. Also tests extraction, degeneracy and plane landmarks.
+
+| Input | Output |
+|---|---|
+| Simulated corridor scans from a 32-ring LiDAR with range noise | Prints one results table per experiment (no plot) |
+
+| Registration method | Meaning |
+|---|---|
+| Point-to-point ICP | Pairs each source point with its nearest target point |
+| Point-to-plane ICP | Same pairs, but only distance along the target normal counts |
+| Primitives | Matches fitted planes and cylinders between scans |
+
+**Details:** [lidar_primitives.md](docs/frontend/lidar_primitives.md)
+
+![Three panels from lidar_primitives.py experiments 2 to 4: success rate against initial error for point-to-point ICP, point-to-plane ICP and primitives; error along the corridor against the predicted sigma in the planes-only corridor and with pillars; and the end-point drift and aligned trajectory error of odometry versus the plane-landmark graph over five runs](assets/lidar_primitives.png)
+
+Figure made by `generator/make_figures.py lidar_primitives` (experiments 2-4 at their defaults); the script itself only prints.
+
+**Scripts:**
+
+- [use_numpy/lidar_primitives.py](use_numpy/lidar_primitives.py)
+- [use_manif/lidar_primitives.py](use_manif/lidar_primitives.py): same experiments with manif poses
+- [lidar_utils.py](lidar_utils.py): shared scene, LiDAR and extraction helpers
+- [generator/animate_lidar_primitives.py](generator/animate_lidar_primitives.py): GIF of one registration; render with `uv run python generator/animate_lidar_primitives.py --out assets/lidar_primitives.gif`
+
+**Run:**
+
+```
+uv run python use_numpy/lidar_primitives.py --experiment all --n-trials 10 --n-pairs 10 --n-starts 5 --n-runs 5 --noise 0.01 --seed 0
+```
+
+<details>
+<summary>All flags</summary>
+
+- `--experiment`: `1` extraction accuracy, `2` convergence basin, `3` degeneracy, `4` planes as landmarks, or `all` (default `all`; several minutes per experiment)
+- `--n-trials`: experiment 1, sensor poses per noise/density cell (default `10`)
+- `--n-pairs`: experiments 2-3, scan pairs (default `10`)
+- `--n-starts`: experiment 2, initial guesses per pair and error size (default `5`)
+- `--n-runs`: experiment 4, noise realizations of the trajectory (default `5`)
+- `--noise`: experiments 2-4, range noise std, m (default `0.01`)
+- `--seed`: RNG seed (default `0`)
+
+</details>
+
+### Factor graphs and smoothing
+
+#### 7. 3D pose-graph relaxation
+
+**Purpose:** Shows how one loop-closure edge lets pose-graph optimization remove the drift of a noisy odometry loop.
+
+| Input | Output |
+|---|---|
+| A robot drives a 4-node square loop with noisy relative-pose (odometry) edges and one loop-closure edge back to node 0 | Prints per-iteration error and final errors, odometry vs. optimized; plots the trajectory against ground truth |
+
+**Details:** [pose_graph_optimization.md](docs/optimization/pose_graph_optimization.md)
 
 ![Two panels from pose_graph.py: the four-pose square loop with ground truth, drifting odometry, the optimized estimate and the loop-closure edge, and each pose's position error before and after optimization](assets/pose_graph.png)
 
-#### Scripts
+**Scripts:**
 
-- [use_numpy/pose_graph.py](use_numpy/pose_graph.py)
+- [use_numpy/pose_graph.py](use_numpy/pose_graph.py): hand-rolled $`SE(3)`$ math
+- [use_manif/pose_graph.py](use_manif/pose_graph.py): `manifpy` Jacobians
 
-- [use_manif/pose_graph.py](use_manif/pose_graph.py)
-
-#### Usage
+**Run:**
 
 ```
 uv run python use_numpy/pose_graph.py --side-length 2.0 --pos-noise-std 0.05 --rot-noise-std 0.01 --loop-noise-scale 0.5 --damping 0.01 --gn-tol 1e-6 --gn-max-iters 10 --seed 0 --out out.png
 ```
+
+<details>
+<summary>All flags</summary>
 
 - `--side-length`: side length of the square ground-truth loop, m (default `2.0`)
 - `--pos-noise-std`: odometry-edge translation noise std-dev, m (default `0.05`)
@@ -351,34 +485,40 @@ uv run python use_numpy/pose_graph.py --side-length 2.0 --pos-noise-std 0.05 --r
 - `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
 
-### 6. Bundle adjustment: joint pose + landmark refinement
+</details>
 
-#### Purpose
+#### 8. Bundle adjustment: joint pose + landmark refinement
 
-`n_cameras` cameras are placed on a horizontal arc around a cluster of `n_landmarks` 3D landmarks, each looking inward via a look-at rotation. A landmark counts as observed only if it lies in front of a camera and projects inside its image, so not every camera observes every landmark (landmarks seen by fewer than `--min-observations` cameras are dropped as not triangulable) - this is `docs/optimization/bundle_adjustment.md`'s observed set ${\mathcal{O}}$, a real strict subset of all camera-landmark pairs, not "every camera sees everything." Every camera pose and every landmark is perturbed from ground truth to build a noisy initial guess, then three solvers are compared:
+**Purpose:** Compares refining only landmarks, only camera poses, or both together (bundle adjustment) from the same noisy start, to show why the joint solve is needed.
 
-- **Landmarks-only refinement:** poses held fixed at their noisy initial guess, only landmarks refined (the "cameras are correct" strawman) - decouples into independent $3\times3$ Gauss-Newton solves per landmark (classic triangulation from known poses).
-- **Poses-only refinement:** landmarks held fixed, only poses refined (the "points are correct" strawman) - decouples into independent $6\times6$ Gauss-Newton solves per camera (classic PnP-style **resection**: solving for a camera's pose from known 3D points).
-- **Full joint bundle adjustment:** both refined together in one coupled dense Gauss-Newton solve over every pose and landmark. This is bundle adjustment proper.
-  - **Gauge freedom:** joint BA reintroduces the monocular gauge freedom (6-DoF rigid + 1-DoF scale). It is fixed with a prior factor on the first two camera poses (mean = their own noisy initial guess), the same prior-factor pattern as `run_batch_gn`'s initial-pose prior in `pointcloud_pose_tracking.py`.
-  - **Alignment:** the result is aligned to ground truth via Umeyama's least-squares similarity fit (standard for evaluating monocular BA/SfM output) before computing absolute pose/landmark error. Reprojection error is unaffected by this alignment.
+| Input | Output |
+|---|---|
+| Cameras on an arc looking at a cluster of 3D landmarks, with noisy pixel measurements and a perturbed initial guess | Prints pose, landmark and reprojection errors for each solver; plots the scene and the errors |
 
-Camera-pose Jacobians come from a hand-derived closed form ($\partial p_c/\partial(\text{right-perturbation of }T) = [-I \mid \mathrm{skew}(p_c)]$, finite-difference verified) in the `use_numpy` version, and from chaining `manifpy`'s own `inverse`/`act` Jacobian out-parameters in the `use_manif` version - no manifold formula hand-rolled there. Prints pose rotation/position RMSE, landmark RMSE, and reprojection error for all four rows (noisy init, landmarks-only, poses-only, joint BA), and plots a top-down scene view (ground truth vs. noisy init vs. joint BA) alongside a grouped bar chart of the four RMSE metrics.
+| Variant | Meaning |
+|---|---|
+| Landmarks-only | Poses held fixed, landmarks refined |
+| Poses-only | Landmarks held fixed, poses refined |
+| Joint BA | Poses and landmarks refined together |
+
+**Details:** [bundle_adjustment.md](docs/optimization/bundle_adjustment.md)
 
 ![Two panels from bundle_adjustment.py: a top-down view of cameras on an arc around a landmark cluster (ground truth, noisy initial guess, joint BA), and log-scale RMSE for the noisy initial guess, landmarks-only, poses-only and joint bundle adjustment](assets/bundle_adjustment.png)
 
-#### Scripts
+**Scripts:**
 
-- [use_numpy/bundle_adjustment.py](use_numpy/bundle_adjustment.py)
-- [generator/animate_bundle_adjustment.py](generator/animate_bundle_adjustment.py): animated GIF of the default run, embedded in [bundle_adjustment.md](docs/optimization/bundle_adjustment.md); render with `uv run python generator/animate_bundle_adjustment.py --out assets/bundle_adjustment.gif`
+- [use_numpy/bundle_adjustment.py](use_numpy/bundle_adjustment.py): hand-derived Jacobians
+- [generator/animate_bundle_adjustment.py](generator/animate_bundle_adjustment.py): animated GIF, embedded in [bundle_adjustment.md](docs/optimization/bundle_adjustment.md); render with `uv run python generator/animate_bundle_adjustment.py --out assets/bundle_adjustment.gif`
+- [use_manif/bundle_adjustment.py](use_manif/bundle_adjustment.py): `manifpy` Jacobians
 
-- [use_manif/bundle_adjustment.py](use_manif/bundle_adjustment.py)
-
-#### Usage
+**Run:**
 
 ```
 uv run python use_numpy/bundle_adjustment.py --n-cameras 8 --n-landmarks 60 --camera-radius 5.0 --arc-span-deg 180 --landmark-spread 2.0 --image-width 640 --image-height 480 --focal-length 800 --pose-noise-std 0.1 --landmark-noise-std 0.3 --pixel-noise-std 1.0 --min-observations 2 --gn-tol 1e-6 --gn-max-iters 30 --seed 0 --out out.png
 ```
+
+<details>
+<summary>All flags</summary>
 
 - `--n-cameras`: number of cameras placed on the arc (default `8`)
 - `--n-landmarks`: number of 3D landmarks sampled, before dropping under-observed ones (default `60`)
@@ -396,45 +536,33 @@ uv run python use_numpy/bundle_adjustment.py --n-cameras 8 --n-landmarks 60 --ca
 - `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
 
-### 7. Local + Global bundle adjustment: bounded windows vs. whole-map re-solves
+</details>
 
-#### Purpose
-`docs/optimization/bundle_adjustment.md`'s Local-vs-Global-BA section (§13) notes that `bundle_adjustment.py`'s solvers are all single-batch joint solves - no windowing, no covisibility graph, no incremental registration. This script fills that gap:
+#### 9. Local + Global bundle adjustment: bounded windows vs. whole-map re-solves
 
-- `n_keyframes` keyframes move one at a time along a forward-facing arc through a corridor of landmarks scattered near the path (not a static ring around a shared centroid).
-- A field-of-view **and** `--max-view-range` cutoff makes each landmark visible only from a short run of nearby keyframes. Real feature detectors have a finite effective range; without this cutoff a forward-facing camera would see nearly every landmark from nearly every keyframe, destroying the locality the whole exercise depends on.
-- Each keyframe arrives with a front-end pose estimate built by chaining a noisy relative motion onto the previous one (`simulate_frontend_trajectory`, the same dead-reckoning pattern as `pose_graph.py`), so small per-step errors compound into real drift.
+**Purpose:** Compares Local BA (optimize only a small window of recent keyframes) with Local BA plus periodic Global BA (re-solve the whole map) as a keyframe path grows.
 
-The incremental loop (`run_incremental_local_ba`) runs keyframe-by-keyframe:
+| Input | Output |
+|---|---|
+| Keyframes move along a path through a landmark corridor, each starting from a drifting pose estimate | Prints solve counts, times and trajectory errors for both modes; plots path, solve time and error |
 
-- **Reveal + triangulate:** each keyframe's observations are revealed one at a time; a landmark is triangulated (closed-form ray intersection, then a few Gauss-Newton iterations) the moment it crosses `--min-observations` observers, and committed only if it passes a cheirality (positive-depth) check - a weakly-constrained point can otherwise converge to a reflection behind a camera that still fits that view's pixel almost exactly, since the projected pixel ($fx \cdot x/z + c_x$, in code terms) is unchanged when the whole camera-frame point is negated.
-- **Bounded local BA window** (`build_active_window` + `run_local_ba_step`): the new keyframe plus its strongest covisible neighbors (up to `--max-window-keyframes`) are optimized together; every other keyframe that also observes one of the window's landmarks is held fixed as a rigid anchor. Keyframes 0/1 are hard-fixed forever as the gauge anchor - no prior factor needed. Keyframe 1 keeps its noisy front-end pose, so the anchor pins a wrong scale and orientation (see [bundle_adjustment.md §13.6](docs/optimization/bundle_adjustment.md#136-in-this-repo)).
-- **Periodic Global BA** (`run_global_ba`): every `--global-ba-interval` keyframes (plus once at the end), every keyframe and landmark seen so far is jointly re-solved in one system, for direct comparison against the bounded local window.
-
-**Shared solver core.** Both solvers use one Levenberg-Marquardt core (`run_windowed_gn_lm`): a step is accepted only if it actually reduces total reprojection error; otherwise the damping grows and the step is retried. Plain fixed-damping Gauss-Newton (as `bundle_adjustment.py` uses for its densely-observed, prior-anchored toy scene) diverges on this script's weakly-constrained early windows.
-
-**What it reports.** The incremental loop runs twice off the same scene, once with Global BA disabled and once enabled, and prints/plots:
-- wall-clock solve time (should stay bounded for the local window, set by its size rather than the map, and grow for Global BA as the map grows);
-- a trailing-window trajectory RMSE (drift accumulating vs. periodically corrected).
-
-**Findings:**
-- On the default open path, Global BA has no *new* geometric constraint beyond what the overlapping local windows already used. Across two seed sweeps it's close to a wash against Local-only (6/15 wins in the regression test's sweep, with a median trajectory-RMSE difference of +0.06 m; 11/20 wins at the defaults, median -0.02 m; see `docs/optimization/bundle_adjustment.md` §13.6), not a reliable win the way a real loop closure is.
-- A few individual seeds diverge to thousands of meters in *either* run mode. The cause is a rare bad local minimum in the windowed GN/LM solve, which neither mode guards against. The two backends agree to ~1e-5 relative on the same scenario (per the regression test's notes), so a diverging seed diverges in both.
-- The covisibility/window/Global-BA machinery itself is loop-closure-agnostic - see "Loop closure example" below for a path that actually has one.
+**Details:** [bundle_adjustment.md §13.6](docs/optimization/bundle_adjustment.md#136-in-this-repo)
 
 ![Three panels from bundle_adjustment_advanced.py: the keyframe path through a landmark corridor with the Local-only and Local plus Global estimates, solve time per call for the bounded Local BA window versus Global BA, and trailing trajectory RMSE over keyframes for both modes](assets/bundle_adjustment_advanced.png)
 
-#### Scripts
+**Scripts:**
 
 - [use_numpy/bundle_adjustment_advanced.py](use_numpy/bundle_adjustment_advanced.py)
-
 - [use_manif/bundle_adjustment_advanced.py](use_manif/bundle_adjustment_advanced.py)
 
-#### Usage
+**Run:**
 
 ```
 uv run python use_numpy/bundle_adjustment_advanced.py --n-keyframes 50 --path-radius 15.0 --arc-span-deg 90 --landmarks-per-keyframe 8 --lateral-spread 2.0 --vertical-spread 1.0 --max-view-range 6.0 --image-width 640 --image-height 480 --focal-length 800 --min-observations 3 --min-shared-for-covisibility 2 --max-window-keyframes 6 --global-ba-interval 8 --relative-pose-noise-std 0.02 --pixel-noise-std 1.0 --gn-tol 1e-6 --gn-max-iters 15 --seed 0 --out out.png
 ```
+
+<details>
+<summary>All flags</summary>
 
 - `--n-keyframes`: number of keyframes along the path (default `50`)
 - `--path-radius`: radius of the arc the path follows, m (default `15.0`)
@@ -456,40 +584,39 @@ uv run python use_numpy/bundle_adjustment_advanced.py --n-keyframes 50 --path-ra
 - `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
 
-#### Loop closure example
+</details>
 
-The default `--arc-span-deg 90` path never revisits a place, so Global BA never gets a genuinely new constraint. Pushing the span close to 360 degrees swings the path's end back within view range of its own start, so a late keyframe re-observes an early landmark - a real loop closure, picked up automatically by the same covisibility/window/Global-BA code with zero logic changes. Raise `--n-keyframes` with the span so the keyframe spacing stays at the default run's ~0.5 m (190 for 350 degrees); at 50 keyframes the spacing grows to ~1.9 m and too few landmarks get triangulated for the closure to register:
+**Loop closure example:** a path spanning close to 360 degrees returns to its start, so a late keyframe re-observes an early landmark and the same code detects the loop closure. Raise `--n-keyframes` with the span to keep the default keyframe spacing. The closure is detected on every seed tried, but whether the next Global BA pass then helps depends on the seed:
 
 ```
 uv run python use_numpy/bundle_adjustment_advanced.py --arc-span-deg 350 --n-keyframes 190 --seed 0 --out loop_closure.png
 ```
 
-This prints an extra line (in place of the "never revisits" caveat) identifying exactly which keyframe closed the loop and against which earlier one, plus the measured trajectory-RMSE change once the next Global BA pass runs (closure is detected on all of seeds 0-4, but the Local+Global result on this long run is unstable - seed- and BLAS-thread-dependent - so it does not show that a Global pass reliably helps; see [bundle_adjustment.md §13.6](docs/optimization/bundle_adjustment.md#136-in-this-repo)), and adds a labeled green "Loop closure" marker to the drift plot at that keyframe.
+#### 10. Incremental (square-root SAM) vs. batch pose-graph solving
 
-### 8. Incremental (square-root SAM) vs. batch pose-graph solving
+**Purpose:** Compares incremental square-root SAM, which updates an existing factorization with each new node, against re-solving the whole pose graph at every node.
 
-#### Purpose
+| Input | Output |
+|---|---|
+| A square loop streamed in one noisy odometry node at a time, ending with a loop-closure edge | Prints final errors, full-solve counts and time per node for both solvers; plots trajectories and per-node cost |
 
-`docs/optimization/isam_optimization.md` describes iSAM's core mechanism: absorbing a new measurement into an existing square-root-information factorization instead of rebuilding the whole linear system. `pose_graph.py`'s batch solver always rebuilds from scratch. This script fills that gap on a longer version of the same square loop (`--nodes-per-side` nodes per side instead of `pose_graph.py`'s fixed 4 corners), streamed in one node/odometry-edge at a time, and runs two solvers over the identical stream:
-
-- **Batch streaming** (`run_batch_streaming`): the expensive baseline - every new node triggers a full re-solve of the entire graph so far, from a fresh dead-reckoning guess, by calling `pose_graph.py`'s own `run_pose_graph_optimization` unmodified.
-- **Incremental square-root SAM** (`run_incremental_pose_graph`): absorbs each new odometry edge into a running upper-triangular square-root-information matrix via Givens-rotation row insertion (`qr_insert_row` in `utils.py`), touching only the new node's columns - no other row is re-evaluated. Every `--relinearize-every` nodes, and unconditionally on the loop-closure edge (which, unlike a sequential odometry edge, connects the newest node all the way back to the first one), it instead relinearizes fully: adopts the current estimate as a new linearization point and rebuilds the whole system from one `np.linalg.qr` call, iterating to Gauss-Newton convergence exactly like the batch solver does.
-
-This deliberately does **not** implement iSAM2's Bayes tree (selective relinearization of only the affected subtree) or variable reordering - see the module docstring and `docs/optimization/isam_optimization.md` §14 for exactly what is/isn't in scope. Both solvers are timed via `utils.py`'s `measure_performance` and converge to matching final pose error and RMSE; the printed relinearization counts and per-node wall-clock time are the actual point of the comparison.
+**Details:** [isam_optimization.md](docs/optimization/isam_optimization.md)
 
 ![Two panels from pose_graph_incremental.py: a 64-pose square loop with ground truth, odometry, and the batch and incremental estimates lying on top of each other, and the average wall-clock cost per streamed node with the number of full solves each approach ran](assets/pose_graph_incremental.png)
 
-#### Scripts
+**Scripts:**
 
 - [use_numpy/pose_graph_incremental.py](use_numpy/pose_graph_incremental.py)
-
 - [use_manif/pose_graph_incremental.py](use_manif/pose_graph_incremental.py)
 
-#### Usage
+**Run:**
 
 ```
 uv run python use_numpy/pose_graph_incremental.py --side-length 2.0 --nodes-per-side 16 --pos-noise-std 0.05 --rot-noise-std 0.01 --loop-noise-scale 0.5 --damping 0.01 --gn-tol 1e-6 --gn-max-iters 10 --anchor-weight 1e6 --relinearize-every 8 --seed 0 --out out.png
 ```
+
+<details>
+<summary>All flags</summary>
 
 - `--side-length`: side length of the square ground-truth loop, m (default `2.0`)
 - `--nodes-per-side`: nodes per side of the loop, streamed in one at a time (default `16`)
@@ -504,102 +631,117 @@ uv run python use_numpy/pose_graph_incremental.py --side-length 2.0 --nodes-per-
 - `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
 
-**Tip:** the script solves many small dense systems, where multithreaded BLAS costs more than it saves. Limiting it to one thread made the default run about 2× faster on an 8-core machine (8-9 s vs. 14-20 s), and the gap widens when other processes load the CPU:
+</details>
+
+**Tip:** the script solves many small dense systems, where multithreaded BLAS costs more than it saves. Limit it to one thread to run faster:
 
 ```
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run python use_numpy/pose_graph_incremental.py
 ```
 
-### 9. Bayes tree construction and affected-region query
+#### 11. Bayes tree construction and affected-region query
 
-#### Purpose
+**Purpose:** Builds the elimination tree behind the Bayes tree for the pose-graph loop and shows which variables a new odometry edge or a loop-closure edge affects.
 
-`docs/optimization/bayes_tree.md` and `docs/optimization/isam2_optimization.md` describe the Bayes tree iSAM2 builds from a factor graph's elimination order, and the key claim that makes it useful: a new factor only invalidates the affected part of the tree, not the whole thing. This script makes that concrete instead of leaving it to ASCII diagrams:
-- It builds the elimination tree underlying the Bayes tree (one node per variable, not merged into the cliques of `bayes_tree.md` §13) over `pose_graph.py`'s square-loop topology.
-- It uses symbolic variable elimination (`symbolic_eliminate` in `utils.py`): eliminating a node connects its still-uneliminated neighbors, and that node's parent is whichever neighbor is eliminated next.
-- The elimination order is fixed oldest-node-first, not COLAMD - that dynamic reordering is explicitly out of scope (see `docs/optimization/isam2_optimization.md` §12).
+| Input | Output |
+|---|---|
+| The square-loop pose-graph topology: odometry edges plus one loop-closure edge, no poses or noise | Prints the affected variables for each edge; plots the elimination chain |
 
-It then answers `bayes_tree_affected_path`'s (`utils.py`) "what's affected" query for two scenarios: an ordinary new odometry edge, and the loop-closure edge. The printed output shows:
-- Under oldest-first elimination the tree is always a straight chain here.
-- The loop-closure edge connects the *first*-eliminated node (the deepest leaf) to the root, so it invalidates the *entire* chain (16 of 16 at the default size) - the worst case iSAM2's constrained reordering (CCOLAMD) exists to avoid.
-- An ordinary odometry edge near the root invalidates only 2 variables regardless of graph size.
-
-This is pure index/graph bookkeeping - no pose math, $SE(3)$, or Lie algebra anywhere. The tree depends only on which node indices a factor connects, never on the noisy relative-pose values. It implements only the tree's *construction* and *affected-region query*. It does not implement the numeric selective-relinearization solve (`pose_graph_incremental.py`'s original-iSAM square-root-SAM update handles that without building a Bayes tree) or dynamic reordering.
+**Details:** [bayes_tree.md](docs/optimization/bayes_tree.md)
 
 ![Two rows from bayes_tree_construction.py: the 16-variable elimination chain, where a new odometry edge affects 2 variables and the loop-closure edge affects all 16](assets/bayes_tree_construction.png)
 
-#### Scripts
+**Scripts:**
 
 - [use_numpy/bayes_tree_construction.py](use_numpy/bayes_tree_construction.py)
 
-#### Usage
+**Run:**
 
 ```
 uv run python use_numpy/bayes_tree_construction.py --nodes-per-side 4 --out out.png
 ```
 
+<details>
+<summary>All flags</summary>
+
 - `--nodes-per-side`: nodes per side of the ring pose graph, same topology as `pose_graph_incremental.py` (default `4`; kept small since this plots an inspectable diagram, not a timing benchmark)
 - `--out`: save the figure to this path instead of showing it (default: show)
 
-### 10. Perspective-n-Point (PnP): recovering a camera pose from known 3D-2D correspondences
+</details>
 
-#### Purpose
+#### 12. Sliding-window marginalization: bounded-memory pose-graph smoothing
 
-`docs/frontend/triangulation_pnp.md` frames triangulation and PnP as one reprojection problem run in opposite directions. Triangulation (`bundle_adjustment_advanced.py`'s `triangulate_landmark`/`refine_landmark_gn`) holds camera poses fixed to solve for an unknown 3D point. PnP holds known 3D points fixed and solves for the camera pose that observed them. This script implements PnP with the two-step recipe used throughout this codebase: a closed-form linear initial guess, then a few Gauss-Newton iterations against the true nonlinear reprojection error.
+**Purpose:** Compares a sliding window that marginalizes out its oldest pose with a full batch re-solve at every new node, to show how memory scales with trajectory length.
 
-`linear_pnp_dlt` solves the classic Direct Linear Transform (DLT) camera-resectioning problem specialized to known intrinsics - each calibrated ray is parallel to its camera-frame point, giving a linear homogeneous constraint on the flattened world-to-camera $[R \mid t]$, solved via the smallest right-singular vector and then projected onto the nearest proper rotation (SVD orthogonalization), with scale and sign fixed from that same decomposition and a positive-depth check (this repo's PnP analogue of `passes_cheirality`). `refine_pose_gn` then runs ordinary Gauss-Newton on the true reprojection residual, updating the pose via a right-multiplicative $SE(3)$ correction, mirroring `refine_landmark_gn`'s loop.
+| Input | Output |
+|---|---|
+| A noisy odometry chain streamed in one node at a time, run over a sweep of trajectory lengths | Prints information-matrix size, cost and position error per length; plots them against trajectory length |
 
-![Two panels from pnp_estimation.py: the image plane with observed pixels and 20-times-magnified reprojection residuals for the linear DLT pose and the Gauss-Newton-refined pose, and bars of rotation, position and reprojection error for both](assets/pnp_estimation.png)
+**Details:** [marginalization.md](docs/optimization/marginalization.md)
 
-#### Scripts
+![Three panels from sliding_window_marginalization.py: largest information-matrix size, time per new pose and position RMSE against trajectory length from 8 to 256 poses, for a full batch re-solve and a 10-pose sliding window](assets/sliding_window_marginalization.png)
 
-- [use_numpy/pnp_estimation.py](use_numpy/pnp_estimation.py)
+**Scripts:**
 
-#### Usage
+- [use_numpy/sliding_window_marginalization.py](use_numpy/sliding_window_marginalization.py)
+- [generator/animate_sliding_window_marginalization.py](generator/animate_sliding_window_marginalization.py): animated GIF, embedded in [marginalization.md](docs/optimization/marginalization.md); render with `uv run python generator/animate_sliding_window_marginalization.py --out assets/sliding_window_marginalization.gif`
+
+**Run:**
 
 ```
-uv run python use_numpy/pnp_estimation.py --n-points 20 --pixel-noise-std 1.0 --seed 0 --out out.png
+uv run python use_numpy/sliding_window_marginalization.py --nodes-per-side-sweep 2 4 8 16 32 64 --side-length 2.0 --window-size 10 --pos-noise-std 0.05 --rot-noise-std 0.01 --anchor-weight 1e6 --gn-tol 1e-6 --gn-max-iters 10 --seed 0 --out out.png
 ```
 
-- `--n-points`: number of 3D-2D correspondences (default `20`)
-- `--image-width`/`--image-height`/`--focal-length`: pinhole intrinsics (defaults `640`/`480`/`800.0`)
-- `--pixel-noise-std`: std-dev of Gaussian pixel noise added to each observation (px, default `1.0`)
-- `--gn-tol`/`--gn-max-iters`: Gauss-Newton convergence tolerance and iteration cap (defaults `1e-8`/`20`)
+<details>
+<summary>All flags</summary>
+
+- `--nodes-per-side-sweep`: sweep of nodes-per-side values, trajectory has 4x this many total poses per entry (default `2 4 8 16 32 64`) - the resource-constraint result is how cost scales across this sweep, not any single run
+- `--side-length`: side length of the square ground-truth path, m (default `2.0`)
+- `--window-size`: sliding-window size, poses kept live at once (default `10`)
+- `--pos-noise-std`: odometry-edge translation noise std-dev, m (default `0.05`)
+- `--rot-noise-std`: odometry-edge rotation noise std-dev, rad (default `0.01`)
+- `--anchor-weight`: information weight of the node-0 gauge-fixing prior (default `1e6`)
+- `--gn-tol`: Gauss-Newton convergence tolerance (default `1e-6`)
+- `--gn-max-iters`: maximum Gauss-Newton iterations per solve (default `10`)
 - `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
 
-### 11. Saltation-matrix EKF: tracking a point mass through discrete ground-contact events
+</details>
 
-#### Purpose
+### Non-smooth and legged motion
 
-The earlier filtering scripts assume smooth, continuous motion between measurements. `docs/filtering/hybrid_saltation_ekf.md` introduces the exception: a **hybrid dynamical system**, where a point mass in free-fall bounces (inelastically, restitution `e`) off the ground $p_z = 0$. Between bounces the dynamics is exactly linear (mean/covariance propagate exactly, no linearization at all), so any disagreement between the two EKF variants below is attributable entirely to how each one handles the bounce itself.
+#### 13. Saltation-matrix EKF: tracking a point mass through discrete ground-contact events
 
-Three methods are compared:
-- A **dead-reckoning baseline:** propagates the exact dynamics from an uncertain initial guess, never looking at measurements - an initial-condition error still causes growing error, since bounce *timing* is sensitive to the state even though the dynamics model itself is exact
-- An **EKF with naive bounce handling:** $`P^+ = DR\,P^-\,DR^\top`$, the reset map's own Jacobian alone - the common mistake, since it is not the correct linearization of "post-impact state as a function of pre-impact state" once a perturbed trajectory reaches the guard at a different time
-- An **EKF with saltation-corrected bounce handling:** $`P^+ = \Xi\,P^-\,\Xi^\top`$, the true `saltation_matrix` composed with the ordinary flow Jacobians before/after the bounce, so the covariance is mapped over the whole filter tick that contains it, derived from first principles and verified against a finite-difference ground truth to ~7e-6
+**Purpose:** Isolates how an EKF should treat its covariance at a bounce, the sudden jump in a point mass's velocity when it hits the ground. The saltation matrix corrects for the shifted impact time of a perturbed trajectory.
 
-A Monte Carlo consistency check (`run_monte_carlo_consistency`, [NEES](docs/glossary.md#consistency-and-nees)) repeats both EKFs over many independent noise realizations of the same nominal trajectory. The expected "naive is overconfident, saltation fixes it" does not hold at exact detection:
-- **Exact contact detection:** both filters are *under*confident after a bounce - post-bounce NEES is about 2.35 (naive) and 2.49 (saltation) at seed 0 against a consistent value of 6. So saltation is slightly *closer* to consistent, and which filter comes out ahead depends on the tuning (doc §6).
-- **Mechanism:** the saltation matrix shrinks, but does not zero out, the guard-normal (height) variance at every bounce ($`Dg\,\Xi = -e\,Dg`$ identically, verified). That is only right if the detected bounce time is right.
-- **Jittered detection** (`--detect-time-noise-std`, doc §8): from 2 ms of jitter on (10% of `--dt`), both filters become overconfident and the saltation-corrected one more so, by about 1.4-1.6× the naive filter's NEES - a modest gap, not a blow-up: saltation matrices assume a known transition time.
-- Both EKFs' mean trajectories look nearly identical throughout - this entire effect is invisible in the point estimate.
+| Input | Output |
+|---|---|
+| Bouncing point mass in free fall, noisy position measured every step, optional contact-detection timing error | Prints per-method errors and Monte Carlo [NEES](docs/glossary.md#consistency-and-nees) (consistency check); plots height, error and NEES |
 
-Plain $\mathbb{R}^6$ state (position/velocity, no rotation) - no `use_manif/` counterpart: a plain Euclidean state raises no manifold question.
+| Variant | Meaning |
+|---|---|
+| Dead reckoning | Exact dynamics, no measurements |
+| EKF, naive | Covariance mapped by the reset Jacobian alone |
+| EKF, saltation | Covariance mapped by the saltation matrix |
+
+**Details:** [hybrid_saltation_ekf.md](docs/filtering/hybrid_saltation_ekf.md)
 
 ![Two panels from saltation_matrix_ekf.py: the height of the bouncing point mass with measurements, ground truth and both EKFs, and Monte Carlo NEES over time for the naive and saltation bounce updates against the consistent value of 6](assets/saltation_matrix_ekf.png)
 
-#### Scripts
+**Scripts:**
 
 - [use_numpy/saltation_matrix_ekf.py](use_numpy/saltation_matrix_ekf.py)
 - [use_numpy/saltation_matrix_ekf_v2.py](use_numpy/saltation_matrix_ekf_v2.py): class-based version, same output
-- [generator/animate_saltation_ekf.py](generator/animate_saltation_ekf.py): animated GIF of the default run, embedded in [hybrid_saltation_ekf.md](docs/filtering/hybrid_saltation_ekf.md); render with `uv run python generator/animate_saltation_ekf.py --out assets/saltation_matrix_ekf.gif`
+- [generator/animate_saltation_ekf.py](generator/animate_saltation_ekf.py): animated GIF; render with `uv run python generator/animate_saltation_ekf.py --out assets/saltation_matrix_ekf.gif`
 
-#### Usage
+**Run:**
 
 ```
 uv run python use_numpy/saltation_matrix_ekf.py --duration 5.0 --dt 0.02 --restitution 0.85 --gravity 9.81 --drop-height 5.0 --init-horizontal-vel 1.0 0.5 --pos-noise-std 0.03 --process-noise-std 0.3 --impact-noise-std 0.005 --init-pos-noise-std 0.1 --init-vel-noise-std 0.2 --detect-time-bias 0.0 --detect-time-noise-std 0.0 --n-mc-trials 500 --seed 0 --out out.png
 ```
+
+<details>
+<summary>All flags</summary>
 
 - `--duration`: simulation length in seconds (default `5.0`) - kept comfortably below the trajectory's own Zeno settling time (bounce intervals shrink geometrically for a lossy bounce; the default stops after 3 well-separated bounces)
 - `--dt`: filter/measurement step interval in seconds (default `0.02`)
@@ -617,161 +759,43 @@ uv run python use_numpy/saltation_matrix_ekf.py --duration 5.0 --dt 0.02 --resti
 - `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
 
-### 12. Inchworm ZUPT: exploiting a known anchor/dwell schedule
+</details>
 
-#### Purpose
+#### 14. Invariant EKF on $SE_2(3)$ through a bounce
 
-`docs/filtering/inchworm_zupt_ekf.md` works through a known-schedule anchor(dwell)/extend gait - a 1D point mass alternates between being exactly stationary (anchor) and moving at a commanded cruise speed (extend), state $x=[p,v]$. Unlike `saltation_matrix_ekf.py`, this is *not* a discontinuous-state-reset problem - velocity is externally commanded per phase, an ordinary switched-linear system - so the entire interesting question sits on the *measurement* side: whether the filter exploits the free zero-velocity information an anchor phase provides. Three ZUPT policies sharing an identical predict step and the same noisy position measurement every tick are compared via the same Monte Carlo NEES pattern as `saltation_matrix_ekf.py`:
+**Purpose:** Extends §13's bouncing point mass to a tumbling rigid body with an IMU (gyro and accelerometer), tracked by a right-invariant EKF (RIEKF). Compares five filters that treat the bounce covariance differently.
 
-- **`never`:** only the position measurement is ever fused - never wrong, but leaves free information on the table during every anchor tick.
-- **`always`:** an unconditional ZUPT is fused every tick regardless of true phase - the schedule-unaware mistake.
-- **`phase_conditional`:** ZUPT is fused only on ticks the known schedule marks as anchor - the correct policy.
+| Input | Output |
+|---|---|
+| Rigid body bouncing on the ground, IMU plus body-frame landmark measurements, optional contact-detection timing error | Prints per-filter errors and Monte Carlo [NEES](docs/glossary.md#consistency-and-nees) (consistency check); plots height, position error and NEES |
 
-Findings:
-- **`always`** is dramatically worse than `phase_conditional` in *both* the anchor and cruise windows, not just during motion: the overconfidence from misapplying ZUPT during cruise bleeds into the next anchor phase.
-- **No variant is consistent at the defaults:** the velocity ramps' acceleration is about 3.3× the filters' assumed process noise.
-- **`never` beats `phase_conditional`** in calibration and position accuracy at the defaults, because ZUPT has just made `phase_conditional` confident when the ramp arrives. With the process noise sized to cover the ramps, `phase_conditional` wins on both.
-- **Side extension (§5, heading and ZARU):** a planar version with heading and turn rate. When the process noise covers the ramps, gating ZUPT and ZARU together on anchor ticks gives the lowest NEES and heading error, because without ZARU the unobserved heading drifts through every dwell. At the defaults `never` again has the lowest NEES.
-- See the doc for the full numbers and mechanism.
+| Variant | Meaning |
+|---|---|
+| RIEKF, invariant-naive | Treats the bounce as state-independent |
+| RIEKF, reset-Jacobian | Adds the bounce's state dependence |
+| RIEKF, saltation | Also corrects the impact timing |
+| RIEKF, saltation + timing noise | Adds a contact-detection timing term |
+| World-frame EKF, saltation | Non-invariant baseline |
 
-![Two panels from inchworm_zupt_ekf.py: velocity over the anchor/extend gait with the estimates of the three ZUPT policies, and Monte Carlo NEES for the never, always and phase_conditional ZUPT policies against the consistent value of 2](assets/inchworm_zupt_ekf.png)
-
-#### Scripts
-
-- [use_numpy/inchworm_zupt_ekf.py](use_numpy/inchworm_zupt_ekf.py)
-- [use_numpy/inchworm_zupt_ekf_v2.py](use_numpy/inchworm_zupt_ekf_v2.py): class-based version, same output
-- [generator/animate_inchworm_zupt_ekf.py](generator/animate_inchworm_zupt_ekf.py): animated GIF of the default run, embedded in [inchworm_zupt_ekf.md](docs/filtering/inchworm_zupt_ekf.md); render with `uv run python generator/animate_inchworm_zupt_ekf.py --out assets/inchworm_zupt_ekf.gif`
-- [use_numpy/inchworm_zupt_zaru_ekf.py](use_numpy/inchworm_zupt_zaru_ekf.py): the planar side extension with heading and ZARU (doc §5); same flags plus `--omega-extend`, `--process-noise-ang-std`, `--zaru-noise-std`, `--init-heading-noise-std`, `--init-omega-noise-std`
-- [use_numpy/inchworm_zupt_zaru_ekf_v2.py](use_numpy/inchworm_zupt_zaru_ekf_v2.py): class-based version, same output
-- [generator/animate_inchworm_zupt_zaru_ekf.py](generator/animate_inchworm_zupt_zaru_ekf.py): animated GIF of the side extension at matched process noise (its defaults, not the script's); render with `uv run python generator/animate_inchworm_zupt_zaru_ekf.py --out assets/inchworm_zupt_zaru_ekf.gif`
-- [use_numpy/inchworm_slip_gate_ekf.py](use_numpy/inchworm_slip_gate_ekf.py): anchor slip and the pad-sensor gate (doc §6); flags `--p-slip`, `--v-slip`, `--t-slip`, `--sensor-noise-std`, `--gate-sigmas`, plus the gait and noise flags of `inchworm_zupt_ekf.py`; the default process noise is the matched 0.5 m/s², not 0.15
-- [use_numpy/inchworm_slip_gate_ekf_v2.py](use_numpy/inchworm_slip_gate_ekf_v2.py): class-based version, same output
-- [generator/animate_inchworm_slip_gate_ekf.py](generator/animate_inchworm_slip_gate_ekf.py): animated GIF of the slip-gate extension at its defaults; render with `uv run python generator/animate_inchworm_slip_gate_ekf.py --out assets/inchworm_slip_gate_ekf.gif`
-
-#### Usage
-
-```
-uv run python use_numpy/inchworm_zupt_ekf.py --duration 10.0 --dt 0.05 --t-anchor 1.0 --t-extend 1.0 --t-ramp 0.2 --v-extend 0.1 --pos-noise-std 0.02 --process-noise-std 0.15 --zupt-noise-std 0.01 --init-pos-noise-std 0.05 --init-vel-noise-std 0.05 --n-mc-trials 500 --seed 0 --out out.png
-```
-
-- `--duration`: simulation length in seconds (default `10.0`)
-- `--dt`: filter/measurement step interval in seconds (default `0.05`)
-- `--t-anchor`: anchor/dwell phase duration per cycle, s (default `1.0`)
-- `--t-extend`: extend phase duration per cycle (including its ramps), s (default `1.0`)
-- `--t-ramp`: linear ramp-up/ramp-down duration at each end of the extend phase, s (default `0.2`) - keeps `true_velocity` continuous everywhere; see the doc's §2 (a step jump is an unmodeled acceleration) for why this (and its interaction with `--process-noise-std`) matters
-- `--v-extend`: commanded cruise speed during the extend phase, m/s (default `0.1`)
-- `--pos-noise-std`: position measurement noise std-dev, m (default `0.02`)
-- `--process-noise-std`: assumed acceleration-disturbance noise std-dev, $\text{m/s}^2$ (default `0.15`)
-- `--zupt-noise-std`: ZUPT pseudo-measurement noise std-dev, m/s (default `0.01`)
-- `--init-pos-noise-std`/`--init-vel-noise-std`: std-dev used to perturb the initial position/velocity guess (defaults `0.05`/`0.05`)
-- `--n-mc-trials`: number of Monte Carlo consistency trials (default `500`)
-- `--seed`: RNG seed (default `0`)
-- `--out`: save the figure to this path instead of showing it (default: show)
-
-### 13. Friction-anisotropic process noise: fixed vs. heading-aware Q
-
-#### Purpose
-
-`docs/filtering/friction_anisotropic_ekf.md` applies this repo's own `pointcloud_pose_tracking_empirical_note.md` argument (a noise ellipsoid fixed in a body frame looks anisotropic-and-rotating in the world frame) to *process* noise instead of measurement noise. A unicycle drives an exact, known circular arc (heading is exact and noise-free, driven by a known commanded turn rate) while true position picks up a random slip disturbance each tick, drawn anisotropically in the pad's own body frame - low variance along grip/forward, high variance along slip/lateral - then rotated into world coordinates by the *true* heading. Three ways of building the position block of the filter's process-noise covariance $Q$ are compared, sharing an identical predict step and the same noisy position measurement each tick:
-
-- **`isotropic`:** direction-blind, same total noise budget as the other two.
-- **`fixed_anisotropic`:** correctly anisotropic in shape, but fixed to the heading at $t=0$ and never updated - the mistake of knowing the pad is anisotropic without re-deriving $Q$ as the robot turns.
-- **`heading_aware`:** correctly anisotropic and re-oriented every predict step using the filter's own current heading estimate - the correct policy.
-
-`fixed_anisotropic` comes out dramatically worse than *both* alternatives at every heading checkpoint, and the worst mismatch sits at a 90° heading difference from its stale reference, not 180° - a covariance ellipse has period $\pi$, not $2\pi$. Past 90° its NEES recovers only partly, likely because the mismatch leaves error in the heading estimate, which is never measured directly (mechanism not isolated; see the doc). See the doc for the full Monte Carlo NEES table (each trial redraws the slip, the initial error and the measurement noise).
-
-![Two panels from friction_anisotropic_ekf.py: the circular path with the per-step slip covariance ellipse turning with the heading, and Monte Carlo NEES over one full turn for isotropic, frozen anisotropic and heading-aware process noise](assets/friction_anisotropic_ekf.png)
-
-#### Scripts
-
-- [use_numpy/friction_anisotropic_ekf.py](use_numpy/friction_anisotropic_ekf.py)
-- [use_numpy/friction_anisotropic_ekf_v2.py](use_numpy/friction_anisotropic_ekf_v2.py): class-based version, same output
-- [generator/animate_friction_anisotropic_ekf.py](generator/animate_friction_anisotropic_ekf.py): animated GIF of the default run, embedded in [friction_anisotropic_ekf.md](docs/filtering/friction_anisotropic_ekf.md); render with `uv run python generator/animate_friction_anisotropic_ekf.py --out assets/friction_anisotropic_ekf.gif`
-
-#### Usage
-
-```
-uv run python use_numpy/friction_anisotropic_ekf.py --duration 20.0 --dt 0.05 --v-cmd 0.2 --sigma-grip 0.02 --sigma-slip 0.1 --sigma-theta 0.01 --pos-noise-std 0.02 --init-pos-noise-std 0.05 --init-theta-noise-std 0.05 --n-mc-trials 500 --seed 0 --out out.png
-```
-
-- `--duration`: simulation length in seconds (default `20.0`)
-- `--dt`: filter/measurement step interval in seconds (default `0.05`)
-- `--v-cmd`: constant commanded forward speed, m/s (default `0.2`)
-- `--omega-cmd`: constant commanded turn rate, rad/s (default: $2\pi/\text{duration}$, i.e. exactly one full loop, so heading sweeps every orientation relative to the fixed reference)
-- `--sigma-grip`/`--sigma-slip`: true body-frame slip std-dev along the grip/forward and slip/lateral axes, m/s (defaults `0.02`/`0.1`)
-- `--sigma-theta`: assumed heading process-noise std-dev, all three filter variants, rad/s (default `0.01`)
-- `--pos-noise-std`: position measurement noise std-dev, m (default `0.02`)
-- `--init-pos-noise-std`/`--init-theta-noise-std`: std-dev used to perturb the initial position/heading guess (defaults `0.05`/`0.05`)
-- `--n-mc-trials`: number of Monte Carlo consistency trials (default `500`)
-- `--seed`: RNG seed (default `0`)
-- `--out`: save the figure to this path instead of showing it (default: show)
-
-### 14. Sliding-window marginalization: bounded-memory pose-graph smoothing
-
-#### Purpose
-
-`docs/optimization/marginalization.md` §4 derives the Schur complement that turns an eliminated pose into a prior factor over its surviving neighbors; this script implements it.
-- **Setup:** a pure odometry chain streams in one node at a time. It deliberately has no loop closures, so the marginal produced at each step is provably unary - isolating the memory-*bounding* property from the fill-in problem `bayes_tree.md`/`isam2_optimization.md` already cover.
-- **Sliding window:** whenever the live window would exceed `--window-size`, the oldest pose is marginalized out via the Schur complement and dropped; every other pose keeps optimizing inside a bounded-size Gauss-Newton solve.
-- **Baseline:** `run_full_batch_growing` re-solves the entire graph from scratch at every new node, compared across a sweep of trajectory lengths (`--nodes-per-side-sweep`).
-- **Result:** full-batch's largest dense information matrix (`max_dof`) grows linearly with trajectory length (so its memory grows quadratically), while sliding-window's caps at exactly `6 * window_size` the moment the window first fills and never moves again.
-- **Identical final position RMSE** between the two - a consequence of the no-loop-closure scope: a pure odometry chain has no redundant measurements, so both solvers return exactly the dead-reckoned trajectory (see the doc §9).
-
-![Three panels from sliding_window_marginalization.py: largest information-matrix size, time per new pose and position RMSE against trajectory length from 8 to 256 poses, for a full batch re-solve and a 10-pose sliding window](assets/sliding_window_marginalization.png)
-
-#### Scripts
-
-- [use_numpy/sliding_window_marginalization.py](use_numpy/sliding_window_marginalization.py)
-- [generator/animate_sliding_window_marginalization.py](generator/animate_sliding_window_marginalization.py): animated GIF of the default run, embedded in [marginalization.md](docs/optimization/marginalization.md); render with `uv run python generator/animate_sliding_window_marginalization.py --out assets/sliding_window_marginalization.gif`
-
-#### Usage
-
-```
-uv run python use_numpy/sliding_window_marginalization.py --nodes-per-side-sweep 2 4 8 16 32 64 --side-length 2.0 --window-size 10 --pos-noise-std 0.05 --rot-noise-std 0.01 --anchor-weight 1e6 --gn-tol 1e-6 --gn-max-iters 10 --seed 0 --out out.png
-```
-
-- `--nodes-per-side-sweep`: sweep of nodes-per-side values, trajectory has 4x this many total poses per entry (default `2 4 8 16 32 64`) - the resource-constraint result is how cost scales across this sweep, not any single run
-- `--side-length`: side length of the square ground-truth path, m (default `2.0`)
-- `--window-size`: sliding-window size, poses kept live at once (default `10`)
-- `--pos-noise-std`: odometry-edge translation noise std-dev, m (default `0.05`)
-- `--rot-noise-std`: odometry-edge rotation noise std-dev, rad (default `0.01`)
-- `--anchor-weight`: information weight of the node-0 gauge-fixing prior (default `1e6`)
-- `--gn-tol`: Gauss-Newton convergence tolerance (default `1e-6`)
-- `--gn-max-iters`: maximum Gauss-Newton iterations per solve (default `10`)
-- `--seed`: RNG seed (default `0`)
-- `--out`: save the figure to this path instead of showing it (default: show)
-
-### 15. Invariant EKF on $SE_2(3)$ through a bounce
-
-#### Purpose
-
-`docs/filtering/invariant_saltation_ekf.md` lifts §11's bouncing point mass to a **tumbling rigid body carrying an IMU**, with state $`X = (R, v, p) \in SE_2(3)`$, tracked by a **right-invariant EKF (RIEKF)**. Between bounces the RIEKF's error dynamics are exactly linear and trajectory-independent ($`\Phi = e^{A h}`$ with constant $`A`$), and body-frame landmark measurements give a constant $`H`$. The bounce $`(R, v, p) \mapsto (R, M v, p)`$ is not a group automorphism, so its Jacobian in invariant coordinates is state-dependent.
-
-Five filters, identical apart from the bounce treatment or the error coordinates:
- 1. **RIEKF, invariant-naive:** $`\mathrm{blockdiag}(I, M, I)`$ - applies the reset to the velocity error as if it were an automorphism.
- 2. **RIEKF, reset-Jacobian:** $`T(X^+)^{-1} DR\, T(X^-)`$ - correct state dependence, no impact-timing correction.
- 3. **RIEKF, saltation:** $`\Xi_{RI} = T(X^+)^{-1} \Xi_{\text{world}} T(X^-)`$ - both; matches a finite-difference ground truth of the exact hybrid map on $`SE_2(3)`$ to about $`10^{-9}`$ (the other two are off by order one).
- 4. **RIEKF, saltation + timing noise:** saltation plus $`s^2 w w^\top`$ at each bounce, where $`w = T(X^+)^{-1}(f^+ - DR\, f^-)`$ is how far the post-impact state moves per second of contact-detection timing error and $`s`$ is that error's RMSE. Identical to saltation with exact detection (the default).
- 5. **World-frame EKF, saltation:** the non-invariant baseline.
-
-Results (Monte Carlo NEES over mode-matched ticks, 200 trials; consistent value 9, 95% interval [8.42, 9.60]): after bounces the invariant-naive filter is overconfident (13.45 at the defaults, 16.44 with `--meas-every 25`), reset-Jacobian and saltation are close to consistent (9.33/8.89 and 10.36/9.37), and the world-frame EKF is already inconsistent before the first bounce (14.01/18.92). RMSEs are nearly identical across the RIEKFs - the effect is in the reported uncertainty.
-
-With contact-detection jitter (`--detect-time-noise-std`, doc §7), every filter without the timing term becomes overconfident after bounces, the saltation one more than the reset-Jacobian one from 2 ms of jitter on (30.99 vs. 22.55 at 5 ms, seeds 0-3), while saltation + timing noise stays consistent (8.68-9.03 from 0 to 5 ms).
+**Details:** [invariant_saltation_ekf.md](docs/filtering/invariant_saltation_ekf.md)
 
 ![Three panels from invariant_saltation_ekf.py: height of the bouncing body for the ground truth and the filters, single-run position error, and Monte Carlo average NEES over time against the consistent value of 9](assets/invariant_saltation_ekf.png)
 
-#### Scripts
+**Scripts:**
 
 - [use_numpy/invariant_saltation_ekf.py](use_numpy/invariant_saltation_ekf.py)
 - [use_numpy/invariant_saltation_ekf_v2.py](use_numpy/invariant_saltation_ekf_v2.py): class-based version, same output
 - [use_manif/invariant_saltation_ekf.py](use_manif/invariant_saltation_ekf.py)
-- [generator/animate_invariant_saltation_ekf.py](generator/animate_invariant_saltation_ekf.py): animated GIF of the default run, embedded in [invariant_saltation_ekf.md](docs/filtering/invariant_saltation_ekf.md); render with `uv run python generator/animate_invariant_saltation_ekf.py --out assets/invariant_saltation_ekf.gif`
+- [generator/animate_invariant_saltation_ekf.py](generator/animate_invariant_saltation_ekf.py): animated GIF; render with `uv run python generator/animate_invariant_saltation_ekf.py --out assets/invariant_saltation_ekf.gif`
 
-#### Usage
+**Run:**
 
 ```
 uv run python use_numpy/invariant_saltation_ekf.py --duration 5.0 --dt 0.01 --meas-every 10 --restitution 0.8 --gravity 9.81 --drop-height 5.0 --init-velocity 1.0 0.5 0.0 --body-rate 1.0 -0.6 2.0 --gyro-noise-std 0.02 --accel-noise-std 0.3 --meas-noise-std 0.05 --init-rot-std-deg 5.0 --init-vel-std 0.2 --init-pos-std 0.1 --detect-time-bias 0.0 --detect-time-noise-std 0.0 --n-mc-trials 200 --seed 0
 ```
+
+<details>
+<summary>All flags</summary>
 
 - `--duration`: simulation length in seconds (default `5.0`, four bounces) - the run raises an error if an impact gets slower than `min_bounce_speed`, rather than modeling the settling phase
 - `--dt`: IMU step in seconds (default `0.01`)
@@ -789,151 +813,96 @@ uv run python use_numpy/invariant_saltation_ekf.py --duration 5.0 --dt 0.01 --me
 - `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
 
-### 16. Hexapod leg odometry: what the gait changes
+</details>
 
-#### Purpose
+#### 15. Inchworm ZUPT: exploiting a known anchor/dwell schedule
 
-`docs/filtering/hexapod_gait_ekf.md` tracks a planar hexapod body, state $`x = [p_x, p_y, \theta, u, v, \omega]`$, from its legs alone: each stance foot reports its velocity relative to the body, $`-(b + \omega \times r_i)`$, and the gait (tripod, ripple or wave: 3, 4 or 5 feet down) decides which feet those are. Every gait walks the same random-walk truth with the same per-foot noise, and $Q$ is matched, so NEES is a fair test.
+**Purpose:** Asks whether a filter should use the free zero-velocity update (ZUPT) during the stationary phases of a known anchor/extend gait. Compares three ZUPT policies on a 1D point mass.
 
-- **No slip:** every gait is consistent (100 trials, seeds 0-2: twist NEES 2.96-3.02 against 3). Wave beats tripod on twist RMSE by only 12%, not the 22% of a single tick, because the filter's steady-state std scales as $`n^{-1/4}`$. Three feet on one side would be about 40% worse than the tripod's triangle. Position and heading are never measured and drift for every gait.
-- **One slipping leg** (L2, 0.1 m/s sideways for 4 s): trusting every foot gives about 5× the velocity error and twist NEES 34-37; a per-foot $`\chi^2`$ gate (99%) drops about 98% of the slipping readings and restores the no-slip numbers for every gait. A 0.03 m/s slip mostly passes the gate.
-- **Random foot drift** (tripod and wave, `--foot-drift-std 0.02`): it acts as extra reading noise. Ignoring it leaves accuracy intact but twist NEES about 1.5× too high (4.51-4.67); including it in the reading variance restores 2.94-3.05.
-- **Contact-timing jitter** (`--detect-time-noise-std`): a filter that trusts the detected touchdown/liftoff times reads swinging feet as planted. The wave gait's fast swings make this far worse than for the tripod (twist NEES 108-123 vs 6.8-7.5 at 0.05 s). The per-foot gate stays near 3 for both gaits from 0.02 to 0.1 s; trimming readings near detected touchdowns and liftoffs works for the tripod only. Touchdown changes no body state here, so the saltation matrix is the identity and its timing-noise term is zero (doc §1).
+| Input | Output |
+|---|---|
+| 1D point mass alternating anchor (still) and extend (moving) phases, noisy position measured every step | Prints per-policy errors and Monte Carlo [NEES](docs/glossary.md#consistency-and-nees) (consistency check); plots velocity, error and NEES |
 
-![Three panels from hexapod_gait_ekf.py: forward-speed and turn-rate RMSE per gait with the (q s^2)^(1/4) steady-state estimate, and sideways-velocity RMSE over time with leg L2 slipping, trusting every foot versus the per-foot chi-squared gate](assets/hexapod_gait_ekf.png)
+| Policy | Meaning |
+|---|---|
+| `never` | No ZUPT; position measurement only |
+| `always` | ZUPT on every tick |
+| `phase_conditional` | ZUPT only on scheduled anchor ticks |
 
-#### Scripts
+**Details:** [inchworm_zupt_ekf.md](docs/filtering/inchworm_zupt_ekf.md)
 
-- [use_numpy/hexapod_gait_ekf.py](use_numpy/hexapod_gait_ekf.py)
-- [use_numpy/hexapod_gait_ekf_v2.py](use_numpy/hexapod_gait_ekf_v2.py): class-based version, same output
-- [generator/animate_hexapod_gait_ekf.py](generator/animate_hexapod_gait_ekf.py): animated GIF of one run with L2 slipping, embedded in [hexapod_gait_ekf.md](docs/filtering/hexapod_gait_ekf.md); render with `uv run python generator/animate_hexapod_gait_ekf.py --out assets/hexapod_gait_ekf.gif`
+![Two panels from inchworm_zupt_ekf.py: velocity over the anchor/extend gait with the estimates of the three ZUPT policies, and Monte Carlo NEES for the never, always and phase_conditional ZUPT policies against the consistent value of 2](assets/inchworm_zupt_ekf.png)
 
-#### Usage
+**Scripts:**
+
+- [use_numpy/inchworm_zupt_ekf.py](use_numpy/inchworm_zupt_ekf.py)
+- [use_numpy/inchworm_zupt_ekf_v2.py](use_numpy/inchworm_zupt_ekf_v2.py): class-based version, same output
+- [generator/animate_inchworm_zupt_ekf.py](generator/animate_inchworm_zupt_ekf.py): animated GIF; render with `uv run python generator/animate_inchworm_zupt_ekf.py --out assets/inchworm_zupt_ekf.gif`
+- [use_numpy/inchworm_zupt_zaru_ekf.py](use_numpy/inchworm_zupt_zaru_ekf.py): planar extension with heading and zero-angular-rate update (ZARU), doc §5; same flags plus `--omega-extend`, `--process-noise-ang-std`, `--zaru-noise-std`, `--init-heading-noise-std`, `--init-omega-noise-std`
+- [use_numpy/inchworm_zupt_zaru_ekf_v2.py](use_numpy/inchworm_zupt_zaru_ekf_v2.py): class-based version, same output
+- [generator/animate_inchworm_zupt_zaru_ekf.py](generator/animate_inchworm_zupt_zaru_ekf.py): animated GIF at matched process noise; render with `uv run python generator/animate_inchworm_zupt_zaru_ekf.py --out assets/inchworm_zupt_zaru_ekf.gif`
+- [use_numpy/inchworm_slip_gate_ekf.py](use_numpy/inchworm_slip_gate_ekf.py): anchor slip and a pad-sensor gate, doc §6; flags `--p-slip`, `--v-slip`, `--t-slip`, `--sensor-noise-std`, `--gate-sigmas`, plus the gait and noise flags above; default process noise 0.5 m/s², not 0.15
+- [use_numpy/inchworm_slip_gate_ekf_v2.py](use_numpy/inchworm_slip_gate_ekf_v2.py): class-based version, same output
+- [generator/animate_inchworm_slip_gate_ekf.py](generator/animate_inchworm_slip_gate_ekf.py): animated GIF; render with `uv run python generator/animate_inchworm_slip_gate_ekf.py --out assets/inchworm_slip_gate_ekf.gif`
+
+**Run:**
 
 ```
-uv run python use_numpy/hexapod_gait_ekf.py --duration 12.0 --dt 0.02 --cycle-period 1.2 --forward-speed 0.1 --turn-rate 0.2 --lin-accel-std 0.05 --ang-accel-std 0.1 --meas-noise-std 0.02 --init-pos-noise-std 0.01 --init-heading-noise-std 0.01 --init-twist-noise-std 0.05 --slip-leg L2 --slip-start 4.0 --slip-end 8.0 --slip-speed 0.1 --foot-drift-std 0.02 --detect-time-noise-std 0.05 --n-mc-trials 100 --seed 0
+uv run python use_numpy/inchworm_zupt_ekf.py --duration 10.0 --dt 0.05 --t-anchor 1.0 --t-extend 1.0 --t-ramp 0.2 --v-extend 0.1 --pos-noise-std 0.02 --process-noise-std 0.15 --zupt-noise-std 0.01 --init-pos-noise-std 0.05 --init-vel-noise-std 0.05 --n-mc-trials 500 --seed 0 --out out.png
 ```
 
-- `--duration`: simulation length in seconds (default `12.0`)
-- `--dt`: filter/measurement step interval in seconds (default `0.02`)
-- `--cycle-period`: gait cycle period, s; must be a multiple of `6*dt` (default `1.2`)
-- `--forward-speed`/`--turn-rate`: initial forward speed, m/s, and turn rate, rad/s, of the random-walk truth (defaults `0.1`/`0.2`)
-- `--lin-accel-std`/`--ang-accel-std`: twist random-walk std-devs, $`\text{m/s}^2`$ and $`\text{rad/s}^2`$, used by both truth and filter (defaults `0.05`/`0.1`)
-- `--meas-noise-std`: per-axis std-dev of each foot's relative-velocity reading, m/s (default `0.02`)
-- `--init-pos-noise-std`/`--init-heading-noise-std`/`--init-twist-noise-std`: initial-guess std-devs, m, rad and m/s (rad/s for $`\omega`$) (defaults `0.01`/`0.01`/`0.05`)
-- `--slip-leg`: leg that slips in the slip experiment, one of `L1`-`L3`, `R1`-`R3` (default `L2`)
-- `--slip-start`/`--slip-end`: slip window, s (defaults `4.0`/`8.0`)
-- `--slip-speed`: outward sideways slip speed, m/s (default `0.1`)
-- `--foot-drift-std`: random drift velocity std-dev of every stance foot in the drift experiment, m/s (default `0.02`)
-- `--detect-time-noise-std`: touchdown/liftoff detection-time error std-dev in the jitter experiment, s (default `0.05`)
-- `--n-mc-trials`: number of Monte Carlo trials (default `100`; about 3 minutes)
+<details>
+<summary>All flags</summary>
+
+- `--duration`: simulation length in seconds (default `10.0`)
+- `--dt`: filter/measurement step interval in seconds (default `0.05`)
+- `--t-anchor`: anchor/dwell phase duration per cycle, s (default `1.0`)
+- `--t-extend`: extend phase duration per cycle (including its ramps), s (default `1.0`)
+- `--t-ramp`: linear ramp-up/ramp-down duration at each end of the extend phase, s (default `0.2`) - keeps `true_velocity` continuous everywhere; see the doc's §2 (a step jump is an unmodeled acceleration) for why this (and its interaction with `--process-noise-std`) matters
+- `--v-extend`: commanded cruise speed during the extend phase, m/s (default `0.1`)
+- `--pos-noise-std`: position measurement noise std-dev, m (default `0.02`)
+- `--process-noise-std`: assumed acceleration-disturbance noise std-dev, $\text{m/s}^2$ (default `0.15`)
+- `--zupt-noise-std`: ZUPT pseudo-measurement noise std-dev, m/s (default `0.01`)
+- `--init-pos-noise-std`/`--init-vel-noise-std`: std-dev used to perturb the initial position/velocity guess (defaults `0.05`/`0.05`)
+- `--n-mc-trials`: number of Monte Carlo consistency trials (default `500`)
 - `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
 
-### 17. Contact-aided invariant EKF on a hexapod: which filter knows yaw is unobservable
+</details>
 
-#### Purpose
+#### 16. Two-pad inchworm: trusting the anchored pad without a position fix
 
-`docs/filtering/hexapod_contact_inekf.md` tracks a 3D hexapod from an IMU and leg kinematics, with every stance foot's world position in the state: $`X = (R, v, p, d_1, \dots, d_K) \in SE_{K+2}(3)`$, a foot added at touchdown and marginalized at liftoff (Hartley et al. 2020). The invariant EKF (right-invariant error) and a world-frame error-state EKF run on identical data. Yaw and absolute position are unobservable from these sensors, so a consistent filter can only lose information about them.
+**Purpose:** Asks how a planar inchworm with no position fix, whose two pads swap anchored and moving roles each phase, should treat its anchored pad when it can slip. Compares four policies, from assuming the pad is still to fusing its sensor.
 
-- **No biases, small initial error** (rotation std 0.02 rad, 50 trials): both filters consistent (NEES 8.9-9.3 against 9) and equally accurate for every gait, but the world-frame EKF's reported yaw σ already falls below its prior (1.03-1.06° vs 1.146°).
-- **Larger initial rotation error** (tripod): at 0.1 / 0.3 rad the world-frame EKF's NEES is 18.2 / 481, with a reported yaw σ of 1.9° / 1.3° against an actual 6.8° / 20.2°; the invariant EKF stays at 9.3-9.4. Accuracy is within 6-9%.
-- **One slipping leg:** a per-foot $`\chi^2`$ gate (3 DoF, 99%) halves the in-window velocity error and brings NEES back to about 10, but passes 30-52% of the slipping readings, since the residual is the distance slid since touchdown.
-- **IMU biases** in the state (the "imperfect" InEKF): the invariant EKF stays consistent (NEES 8.9-9.5, bias NEES 6.1-6.3); the world-frame EKF is again mildly overconfident in yaw.
+| Input | Output |
+|---|---|
+| Planar two-pad inchworm with a gyro and an anchored-pad displacement sensor, no position measurement, random anchor slips | Prints per-policy errors and Monte Carlo [NEES](docs/glossary.md#consistency-and-nees) (consistency check); plots top view, sensor reading, error and NEES |
 
-![Three panels from hexapod_contact_inekf.py: yaw error with 0.1 rad initial rotation std, actual RMSE versus reported sigma for both filters; average NEES against initial rotation std 0.02, 0.1 and 0.3 rad, invariant EKF 9.3-9.4 and world-frame EKF 9.6, 18.2 and 481; and the invariant EKF's velocity RMSE with leg L2 slipping, trusting every foot versus the per-foot chi-squared gate](assets/hexapod_contact_inekf.png)
+| Policy | Meaning |
+|---|---|
+| `never` | Anchored pad moves as a loose random walk |
+| `schedule` | Anchored pad assumed still |
+| `schedule_and_sensor` | As `schedule`, unless the pad sensor shows motion |
+| `pad_fused` | Anchored pad moves by its sensor reading |
 
-#### Scripts
-
-- [use_numpy/hexapod_contact_inekf.py](use_numpy/hexapod_contact_inekf.py)
-- [generator/animate_hexapod_contact_inekf.py](generator/animate_hexapod_contact_inekf.py): animated GIF of one run (seed 4, 0.1 rad initial rotation std), embedded in [hexapod_contact_inekf.md](docs/filtering/hexapod_contact_inekf.md); render with `uv run python generator/animate_hexapod_contact_inekf.py --out assets/hexapod_contact_inekf.gif`
-
-#### Usage
-
-```
-uv run python use_numpy/hexapod_contact_inekf.py --duration 12.0 --dt 0.02 --cycle-period 1.2 --forward-speed 0.1 --turn-rate 0.2 --gyro-noise-std 0.005 --accel-noise-std 0.05 --contact-noise-std 0.01 --kin-noise-std 0.005 --slip-leg L2 --slip-start 4.0 --slip-end 8.0 --slip-speed 0.1 --n-mc-trials 50 --seed 0
-```
-
-- `--duration`: simulation length in seconds (default `12.0`)
-- `--dt`: IMU and kinematics step in seconds (default `0.02`)
-- `--cycle-period`: gait cycle period, s; must be a multiple of `6*dt` (default `1.2`)
-- `--forward-speed`/`--turn-rate`: initial forward speed, m/s, and turn rate, rad/s, of the random-walk truth (defaults `0.1`/`0.2`)
-- `--gyro-noise-std`/`--accel-noise-std`: per-sample IMU noise std-devs, rad/s and $`\text{m/s}^2`$ (defaults `0.005`/`0.05`)
-- `--contact-noise-std`: stance-foot velocity noise, body frame, m/s (default `0.01`)
-- `--kin-noise-std`: kinematic foot-position noise per axis, m (default `0.005`)
-- `--slip-leg`: leg that slips in experiment 2, one of `L1`-`L3`, `R1`-`R3` (default `L2`)
-- `--slip-start`/`--slip-end`: slip window, s (defaults `4.0`/`8.0`)
-- `--slip-speed`: outward sideways slip speed, m/s (default `0.1`)
-- `--n-mc-trials`: Monte Carlo trials per experiment (default `50`; about 4 minutes for all experiments)
-- `--seed`: RNG seed (default `0`)
-- `--out`: save the figure to this path instead of showing it (default: show)
-
-### 18. LiDAR primitives: planes and cylinders for scan registration
-
-#### Purpose
-
-`docs/frontend/lidar_primitives.md` does the correspondence step that `pointcloud_pose_tracking.py` skips. Planes and cylinders are fitted to each simulated LiDAR scan (sequential RANSAC with competing plane and cylinder hypotheses), and two scans are registered three ways in one SE(3) Gauss-Newton loop, re-associated every iteration: point-to-point ICP, point-to-plane ICP, and matched primitives.
-
-- **Extraction** (32 rings, 10 poses per cell): planes 100% found at every noise level (normal error ≤ 0.024°); the usual orthogonal-distance cylinder fit underestimates a pillar's radius by a bias that grows with the square of the range noise (−16 to −20 mm at 4 cm); a range-space fit cuts it to +3.6 to +6.6 mm. With fixed 12-neighbor normals, 720 points per ring finds only 61% of the pillars at 4 cm noise, against 100% at 180.
-- **Convergence basin** (pillared corridor, 50 starts per size): primitives are the most accurate (0.2-0.4 mm, 4-5 iterations) but point-to-plane ICP has the wider basin (98% against 84% at 1 m and 20°); point-to-point ICP stalls (22% at 0.5 m and 10°).
-- **Degeneracy** (planes-only corridor): only the primitive method's Hessian reports the free corridor axis honestly (predicted σ 13 m); point-to-plane predicts 2.1 mm and point-to-point 0.11 mm while being off by 288 and 118 mm. With pillars, only the primitive method is consistent (median error 0.74σ).
-- **Planes as landmarks** (L-shaped corridor, 40 scans, 5 runs): 6 landmarks every run for the 6 planes; end-point drift 5.6 → 4.3 mm, a small gain because the primitive odometry barely drifts.
-
-![Three panels from lidar_primitives.py experiments 2 to 4: success rate against initial error for point-to-point ICP, point-to-plane ICP and primitives; error along the corridor against the predicted sigma in the planes-only corridor and with pillars; and the end-point drift and aligned trajectory error of odometry versus the plane-landmark graph over five runs](assets/lidar_primitives.png)
-
-#### Scripts
-
-- [use_numpy/lidar_primitives.py](use_numpy/lidar_primitives.py)
-- [use_manif/lidar_primitives.py](use_manif/lidar_primitives.py): same experiments with manif poses; agrees with the `use_numpy` version to round-off except in nearly singular runs
-- [lidar_utils.py](lidar_utils.py): the shared scene, LiDAR, extraction, matching and landmark-association helpers
-- [generator/animate_lidar_primitives.py](generator/animate_lidar_primitives.py): animated GIF of one registration (pair 1 of experiment 2, 0.5 m and 10° initial error), embedded in [lidar_primitives.md](docs/frontend/lidar_primitives.md); render with `uv run python generator/animate_lidar_primitives.py --out assets/lidar_primitives.gif`
-
-#### Usage
-
-```
-uv run python use_numpy/lidar_primitives.py --experiment all --n-trials 10 --n-pairs 10 --n-starts 5 --n-runs 5 --noise 0.01 --seed 0
-```
-
-- `--experiment`: `1` extraction accuracy, `2` convergence basin, `3` degeneracy, `4` planes as landmarks, or `all` (default `all`; several minutes per experiment)
-- `--n-trials`: experiment 1, sensor poses per noise/density cell (default `10`)
-- `--n-pairs`: experiments 2-3, scan pairs (default `10`)
-- `--n-starts`: experiment 2, initial guesses per pair and error size (default `5`)
-- `--n-runs`: experiment 4, noise realizations of the trajectory (default `5`)
-- `--noise`: experiments 2-4, range noise std, m (default `0.01`)
-- `--seed`: RNG seed (default `0`)
-
-### 19. Two-pad inchworm: trusting the anchored pad without a position fix
-
-#### Purpose
-
-`docs/filtering/inchworm_two_pad_ekf.md` drops the simplifications of §12's slip-gate extension (a 1D point mass, one sensor that reads the body in every phase, a noisy position measurement every tick). A planar inchworm has a **back pad** and a **front pad** that swap roles every phase: one is the **anchored pad** (gripping, ideally still), the other the **moving pad**. The body turns while it extends (measured by a gyro), only the anchored pad's displacement sensor is read, and nothing measures the robot's position, so the filter can only dead-reckon. State $`x=[b_x,b_y,f_x,f_y,\theta]`$ (back pad, front pad, heading); the only update is the **kinematic closure** (the front pad's position relative to the back pad, from the motor encoders), an EKF update that is nonlinear in $`\theta`$. With probability 0.5 per phase the anchored pad slides backward in one pulse. Four policies for the anchored pad share everything else:
-
-- **`never`:** no anchor knowledge - a loose random walk (0.1 m/s).
-- **`schedule`:** "anchored, so still" - blind to slip pulses.
-- **`schedule_and_sensor`:** as `schedule`, unless the pad sensor reads more than a 3σ threshold; then loose for that tick (a veto).
-- **`pad_fused`:** the anchored pad moves by the sensor's reading - the sensor used as a value, not a flag.
-
-Findings (seeds 0-3, 500 trials each; a consistent filter has NEES 5):
-- **`schedule`** is blind to slip, and with no position fix the error is kept: NEES 58.8-483.3 and a final position error of 19.1-50.8% of the distance traveled.
-- **The veto** lowers the NEES to 10.3-28.2 but the position error stays almost as large (17.8-47.0%): it admits the pad moved but not where it went.
-- **`pad_fused`** stays at NEES 4.84-5.01 with a final error of 1.3-4.1%, whatever the number of pulses.
-- **`never`** is not safe either: every pulse slides backward but the filter models independent steps, so with 5 to 13 pulses its NEES grows from 3.19 to 8.09 (errors 8.7-39.3%).
-- **Without slip** (`--p-slip 0`): `schedule` (4.91) and `pad_fused` (4.92) are both consistent, so the problems above come from slip.
-- See the doc for the full tables, the veto tuning and what the toy leaves out.
+**Details:** [inchworm_two_pad_ekf.md](docs/filtering/inchworm_two_pad_ekf.md)
 
 ![Four panels from inchworm_two_pad_ekf.py at its defaults: top view of the true body midpoint and four estimates, the anchored-pad sensor reading with the veto threshold, the midpoint position error over time, and the Monte Carlo NEES per policy on a log scale against the consistent value 5](assets/inchworm_two_pad_ekf.png)
 
-#### Scripts
+**Scripts:**
 
 - [use_numpy/inchworm_two_pad_ekf.py](use_numpy/inchworm_two_pad_ekf.py)
 - [use_numpy/inchworm_two_pad_ekf_v2.py](use_numpy/inchworm_two_pad_ekf_v2.py): class-based version, same output
-- [generator/animate_inchworm_two_pad_ekf.py](generator/animate_inchworm_two_pad_ekf.py): animated GIF of the default run, embedded in [inchworm_two_pad_ekf.md](docs/filtering/inchworm_two_pad_ekf.md); render with `uv run python generator/animate_inchworm_two_pad_ekf.py --out assets/inchworm_two_pad_ekf.gif`
+- [generator/animate_inchworm_two_pad_ekf.py](generator/animate_inchworm_two_pad_ekf.py): animated GIF; render with `uv run python generator/animate_inchworm_two_pad_ekf.py --out assets/inchworm_two_pad_ekf.gif`
 
-#### Usage
+**Run:**
 
 ```
 uv run python use_numpy/inchworm_two_pad_ekf.py --duration 20.0 --dt 0.05 --t-phase 1.0 --t-ramp 0.2 --v-stroke 0.1 --l-min 0.15 --steer 0.3 --p-slip 0.5 --v-slip 0.08 --t-slip 0.6 --micro-slip-std 0.01 --gyro-noise-std 0.02 --sensor-noise-std 0.0005 --closure-noise-std 0.001 --closure-lat-noise-std 0.001 --gate-sigmas 3.0 --free-noise-std 0.1 --move-noise-std 0.02 --init-pos-noise-std 0.005 --init-heading-noise-std 0.02 --n-mc-trials 500 --seed 0 --out out.png
 ```
+
+<details>
+<summary>All flags</summary>
 
 - `--duration`: simulation length in seconds (default `20.0`, 10 extend/contract cycles)
 - `--dt`: filter/sensor step interval, s (default `0.05`)
@@ -957,95 +926,41 @@ uv run python use_numpy/inchworm_two_pad_ekf.py --duration 20.0 --dt 0.05 --t-ph
 - `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
 
-### 20. Gait phase: which feet are on the ground, when touchdowns are uncertain
+</details>
 
-#### Purpose
+#### 17. Two-pad inchworm: reading both pad sensors
 
-`docs/filtering/gait_phase_ekf.md` drops the assumption of §16 that the filter is told which feet are on the ground. The hexapod walks a tripod gait whose liftoffs are commanded (so known), but each foot lands at the commanded time plus an unknown **touchdown offset**: a lag that grows over the run, terrain scatter, and one blocked leg that lands 0.2 s late for 4 s. A **contact detector** flags each touchdown after a delay and sometimes fires falsely during the swing-down. The body EKF is `hexapod_gait_ekf.py`'s, unchanged; only the **stance flags** it receives differ. Four ways to set them, plus the true stance (`oracle`) as a reference:
+**Purpose:** Extends §16's `pad_fused` filter, which reads only the anchored pad's sensor, with the moving pad's sensor and sensor faults (spikes, dropouts). Compares five ways to move the moving pad, including a cross-check between the two sensors.
 
-- **`schedule`:** stance starts at the commanded touchdown (assumes no offset).
-- **`detector`:** stance starts at the detector's first trigger of the step.
-- **`cpg`** (after a central pattern generator, CPG)**:** per tripod group, a learned typical detection offset; triggers earlier than that minus a window (0.1 s) are rejected.
-- **`phase_ekf`:** per tripod group, a two-state Kalman filter on the lag and its rate; triggers more than 3σ earlier than predicted are rejected.
+| Input | Output |
+|---|---|
+| §16's inchworm plus a moving-pad sensor and random sensor faults | Prints per-variant errors, Monte Carlo [NEES](docs/glossary.md#consistency-and-nees) (consistency check) and fault-detection counts; plots readings, error and NEES |
 
-Findings (100 trials; a consistent body NEES here is 5.34-6.70):
-- **The schedule and the raw detector are overconfident:** body NEES 40.6 and 49.8. The schedule reads a foot that is still swinging on 398 ticks per run (late landings), the detector on 129 (false triggers).
-- **A rhythm model fixes it:** `cpg` 6.28 and `phase_ekf` 6.60, against 6.23 with the true stance. They read a swinging foot on 0 and 2.2 ticks per run.
-- **The price is small:** they start stance only after the detector fires, so about 240-250 true-stance ticks per run go unread, but the forward-speed RMSE is 0.0039-0.0040 m/s against 0.0038 with the true stance.
-- **The detector is safe without false triggers** (40-trial sweeps): at a 0% false-trigger rate its NEES is 7.04, the same as `cpg` and `phase_ekf`; at 30% it is 216.2.
-- **The width of the acceptance window decides** (40-trial sweeps): at 100 ms terrain spread, `cpg` with a 0.1 s window stays at NEES 6.81, while `phase_ekf`'s 3σ gate (whose width grows with the terrain spread) reaches 45.6 and its 2σ gate 21.6; a 0.2 s `cpg` window reaches 17.3.
-- **Mistiming flags:** at the defaults `cpg` flags 400 of the 400 blocked steps (99 false alarms among 11600 others) and `phase_ekf` 387 of 400 (78 false alarms).
-- See the doc for the full sweeps, the mistiming table on rougher ground and what the toy leaves out.
+| Variant | Meaning |
+|---|---|
+| `random_walk` | No moving-pad model (§16's `pad_fused`) |
+| `encoder_model` | Anchored pad's motion plus the commanded stroke |
+| `moving_sensor` | The moving pad's own sensor reading |
+| `both` | Inverse-variance mix of the two above |
+| `cross_check` | As `both`, after a disagreement test between the sensors |
 
-![Four panels from gait_phase_ekf.py at its defaults plus a terrain sweep: stance flags of the blocked leg for the true stance and the four approaches with swinging-foot reads highlighted; true touchdown offsets with the CPG and phase-EKF lag estimates; body NEES over time per approach from 100 Monte Carlo runs; and body NEES against terrain spread for the CPG window and the phase EKF at 2 and 3 sigma](assets/gait_phase_ekf.png)
-
-#### Scripts
-
-- [use_numpy/gait_phase_ekf.py](use_numpy/gait_phase_ekf.py)
-- [generator/animate_gait_phase_ekf.py](generator/animate_gait_phase_ekf.py): animated GIF of one default run (7-19.5 s, around the blocked window), embedded in [gait_phase_ekf.md](docs/filtering/gait_phase_ekf.md); render with `uv run python generator/animate_gait_phase_ekf.py --out assets/gait_phase_ekf.gif`
-
-#### Usage
-
-```
-uv run python use_numpy/gait_phase_ekf.py --duration 24.0 --dt 0.02 --cycle-period 1.2 --forward-speed 0.1 --turn-rate 0.2 --lin-accel-std 0.05 --ang-accel-std 0.1 --meas-noise-std 0.02 --init-pos-noise-std 0.01 --init-heading-noise-std 0.01 --init-twist-noise-std 0.05 --lag-max 0.2 --terrain-std 0.03 --blocked-leg L2 --blocked-start 10.0 --blocked-end 14.0 --blocked-delay 0.2 --det-delay 0.04 --det-delay-std 0.02 --false-rate 0.1 --cpg-gain 0.3 --cpg-window 0.1 --cpg-mistime 0.1 --ekf-rate-q 1e-5 --ekf-init-lag-std 0.05 --ekf-init-rate-std 0.01 --ekf-gate 3.0 --n-mc-trials 100 --seed 0 --out out.png
-```
-
-- `--duration`: simulation length in seconds (default `24.0`, 20 gait cycles)
-- `--dt`: filter/measurement step interval in seconds (default `0.02`)
-- `--cycle-period`: commanded gait cycle period, s (default `1.2`)
-- `--forward-speed`/`--turn-rate`: initial forward speed, m/s, and turn rate, rad/s, of the random-walk truth (defaults `0.1`/`0.2`)
-- `--lin-accel-std`/`--ang-accel-std`: twist random-walk std-devs, $`\text{m/s}^2`$ and $`\text{rad/s}^2`$ (defaults `0.05`/`0.1`)
-- `--meas-noise-std`: std-dev of each foot's velocity reading, m/s (default `0.02`)
-- `--init-pos-noise-std`/`--init-heading-noise-std`/`--init-twist-noise-std`: initial-guess std-devs, m, rad and m/s (rad/s for $`\omega`$) (defaults `0.01`/`0.01`/`0.05`)
-- `--lag-max`: final systematic touchdown lag as a fraction of the swing time, growing linearly from 0 (default `0.2`)
-- `--terrain-std`: per-foot, per-step touchdown offset std-dev, s (default `0.03`)
-- `--blocked-leg`: leg that gets blocked, one of `L1`-`L3`, `R1`-`R3` (default `L2`)
-- `--blocked-start`/`--blocked-end`: blocked window, s (defaults `10.0`/`14.0`)
-- `--blocked-delay`: extra landing delay of the blocked leg, s; `0` = off (default `0.2`)
-- `--det-delay`/`--det-delay-std`: mean and std-dev of the detection delay, s; the estimators know the mean (defaults `0.04`/`0.02`)
-- `--false-rate`: probability of a false trigger early in a swing-down, per step (default `0.1`)
-- `--cpg-gain`: CPG learning gain on the touchdown offset (default `0.3`)
-- `--cpg-window`: CPG rejects triggers earlier than the learned offset minus this, s (default `0.1`)
-- `--cpg-mistime`: CPG mistiming threshold on the offset error, s (default `0.1`)
-- `--ekf-rate-q`: phase EKF lag-rate change intensity, $`\text{s}^2/\text{s}^3`$ (default `1e-5`)
-- `--ekf-init-lag-std`/`--ekf-init-rate-std`: phase EKF initial lag std-dev, s, and lag-rate std-dev, s/s (defaults `0.05`/`0.01`)
-- `--ekf-gate`: phase EKF early-reject and mistiming gate, in σ (default `3.0`)
-- `--n-mc-trials`: number of Monte Carlo trials (default `100`)
-- `--seed`: RNG seed (default `0`)
-- `--out`: save the figure to this path instead of showing it (default: show)
-
-### 21. Two-pad inchworm: reading both pad sensors
-
-#### Purpose
-
-`docs/filtering/inchworm_two_pad_ekf.md`'s best filter (`pad_fused`) reads only the **anchored pad**'s displacement sensor and gives the **moving pad** no motion model; `docs/filtering/inchworm_two_pad_fusion_ekf.md` adds what that left out, on the same planar toy (state $`x=[b_x,b_y,f_x,f_y,\theta]`$, kinematic closure, no position fix): the moving pad's own sensor, a prediction of the moving pad from the commanded stroke (an **encoder model**), and imperfect sensors - a **spike** (a backward reading that did not happen, like a slip) or a **dropout** (a reading of 0) lasting 0.3 s. One fact drives the design: a real slip moves both pads by the same amount, so the two sensors agree; a faulty sensor makes them disagree. Five ways to move the moving pad share everything else (the anchored pad always moves by its sensor's reading):
-
-- **`random_walk`:** no motion model for the moving pad, a loose random walk placed by the closure - the two-pad script's `pad_fused`.
-- **`encoder_model`:** the anchored pad's motion plus the commanded change of the body.
-- **`moving_sensor`:** the moving pad's own sensor reading.
-- **`both`:** the inverse-variance combination of the two above.
-- **`cross_check`:** as `both`, after a disagreement test (a Mahalanobis distance of 3) on the moving sensor against the anchored sensor plus the command; on a disagreement, the sensor that disagrees more with "the anchored pad is still" is treated as faulty, and the disagreement's outer product $`r\,r^\top`$ is added to both pads' covariance, since the two choices differ by exactly that (`--no-cross-check-inflate` turns this off).
-
-Findings (300 trials; a consistent filter has NEES 5):
-- **Unchecked fusion adds the faults:** NEES 17.40 (`random_walk`), 25.67 (`encoder_model`), 47.68 (`moving_sensor`), 44.23 (`both`) against 4.67 for `cross_check` (consistent band [4.65, 5.36]), with final errors of 6.1, 5.9, 8.0, 7.6 and 2.4% of the distance traveled. With no slip, faults or stroke error, all five are consistent and the moving pad's sensor gains little.
-- **The cross-check catches most faults:** 1218 of 1222 spikes and 757 of 1145 dropouts, and cuts the false slip alarms raised during sensor faults from 10.4 to 0.8 per run.
-- **Admitting the doubt is what makes it consistent:** without the covariance inflation it reaches 7.70 (100 trials), because a few fault ticks pass the test undetected (two faults that agree; small spikes) or are blamed on the wrong sensor (an anchored-sensor dropout during a slip), and with no position fix those errors never go away.
-- **It stays consistent only if the moving pad's sensor is about as precise as the anchored one's:** at 1 mm noise its NEES is 5.54; at 2 mm, 10.2, and at 5 mm, 14.1, still better than ignoring that sensor (17.5) but overconfident.
-- **The encoder model is overconfident without faults** (`--p-fault 0`, 5% stroke error): the true error is a gain that persists for a whole phase but is treated as white noise, giving NEES 9.14.
-- See the doc for the full tables, the fault-rate and stroke-error sweeps and what the toy leaves out.
+**Details:** [inchworm_two_pad_fusion_ekf.md](docs/filtering/inchworm_two_pad_fusion_ekf.md)
 
 ![Four panels from inchworm_two_pad_fusion_ekf.py: both pad readings of one run with the slip threshold, slip pulses and sensor faults; the Monte Carlo midpoint position RMSE over time for the five variants; the Monte Carlo NEES of the five variants on a log scale against the consistent value 5; and NEES against the moving sensor's noise for the anchored sensor only, the unchecked moving sensor and the cross-check](assets/inchworm_two_pad_fusion_ekf.png)
 
-#### Scripts
+**Scripts:**
 
 - [use_numpy/inchworm_two_pad_fusion_ekf.py](use_numpy/inchworm_two_pad_fusion_ekf.py)
-- [generator/animate_inchworm_two_pad_fusion_ekf.py](generator/animate_inchworm_two_pad_fusion_ekf.py): animated GIF of the default run (re-runs the 300-trial Monte Carlo, about 2 min), embedded in [inchworm_two_pad_fusion_ekf.md](docs/filtering/inchworm_two_pad_fusion_ekf.md); render with `uv run python generator/animate_inchworm_two_pad_fusion_ekf.py --out assets/inchworm_two_pad_fusion_ekf.gif`
+- [generator/animate_inchworm_two_pad_fusion_ekf.py](generator/animate_inchworm_two_pad_fusion_ekf.py): animated GIF (about 2 min); render with `uv run python generator/animate_inchworm_two_pad_fusion_ekf.py --out assets/inchworm_two_pad_fusion_ekf.gif`
 
-#### Usage
+**Run:**
 
 ```
 uv run python use_numpy/inchworm_two_pad_fusion_ekf.py --duration 20.0 --dt 0.05 --t-phase 1.0 --t-ramp 0.2 --v-stroke 0.1 --l-min 0.15 --steer 0.3 --stroke-err-std 0.05 --p-slip 0.5 --v-slip 0.08 --t-slip 0.6 --micro-slip-std 0.01 --p-fault 0.2 --t-fault 0.3 --fault-type both --v-spike 0.08 --gyro-noise-std 0.02 --sensor-noise-std 0.0005 --moving-sensor-noise-std 0.0005 --closure-noise-std 0.001 --closure-lat-noise-std 0.001 --gate-sigmas 3.0 --move-noise-std 0.02 --init-pos-noise-std 0.005 --init-heading-noise-std 0.02 --n-mc-trials 300 --seed 0 --out out.png
 ```
+
+<details>
+<summary>All flags</summary>
 
 - `--duration`: simulation length in seconds (default `20.0`, 10 extend/contract cycles)
 - `--dt`: filter/sensor step interval, s (default `0.05`)
@@ -1076,3 +991,201 @@ uv run python use_numpy/inchworm_two_pad_fusion_ekf.py --duration 20.0 --dt 0.05
 - `--n-mc-trials`: number of Monte Carlo consistency trials (default `300`)
 - `--seed`: RNG seed (default `0`)
 - `--out`: save the figure to this path instead of showing it (default: show)
+
+</details>
+
+#### 18. Friction-anisotropic process noise: fixed vs. heading-aware Q
+
+**Purpose:** Compares three ways of building the process-noise covariance $Q$ for a robot whose pad grips along its forward axis and slips sideways. The question is whether $Q$ must follow the robot's heading as it turns.
+
+| Input | Output |
+|---|---|
+| A unicycle driving one circular loop with anisotropic random slip, plus noisy position measurements | Prints position error and Monte Carlo NEES per policy; plots paths, error and NEES |
+
+| Variant | Meaning |
+|---|---|
+| `isotropic` | Direction-blind circle, same total noise |
+| `fixed_anisotropic` | Correct ellipse, frozen at the initial heading |
+| `heading_aware` | Correct ellipse, re-oriented with the heading estimate |
+
+**Details:** [friction_anisotropic_ekf.md](docs/filtering/friction_anisotropic_ekf.md)
+
+![Two panels from friction_anisotropic_ekf.py: the circular path with the per-step slip covariance ellipse turning with the heading, and Monte Carlo NEES over one full turn for isotropic, frozen anisotropic and heading-aware process noise](assets/friction_anisotropic_ekf.png)
+
+**Scripts:**
+- [use_numpy/friction_anisotropic_ekf.py](use_numpy/friction_anisotropic_ekf.py)
+- [use_numpy/friction_anisotropic_ekf_v2.py](use_numpy/friction_anisotropic_ekf_v2.py): class-based version, same output
+- [generator/animate_friction_anisotropic_ekf.py](generator/animate_friction_anisotropic_ekf.py): animated GIF; render with `uv run python generator/animate_friction_anisotropic_ekf.py --out assets/friction_anisotropic_ekf.gif`
+
+**Run:**
+
+```
+uv run python use_numpy/friction_anisotropic_ekf.py --duration 20.0 --dt 0.05 --v-cmd 0.2 --sigma-grip 0.02 --sigma-slip 0.1 --sigma-theta 0.01 --pos-noise-std 0.02 --init-pos-noise-std 0.05 --init-theta-noise-std 0.05 --n-mc-trials 500 --seed 0 --out out.png
+```
+
+<details>
+<summary>All flags</summary>
+
+- `--duration`: simulation length in seconds (default `20.0`)
+- `--dt`: filter/measurement step interval in seconds (default `0.05`)
+- `--v-cmd`: constant commanded forward speed, m/s (default `0.2`)
+- `--omega-cmd`: constant commanded turn rate, rad/s (default: $2\pi/\text{duration}$, i.e. exactly one full loop, so heading sweeps every orientation relative to the fixed reference)
+- `--sigma-grip`/`--sigma-slip`: true body-frame slip std-dev along the grip/forward and slip/lateral axes, m/s (defaults `0.02`/`0.1`)
+- `--sigma-theta`: assumed heading process-noise std-dev, all three filter variants, rad/s (default `0.01`)
+- `--pos-noise-std`: position measurement noise std-dev, m (default `0.02`)
+- `--init-pos-noise-std`/`--init-theta-noise-std`: std-dev used to perturb the initial position/heading guess (defaults `0.05`/`0.05`)
+- `--n-mc-trials`: number of Monte Carlo consistency trials (default `500`)
+- `--seed`: RNG seed (default `0`)
+- `--out`: save the figure to this path instead of showing it (default: show)
+
+</details>
+
+#### 19. Hexapod leg odometry: what the gait changes
+
+**Purpose:** Shows how the gait (tripod, ripple or wave) changes what a planar hexapod can estimate from its legs alone. It also tests slipping feet, foot drift and uncertain contact timing.
+
+| Input | Output |
+|---|---|
+| A planar hexapod with noisy stance-foot velocity readings | Prints errors and NEES per gait and experiment; plots RMSE and NEES |
+
+| Variant | Meaning |
+|---|---|
+| `tripod` | 3 feet down at a time |
+| `ripple` | 4 feet down at a time |
+| `wave` | 5 feet down at a time |
+
+**Details:** [hexapod_gait_ekf.md](docs/filtering/hexapod_gait_ekf.md)
+
+![Three panels from hexapod_gait_ekf.py: forward-speed and turn-rate RMSE per gait with the (q s^2)^(1/4) steady-state estimate, and sideways-velocity RMSE over time with leg L2 slipping, trusting every foot versus the per-foot chi-squared gate](assets/hexapod_gait_ekf.png)
+
+**Scripts:**
+- [use_numpy/hexapod_gait_ekf.py](use_numpy/hexapod_gait_ekf.py)
+- [use_numpy/hexapod_gait_ekf_v2.py](use_numpy/hexapod_gait_ekf_v2.py): class-based version, same output
+- [generator/animate_hexapod_gait_ekf.py](generator/animate_hexapod_gait_ekf.py): animated GIF; render with `uv run python generator/animate_hexapod_gait_ekf.py --out assets/hexapod_gait_ekf.gif`
+
+**Run:**
+
+```
+uv run python use_numpy/hexapod_gait_ekf.py --duration 12.0 --dt 0.02 --cycle-period 1.2 --forward-speed 0.1 --turn-rate 0.2 --lin-accel-std 0.05 --ang-accel-std 0.1 --meas-noise-std 0.02 --init-pos-noise-std 0.01 --init-heading-noise-std 0.01 --init-twist-noise-std 0.05 --slip-leg L2 --slip-start 4.0 --slip-end 8.0 --slip-speed 0.1 --foot-drift-std 0.02 --detect-time-noise-std 0.05 --n-mc-trials 100 --seed 0
+```
+
+<details>
+<summary>All flags</summary>
+
+- `--duration`: simulation length in seconds (default `12.0`)
+- `--dt`: filter/measurement step interval in seconds (default `0.02`)
+- `--cycle-period`: gait cycle period, s; must be a multiple of `6*dt` (default `1.2`)
+- `--forward-speed`/`--turn-rate`: initial forward speed, m/s, and turn rate, rad/s, of the random-walk truth (defaults `0.1`/`0.2`)
+- `--lin-accel-std`/`--ang-accel-std`: twist random-walk std-devs, $`\text{m/s}^2`$ and $`\text{rad/s}^2`$, used by both truth and filter (defaults `0.05`/`0.1`)
+- `--meas-noise-std`: per-axis std-dev of each foot's relative-velocity reading, m/s (default `0.02`)
+- `--init-pos-noise-std`/`--init-heading-noise-std`/`--init-twist-noise-std`: initial-guess std-devs, m, rad and m/s (rad/s for $`\omega`$) (defaults `0.01`/`0.01`/`0.05`)
+- `--slip-leg`: leg that slips in the slip experiment, one of `L1`-`L3`, `R1`-`R3` (default `L2`)
+- `--slip-start`/`--slip-end`: slip window, s (defaults `4.0`/`8.0`)
+- `--slip-speed`: outward sideways slip speed, m/s (default `0.1`)
+- `--foot-drift-std`: random drift velocity std-dev of every stance foot in the drift experiment, m/s (default `0.02`)
+- `--detect-time-noise-std`: touchdown/liftoff detection-time error std-dev in the jitter experiment, s (default `0.05`)
+- `--n-mc-trials`: number of Monte Carlo trials (default `100`; about 3 minutes)
+- `--seed`: RNG seed (default `0`)
+- `--out`: save the figure to this path instead of showing it (default: show)
+
+</details>
+
+#### 20. Contact-aided invariant EKF on a hexapod: which filter knows yaw is unobservable
+
+**Purpose:** Compares an invariant EKF with a world-frame error-state EKF on the same data. Both keep stance-foot positions in the state, and the question is which one respects that yaw is unobservable.
+
+| Input | Output |
+|---|---|
+| A 3D hexapod walking with IMU and leg-kinematics measurements | Prints position error and NEES per filter; plots yaw error, NEES and velocity error |
+
+**Details:** [hexapod_contact_inekf.md](docs/filtering/hexapod_contact_inekf.md)
+
+![Three panels from hexapod_contact_inekf.py: yaw error with 0.1 rad initial rotation std, actual RMSE versus reported sigma for both filters; average NEES against initial rotation std 0.02, 0.1 and 0.3 rad, invariant EKF 9.3-9.4 and world-frame EKF 9.6, 18.2 and 481; and the invariant EKF's velocity RMSE with leg L2 slipping, trusting every foot versus the per-foot chi-squared gate](assets/hexapod_contact_inekf.png)
+
+**Scripts:**
+- [use_numpy/hexapod_contact_inekf.py](use_numpy/hexapod_contact_inekf.py)
+- [generator/animate_hexapod_contact_inekf.py](generator/animate_hexapod_contact_inekf.py): animated GIF; render with `uv run python generator/animate_hexapod_contact_inekf.py --out assets/hexapod_contact_inekf.gif`
+
+**Run:**
+
+```
+uv run python use_numpy/hexapod_contact_inekf.py --duration 12.0 --dt 0.02 --cycle-period 1.2 --forward-speed 0.1 --turn-rate 0.2 --gyro-noise-std 0.005 --accel-noise-std 0.05 --contact-noise-std 0.01 --kin-noise-std 0.005 --slip-leg L2 --slip-start 4.0 --slip-end 8.0 --slip-speed 0.1 --n-mc-trials 50 --seed 0
+```
+
+<details>
+<summary>All flags</summary>
+
+- `--duration`: simulation length in seconds (default `12.0`)
+- `--dt`: IMU and kinematics step in seconds (default `0.02`)
+- `--cycle-period`: gait cycle period, s; must be a multiple of `6*dt` (default `1.2`)
+- `--forward-speed`/`--turn-rate`: initial forward speed, m/s, and turn rate, rad/s, of the random-walk truth (defaults `0.1`/`0.2`)
+- `--gyro-noise-std`/`--accel-noise-std`: per-sample IMU noise std-devs, rad/s and $`\text{m/s}^2`$ (defaults `0.005`/`0.05`)
+- `--contact-noise-std`: stance-foot velocity noise, body frame, m/s (default `0.01`)
+- `--kin-noise-std`: kinematic foot-position noise per axis, m (default `0.005`)
+- `--slip-leg`: leg that slips in experiment 2, one of `L1`-`L3`, `R1`-`R3` (default `L2`)
+- `--slip-start`/`--slip-end`: slip window, s (defaults `4.0`/`8.0`)
+- `--slip-speed`: outward sideways slip speed, m/s (default `0.1`)
+- `--n-mc-trials`: Monte Carlo trials per experiment (default `50`; about 4 minutes for all experiments)
+- `--seed`: RNG seed (default `0`)
+- `--out`: save the figure to this path instead of showing it (default: show)
+
+</details>
+
+#### 21. Gait phase: which feet are on the ground, when touchdowns are uncertain
+
+**Purpose:** Compares four ways of deciding which feet are on the ground when touchdown times are uncertain, with the true stance as a reference. This drops the assumption of §19 that the filter is told the stance.
+
+| Input | Output |
+|---|---|
+| A tripod-gait hexapod with late and uncertain touchdowns and a contact detector that sometimes fires falsely | Prints wrong-stance counts and NEES per approach; plots stance flags, touchdown offsets and NEES |
+
+| Variant | Meaning |
+|---|---|
+| `schedule` | Stance starts at the commanded touchdown |
+| `detector` | Stance starts at the first detector trigger |
+| `cpg` | Central pattern generator (CPG): learns the typical offset; rejects too-early triggers |
+| `phase_ekf` | Kalman filter on the touchdown lag; rejects early triggers |
+| `oracle` | The true stance (reference) |
+
+**Details:** [gait_phase_ekf.md](docs/filtering/gait_phase_ekf.md)
+
+![Four panels from gait_phase_ekf.py at its defaults plus a terrain sweep: stance flags of the blocked leg for the true stance and the four approaches with swinging-foot reads highlighted; true touchdown offsets with the CPG and phase-EKF lag estimates; body NEES over time per approach from 100 Monte Carlo runs; and body NEES against terrain spread for the CPG window and the phase EKF at 2 and 3 sigma](assets/gait_phase_ekf.png)
+
+**Scripts:**
+- [use_numpy/gait_phase_ekf.py](use_numpy/gait_phase_ekf.py)
+- [generator/animate_gait_phase_ekf.py](generator/animate_gait_phase_ekf.py): animated GIF; render with `uv run python generator/animate_gait_phase_ekf.py --out assets/gait_phase_ekf.gif`
+
+**Run:**
+
+```
+uv run python use_numpy/gait_phase_ekf.py --duration 24.0 --dt 0.02 --cycle-period 1.2 --forward-speed 0.1 --turn-rate 0.2 --lin-accel-std 0.05 --ang-accel-std 0.1 --meas-noise-std 0.02 --init-pos-noise-std 0.01 --init-heading-noise-std 0.01 --init-twist-noise-std 0.05 --lag-max 0.2 --terrain-std 0.03 --blocked-leg L2 --blocked-start 10.0 --blocked-end 14.0 --blocked-delay 0.2 --det-delay 0.04 --det-delay-std 0.02 --false-rate 0.1 --cpg-gain 0.3 --cpg-window 0.1 --cpg-mistime 0.1 --ekf-rate-q 1e-5 --ekf-init-lag-std 0.05 --ekf-init-rate-std 0.01 --ekf-gate 3.0 --n-mc-trials 100 --seed 0 --out out.png
+```
+
+<details>
+<summary>All flags</summary>
+
+- `--duration`: simulation length in seconds (default `24.0`, 20 gait cycles)
+- `--dt`: filter/measurement step interval in seconds (default `0.02`)
+- `--cycle-period`: commanded gait cycle period, s (default `1.2`)
+- `--forward-speed`/`--turn-rate`: initial forward speed, m/s, and turn rate, rad/s, of the random-walk truth (defaults `0.1`/`0.2`)
+- `--lin-accel-std`/`--ang-accel-std`: twist random-walk std-devs, $`\text{m/s}^2`$ and $`\text{rad/s}^2`$ (defaults `0.05`/`0.1`)
+- `--meas-noise-std`: std-dev of each foot's velocity reading, m/s (default `0.02`)
+- `--init-pos-noise-std`/`--init-heading-noise-std`/`--init-twist-noise-std`: initial-guess std-devs, m, rad and m/s (rad/s for $`\omega`$) (defaults `0.01`/`0.01`/`0.05`)
+- `--lag-max`: final systematic touchdown lag as a fraction of the swing time, growing linearly from 0 (default `0.2`)
+- `--terrain-std`: per-foot, per-step touchdown offset std-dev, s (default `0.03`)
+- `--blocked-leg`: leg that gets blocked, one of `L1`-`L3`, `R1`-`R3` (default `L2`)
+- `--blocked-start`/`--blocked-end`: blocked window, s (defaults `10.0`/`14.0`)
+- `--blocked-delay`: extra landing delay of the blocked leg, s; `0` = off (default `0.2`)
+- `--det-delay`/`--det-delay-std`: mean and std-dev of the detection delay, s; the estimators know the mean (defaults `0.04`/`0.02`)
+- `--false-rate`: probability of a false trigger early in a swing-down, per step (default `0.1`)
+- `--cpg-gain`: CPG learning gain on the touchdown offset (default `0.3`)
+- `--cpg-window`: CPG rejects triggers earlier than the learned offset minus this, s (default `0.1`)
+- `--cpg-mistime`: CPG mistiming threshold on the offset error, s (default `0.1`)
+- `--ekf-rate-q`: phase EKF lag-rate change intensity, $`\text{s}^2/\text{s}^3`$ (default `1e-5`)
+- `--ekf-init-lag-std`/`--ekf-init-rate-std`: phase EKF initial lag std-dev, s, and lag-rate std-dev, s/s (defaults `0.05`/`0.01`)
+- `--ekf-gate`: phase EKF early-reject and mistiming gate, in σ (default `3.0`)
+- `--n-mc-trials`: number of Monte Carlo trials (default `100`)
+- `--seed`: RNG seed (default `0`)
+- `--out`: save the figure to this path instead of showing it (default: show)
+
+</details>

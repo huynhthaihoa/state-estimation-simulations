@@ -52,7 +52,7 @@ Then we polish and validate:
   - The reason: `pixel = f*x/z` is invariant to negating a camera-frame point's $x,y,z$ together.
   - A weakly-constrained point has few observers and little **parallax** (the angle between the rays from different cameras to the point).
   - For such a point, the Gauss-Newton step can walk to a *reflection* behind a camera that still fits every pixel almost exactly (see the `refine_landmark_gn` and `passes_cheirality` docstrings).
-- **Reject.** A point failing the check is never committed to the map (see the [`bundle_adjustment_advanced.py` README description](../../README.md#7-local--global-bundle-adjustment-bounded-windows-vs-whole-map-re-solves)). It stays pending until another observation gives it more parallax.
+- **Reject.** A point failing the check is never committed to the map (see the [`bundle_adjustment_advanced.py` README description](../../README.md#9-local--global-bundle-adjustment-bounded-windows-vs-whole-map-re-solves)). It stays pending until another observation gives it more parallax.
 
 **The triangulation math, concretely.** Poses are camera-to-world: observer $k$ has rotation $R_k$ and camera center $o_k$ (its translation). `triangulate_landmark` rotates each pixel's calibrated ray into the world frame and normalizes it:
 
