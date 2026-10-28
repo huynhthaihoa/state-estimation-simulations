@@ -62,16 +62,13 @@ this codebase.
 '''
 
 import argparse
-import os
-import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from lie_utils import skew, se3_exp, se3_log, se3_inv, se3_adjoint, compute_se3_inv_right_jacobian, se3_right_jacobian
-from numpy_utils import pose_errors
-from utils import measure_performance, true_body_rates, unscented_weights, unscented_sigma_offsets
+from state_estimation_simulations.use_numpy.lie_utils import skew, se3_exp, se3_log, se3_inv, se3_adjoint, compute_se3_inv_right_jacobian, se3_right_jacobian
+from state_estimation_simulations.use_numpy.numpy_utils import pose_errors
+from state_estimation_simulations.utils import measure_performance, true_body_rates, unscented_weights, unscented_sigma_offsets
 
 def make_body_point_cloud(n_points, rng, half_extent=0.5):
     """A fixed, non-degenerate set of body-frame landmark points (the object's
