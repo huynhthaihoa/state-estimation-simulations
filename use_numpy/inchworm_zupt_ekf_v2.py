@@ -210,7 +210,7 @@ class InchwormEKF:
         Arguments:
             x_init: initial state estimate (2,)
             P_init: initial covariance (2,2)
-            dt: propagation interval (s)
+            dt: default propagation interval (s), used whenever predict/step get no dt of their own
             process_noise_std: std-dev of the assumed acceleration disturbance (m/s^2)
             R_pos: position measurement noise variance (scalar)
             R_zupt: ZUPT pseudo-measurement noise variance (scalar)
@@ -223,12 +223,18 @@ class InchwormEKF:
         self.R_pos = R_pos
         self.R_zupt = R_zupt
         self.zupt_mode = zupt_mode
+        self.process_noise_std = process_noise_std
 
-        self.Phi = np.array([[1.0, dt], [0.0, 1.0]])
-        self.Q = np.array([[(0.5 * process_noise_std * dt * dt) ** 2, 0.0],
-                           [0.0, (process_noise_std * dt) ** 2]])
+        self.Phi, self.Q = self._transition(dt)
 
-    def predict(self):
+    def _transition(self, dt):
+        """State transition Phi and process noise Q of the constant-velocity model over an interval dt (s)."""
+        Phi = np.array([[1.0, dt], [0.0, 1.0]])
+        Q = np.array([[(0.5 * self.process_noise_std * dt * dt) ** 2, 0.0],
+                      [0.0, (self.process_noise_std * dt) ** 2]])
+        return Phi, Q
+
+    def predict(self, dt=None):
         """Ordinary constant-velocity EKF predict step -- exactly linear, so no
         linearization error, and identical for all 3 filter variants and both
         gait phases: the filter does not know the true commanded velocity, only
@@ -236,9 +242,13 @@ class InchwormEKF:
         dead-reckoning assumption), regardless of phase. The same "simple
         heuristic, not textbook continuous white-noise-acceleration" Q as
         saltation_matrix_ekf.process_noise_covariance.
+        Arguments:
+            dt: propagation interval (s) for this step, e.g. the gap between two measurement stamps; None uses the
+                constructor's dt (its Phi and Q are computed once)
         """
-        self.x = self.Phi @ self.x
-        self.P = self.Phi @ self.P @ self.Phi.T + self.Q
+        Phi, Q = (self.Phi, self.Q) if dt is None else self._transition(dt)
+        self.x = Phi @ self.x
+        self.P = Phi @ self.P @ Phi.T + Q
 
     def measurement_update_position(self, z):
         """Linear-Gaussian update against a direct noisy position observation
@@ -281,15 +291,16 @@ class InchwormEKF:
         if apply_zupt:
             self.measurement_update_zupt()
             
-    def step(self, z, is_anchor_tick):
+    def step(self, z, is_anchor_tick, dt=None):
         """One filter tick: predict, position update, then a ZUPT update if
         zupt_mode calls for one on this tick.
         Arguments:
             z: position measurement for this tick (scalar)
             is_anchor_tick: whether the known schedule marks this tick as anchor
                 (only consulted when zupt_mode == "phase_conditional")
+            dt: propagation interval (s) since the previous tick; None uses the constructor's dt
         """
-        self.predict()
+        self.predict(dt)
         self.update(z, is_anchor_tick)
 
     def get_state(self):
