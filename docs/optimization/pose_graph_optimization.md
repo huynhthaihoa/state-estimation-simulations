@@ -595,7 +595,7 @@ Robust cost functions replace or reweight the standard $L_2$ norm to cap or redu
 
 ### 16.1 The M-Estimator Framework (Iteratively Reweighted Least Squares)
 
-Instead of minimizing the squared cost $e^2$ (where $e = \sqrt{r^\top \Omega r}$ is the normalized residual scalar: here $e$ is the scalar Mahalanobis norm, not the vector $e_{ij}$ of §7; §16.3's $e_{ij}^2$ is this scalar squared for edge $`(i,j)`$), **M-estimators** (estimators that replace squared error with a robust cost) minimize a robust kernel $\rho(e)$. Kernels are conventionally written with a $\frac{1}{2}$ (e.g. $\rho = \frac{1}{2}e^2$ for $L_2$, as in Huber below), while §15.3's $F$ has none. A constant factor changes neither the minimizer nor the weights $w(e)$.
+Instead of minimizing the squared cost $e^2$ (where $e = \sqrt{r^\top \Omega r}$ is the normalized residual scalar: here $e$ is the scalar Mahalanobis norm, not the vector $e_{ij}$ of §7; §16.3's $e_{ij}^2$ is this scalar squared for edge $`(i,j)`$), **M-estimators** (estimators that replace squared error with a robust cost) minimize a robust kernel $\rho(e)$. Kernels are conventionally written with a $\frac{1}{2}$ (e.g. $\rho = \frac{1}{2}e^2$ for $L_2$, as in Huber below), while §15.3's $F$ has none. A constant factor changes neither the minimizer nor the relative weights (every $w(e)$ is scaled by the same constant).
 
 ```math
 \min_{X} \sum_{(i,j) \in \mathcal{E}} \rho\left( \sqrt{r_{ij}(X)^\top \Omega_{ij} \, r_{ij}(X)} \right)

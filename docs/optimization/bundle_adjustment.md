@@ -48,7 +48,7 @@ $$p = \pi(T^{-1}P)$$
 where:
 
 - $P$ = 3D point, in world coordinates
-- $T$ = camera pose, camera-to-world (it maps camera-frame points into the world), so $T^{-1}P$ is the point expressed in the camera frame (with $P$ in homogeneous coordinates, $[P;\,1]$, so the $4\times4$ matrix can multiply it)
+- $T$ = camera pose, camera-to-world (it maps camera-frame points into the world), so $T^{-1}P$ is the point expressed in the camera frame (with $P$ in homogeneous coordinates, $`[P;\,1]`$, so the $4\times4$ matrix can multiply it)
 - $\pi$ = camera projection function
 - $p$ = predicted 2D pixel location
 

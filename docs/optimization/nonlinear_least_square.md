@@ -75,7 +75,7 @@ where:
 - $X_i$ = 3D landmark
 - $\pi$ = camera projection
 
-This residual is measurement minus prediction. [gauss_newton.md](gauss_newton.md) and [levenberg_marquardt.md](levenberg_marquardt.md) write prediction minus measurement; since $J$ is always the Jacobian of the residual, the step $J^\top J\,\Delta x=-J^\top e$ is identical.
+This residual is measurement minus prediction. [gauss_newton.md](gauss_newton.md) and [levenberg_marquardt.md](levenberg_marquardt.md) write prediction minus measurement; since $J$ is always the Jacobian of the residual, the step $`J^\top J\,\Delta x=-J^\top e`$ is identical.
 
 The relationship between unknowns and measurements is nonlinear, so this is **nonlinear least squares**.
 

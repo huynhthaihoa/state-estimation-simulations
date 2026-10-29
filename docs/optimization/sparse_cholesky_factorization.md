@@ -193,7 +193,7 @@ Finding the truly optimal order is NP-hard (no known polynomial-time algorithm),
 - **CCOLAMD:** constrained COLAMD, which can force chosen variables (for example the newest poses) to the end. iSAM2 (an incremental solver) uses it ([isam2_optimization.md §12](isam2_optimization.md#12-variable-ordering-is-also-crucial)).
 - **Nested dissection:** split the graph with a small **separator** (a set of variables whose removal disconnects it), order each half recursively, and put the separator last.
 
-[elimination_tree.md §9](elimination_tree.md#9-why-ordering-matters-so-much) works through the effect of ordering on a SLAM example.
+[elimination_tree.md §9](elimination_tree.md#9-why-ordering-matters-so-much) works through the effect of ordering on two bundle-adjustment examples.
 
 ---
 

@@ -115,7 +115,7 @@ One step gets us much closer to $2$, and repeating converges rapidly.
 
 ## 7. Why is it called Gauss-Newton?
 
-**Newton's method** uses the exact [Hessian](../glossary.md#normal-equations-and-hessian) $\nabla^2 f$ (the second derivatives of $f$) and solves $\nabla^2 f\,\Delta x=-\nabla f$. For nonlinear least squares, the exact Hessian decomposes as (with $r_i$ the $i$-th entry of $r$):
+**Newton's method** uses the exact [Hessian](../glossary.md#normal-equations-and-hessian) $\nabla^2 f$ (the second derivatives of $f$) and solves $`\nabla^2 f\,\Delta x=-\nabla f`$. For nonlinear least squares, the exact Hessian decomposes as (with $r_i$ the $i$-th entry of $r$):
 
 $$\nabla^2 f=J^\top J + \sum_i r_i \nabla^2 r_i$$
 

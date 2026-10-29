@@ -78,7 +78,7 @@ Marginalizing out $x_a$ means integrating it out of the joint distribution. The 
 \Lambda_b' = \Lambda_{bb} - \Lambda_{ba}\Lambda_{aa}^{-1}\Lambda_{ab}, \qquad \eta_b' = \eta_b - \Lambda_{ba}\Lambda_{aa}^{-1}\eta_a
 ```
 
-Here $\Lambda$ and $\eta$ are built only from the factors that touch $x_a$. Factors among the $x_b$ variables alone stay in the graph unchanged, so folding their contribution to $\Lambda_{bb}$ into the prior would count it twice. §8.1 shows how the script handles this.
+For the prior, $\Lambda_{bb}$ and $\eta_b$ must contain only the factors that touch $x_a$. Factors among the $x_b$ variables alone stay in the graph unchanged, so folding their contribution to $\Lambda_{bb}$ into the prior would count it twice. §8.1 shows how the script handles this.
 
 $(\Lambda_b', \eta_b')$ is a brand-new **prior factor** over exactly the variables $x_a$ used to connect to. It enters the graph like any other factor, as in the §2 diagram with $x_a = x_1$: $x_a$ disappears and the summarized information sits on its former neighbors.
 
@@ -149,7 +149,7 @@ The window never grows past a fixed size, so cost and memory stay **bounded by t
 
 This is what `filtering_smoothing.md §10`'s "fixed-lag smoothing" box and its MSCKF/VINS-Mono bullets refer to:
 - MSCKF keeps a sliding window of camera poses. When a landmark's track ends, it [triangulates](../glossary.md#triangulation-and-pnp) the landmark, uses its observations to update the window poses, then discards it: the landmark never enters the state (see [kf_ekf_iekf.md](../filtering/kf_ekf_iekf.md)'s MSCKF paragraph).
-- VINS-Mono keeps a sliding window of [keyframes](../glossary.md#keyframe) and marginalizes the oldest one with the Schur-complement step in §4, with no systematic FEJ (§6).
+- VINS-Mono keeps a sliding window of [keyframes](../glossary.md#keyframe) and marginalizes the oldest frame when the second-newest is a keyframe (otherwise it drops the second-newest frame's visual measurements) with the Schur-complement step in §4, with no systematic FEJ (§6).
 
 ![Three panels from sliding_window_marginalization.py on a 16-pose square with a 10-pose window: window membership after each new pose, the window's block-tridiagonal information matrix with the oldest pose's block about to be eliminated, and the next window's matrix where that information lands as one prior block on the new oldest pose](../../assets/sliding_window_marginalization_concept.png)
 
@@ -193,7 +193,7 @@ The first prior is the [gauge](../glossary.md#gauge-freedom) anchor, with $X_{\t
 H = \sum J^\top \Omega\, J, \qquad g = -\sum J^\top \Omega\, e, \qquad H\delta = g, \qquad X_k \leftarrow X_k \mathrm{Exp}(\delta_k)
 ```
 
-Here each $J$ is read as the blocks above ($J_i$, $J_j$ per edge, $J_p$ for the prior), and the prior enters as one more factor with $\Omega_p$ in place of $\Omega$. In the glossary's convention $g = -b$ (with $b = J^\top \Omega\, e$), and $\delta$ is the step called $\delta^*$ in [pose_graph_optimization.md §15.5](pose_graph_optimization.md#155-solving-the-linear-system-gauss-newton-step).
+Here each $J$ is read as the blocks above ($J_i$, $J_j$ per edge, $J_p$ for the prior), and the prior enters as one more factor with $\Omega_p$ in place of $\Omega$. In the glossary's convention $g = -b$ (with $`b = J^\top \Omega\, e`$), and $\delta$ is the step called $\delta^*$ in [pose_graph_optimization.md §15.5](pose_graph_optimization.md#155-solving-the-linear-system-gauss-newton-step).
 
 It stops when $\lVert\delta\rVert$ < `gn_tol` ($10^{-6}$) or after `gn_max_iters` (10) iterations. With $W$ poses in the window, $H$ is $6W \times 6W$.
 
@@ -261,7 +261,7 @@ The same scope silences §6's FEJ subtlety here: the inconsistency only shows up
 
 ## 10. One-sentence summary
 
-> **Marginalization is the variable-elimination step from `bayes_tree.md`, used to permanently discard an old state.** It turns that state into a dense prior over whatever it was still connected to. That lets sliding-window/fixed-lag smoothers (VINS-Mono) and window filters (MSCKF) run in bounded memory and time forever. The price is fill-in (§5) and a consistency subtlety (FEJ, §6) that full-batch and iSAM2 never face.
+> **Marginalization is the variable-elimination step from `bayes_tree.md`, used to permanently discard an old state.** It turns that state into a dense prior over whatever it was still connected to. That lets sliding-window/fixed-lag smoothers (VINS-Mono) and window filters (MSCKF) run in bounded memory and time forever. The price is fill-in that no reordering can avoid (§5) and a consistency subtlety (FEJ, §6) that full batch and iSAM2 never face.
 
 ---
 

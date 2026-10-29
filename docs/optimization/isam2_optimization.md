@@ -246,7 +246,7 @@ This aims to keep both the fill-in and the next update small.
 
 ## 13. The complete iSAM2 picture
 
-Putting everything together, one iSAM2 update (simplified from Algorithm 1 of Kaess et al. 2012):
+Putting everything together, one iSAM2 update (simplified from Algorithm 8 of Kaess et al. 2012):
 
 ```mermaid
 flowchart TD

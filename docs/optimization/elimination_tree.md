@@ -302,7 +302,7 @@ Precisely (Liu 1990), it's read off the sparsity of the **factor** $L$, with the
 \text{parent}(j) = \min\{\, i > j : L_{ij} \neq 0 \,\}
 ```
 
-That is, the parent of $j$ is the row of the first nonzero below the diagonal in column $j$ of $L$. $L$'s pattern depends on both the matrix's pattern and the elimination order, so the same matrix under two different orderings gives two different trees (§9's point).
+That is, the parent of $j$ is the row of the first nonzero below the diagonal in column $j$ of $L$. $L$'s pattern depends on both the matrix's pattern and the elimination order, so the same matrix under two different orderings can give two different trees (§9's point).
 
 ---
 
