@@ -217,7 +217,8 @@ class ESKF:
         self.P0 = 0.5 * (self.P0 + self.P0.T)
         
     def get_state(self):
-        return self.nominal.copy(), self.P0.copy()
+        nominal = {k: v.copy() for k, v in self.nominal.items()}
+        return nominal, self.P0.copy()
 
 
 def run_eskf(trial, P0, Q_imu, pos_noise_std, bias_states=True, reset_jacobian=True):
