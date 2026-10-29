@@ -19,7 +19,7 @@ One fact makes the second sensor useful for more than extra measurements. When t
 
 A real slip makes the two sensors **agree**; a faulty sensor makes them **disagree**. One sensor alone cannot tell a spike from a slip.
 
-**Short answer:** without sensor faults, the moving pad's sensor gains little: the final position error drops from 2.2% to 1.8% of the distance traveled (`--p-fault 0`). With faults, reading it without a check makes things worse: NEES ([glossary](../glossary.md#consistency-and-nees); 5 is consistent) 47.7 against 17.4 for the anchored sensor alone, because every fault of either sensor now enters the filter. A **cross-check** that compares the two sensors before fusing them, and admits its doubt when they disagree, brings NEES to 4.7 (consistent) and the final error from 6.1% to 2.4%. It also cuts the false slip alarms raised during sensor faults from 10.4 to 0.8 per run. It stays consistent only if the moving pad's sensor is about as precise as the anchored one's: at 2 mm noise instead of 0.5 mm its NEES is 10.2, still better than ignoring that sensor (17.5) but overconfident.
+**Short answer:** without sensor faults, the moving pad's sensor gains little: the final position error drops from 2.3% to 1.8% of the distance traveled (`--p-fault 0`). With faults, reading it without a check makes things worse: NEES ([glossary](../glossary.md#consistency-and-nees); 5 is consistent) 47.7 against 17.4 for the anchored sensor alone, because every fault of either sensor now enters the filter. A **cross-check** that compares the two sensors before fusing them, and admits its doubt when they disagree, brings NEES to 4.7 (consistent) and the final error from 6.1% to 2.4%. It also cuts the false slip alarms raised during sensor faults from 10.4 to 0.8 per run. It stays consistent only if the moving pad's sensor is about as precise as the anchored one's: at 2 mm noise instead of 0.5 mm its NEES is 10.2, still better than ignoring that sensor (17.5) but overconfident.
 
 ![Four panels from inchworm_two_pad_fusion_ekf.py: both pad readings of one run with the slip threshold, slip pulses and sensor faults; the Monte Carlo midpoint position RMSE over time for the five variants; the Monte Carlo NEES of the five variants on a log scale against the consistent value 5; and NEES against the moving sensor's noise for the anchored sensor only, the unchecked moving sensor and the cross-check](../../assets/inchworm_two_pad_fusion_ekf.png)
 
@@ -75,7 +75,7 @@ The **body frame** has x along the body (back pad to front pad) and y across it.
 
 ### 1.3 Five ways to move the moving pad
 
-The state is the two-pad doc's, $`x = [b_x, b_y, f_x, f_y, \theta]`$ (back pad, front pad, heading), and so is the closure update. In every variant the anchored pad moves by $`d_a`$ (rotated into the world frame), as `pad_fused` does. The variants differ only in how the moving pad moves:
+The state is the two-pad doc's, $`x = [b_x, b_y, f_x, f_y, \theta]`$ (back pad, front pad, heading), and so is the closure update. In every variant the anchored pad moves by $`d_a`$ (rotated into the world frame), as `pad_fused` does, except when `cross_check` blames the anchored sensor (§1.4). The variants differ only in how the moving pad moves:
 
 | Variant | Moving pad moves by | Noise it assumes |
 | --- | --- | --- |
@@ -242,7 +242,7 @@ The cross-check stays consistent even when every sensor fails in half the phases
 | 10% | 12.1 | 0.0426 | 5.59 |
 | 20% | 24.4 | 0.0617 | 5.55 |
 
-The stroke error is a gain that persists for a whole phase, but `encoder_model` treats it as white noise, so it underestimates how far the error adds up within a phase and turns overconfident. Through the commanded turn, the wrong stroke also makes its heading worse than the gyro alone at 5% and above. `cross_check` barely notices: the moving sensor dominates the combination, and the encoder model is only its fallback.
+The stroke error is a gain that persists for a whole phase, but `encoder_model` treats it as white noise, so it underestimates how far the error adds up within a phase and turns overconfident. Through the commanded turn, the wrong stroke also makes its heading worse than the gyro alone at 5% and above. `cross_check` barely notices: the moving sensor gets at least half the weight in the combination (more as the stroke error grows), and the encoder model is only its fallback.
 
 With per-cycle gains (`--stroke-err-per-cycle --p-fault 0`), `encoder_model` is at 8.60 instead of 9.14: keeping the body length from drifting hardly matters, because the error still persists through each phase.
 

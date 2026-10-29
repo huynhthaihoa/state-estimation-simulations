@@ -163,11 +163,11 @@ Results (100 trials, seeds 0-2; **naive** = trusts every stance foot, **gated** 
 | wave | naive | 0.0170-0.0172 | 36.6-37.4 | 0.078-0.083 | 100% | 100% |
 | wave | gated | 0.0032-0.0033 | 3.17-3.19 | 0.022-0.024 | 2.0-2.3% | 99.0% |
 
-- **Naive: wrong and overconfident.** About 5× the no-slip velocity error and twist NEES near 34-37 instead of 3. Position error after 12 s triples (≈0.08 m vs ≈0.025 m). The gait changes little: wave is 9% better on velocity, and its NEES is slightly *worse*, since its extra feet make it more confident.
+- **Naive: wrong and overconfident.** About 5× the no-slip velocity error and twist NEES near 34-37 instead of 3. Position error after 12 s triples (≈0.08 m vs ≈0.025 m). The gait changes little: wave is 9% better on velocity, and its NEES is slightly *worse*, probably because its extra feet make it more confident (not tested).
 - **Gated: back to the no-slip numbers.** RMSE and NEES return to the §2 values for every gait. The gate drops about 98% of the slipping readings and 1.0% of the good ones, the false-alarm rate it was set for.
 - **Why 2% get through.** A 0.1 m/s bias against a per-axis std of 0.02 m/s contributes about $`(0.1/0.02)^2 = 25`$ to the test value; noise adds about 2 on average, and sometimes pulls the total under 9.21.
 - **What this needs.** Gating works because the *other* feet agree with the prediction. With a tripod, two good feet still carry 4 readings for 3 twist unknowns.
-- **Small slips get through.** At `--slip-speed 0.03` (1.5× the reading std; seed 0, 100 trials) the gate lets 93.3-93.8% of the slipping readings through. Gated and naive then look alike: in-window $`v`$ RMSE 0.0056-0.0063 vs 0.0060-0.0066 m/s, twist NEES 5.6-5.8 vs 6.0-6.3, all about twice the no-slip values. A per-tick test cannot separate a slip of that size from noise.
+- **Small slips get through.** At `--slip-speed 0.03` (1.5× the reading std; seed 0, 100 trials; ranges over the three gaits) the gate lets 93.3-93.8% of the slipping readings through. Gated and naive then look alike: in-window $`v`$ RMSE 0.0056-0.0063 vs 0.0060-0.0066 m/s, twist NEES 5.6-5.8 vs 6.0-6.3, all about twice the no-slip values. A per-tick test cannot separate a slip of that size from noise.
 
 The same experiment, one run (seed 0, tripod gait), animated. The top-down view shows each stance foot at its simulated foothold, red while L2 slides; trusting every foot drags the sideways velocity off whenever L2 is down, and its estimated path drifts away (final position error 0.083 m vs 0.020 m with the gate). Swing feet are drawn faded at their simulated positions (§5 describes the swing model).
 
@@ -203,7 +203,7 @@ Results (tripod and wave, 100 trials, seeds 0-2; both filters see the same draws
 `--detect-time-noise-std` shifts every touchdown and liftoff the filter uses by its own Gaussian error, std $`\sigma_{\text{detect}}`$, rounded to ticks. The truth keeps the true schedule. When the filter thinks a foot is down but it is still swinging, it reads a moving foot as if planted.
 
 ### Intuition: the swing speed decides the damage
-In one gait cycle (period $`T = 1.2`$ s) the body travels $`u T = 0.12`$ m at the default $`u = 0.1`$ m/s, and a foot must catch up all of it during its swing. Its mean swing speed is therefore $`u / (1 - \text{duty})`$: 0.2 m/s for the tripod, 0.6 m/s for the wave gait. The script's swing (a straight line with a smooth $`1 - \cos`$ speed profile, zero speed at liftoff and touchdown) gives, measured:
+In one gait cycle (period $`T = 1.2`$ s) the body travels $`u T = 0.12`$ m at the default $`u = 0.1`$ m/s, and a foot must catch up all of it during its swing. Its mean swing speed is therefore $`u / (1 - \text{duty})`$: 0.2 m/s for the tripod, 0.6 m/s for the wave gait. The script's swing (a straight line with a smooth $`1 - \cos`$ speed profile, zero speed at liftoff and touchdown) gives, measured on a straight 0.1 m/s walk with no turn:
 
 | Gait | swing | peak foot speed | 1 tick from touchdown | 2 ticks |
 | --- | --- | --- | --- | --- |
@@ -236,7 +236,7 @@ Follow-up: [gait_phase_ekf.md](gait_phase_ekf.md) drops the known touchdown time
 ## 6. Takeaway
 
 - **More feet down is a weak lever for the estimate.** With the filter averaging over time, the gait changes twist RMSE by $`n^{-1/4}`$ (12% from tripod to wave), not $`n^{-1/2}`$. On a real robot, the gait choice is driven by stability and speed.
-- **Keep stance feet spread out.** Three feet on one side are about 40% worse than a tripod triangle. Standard gaits already avoid this; a damaged-leg or custom gait might not.
+- **Keep stance feet spread out.** Three feet on one side give about 40% higher one-tick std than a tripod triangle (§2). Standard gaits already avoid this; a damaged-leg or custom gait might not.
 - **A slipping foot matters much more than the gait**, and a per-foot $`\chi^2`$ test against the prediction is a cheap, effective guard against large slips; small ones pass it. Real filters do the same: Bloesch et al. 2013 (ref. 3) add outlier rejection to the update step for a quadruped on slippery terrain.
 - **Model foot drift as reading noise.** Ignoring a drift as large as the reading noise leaves accuracy intact but NEES about 1.5× too high.
 - **Contact-timing errors hurt fast-swing gaits most.** The wave gait's feet swing 3× faster than the tripod's, so the same timing error reads a foot moving several times faster. Gate each foot's reading; trimming near detected touchdowns and liftoffs already fails for the wave gait at 0.05 s, a quarter of its swing.

@@ -85,7 +85,7 @@ Here $`F`$ is the state transition, $`Q`$ its **process noise** (the uncertainty
 
 ## 2. Sanity check: nothing perturbed
 
-With no lag, no terrain spread, no blocked leg and a perfect detector (40 [Monte Carlo trials](../glossary.md#monte-carlo-trials)), all four approaches produce exactly the true stance flags, and the body NEES is 6.87 for all of them (the band a consistent 40-run average falls in 95% of the time: [4.97, 7.12]). So every difference below comes from touchdown timing.
+With no lag, no terrain spread, no blocked leg and a perfect detector (40 [Monte Carlo trials](../glossary.md#monte-carlo-trials)), all four approaches produce exactly the true stance flags, and the body NEES is 6.92 for all of them (the band a consistent 40-run average falls in 95% of the time: [4.97, 7.12]). So every difference below comes from touchdown timing.
 
 ---
 
@@ -151,7 +151,7 @@ Without false triggers the raw detector is as good as the rhythm models: the del
 | Acceptance rule | Terrain 30 ms | 60 ms | 100 ms |
 | --- | --- | --- | --- |
 | `cpg`, window 0.05 s | 7.08 (524 missed) | 6.80 (1209 missed) | 6.57 (1553 missed) |
-| `cpg`, window 0.1 s (default) | 7.04 | 7.04 | 6.81 |
+| `cpg`, window 0.1 s (default) | 7.04 | 7.04 (378 missed) | 6.81 (673 missed) |
 | `cpg`, window 0.2 s | 9.26 | 11.6 | 17.3 |
 | `phase_ekf`, gate 2σ | 7.05 | 7.27 | 21.6 |
 | `phase_ekf`, gate 3σ (default) | 7.69 | 13.0 | 45.6 |

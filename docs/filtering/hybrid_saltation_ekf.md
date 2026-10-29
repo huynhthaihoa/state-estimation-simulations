@@ -101,11 +101,11 @@ This is a simple diagonal heuristic, not the textbook continuous white-noise-acc
 
 **Crossing time** (`crossing_time`). Solve $`p_{z0} + v_{z0}\,t - \tfrac12 g t^2 = 0`$ in closed form. Keep only roots with $t > 10^{-12}$ that are *descending* ($`v_{z0} - g\,t < 0`$), and return the smallest one. If there is no such root (including a negative discriminant), return `None`. The descending-only rule is the §8 fix: a point mass that starts just below the ground and is moving up does not count its way back out as an impact.
 
-**Hybrid predict** (`step_hybrid`). Starting with `remaining` $= \Delta t$, the step loops up to `max_bounces` $= 20$ times:
+**Hybrid predict** (`step_hybrid`). Starting with `remaining` $= \Delta t$, the step loops until the tick is used up:
 
 1. Compute $\tau$ with `crossing_time`. If there is none, or $\tau \ge$ `remaining`, flow the rest of the tick, set $P \leftarrow \Phi P \Phi^\top + Q(\text{remaining})$, and stop.
 2. Otherwise flow to the detected crossing time $\tau_{\text{detect}}$ (equal to $\tau$ unless the §8 detection parameters are set), and set $P \leftarrow \Phi P \Phi^\top + Q(\tau_{\text{detect}})$.
-3. If the vertical speed there is below `min_bounce_speed` $= 10^{-3}$ m/s, set $v_z = 0$, and use `flow_resting` (below) for the rest of this tick only.
+3. If the vertical speed there is below `min_bounce_speed` $= 10^{-3}$ m/s, or this tick has already had `max_bounces` $= 20$ bounces (a safety cap), set $v_z = 0$, and use `flow_resting` (below) for the rest of this tick only.
 4. Otherwise apply the bounce (equations below) and go back to step 1 with the time that is left.
 
 At each bounce, with $M = \Xi(x^{-})$ (`saltation_matrix`, §4) if `use_saltation` is true and $M = DR$ (`reset_jacobian`) if not:
@@ -194,7 +194,7 @@ Here the two approaches disagree on an actual number. The comparison time matter
 - **True answer** (re-simulated: let the second ball reach its own crossing time, apply the reset there, then flow both forward to $T$ and compare): starting $5\text{cm}$ higher means falling for an extra $`\sim\!4.94\text{ms}`$, so it lands faster ($`10.153`$ vs. $`10.104\,\text{m/s}`$) and bounces back faster - but also later, so it has *less* time flowing back up before $T$. True change in $v_z(T)$: **$+0.0726\ \text{m/s}$**; true change in $p_z(T)$: **$`-0.0126\,\text{m}`$** (lower than nominal, the opposite sign from the naive guess).
 - **Saltation-corrected prediction** ($\Xi$, composed as $`\Phi_{\text{after}}\,\Xi\,\Phi_{\text{before}}`$ - exactly what `saltation_matrix` plus `step_hybrid`'s surrounding `flow` calls compute): change in $v_z(T)$: **$+0.0728\ \text{m/s}$**; change in $p_z(T)$: **$`-0.0123\,\text{m}`$** - both within second-order error of the true answer.
 
-The naive approach is qualitatively wrong on both components. Physically a ball only bounces on contact, so the extra height becomes a *timing* difference: the perturbed ball reaches the ground $`4.94\,\text{ms}`$ later (the exact delay; the first-order estimate $0.05/10.10$ that §4 uses is $4.95\,\text{ms}$), and that shift produces both true changes:
+The naive approach is qualitatively wrong on both components. Physically a ball only bounces on contact, so the extra height becomes a *timing* difference: the perturbed ball reaches the ground $`4.94\,\text{ms}`$ later (the exact delay; the first-order estimate $0.05/10.10$ that §4 uses is $`4.95\,\text{ms}`$), and that shift produces both true changes:
 
 - **Velocity** ($`+0.0726\,\text{m/s}`$, naive: $0$):
   - $`+0.0242\,\text{m/s}`$ because it hit faster and so bounced back faster ($`0.0484\,\text{m/s}`$ extra impact speed, times $e=0.5$).
@@ -231,7 +231,7 @@ $$\Xi_{\text{own-time}}(x^{-}) = DR(x^{-})\left[I - \frac{f(x^{-}) \otimes Dg(x^
 `step_hybrid`, like any fixed-timestep filter, compares nominal and perturbed states at the *same external clock time* (the distinction §3 put a number on). With a shared clock, the flow *after* the reset also depends on where exactly the reset landed, and $\Xi_{\text{own-time}}$ has no term for that. Checked against the finite-difference Jacobian of the *actual* fixed-$`\Delta t`$ tick (perturb the state at the tick's start, run the same `flow`/`crossing_time`/`reset_map` steps to the end of the tick, compare to nominal), it is off by a wide margin: $`\max|\Phi_{\text{after}}\,\Xi_{\text{own-time}}\,\Phi_{\text{before}} - J_{\text{numeric}}| \approx 4.4`$ (test scenario: $x_0=(0,0,0.05,0.3,0.2,-2)$, $e=0.6$, $\Delta t=0.05$ s, $g=9.81$).
 
 ### The derivation this script needs
-Consider a one-parameter family of trajectories $x(t; p)$ ($p$ a perturbation parameter, $p=0$ nominal), each governed by $\dot x = f(x)$ until a $p$-dependent crossing time $`t^{*}(p)`$ defined implicitly by $`g\big(x(t^{*}(p); p)\big) = 0`$, where a reset $x^{+} = R(x^{-})$ is applied and the same flow resumes. Fix a later reference time $T$, independent of $p$, and ask for $\frac{d}{dp}\big[x(T;p)\big]$ - what a fixed-tick filter's covariance propagation needs. Let $S(t) = \left.\dfrac{\partial x(t;p)}{\partial p}\right|_{p=0}$. Here $x_0$ is the nominal state at the start of the interval ($t=0$) and $\delta x_0$ the initial perturbation, $x(0;p) = x_0 + p\,\delta x_0$, so $S(0) = \delta x_0$.
+Consider a one-parameter family of trajectories $x(t; p)$ ($p$ a perturbation parameter, $p=0$ nominal), each governed by $\dot x = f(x)$ until a $p$-dependent crossing time $`t^{*}(p)`$ defined implicitly by $`g\big(x(t^{*}(p); p)\big) = 0`$, where a reset $x^{+} = R(x^{-})$ is applied and the same flow resumes. Fix a later reference time $T$, independent of $p$, and ask for $\frac{d}{dp}\big[x(T;p)\big]$ - what a fixed-tick filter's covariance propagation needs. Let $S(t) = \left.\dfrac{\partial x(t;p)}{\partial p}\right|_{p=0}$. Here $x_0$ is the nominal state at the start of the interval ($t=0$) and $\delta x_0$ the initial perturbation, $`x(0;p) = x_0 + p\,\delta x_0`$, so $S(0) = \delta x_0$.
 
 Implicit differentiation of the guard condition gives the crossing-time sensitivity, how far the crossing time shifts per unit of $p$:
 
@@ -269,7 +269,7 @@ where $`\Phi_{\text{before}} = D_1\Phi(x_0, t^{*})`$ (so $`S(t^{*})=\Phi_{\text{
 - $\Xi$ is $\Xi_{\text{own-time}}$ plus the correction term that formula was missing.
 - It is also the standard saltation matrix of the literature: Kong et al. (2024), Definition 2 (Eq. 9), with a time-independent reset and guard ($`D_t R = 0`$, $`D_t g = 0`$).
 - `saltation_matrix` computes it.
-- **Check:** $`\Phi_{\text{after}}\,\Xi\,\Phi_{\text{before}}`$ matches the finite-difference ground truth of the whole fixed-$`\Delta t`$ map to $`\sim\!7\times10^{-6}`$ (limited by the finite-difference step, not this formula), in the same test scenario as above: `tests/use_numpy/test_saltation_matrix_ekf.py`, `test_saltation_matrix_composes_to_the_fixed_dt_jacobian` (scenario at L88-90).
+- **Check:** $`\Phi_{\text{after}}\,\Xi\,\Phi_{\text{before}}`$ matches the finite-difference ground truth of the whole fixed-$`\Delta t`$ map to $`\sim\!7\times10^{-6}`$ (limited by the finite-difference step, not this formula), in the same test scenario as above: `tests/use_numpy/test_saltation_matrix_ekf.py`, `test_saltation_matrix_composes_to_the_fixed_dt_jacobian` (scenario at L90-92).
 
 ---
 
@@ -318,12 +318,12 @@ Mean NEES, 5 ticks after each of 3 bounces (seed 0):
 
 - The filters differ only at bounces. By §5's $`Dg\,\Xi = -e\,Dg`$, the saltation update scales $P$'s height (guard-normal) variance by $e^2$ ($\approx 0.72$ at $e = 0.85$); the naive update carries it through unchanged ($DR$'s position rows are the identity).
 - Which filter has the higher post-bounce NEES depends on tuning: at `--process-noise-std` $0.05$ or $0.01$ (seed 0), the *naive* one's is higher (2.86 vs. 2.60, and 3.29 vs. 2.65).
-- What holds at every setting tried: both stay below $6$. With exact contact detection, neither filter is overconfident after a bounce.
+- At every setting swept above, both stay below $6$: with exact contact detection, neither filter is overconfident after a bounce. This is not general: with low process noise and no floor (`--process-noise-std 0.01 --impact-noise-std 0`, seed 0), the naive filter is overconfident after a bounce (NEES 8.93) while the saltation-corrected one stays at 4.86.
 - This changes once the bounce time is misjudged: §8 shows that when detection jitter makes both overconfident (NEES $> 6$), the saltation-corrected one is the more overconfident.
 
 So with exact detection there is no case for the naive update:
 
-- The two filters are close, both right after a bounce and over the whole trajectory, and neither is overconfident.
+- At the swept settings, the two filters are close, both right after a bounce and over the whole trajectory, and neither is overconfident; in the low-noise, no-floor case above, the naive one is.
 - The naive update has no principled derivation behind it at all.
 - The larger miscalibration here is the conservatism (underconfidence) both filters share over the whole trajectory, not the difference between their bounce updates.
 - A real hybrid invariant EKF would still benefit from an explicit model of detection uncertainty (e.g., an impact-timing noise term scaled by the velocity jump at the event, rather than this script's isotropic floor). [invariant_saltation_ekf.md §7](invariant_saltation_ekf.md#7-contact-detection-jitter) implements such a term. §8 measures how much detection error costs each filter.
@@ -349,7 +349,7 @@ The same run, animated. The two estimates stay close; what differs is the uncert
 - **Stay well clear of the Zeno regime.** A lossy bounce ($e<1$) produces infinitely many, ever more frequent bounces approaching a finite settling time: $`t_1 + \frac{2 e v_1}{g(1-e)} \approx 12.45\,\text{s}`$ at the defaults (first impact at $t_1 \approx 1.01$ s, speed $v_1 \approx 9.90$ m/s).
   - The $n$-th interval between bounces is $`2 v_1 e^{n}/g \approx 2.02\cdot 0.85^{n}`$ s. It reaches the fixed step $\Delta t = 0.02$ s only at $n \approx 28$, about $0.14$ s before $12.45$ s (around $t \approx 12.3$ s), and is still about $3\Delta t$ at $n \approx 22$, the last $\approx 0.4$ s. So intervals fall to a few $\Delta t$ only in the final fraction of a second.
   - A fixed-tick estimate can't be fairly compared with a truth that bounces many times within one tick.
-  - With `--duration 12` (seed 0), post-bounce mean NEES is $\approx 3{,}600$ (naive) and $\approx 5{,}100$ (saltation), peaking near $56{,}000$ for both. We attribute the blow-up to the many bounces per tick near the end (plus the 20-bounce cap per tick). Both filters share it, for reasons unrelated to the saltation matrix.
+  - With `--duration 12` (seed 0), post-bounce mean NEES is $\approx 3{,}600$ (naive) and $\approx 5{,}100$ (saltation), peaking near $56{,}000$ for both. We first attributed the blow-up to many bounces per tick, but up to 12 s the true trajectory never bounces twice in one tick (checked), so neither that nor the 20-bounce cap is involved; the last bounces are only about 3-4 ticks apart. The cause was not isolated. Both filters share it, for reasons unrelated to the saltation matrix.
   - `--duration`'s default stops after 3 clean, well-separated bounces, before the 4th starts crowding the settling regime.
 
 ---

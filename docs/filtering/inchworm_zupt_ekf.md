@@ -153,7 +153,7 @@ A ramp only helps if it is gentle enough. The rule: compare the true ramp accele
 - $`0.5/0.15 \approx 3.3`$: each ramp is about 3.3 "standard surprises", not 1.
 - The bad-ratio row is the same idea, at $`40`$ standard surprises.
 
-The defaults' $t_{\text{extend}}$ gives 12 cruise and 20 anchor ticks, enough to settle before being measured. The $40\times$ case is far worse, but $3.3\times$ is still a real mismatch, not a negligible one: §3 shows it sets every variant's NEES level and drives the `never`-vs-`phase_conditional` comparison.
+The defaults' $t_{\text{extend}}$ gives 12 cruise and 20 anchor ticks, enough to settle before being measured. The $40\times$ case is far worse, but $3.3\times$ is still a real mismatch, not a negligible one: §3 shows it sets `never`'s and `phase_conditional`'s NEES level and drives the `never`-vs-`phase_conditional` comparison.
 
 The lesson matches the **Zeno**-regime pitfall ([glossary](../glossary.md#zeno-behavior)) in [`hybrid_saltation_ekf.md` §7](hybrid_saltation_ekf.md#7-two-things-worth-knowing-before-reusing-this-pattern): pick simulation parameters with real margin under a hard failure mode, not by trial against the first numbers that come out.
 
@@ -183,14 +183,14 @@ The same run, animated over five anchor/extend cycles. The top strip shows the p
 
 A consistent 2-**DoF** ([degrees of freedom](../glossary.md#degrees-of-freedom-dof)) filter averages $\text{NEES} = 2$; for an average over 500 trials the 95% interval is about $[1.83, 2.18]$. None of the three is consistent: the four non-`always` windows (6.0-16.4) sit at ~3-8× that value.
 
-**Why every variant is overconfident: the ramps.** The truth has no random disturbance at all. Its only departure from the filters' constant-velocity model is the ramp acceleration, $3.3\times$ the assumed $`\sigma_a`$ (§2). The truth changes speed faster than the filter expects. Per tick, at the defaults $`\Delta t = 0.05`$ s:
+**Why `never` and `phase_conditional` are overconfident: the ramps.** The truth has no random disturbance at all. Its only departure from the filters' constant-velocity model is the ramp acceleration, $3.3\times$ the assumed $`\sigma_a`$ (§2). The truth changes speed faster than the filter expects. Per tick, at the defaults $`\Delta t = 0.05`$ s:
 
 - During a ramp the speed really changes by $`0.5 \times 0.05 = 0.025`$ m/s.
 - The filter's process noise allows only $`0.15 \times 0.05 = 0.0075`$ m/s (the $`\sigma_a\Delta t`$ in $Q$).
 - A confident ZUPT adds to the gap: after each update the filter claims $`\sigma_v \le 0.01`$ m/s, so the real change is about $2.5\times$ that claim.
 - Confident and under-sized: that is why the NEES is too high. This is a per-tick scale, not the exact NEES.
 
-Two checks at seed 0 confirm this is the whole story:
+Two checks at seed 0 confirm this is the whole story for these two (`always` stays at NEES 103/253 with $`\sigma_a = 0.5\,\text{m/s}^2`$, because its ZUPT is false during cruise):
 
 | Setting | `never` anchor/cruise | `phase_conditional` anchor/cruise |
 | --- | --- | --- |

@@ -33,7 +33,7 @@ Planar motion; pads are points that never lift off; the body is a straight segme
 
 | Part | What it does | Default |
 | --- | --- | --- |
-| **Gait** | Alternating phases of length $`t_{\text{phase}}`$. **Extend:** back pad anchored, body length $`l`$ grows. **Contract:** front pad anchored, $`l`$ shrinks back. The stroke rate $`\dot l`$ is a trapezoid (peak $`v_{\text{stroke}}`$, ramps $`t_{\text{ramp}}`$), as in the 1D toy | 1 s phases, 0.1 m/s, 0.2 s ramps, $`l_{\min}`$ = 0.15 m |
+| **Gait** | Alternating phases of length $`t_{\text{phase}}`$. **Extend:** back pad anchored, body length $`l`$ grows. **Contract:** front pad anchored, $`l`$ shrinks back. The stroke rate $`\dot l`$ is a trapezoid (peak $`v_{\text{stroke}}`$, ramps $`t_{\text{ramp}}`$), as in the 1D toy. $`l_{\min}`$ is the body length at the start of extend (its shortest) | 1 s phases, 0.1 m/s, 0.2 s ramps, $`l_{\min}`$ = 0.15 m |
 | **Turning** | During extend only, the heading $`\theta`$ (direction from back pad to front pad) turns at $`\dot\theta = \dot l \tan\phi / l_{\min}`$: bicycle-style steering, where $`\phi`$ is the steering angle and $`l_{\min}`$ plays the **wheelbase** (on a bicycle, the distance between the axles). The paper uses the same idea, with turn radius $`R = L / \tan\phi`$ for a wheelbase $`L`$ | $`\phi`$ = 0.3 rad |
 | **Micro-slip** | The anchored pad is never perfectly still: it creeps by small random steps (**white noise** on its velocity: a random value, independent from tick to tick). This is the "approximately still" of the 1D doc's caveats | 0.01 m/s per axis |
 | **Slip pulse** | With probability $`p_{\text{slip}}`$ per phase, the anchored pad slides backward along the body in one trapezoidal pulse (same shape as inchworm §6). The rest of the body slides with it | 0.5, peak 0.08 m/s, 0.6 s |
@@ -126,7 +126,7 @@ Before the four mechanisms below, one pulse: seed 0's first slip (1.0-1.6 s, a 3
 | --- | --- | --- | --- | --- |
 | `schedule` | 32.0 mm | 5.8 mm | 5.5 | Missed the whole slide, and is sure of itself |
 | `schedule_and_sensor` | 29.8 mm | 14.9 mm | 2.0 | Flagged the slide on about 8 ticks and loosened, but did not move: still wrong, and not loose enough |
-| `pad_fused` | 0.2 mm (spread 5.4 mm) | 5.8 mm | ≈ 1 | Followed the slide |
+| `pad_fused` | 0.2 mm (spread 5.4 mm) | 5.8 mm | 0.03 (spread / σ ≈ 0.9) | Followed the slide |
 | `never` | 23.7 mm | 28.7 mm | 0.8 | Wrong, but its loose anchor covers one slide |
 
 #### The schedule is blind to slip, and the error stays
@@ -164,7 +164,7 @@ The veto has two knobs: **how loose it makes the pad** (`--free-noise-std`) and 
 | Much looser: 1.0 m/s | 3.12 | 4.8% |
 | Lower threshold: 1.5σ (1.06 mm per tick) | 4.33 | 14.6% |
 
-- **Consistency can be tuned.** Loosening more, or catching more of the ramps with a lower threshold, makes the veto honest about its uncertainty.
+- **Consistency can be tuned.** Loosening more, or catching more of the ramps with a lower threshold, removes its overconfidence (NEES 3.1-4.3, now slightly below the band: cautious rather than overconfident).
 - **The low error at 1.0 m/s should not be read as a property of the veto.** When the anchored pad is made much looser than the moving pad (2 cm per tick), the closure update hands the body's position to the moving pad's estimate. In this toy the moving pad has no motion model, so the result depends on how far the moving pad happens to travel during a pulse. A slower slip (0.04 m/s) gives 3.6%, a faster one (0.15 m/s) gives 12.9% (both at 1.0 m/s). A real filter would predict the moving pad from the encoders, and this effect would change.
 - **Fusion needs no such tuning.** Its process noise is the sensor's own noise.
 

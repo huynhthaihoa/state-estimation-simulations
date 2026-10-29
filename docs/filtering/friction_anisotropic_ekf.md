@@ -109,7 +109,7 @@ R(\theta_Q)^\top \Delta t^2,
 R(\theta_Q) = \begin{bmatrix} \cos\theta_Q & -\sin\theta_Q \\ \sin\theta_Q & \cos\theta_Q \end{bmatrix}
 ```
 
-The $\Delta t^2$ converts a slip-velocity standard deviation (m/s) into a per-tick position variance (m²). It matches the simulator exactly: `generate_ground_truth_and_data` adds slip of $\sigma\,\Delta t$ each tick, so this is the true slip covariance, not a tuned guess. The simulator itself uses a fixed per-tick std instead of continuous-time white noise ($\sigma^2\Delta t$); see [pointcloud_pose_tracking_empirical_note.md §1.1](pointcloud_pose_tracking_empirical_note.md#11-the-filter-math-concretely) for what that changes. Written out, with $a = \sigma_{\text{grip}}^2 \Delta t^2$, $b = \sigma_{\text{slip}}^2 \Delta t^2$, $c = \cos\theta_Q$ and $s = \sin\theta_Q$:
+The $\Delta t^2$ converts a slip-velocity standard deviation (m/s) into a per-tick position variance (m²). It matches the simulator exactly: `generate_ground_truth_and_data` adds slip of $`\sigma\,\Delta t`$ each tick, so this is the true slip covariance, not a tuned guess. The simulator itself uses a fixed per-tick std instead of continuous-time white noise ($\sigma^2\Delta t$); see [pointcloud_pose_tracking_empirical_note.md §1.1](pointcloud_pose_tracking_empirical_note.md#11-the-filter-math-concretely) for what that changes. Written out, with $a = \sigma_{\text{grip}}^2 \Delta t^2$, $b = \sigma_{\text{slip}}^2 \Delta t^2$, $c = \cos\theta_Q$ and $s = \sin\theta_Q$:
 
 ```math
 Q_{\text{pos}}^{\text{aniso}}(\theta_Q) =
@@ -207,7 +207,7 @@ Position root-mean-square error ([RMSE](../glossary.md#rmse-root-mean-square-err
 
 ## 3. A secondary finding: the worst mismatch is 90°, not 180°
 
-The *worst* of `fixed_anisotropic`'s four bins is 90-135° in all four seeds, not the largest possible mismatch (135-180°). The reason is the 180° periodicity of the ellipse (§1.1): a 180° heading difference is no mismatch at all, so the worst possible mismatch is 90°. (The binned peak lands in 90-135° rather than 45-90° because the filter's error takes about a second to build up, so its NEES trails the mismatch slightly.)
+The *worst* of `fixed_anisotropic`'s four bins is 90-135° in all four seeds, not the largest possible mismatch (135-180°). The reason is the 180° periodicity of the ellipse (§1.1): a 180° heading difference is no mismatch at all, so the worst possible mismatch is 90°. (The binned peak lands in 90-135° rather than 45-90°: NEES peaks about 1 s after each 90° crossing, which puts the first, larger hump (about 29) in 90-135° and the second (about 24) in 45-90°. Why the first hump is larger was not isolated.)
 
 Past the peak, NEES recovers only partly: 18.2 in the 135-180° bin, still about 6× the consistent value, although the ellipse is realigned at 180°. Splitting the NEES into position and heading parts shows why. The table below is an approximate one-off diagnostic (a single 200-trial run, rounded to whole numbers). The script doesn't print it, and heading NEES is heavy-tailed, so values scatter by about ±20% between runs (the pattern stays the same).
 

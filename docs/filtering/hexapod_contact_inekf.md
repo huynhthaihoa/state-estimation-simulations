@@ -17,7 +17,7 @@ So a correct filter can only ever *lose* information about yaw. The experiments 
 - the **invariant EKF**, whose error dynamics do not depend on the estimate;
 - the ordinary **world-frame error-state EKF** ([glossary](../glossary.md#eskf-error-state-kalman-filter)), whose Jacobians ([glossary](../glossary.md#jacobian)) are evaluated at the estimate.
 
-Short answer: both are about equally *accurate*, but the world-frame EKF gains spurious yaw information. With a larger initial rotation error it becomes badly overconfident: NEES ([glossary](../glossary.md#consistency-and-nees), the error scaled by the filter's own claimed uncertainty; 9 is the consistent value here) 18 instead of 9 at an initial rotation std (the std of the random rotation error each trial starts with, per axis) of 0.1 rad (5.7°), 481 at 0.3 rad (17.2°).
+Short answer: at a small initial rotation error both are about equally *accurate*, but the world-frame EKF gains spurious yaw information. With a larger initial rotation error it becomes badly overconfident: NEES ([glossary](../glossary.md#consistency-and-nees), the error scaled by the filter's own claimed uncertainty; 9 is the consistent value here) 18 instead of 9 at an initial rotation std (the std of the random rotation error each trial starts with, per axis) of 0.1 rad (5.7°), 481 at 0.3 rad (17.2°).
 
 ![Three panels from hexapod_contact_inekf.py: yaw error over 12 s with an initial rotation std of 0.1 rad, where the invariant EKF's actual RMSE (6.2 deg) and reported sigma (5.7 deg) stay flat while the world-frame EKF's reported sigma falls to 1.9 deg below its actual 6.8 deg; average NEES bars for initial rotation std 0.02, 0.1 and 0.3 rad, invariant EKF 9.3, 9.3, 9.4 and world-frame EKF 9.6, 18.2, 481, against the 95% band for 9 DoF; and velocity RMSE of the invariant EKF over time with leg L2 slipping between 4 and 8 s, for the tripod and wave gaits, trusting every foot versus the per-foot chi-squared gate](../../assets/hexapod_contact_inekf.png)
 
@@ -113,10 +113,10 @@ The world-frame EKF's Jacobians are evaluated further from the truth, so the spu
 
 - **The invariant EKF stays consistent at every level:** its error dynamics do not depend on the estimate, so a bad estimate does not distort its covariance.
 - **The world-frame EKF claims to know yaw to 1.3°** when its actual error is 20°.
-- **Accuracy is close.** The world-frame EKF's yaw RMSE is 6-9% higher. Position error grows with the initial yaw error for both: a heading error turns the whole estimated path about its start, and the invariant EKF's final yaw RMSE at the 0.1 rad setting, 6.2° (0.108 rad), times the 0.98 m RMS net displacement over 12 s is about 0.11 m (table: 0.107 m).
+- **Accuracy is close in yaw and position.** The world-frame EKF's yaw RMSE is 6-9% higher. Tilt and velocity are not close at 0.3 rad: there its tilt RMSE is 68% higher (2.94° vs 1.75°) and its velocity RMSE 47% higher (0.058 vs 0.039 m/s), averaged over the run (same trials, not in the table); at 0.1 rad the gap is 4-6%. Position error grows with the initial yaw error for both: a heading error turns the whole estimated path about its start, and the invariant EKF's final yaw RMSE at the 0.1 rad setting, 6.2° (0.108 rad), times the 0.98 m RMS net displacement over 12 s is about 0.11 m (table: 0.107 m).
 - **Why it matters.** An overconfident filter rejects good measurements in a gate and weights a later loop closure ([glossary](../glossary.md#loop-closure)) or GPS fix too little against its own wrong yaw.
 
-The 0.1 rad case, one run, animated. Seed 4, not the script's seed 0: seed 0 happens to draw an initial yaw error of only 0.08°, too small to see. Here the world-frame EKF's ±2σ band shrinks from 11.5° to 4.1° while its updates drag the yaw from −1.9° to −6.8°, and its path rotates away (final position error 0.157 m vs 0.050 m). The invariant EKF's yaw error stays between −1.9° and −1.7°, inside a band that never shrinks.
+The 0.1 rad case, one run, animated. Seed 4, not the script's seed 0: seed 0 happens to draw an initial yaw error of only 0.08°, too small to see. Here the world-frame EKF's ±2σ band shrinks from 11.5° to 4.1° while its updates drag the yaw from −1.9° to −6.8°, and its path rotates away (final position error 0.157 m vs 0.050 m). The invariant EKF's yaw error stays between −2.1° and −1.7°, inside a band that never shrinks.
 
 ![Animation of one tripod-gait run with 0.1 rad initial rotation std: left, a top-down view of the hexapod walking a curved path, its true stance feet and each filter's estimated body outline and estimated feet, with the true and both estimated paths; right, each filter's yaw error over time with its shaded plus-minus two sigma band, the world-frame EKF's band shrinking below its error, and each filter's position error over time](../../assets/hexapod_contact_inekf.gif)
 
@@ -153,7 +153,7 @@ Results (50 trials; "in window" = $`t \in [4, 8)`$ s):
 
 ## 5. IMU biases: the "imperfect" invariant EKF
 
-Each trial draws a constant gyroscope **bias** ([glossary](../glossary.md#bias)) (std 0.01 rad/s) and accelerometer bias (std 0.05 m/s²); both filters add the six biases to the state, with that prior. The bias error enters the invariant error through $`-\mathrm{Ad}_{\hat X}`$ ([glossary](../glossary.md#adjoint)), which depends on the estimate: $`\mathrm{Ad}_{\hat X}`$ converts an error given in the body frame (the bias offset) into the world-frame coordinates of $`\xi`$, using $`\hat R`$, $`\hat v`$ and $`\hat p`$. Here it is the adjoint of $`SE_{K+2}(3)`$, a $`(9+3K) \times (9+3K)`$ matrix, not the glossary's $`6 \times 6`$ one for $`SE(3)`$. So exact invariance is lost: Hartley et al. call this the **imperfect InEKF** (InEKF is their abbreviation for the invariant EKF). The bias columns of both filters are a first-order discretization (their error shrinks 4× when $`\Delta t`$ halves; tested).
+Each trial draws a constant gyroscope **bias** ([glossary](../glossary.md#bias)) (std 0.01 rad/s) and accelerometer bias (std 0.05 m/s²); both filters add the six biases to the state, with that prior. The bias error enters the invariant error through $`-\mathrm{Ad}_{\hat X}`$ ([glossary](../glossary.md#adjoint)), which depends on the estimate: $`\mathrm{Ad}_{\hat X}`$ converts an error given in the body frame (the bias offset) into the world-frame coordinates of $`\xi`$, using $`\hat R`$, $`\hat v`$, $`\hat p`$ and the foot positions $`\hat d_i`$. Here it is the adjoint of $`SE_{K+2}(3)`$, a $`(9+3K) \times (9+3K)`$ matrix, not the glossary's $`6 \times 6`$ one for $`SE(3)`$. So exact invariance is lost: Hartley et al. call this the **imperfect InEKF** (InEKF is their abbreviation for the invariant EKF). The bias columns of both filters are a first-order discretization (their error shrinks 4× when $`\Delta t`$ halves; tested).
 
 50 trials; bias NEES should be 6 (95% band $`[5.08, 7.00]`$):
 
@@ -168,14 +168,14 @@ Each trial draws a constant gyroscope **bias** ([glossary](../glossary.md#bias))
 
 - **The invariant EKF stays consistent** on every measure, even though it is no longer exactly invariant. Its yaw variance can now shrink, but only slightly: the largest single-step decrease was about 0.06% (10 seeds × 3 gaits).
 - **The world-frame EKF is again mildly overconfident in yaw:** yaw NEES 1.27-1.54 against the invariant EKF's 0.84-1.11, above the 1.43 bound for ripple. This is at the default 0.02 rad initial error; §3 shows how it grows with a larger one.
-- **A gyroscope bias makes yaw drift faster.** The reported yaw σ after 12 s grows 1.4-2× compared with §3 (tripod 2.34° vs 1.15°, ripple 1.84° vs 1.15°, wave 1.62° vs 1.15°). The final-tick values are from 50 runs, so their ratios are noisy; the time-averaged NEES is the reliable number.
+- **A gyroscope bias makes yaw drift faster** (not tested on its own: this run adds both biases together). The reported yaw σ after 12 s grows 1.4-2× compared with §3 (tripod 2.34° vs 1.15°, ripple 1.84° vs 1.15°, wave 1.62° vs 1.15°). The final-tick values are from 50 runs, so their ratios are noisy; the time-averaged NEES is the reliable number.
 
 ---
 
 ## 6. Takeaway
 
 - **Put the stance feet in the state and use an invariant error.** Then the measurement Jacobian and the touchdown step are constant, and the filter's unobservable directions (yaw and position) are the true ones. That is the main point of ref. 1.
-- **The standard EKF is as accurate but not honest.** At a 0.02 rad (1.1°) initial rotation std the difference is small. At 0.1 rad (5.7°) its NEES doubles, and at 0.3 rad (17.2°) it is about 50× too high, with a reported yaw σ of 1.3°.
+- **The standard EKF is as accurate at a small initial error, but not honest.** At a 0.02 rad (1.1°) initial rotation std the difference is small. At 0.1 rad (5.7°) its NEES doubles, and at 0.3 rad (17.2°) it is about 50× too high, with a reported yaw σ of 1.3°.
 - **Biases cost exact invariance, not consistency**, in this setting.
 - **Gating still works with feet in the state, but catches a slip later.** The residual measures how far a foot has slid, so the first centimetre passes.
 - **Yaw and position still drift.** IMU plus legs fixes roll, pitch and velocity; an **exteroceptive** sensor, one that measures the surroundings (camera, lidar, GPS), is needed for the rest.
