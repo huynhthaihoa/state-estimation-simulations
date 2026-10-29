@@ -41,7 +41,7 @@ The 7-DoF similarity transform is right for monocular output, but not for every 
 | Stereo, RGB-D, LiDAR | position, orientation | 6-DoF rigid: the same algorithm with $s$ fixed to 1 (the classic Kabsch/Horn fit) |
 | Visual-inertial (camera + [IMU](../glossary.md#imu-inertial-measurement-unit)) | position, yaw | 4-DoF: translation plus rotation about gravity only, because gravity makes roll and pitch observable |
 
-Zhang & Scaramuzza (2018) give the full treatment, including the 4-DoF variant.
+Zhang & Scaramuzza (2018) derive the monocular, stereo and visual-inertial rows (their Table I); the RGB-D and LiDAR entries follow the same argument, since both sensors measure metric scale.
 
 ---
 
@@ -155,7 +155,7 @@ Here $X$ and $Y$ are the raw points (one per row); step 1 centers them. Running 
 - **[`bundle_adjustment_advanced.py`](../../use_numpy/bundle_adjustment_advanced.py)** does **not** call it. It hard-fixes **two** [keyframes](../glossary.md#keyframe) (poses 0 and 1) as a gauge anchor instead of using a soft gauge-prior factor (a [prior](../glossary.md#prior-unary-factor) on the first two camera poses that softly pins the gauge):
   - One fixed keyframe removes only the 6 rigid DoF. Scale stays unobservable, since the reconstruction rescaled about that pose satisfies every constraint equally well.
   - A *second* fixed keyframe also fixes the *distance* between the anchors, so no gauge freedom is left.
-  - That doesn't mean there's nothing to align. Keyframe 0 is fixed at its true pose, but keyframe 1 keeps its noisy front-end pose, so the scale and orientation it pins are wrong (up to ~19% in scale over seeds 0-4, see [bundle_adjustment.md §13.6](../optimization/bundle_adjustment.md#136-in-this-repo)).
+  - That doesn't mean there's nothing to align. Keyframe 0 is fixed at its true pose, but keyframe 1 keeps its noisy front-end pose, so the scale and orientation it pins are wrong (the fitted scale is off by up to ~19% over seeds 0-4, to which this anchor contributes; see [bundle_adjustment.md §13.6](../optimization/bundle_adjustment.md#136-in-this-repo)).
   - The reported raw error (measured directly against ground truth, without the Umeyama fit) therefore includes a large similarity offset that Umeyama alignment would remove ([§14](../optimization/bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment)).
 - **[`lidar_primitives.py`](../../use_numpy/lidar_primitives.py)** (both `use_numpy/` and `use_manif/`) calls `umeyama_alignment` inside `trajectory_errors` on the estimated and true positions, but keeps only $R$ and computes $t$ from the centroids, $`t = \mu_{\text{true}} - R\mu_{\text{est}}`$. That is a rigid ($s = 1$) alignment for the **ATE** (absolute trajectory error: the RMS position error after the rigid fit; [glossary](../glossary.md#umeyama-alignment-and-trajectory-rmse)), and the only rigid use of the function in this repo.
 

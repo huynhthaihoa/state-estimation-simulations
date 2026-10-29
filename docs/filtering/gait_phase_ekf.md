@@ -43,7 +43,7 @@ A foot always swings at least 5 ticks and stands at least 1 tick before its comm
 
 ### 1.2 The contact detector
 
-Modeled on the CTU lab's servo **position-error detector** (Faigl & Čížek 2019): contact is declared when the commanded and measured positions of the **femur joint** (the joint that raises and lowers the leg) differ by more than a threshold. The paper reports no delays or error rates, so the numbers below are assumptions.
+Modeled on the CTU lab's servo **position-error detector** (Faigl & Čížek 2019): contact is declared when the commanded and measured positions of the **femur joint** (the joint that raises and lowers the leg) differ by more than a threshold. The paper reports no detection delays or error rates, so the numbers below are assumptions.
 
 | Behavior | Model | Default |
 | --- | --- | --- |

@@ -2,7 +2,7 @@
 
 > **Note:** A visual-inertial state estimator combines a camera with an [IMU](../glossary.md#imu-inertial-measurement-unit) to track the position, velocity, and orientation of a moving robot or device.
 
-Before a visual-inertial estimator can run its normal loop ([preintegrate](../glossary.md#imu-preintegration) IMU, optimize against camera constraints), it has to solve a chicken-and-egg bootstrapping problem. It must find **metric scale** (real-world units such as meters), gravity direction, initial velocity, and [IMU bias](../glossary.md#bias). A **monocular** (single) camera or a bias-corrupted IMU cannot give any of these on its own.
+Before a visual-inertial estimator can run its normal loop ([preintegrate](../glossary.md#imu-preintegration) IMU, optimize against camera constraints), it has to solve a chicken-and-egg bootstrapping problem. It must find **metric scale** (real-world units such as meters), gravity direction, initial velocity, and [IMU bias](../glossary.md#bias). A **monocular** (single) camera or a bias-corrupted IMU cannot give all of these on its own.
 
 This builds on:
 - **IMU preintegration** ($\Delta R, \Delta v, \Delta p$, the relative rotation, velocity and position between keyframes computed from the IMU samples, and their bias [Jacobians](../glossary.md#jacobian)) from [imu_preintegration.md](../optimization/imu_preintegration.md). This doc covers what must happen *before* that machinery can be trusted.
@@ -80,13 +80,13 @@ The other estimators in this doc set (§1's list) linearize *around* an existing
 
 It isn't the only design real systems use:
 - VINS-Mono's gravity refinement (Step 2) is itself a short iterative loop over a tangent-plane reparameterization. The 2 parameters move along the plane that touches, at the current estimate, the sphere of gravity vectors with the known magnitude.
-- ORB-SLAM3 (a visual-inertial SLAM system) instead estimates scale, gravity direction, velocities and IMU biases with an inertial-only MAP (maximum a posteriori: the most probable state given data and priors) optimization over keyframes from a vision-only initialization (Campos et al., 2020; see References), then refined jointly.
+- ORB-SLAM3 (a visual-inertial SLAM system) instead estimates scale, gravity direction, velocities and IMU biases with an inertial-only MAP (maximum a posteriori: the most probable state given data and priors) optimization over keyframes from a vision-only initialization (introduced by Campos et al., 2020, in ORB-SLAM Visual-Inertial; see References), then refined jointly.
 
 ---
 
 ## 4. The hand-off
 
-Once §2 produces an initial scale, gravity direction, per-keyframe velocities, and gyroscope bias (the accelerometer bias still at its near-zero starting value), we are in the situation every other doc in this repo assumes. A reasonable starting point now exists. [imu_preintegration.md](../optimization/imu_preintegration.md)'s $(\Delta R, \Delta v, \Delta p)$ bundles (now scaled and bias-corrected) become real edges, and [factor_graph.md](../optimization/factor_graph.md)-style nonlinear optimization takes over. This doc stops at that hand-off.
+Once §2 produces an initial scale, gravity direction, per-keyframe velocities, and gyroscope bias (the accelerometer bias still at its near-zero starting value), we are in the situation every other doc in this repo assumes. A reasonable starting point now exists. [imu_preintegration.md](../optimization/imu_preintegration.md)'s $(\Delta R, \Delta v, \Delta p)$ bundles (now bias-corrected, with the vision map rescaled to metric) become real edges, and [factor_graph.md](../optimization/factor_graph.md)-style nonlinear optimization takes over. This doc stops at that hand-off.
 
 ---
 
@@ -110,4 +110,4 @@ That is a much larger undertaking than the other scripts in this repo.
 
 1. Qin, T., & Shen, S. (2017). *Robust Initialization of Monocular Visual-Inertial Estimation on Aerial Robots*. IROS 2017, 4225-4232. https://doi.org/10.1109/IROS.2017.8206284 - the source of the linear gyroscope-bias/gravity-scale-velocity alignment pipeline in §2.
 2. Qin, T., Li, P., & Shen, S. (2018). *VINS-Mono: A Robust and Versatile Monocular Visual-Inertial State Estimator*. IEEE Transactions on Robotics, 34(4), 1004-1020. https://doi.org/10.1109/TRO.2018.2853729 - the full system this initialization pipeline bootstraps; already cited in [filtering_smoothing.md §12](../filtering_smoothing.md#12-references) and [marginalization.md §11](../optimization/marginalization.md#11-references).
-3. Campos, C., Montiel, J. M. M., & Tardós, J. D. (2020). *Inertial-Only Optimization for Visual-Inertial Initialization*. ICRA 2020, 51-57. https://doi.org/10.1109/ICRA40945.2020.9197334 - ORB-SLAM3's inertial-only MAP-estimation alternative to §2's linear pipeline, named in §3's contrast.
+3. Campos, C., Montiel, J. M. M., & Tardós, J. D. (2020). *Inertial-Only Optimization for Visual-Inertial Initialization*. ICRA 2020, 51-57. https://doi.org/10.1109/ICRA40945.2020.9197334 - the inertial-only MAP-estimation alternative to §2's linear pipeline (introduced in ORB-SLAM Visual-Inertial, later used by ORB-SLAM3), named in §3's contrast.

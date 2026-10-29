@@ -48,7 +48,7 @@ So a quaternion reads as **"rotate around this axis by this amount."** The four 
 > **Watch the component order and the convention.**
 >
 > - **Component order.** This doc writes quaternions scalar-first, $(w, x, y, z)$. Many libraries store them scalar-last, $[x, y, z, w]$: scipy's `Rotation.as_quat()`, ROS (Robot Operating System) messages, and this repo's own `utils.py`. Reading one ordering as the other silently gives a different rotation.
-> - **Multiplication convention.** **Hamilton** (used here, and by most robotics libraries) and **JPL** (common in older aerospace and early visual-inertial odometry (VIO) papers) compose in opposite orders. Solà (2017) compares them.
+> - **Multiplication convention.** **Hamilton** (used here, and by many robotics libraries, e.g. Eigen, ROS and Ceres) and **JPL** (mostly used in aerospace, and in the visual-inertial odometry (VIO) papers of Mourikis, Roumeliotis and colleagues) compose in opposite orders. Solà (2017) compares them.
 >   Under Hamilton, $`q \otimes \mathbf{v} \otimes q^{\ast}`$ actively rotates the vector $\mathbf{v}$ ($`\otimes`$ is quaternion multiplication, $`q^{\ast}`$ the conjugate of $`q`$, and $`\mathbf{v}`$ is written as a pure quaternion; all three are defined in §13), and $q$ maps body coordinates to world coordinates, like $X$ in [left_right_invariant.md](../filtering/left_right_invariant.md). JPL reverses the product order and encodes the inverse (frame) rotation.
 > - Always check both before mixing code or equations from different sources.
 
@@ -215,7 +215,7 @@ The small error can be attached on either side, and both are common ($`\hat q`$ 
 
 - $`q_{\text{true}} = \delta q\otimes \hat q`$: the error is expressed in the world frame (fixed reference axes). In the terminology of [left_right_invariant.md §1](../filtering/left_right_invariant.md#1-the-setup) this is a **right-invariant** error.
 - $`q_{\text{true}} = \hat q\otimes \delta q`$: the error is expressed in the body frame (axes attached to the robot). This is the **left-invariant** error, the convention of Solà's ESKF and of this repo's `run_iekf` (in `use_numpy/pointcloud_pose_tracking.py`).
-  `run_iekf` uses the $\hat X\,\mathrm{Exp}(\xi)$ form, with $`\hat X`$ the estimated pose and $`\xi`$ the tangent-space error (see the [glossary](../glossary.md#lie-algebra-and-tangent-space)).
+  `run_iekf` uses the $`\hat X\,\mathrm{Exp}(\xi)`$ form, with $`\hat X`$ the estimated pose and $`\xi`$ the tangent-space error (see the [glossary](../glossary.md#lie-algebra-and-tangent-space)).
 
 This is the error-state idea of [extra_kf_variants.md §2](../filtering/extra_kf_variants.md#2-error-state-kalman-filter-eskf), and it leads directly into **SO(3), Lie groups, Lie algebra, and the Invariant EKF**.
 
