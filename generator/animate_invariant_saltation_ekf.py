@@ -12,7 +12,8 @@ Two panels:
   2. the Monte Carlo average NEES of each filter over time, drawn up to the
      current instant, with the consistent value 9 and its 95% interval.
 
-The estimates stay within a few centimeters of the truth for every filter, so
+After the first measurements (about 0.2 s), the estimates stay within a few
+centimeters of the truth for every filter, so
 their markers overlap in the scene: the difference is in panel 2, where the
 invariant-naive filter becomes overconfident after each bounce. No single
 state component's standard deviation is shown, on purpose: the naive filter's

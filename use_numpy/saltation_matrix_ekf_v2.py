@@ -325,7 +325,9 @@ def process_noise_covariance(h, accel_noise_std):
 class BounceConfig:
     """Settings that bound how step_hybrid resolves bounces within one step.
     Fields:
-        max_bounces: safety cap on bounces processed within one step
+        max_bounces: safety cap on bounces processed within one step; a
+            further crossing in the same step is treated as coming to rest,
+            like a slow impact (the rest of the step uses flow_resting)
         min_bounce_speed: impact speed (m/s) below which the point mass is
             treated as having come to rest (see flow_resting)
     """
@@ -382,9 +384,11 @@ def step_hybrid(x, P, dt, e, g, accel_noise_std, use_saltation, impact_noise_std
     function had before this parameter existed.
 
     Once the pre-impact vertical speed at a crossing falls below
-    bounce_cfg.min_bounce_speed, the point mass is treated as having come to
-    rest (v_z clamped to 0, remaining time integrated via flow_resting) rather
-    than continuing to resolve ever-smaller, ever-faster bounces.
+    min_bounce_speed, the point mass is treated as having come to rest
+    (v_z clamped to 0, remaining time integrated via flow_resting) rather
+    than continuing to resolve ever-smaller, ever-faster bounces. The same
+    rest rule applies to a crossing that comes after max_bounces bounces in
+    this step, so the step always integrates the full dt.
     Arguments:
         x: state [p(3), v(3)] (6,)
         P: (6,6) covariance
@@ -411,9 +415,9 @@ def step_hybrid(x, P, dt, e, g, accel_noise_std, use_saltation, impact_noise_std
     """
     remaining = dt
     at_rest = False
-    for _ in range(bounce_cfg.max_bounces):
-        if remaining <= 0.0:
-            break
+    
+    n_bounces = 0
+    while remaining > 0.0:
         if at_rest:
             x, Phi = flow_resting(x, remaining)
             P = Phi @ P @ Phi.T + process_noise_covariance(remaining, accel_noise_std)
@@ -436,7 +440,7 @@ def step_hybrid(x, P, dt, e, g, accel_noise_std, use_saltation, impact_noise_std
         P = Phi @ P @ Phi.T + process_noise_covariance(tau_detect, accel_noise_std)
         remaining -= tau_detect
 
-        if abs(x[5]) < bounce_cfg.min_bounce_speed:
+        if abs(x[5]) < bounce_cfg.min_bounce_speed or n_bounces >= bounce_cfg.max_bounces:
             x[5] = 0.0
             at_rest = True
             continue
@@ -444,6 +448,7 @@ def step_hybrid(x, P, dt, e, g, accel_noise_std, use_saltation, impact_noise_std
         Xi = saltation_matrix(x, e, g) if use_saltation else reset_jacobian(e)
         x = reset_map(x, e)
         P = Xi @ P @ Xi.T + impact_noise_std ** 2 * np.eye(6)
+        n_bounces += 1
 
     return x, P
 
