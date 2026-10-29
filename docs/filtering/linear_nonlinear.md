@@ -15,7 +15,7 @@ The system is linear only if both $f$ and $h$ are linear in the state $x$, meani
 3. **Look for these patterns.** Any of them makes a model nonlinear:
    - **Trig of a state:** $\cos\theta$, $\sin\theta$ where $\theta$ is estimated. This is the unicycle in [kf_ekf_iekf.md §2](kf_ekf_iekf.md#2-extended-kalman-filter-the-world-is-nonlinear-so-ill-approximate-it-locally).
    - **States multiplied together:** $v \cdot \cos\theta$ (here $`v`$ is a speed, not the measurement noise), or $`R\,p`$ when both $R$ and $p$ are estimated ($`R`$ the rotation, not the noise covariance; $`p`$ the position).
-   - **Rotations or poses in minimal coordinates** (as many numbers as degrees of freedom; [glossary](../glossary.md#minimal-vs-ambient-redundant-parameterization)): composing $T \cdot \mathrm{Exp}(\xi)$ (pose $`T`$, tangent-space error $`\xi`$, **exponential map** $`\mathrm{Exp}`$; [glossary](../glossary.md#exp-and-log-maps)), or a pose parameterized by angles. The point-cloud observation $R\,p_i + t$ is the counter-example: it is exactly linear in the state $[\mathrm{vec}(R), t]$ ($\mathrm{vec}(R)$ is the 9 entries of $R$ flattened row-major, as `R.flatten()`; [kf_ekf_iekf.md §1](kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear); see [pointcloud_pose_tracking_empirical_note.md §4.1](pointcloud_pose_tracking_empirical_note.md#41-what-vanilla-buys-and-costs)). The nonlinearity enters through the rotation constraint and the minimal error coordinates.
+   - **Rotations or poses in minimal coordinates** (as many numbers as degrees of freedom; [glossary](../glossary.md#minimal-vs-ambient-redundant-parameterization)): composing $T \cdot \mathrm{Exp}(\xi)$ (pose $`T`$, tangent-space error $`\xi`$, **exponential map** $`\mathrm{Exp}`$; [glossary](../glossary.md#exp-and-log-maps)), or a pose parameterized by angles. The point-cloud observation $`R\,p_i + t`$ is the counter-example: it is exactly linear in the state $[\mathrm{vec}(R), t]$ ($\mathrm{vec}(R)$ is the 9 entries of $R$ flattened row-major, as `R.flatten()`; [kf_ekf_iekf.md §1](kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear); see [pointcloud_pose_tracking_empirical_note.md §4.1](pointcloud_pose_tracking_empirical_note.md#41-what-vanilla-buys-and-costs)). The nonlinearity enters through the rotation constraint and the minimal error coordinates.
    - **Division by a state:** camera projection $u = f_x X/Z$ (here $`u`$ is the pixel coordinate, not the control input; $`f_x`$ is the focal length in pixels, not the motion model $`f`$; $`X`$ and $`Z`$ are the lateral and depth coordinates of the point in the camera frame).
    - **Norms and square roots:** range $\sqrt{(x-x_L)^2 + (y-y_L)^2}$ (robot position $`(x, y)`$, [landmark](../glossary.md#landmark) position $`(x_L, y_L)`$).
    - **Switching or contact:** impacts, or stick/slip friction. These are non-smooth, which is what the saltation-matrix EKF in [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) handles.
@@ -27,10 +27,10 @@ The first two tests are exact. The third is a heuristic for spotting what will f
 - **Linearity is about the state, not time or inputs.** $F_k$ may change with $k$, or depend on a known control or measured signal, and the model is still linear (linear time-varying), so the KF is still exact. Example: $`x_{k+1} = x_k + v\cos\theta\,\Delta t`$ is linear if $\theta$ comes from a trusted compass as an input, and nonlinear if $\theta$ is part of the state we estimate.
 - **Only one side needs to be nonlinear.** Linear motion with a range sensor (a nonlinear $h$) is already a nonlinear filtering problem.
 - **Linearity depends on the choice of state coordinates.** This is the point of the **Invariant EKF** (**IEKF**, [glossary](../glossary.md#iekf-invariant-ekf); [kf_ekf_iekf.md §5](kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error)). Pose dynamics are nonlinear when:
-  - the state is a minimal parameterization (angles, tangent-space error) or must satisfy the $SO(3)$ constraint ([glossary](../glossary.md#so3-and-se3));
+  - the state is a minimal parameterization (angles, tangent-space error);
   - the angular velocity or a bias is itself a state, so it multiplies $R$.
 
-  With a known body twist, $R_{k+1} = R_k\,\mathrm{Exp}(\omega\,\Delta t)$ is linear in $\mathrm{vec}(R_k)$. The vanilla KF in [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) is inexact for three reasons. It truncates the exponential, it carries a redundant 12-dimensional covariance that is not comparable to a minimal $6\times6$ tangent covariance, and it needs an **SVD** (singular value decomposition) re-projection onto $SO(3)$ (snapping the matrix back to the nearest rotation).
+  With a known body twist, $`R_{k+1} = R_k\,\mathrm{Exp}(\omega\,\Delta t)`$ is linear in $\mathrm{vec}(R_k)$. The vanilla KF in [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) is inexact for three reasons. It truncates the exponential, it carries a redundant 12-dimensional covariance that is not comparable to a minimal $6\times6$ tangent covariance, and it needs an **SVD** (singular value decomposition) re-projection onto $SO(3)$ (snapping the matrix back to the nearest rotation; [glossary](../glossary.md#so3-and-se3)).
 
   For [group-affine dynamics](../glossary.md#group-affine-dynamics-trajectory-independence) ([lie_algebra.md §11.1](../foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity)), a well-chosen invariant error evolves independently of the state estimate (Barrau & Bonnabel 2017, [kf_ekf_iekf.md §11](kf_ekf_iekf.md#11-references)).
 
@@ -77,7 +77,7 @@ The EKF keeps only the first two terms. With $\delta \sim \mathcal N(0, P)$ (and
 
 Compare both with the noise the model already carries: the measurement noise covariance $R$ for $h$ and the process noise covariance $Q$ for $f$ (not the rotation $R$).
 
-- **Small:** the bias and the extra spread $`\sqrt{\tfrac12\mathrm{tr}(\nabla^2 f_i\,P\,\nabla^2 f_i\,P)}`$ are both much smaller than $`\sqrt{R_{ii}}`$ (the sensor's own standard deviation), so the linearization is adequate.
+- **Small:** the bias and the extra spread $`\sqrt{\tfrac12\mathrm{tr}(\nabla^2 f_i\,P\,\nabla^2 f_i\,P)}`$ are both much smaller than $`\sqrt{R_{ii}}`$ (the sensor's own standard deviation; or $`\sqrt{Q_{ii}}`$ for $f$), so the linearization is adequate.
 - **Comparable or larger**, in either: the model is effectively nonlinear at this uncertainty.
 
 **Range sensor example (2D):** the Hessian of $`h = \lVert p - L\rVert`$ is $`(I - uu^\top)/r`$. Here $u$ is the unit line-of-sight vector (not the control input), $`p`$ the position, $`L`$ the landmark, $`r`$ the range $`\lVert p-L\rVert`$ and $`\sigma_p`$ the position standard deviation. It has curvature $1/r$ across the line of sight, so the bias is about $\sigma_p^2 / (2r)$ (in 3D there are two perpendicular directions, which gives $\sigma_p^2 / r$). With $\sigma_p = 1$ m and $\sigma_{\text{range}} = 0.1$ m:
@@ -89,7 +89,7 @@ Compare both with the noise the model already carries: the measurement noise cov
 
 The spread matters even more than the bias here. The model is the same in both rows. Only the ratio of uncertainty to curvature changed.
 
-Some quick scalings, each giving the dropped second-order term relative to the function's value (for $\cos\theta$, the value at $\hat\theta = 0$, since the ratio blows up where $\cos\hat\theta \approx 0$):
+Some quick scalings, each giving the dropped second-order term relative to the function's value (for $\cos\theta$ the ratio is the same at every $\hat\theta$ with $\cos\hat\theta \neq 0$, since $`E[\cos\theta] = \cos\hat\theta\,e^{-\sigma_\theta^2/2}`$):
 
 | Model | Second-order term ÷ value | Example |
 | --- | --- | --- |
@@ -101,7 +101,7 @@ Some quick scalings, each giving the dropped second-order term relative to the f
 - Toy case: $\hat\theta = 0$, $\theta \sim \mathcal N(0, 0.5^2)$, so $\sigma_\theta = 0.5$ rad.
 - $\cos\theta$ has a flat top at $0$: an error of $+0.5$ and an error of $-0.5$ both push it below $1$.
 - The errors do not cancel. Exactly, $`E[\cos\theta] = e^{-\sigma_\theta^2/2} = 0.8825`$, about 11.8% below $1$.
-- This matches the $\sigma_\theta^2/2 = 12.5\%$ in the table, which is the leading-order estimate of the same bias.
+- This matches the $`\sigma_\theta^2/2 = 12.5\%`$ in the table, which is the leading-order estimate of the same bias.
 - A linearization at $\hat\theta = 0$ predicts exactly $1$, so it misses this shift.
 
 ### 4.2 Numerical: sample and compare (works for any model)
@@ -156,9 +156,9 @@ A consistent filter's NEES averages the state dimension $n$ (NIS: the measuremen
 | [`friction_anisotropic_ekf.py`](../../use_numpy/friction_anisotropic_ekf.py) | 3 | genuinely nonlinear (heading enters through $\cos\theta$, $\sin\theta$) | [2.79, 3.22] |
 | [`saltation_matrix_ekf.py`](../../use_numpy/saltation_matrix_ekf.py) | 6 | linear between bounces, with the nonlinearity concentrated in the bounce itself | [5.70, 6.31] |
 
-Above the upper bound, the filter is overconfident. Below the lower bound, it's **underconfident** (its reported covariance is larger than its real errors), which is what `saltation_matrix_ekf.py` shows after a bounce (NEES about 2.4 against 6). A nonzero mean in the innovations is a second warning sign.
+Above the upper bound, the filter is overconfident. Below the lower bound, it's **underconfident** (its reported covariance is larger than its real errors), which is what `saltation_matrix_ekf.py` shows (NEES about 2.4 against 6 after a bounce, about 3.3 over the whole run). A nonzero mean in the innovations is a second warning sign.
 
 These tests catch **any** mismatch between the filter's model and reality, not just linearization error:
 - A wrong $Q$ or $R$, or dynamics the model leaves out, fail them just as well.
-- `inchworm_zupt_ekf.py` is a clean example. Its model is exactly linear, yet its NEES is 6-16 against 2, mostly from a ramp acceleration the model doesn't include ([inchworm_zupt_ekf.md §3](inchworm_zupt_ekf.md#3-the-finding-not-just-always-is-wrong-while-moving)).
+- `inchworm_zupt_ekf.py` is a clean example. Its model is exactly linear, yet its `never` and `phase_conditional` variants' NEES is 6-16 against 2, mostly from a ramp acceleration the model doesn't include ([inchworm_zupt_ekf.md §3](inchworm_zupt_ekf.md#3-the-finding-not-just-always-is-wrong-while-moving)).
 - So a failed test says *that* something is wrong, not what. To pin it on the linearization, use the direct checks in §4.1-§4.3, or remove the suspected cause and run again.

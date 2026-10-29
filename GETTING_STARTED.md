@@ -42,45 +42,47 @@ After all nine phases (and, optionally, [Track L](#track-l---hybrid-and-bio-insp
 
 **Then read:** [`docs/filtering/pointcloud_pose_tracking_empirical_note.md`](docs/filtering/pointcloud_pose_tracking_empirical_note.md) - deliberately *after* running the script, since it explains that script's output after the fact: why EKF/IEKF agree to round-off, why UKF differs mainly during the initial correction, and why vanilla KF stays millimeters away.
 
+**Next:** [`docs/filtering/eskf.md`](docs/filtering/eskf.md) + [README.md §5](README.md#5-error-state-kalman-filter-eskf-vs-a-quaternion-in-the-state) - [`use_numpy/eskf_imu_position_fix.py`](use_numpy/eskf_imu_position_fix.py) - an IMU-driven error-state Kalman filter: a nominal state plus a small error state, against leaving the biases out and against a quaternion in the EKF state.
+
 **Optional next:** [Track L - Hybrid and bio-inspired locomotion](#track-l---hybrid-and-bio-inspired-locomotion-optional) (after Phase 8). Everything above assumes smooth motion between measurements; Track L drops that assumption: bounces, anchored crawling, and legs. It needs only this phase, so it can also be done right now.
 
 ## Phase 5 - Graph-based batch smoothing
 
 **Read:** [`docs/optimization/levenberg_marquardt.md`](docs/optimization/levenberg_marquardt.md), [`docs/optimization/factor_graph.md`](docs/optimization/factor_graph.md), [`docs/optimization/pose_graph_optimization.md`](docs/optimization/pose_graph_optimization.md).
 
-**Run:** [README.md §7](README.md#7-3d-pose-graph-relaxation) - [`use_numpy/pose_graph.py`](use_numpy/pose_graph.py) - drift, loop closure, gauge-freedom anchoring, and the [chi-squared](docs/glossary.md#chi-square-distribution) convergence printout, all in one script.
+**Run:** [README.md §8](README.md#8-3d-pose-graph-relaxation) - [`use_numpy/pose_graph.py`](use_numpy/pose_graph.py) - drift, loop closure, gauge-freedom anchoring, and the [chi-squared](docs/glossary.md#chi-square-distribution) convergence printout, all in one script.
 
 ## Phase 6 - Bundle adjustment
 
 **Read:** [`docs/foundations/umeyama_alignment.md`](docs/foundations/umeyama_alignment.md) (needed to align monocular BA's gauge-free output to ground truth), [`docs/optimization/bundle_adjustment.md`](docs/optimization/bundle_adjustment.md).
 
-**Run:** [README.md §8](README.md#8-bundle-adjustment-joint-pose--landmark-refinement) - [`use_numpy/bundle_adjustment.py`](use_numpy/bundle_adjustment.py) - landmarks-only vs. poses-only strawmen vs. full joint BA.
+**Run:** [README.md §9](README.md#9-bundle-adjustment-joint-pose--landmark-refinement) - [`use_numpy/bundle_adjustment.py`](use_numpy/bundle_adjustment.py) - landmarks-only vs. poses-only strawmen vs. full joint BA.
 
-**Side quest:** [`docs/frontend/triangulation_pnp.md`](docs/frontend/triangulation_pnp.md) + [README.md §5](README.md#5-perspective-n-point-pnp-recovering-a-camera-pose-from-known-3d-2d-correspondences) - [`use_numpy/pnp_estimation.py`](use_numpy/pnp_estimation.py) - the inverse of triangulation, using the same closed-form-then-Gauss-Newton recipe.
+**Side quest:** [`docs/frontend/triangulation_pnp.md`](docs/frontend/triangulation_pnp.md) + [README.md §6](README.md#6-perspective-n-point-pnp-recovering-a-camera-pose-from-known-3d-2d-correspondences) - [`use_numpy/pnp_estimation.py`](use_numpy/pnp_estimation.py) - the inverse of triangulation, using the same closed-form-then-Gauss-Newton recipe.
 
-**Second side quest, the LiDAR front-end:** [`docs/frontend/lidar_primitives.md`](docs/frontend/lidar_primitives.md) + [README.md §6](README.md#6-lidar-primitives-planes-and-cylinders-for-scan-registration) - [`use_numpy/lidar_primitives.py`](use_numpy/lidar_primitives.py) - the correspondence step that `pointcloud_pose_tracking.py` (Phase 4) skips: point-to-point and point-to-plane ICP against fitted planes and cylinders, one Gauss-Newton loop for all three. Its §5 shows a corridor's degeneracy and which method's Hessian admits it; its §6 uses Phase 5's factor graph with planes as landmarks.
+**Second side quest, the LiDAR front-end:** [`docs/frontend/lidar_primitives.md`](docs/frontend/lidar_primitives.md) + [README.md §7](README.md#7-lidar-primitives-planes-and-cylinders-for-scan-registration) - [`use_numpy/lidar_primitives.py`](use_numpy/lidar_primitives.py) - the correspondence step that `pointcloud_pose_tracking.py` (Phase 4) skips: point-to-point and point-to-plane ICP against fitted planes and cylinders, one Gauss-Newton loop for all three. Its §5 shows a corridor's degeneracy and which method's Hessian admits it; its §6 uses Phase 5's factor graph with planes as landmarks.
 
 ## Phase 7 - Scaling BA to a real system
 
 **Read:** `bundle_adjustment.md` §13 (Local vs. Global BA, already covered in Phase 6).
 
-**Run:** [README.md §9](README.md#9-local--global-bundle-adjustment-bounded-windows-vs-whole-map-re-solves) - [`use_numpy/bundle_adjustment_advanced.py`](use_numpy/bundle_adjustment_advanced.py) - bounded local windows plus periodic Global BA, cheirality guards, LM-with-step-rejection. Try the `--arc-span-deg 350 --n-keyframes 190` loop-closure variant afterward to see a real loop closure detected (Global BA's payoff there is seed-dependent).
+**Run:** [README.md §10](README.md#10-local--global-bundle-adjustment-bounded-windows-vs-whole-map-re-solves) - [`use_numpy/bundle_adjustment_advanced.py`](use_numpy/bundle_adjustment_advanced.py) - bounded local windows plus periodic Global BA, cheirality guards, LM-with-step-rejection. Try the `--arc-span-deg 350 --n-keyframes 190` loop-closure variant afterward to see a real loop closure detected (Global BA's payoff there is seed-dependent).
 
 ## Phase 8 - Incremental solving (the iSAM lineage)
 
 **Read:** [`docs/optimization/isam_optimization.md`](docs/optimization/isam_optimization.md).
 
-**Run:** [README.md §10](README.md#10-incremental-square-root-sam-vs-batch-pose-graph-solving) - [`use_numpy/pose_graph_incremental.py`](use_numpy/pose_graph_incremental.py) - batch re-solve vs. incremental square-root SAM (Givens updates for odometry edges, a full rebuild at loop closure, no reordering), reusing `pose_graph.py`'s own solver as the baseline.
+**Run:** [README.md §11](README.md#11-incremental-square-root-sam-vs-batch-pose-graph-solving) - [`use_numpy/pose_graph_incremental.py`](use_numpy/pose_graph_incremental.py) - batch re-solve vs. incremental square-root SAM (Givens updates for odometry edges, a full rebuild at loop closure, no reordering), reusing `pose_graph.py`'s own solver as the baseline.
 
 **Read:** [`docs/optimization/elimination_tree.md`](docs/optimization/elimination_tree.md), [`docs/optimization/bayes_tree.md`](docs/optimization/bayes_tree.md).
 
-**Run:** [README.md §11](README.md#11-bayes-tree-construction-and-affected-region-query) - [`use_numpy/bayes_tree_construction.py`](use_numpy/bayes_tree_construction.py) - builds the elimination tree underlying the Bayes tree over the same square-loop topology, and shows why a loop-closure edge invalidates the *whole* chain while an ordinary edge invalidates just 2 of 16 variables.
+**Run:** [README.md §12](README.md#12-bayes-tree-construction-and-affected-region-query) - [`use_numpy/bayes_tree_construction.py`](use_numpy/bayes_tree_construction.py) - builds the elimination tree underlying the Bayes tree over the same square-loop topology, and shows why a loop-closure edge invalidates the *whole* chain while an ordinary edge invalidates just 2 of 16 variables.
 
 **Read:** [`docs/optimization/isam2_optimization.md`](docs/optimization/isam2_optimization.md) (what selective relinearization + reordering buy you beyond what you just built - conceptual only, no accompanying script) and [`docs/optimization/sparse_cholesky_factorization.md`](docs/optimization/sparse_cholesky_factorization.md) (why real solvers exploit sparsity; this repo's solves are dense).
 
 **Then read:** [`docs/optimization/marginalization.md`](docs/optimization/marginalization.md) (sliding-window smoothing - ties VINS-Mono-style windows back to the elimination machinery you just learned).
 
-**Run:** [README.md §12](README.md#12-sliding-window-marginalization-bounded-memory-pose-graph-smoothing) - [`use_numpy/sliding_window_marginalization.py`](use_numpy/sliding_window_marginalization.py) - marginalizes the oldest pose out of a bounded window via the Schur complement as an odometry chain streams in, and compares it with an unbounded from-scratch re-solve across a sweep of trajectory lengths.
+**Run:** [README.md §13](README.md#13-sliding-window-marginalization-bounded-memory-pose-graph-smoothing) - [`use_numpy/sliding_window_marginalization.py`](use_numpy/sliding_window_marginalization.py) - marginalizes the oldest pose out of a bounded window via the Schur complement as an odometry chain streams in, and compares it with an unbounded from-scratch re-solve across a sweep of trajectory lengths.
 - Full-batch system size grows linearly (dense-matrix memory quadratically).
 - The sliding window's size caps flat once the window first fills.
 - Accuracy ties by construction (the optimum of a pure odometry chain is the dead-reckoned trajectory), so the memory bound is the real result.
@@ -93,8 +95,8 @@ After all nine phases (and, optionally, [Track L](#track-l---hybrid-and-bio-insp
 
 | Step | Read + run | The question | Builds on |
 | --- | --- | --- | --- |
-| L1.1 | [`hybrid_saltation_ekf.md`](docs/filtering/hybrid_saltation_ekf.md) + [README.md §13](README.md#13-saltation-matrix-ekf-tracking-a-point-mass-through-discrete-ground-contact-events) - [`saltation_matrix_ekf.py`](use_numpy/saltation_matrix_ekf.py) | A point mass bounces off the ground: how to carry the *covariance* (not just the mean) through that discrete reset | Phase 4 |
-| L1.2 | [`invariant_saltation_ekf.md`](docs/filtering/invariant_saltation_ekf.md) + [README.md §14](README.md#14-invariant-ekf-on-se_23-through-a-bounce) - [`invariant_saltation_ekf.py`](use_numpy/invariant_saltation_ekf.py) (or its [`use_manif/`](use_manif/invariant_saltation_ekf.py) twin) | The same bounce on a Lie group: the right-invariant error with the saltation matrix, and why the bounce breaks the invariant filter's [trajectory independence](docs/glossary.md#group-affine-dynamics-trajectory-independence) | L1.1, plus [`left_right_invariant.md`](docs/filtering/left_right_invariant.md) and README §4 |
+| L1.1 | [`hybrid_saltation_ekf.md`](docs/filtering/hybrid_saltation_ekf.md) + [README.md §14](README.md#14-saltation-matrix-ekf-tracking-a-point-mass-through-discrete-ground-contact-events) - [`saltation_matrix_ekf.py`](use_numpy/saltation_matrix_ekf.py) | A point mass bounces off the ground: how to carry the *covariance* (not just the mean) through that discrete reset | Phase 4 |
+| L1.2 | [`invariant_saltation_ekf.md`](docs/filtering/invariant_saltation_ekf.md) + [README.md §15](README.md#15-invariant-ekf-on-se_23-through-a-bounce) - [`invariant_saltation_ekf.py`](use_numpy/invariant_saltation_ekf.py) (or its [`use_manif/`](use_manif/invariant_saltation_ekf.py) twin) | The same bounce on a Lie group: the right-invariant error with the saltation matrix, and why the bounce breaks the invariant filter's [trajectory independence](docs/glossary.md#group-affine-dynamics-trajectory-independence) | L1.1, plus [`left_right_invariant.md`](docs/filtering/left_right_invariant.md) and README §4 |
 
 How to work through L1.1:
 - **Read** the doc's derivation section first. It includes a formula that is correct for a different comparison than this filter needs; finite-difference checks show which one applies.
@@ -107,25 +109,25 @@ Not a discontinuous reset like L1, but an ordinary switched-linear system: the q
 
 | Step | Read + run | The question | Builds on |
 | --- | --- | --- | --- |
-| L2.1 | [`inchworm_zupt_ekf.md`](docs/filtering/inchworm_zupt_ekf.md) §1-§4 + [README.md §15](README.md#15-inchworm-zupt-exploiting-a-known-anchordwell-schedule) - [`inchworm_zupt_ekf.py`](use_numpy/inchworm_zupt_ekf.py) | Using the free zero-velocity information (ZUPT) of a known anchor/dwell phase: correctly, always, or never | Phase 4 |
+| L2.1 | [`inchworm_zupt_ekf.md`](docs/filtering/inchworm_zupt_ekf.md) §1-§4 + [README.md §16](README.md#16-inchworm-zupt-exploiting-a-known-anchordwell-schedule) - [`inchworm_zupt_ekf.py`](use_numpy/inchworm_zupt_ekf.py) | Using the free zero-velocity information (ZUPT) of a known anchor/dwell phase: correctly, always, or never | Phase 4 |
 | L2.2 | Same doc, §5 - [`inchworm_zupt_zaru_ekf.py`](use_numpy/inchworm_zupt_zaru_ekf.py) | The gait in the plane with a heading: ZARU (zero angular rate) joins ZUPT on anchor ticks and keeps the unobserved heading from drifting at rest | L2.1 |
 | L2.3 | Same doc, §6 - [`inchworm_slip_gate_ekf.py`](use_numpy/inchworm_slip_gate_ekf.py) | The anchor can slip, and a pad displacement sensor can veto the schedule's "v = 0" | L2.1 |
-| L2.4 | [`inchworm_two_pad_ekf.md`](docs/filtering/inchworm_two_pad_ekf.md) + [README.md §16](README.md#16-two-pad-inchworm-trusting-the-anchored-pad-without-a-position-fix) - [`inchworm_two_pad_ekf.py`](use_numpy/inchworm_two_pad_ekf.py) | Two pads, turning, no position fix: a slip the filter does not track is never corrected, so only fusing the anchored pad's measured displacement keeps the estimate accurate and consistent | L2.3 |
-| L2.5 | [`inchworm_two_pad_fusion_ekf.md`](docs/filtering/inchworm_two_pad_fusion_ekf.md) + [README.md §17](README.md#17-two-pad-inchworm-reading-both-pad-sensors) - [`inchworm_two_pad_fusion_ekf.py`](use_numpy/inchworm_two_pad_fusion_ekf.py) | The moving pad has a sensor too, and sensors fail: a real slip moves both pads so the two sensors agree, a fault makes them disagree, so a cross-check before fusing removes most faults (reading the second sensor blindly adds them) | L2.4 |
-| L2.6 | [`friction_anisotropic_ekf.md`](docs/filtering/friction_anisotropic_ekf.md) + [README.md §18](README.md#18-friction-anisotropic-process-noise-fixed-vs-heading-aware-q) - [`friction_anisotropic_ekf.py`](use_numpy/friction_anisotropic_ekf.py) | A crawler on a friction-anisotropic pad: the isotropic/anisotropic and rotating-frame argument of `pointcloud_pose_tracking_empirical_note.md`, applied to *process* noise instead of measurement noise | Phase 4 |
+| L2.4 | [`inchworm_two_pad_ekf.md`](docs/filtering/inchworm_two_pad_ekf.md) + [README.md §17](README.md#17-two-pad-inchworm-trusting-the-anchored-pad-without-a-position-fix) - [`inchworm_two_pad_ekf.py`](use_numpy/inchworm_two_pad_ekf.py) | Two pads, turning, no position fix: a slip the filter does not track is never corrected, so only fusing the anchored pad's measured displacement keeps the estimate accurate and consistent | L2.3 |
+| L2.5 | [`inchworm_two_pad_fusion_ekf.md`](docs/filtering/inchworm_two_pad_fusion_ekf.md) + [README.md §18](README.md#18-two-pad-inchworm-reading-both-pad-sensors) - [`inchworm_two_pad_fusion_ekf.py`](use_numpy/inchworm_two_pad_fusion_ekf.py) | The moving pad has a sensor too, and sensors fail: a real slip moves both pads so the two sensors agree, a fault makes them disagree, so a cross-check before fusing removes most faults (reading the second sensor blindly adds them) | L2.4 |
+| L2.6 | [`friction_anisotropic_ekf.md`](docs/filtering/friction_anisotropic_ekf.md) + [README.md §19](README.md#19-friction-anisotropic-process-noise-fixed-vs-heading-aware-q) - [`friction_anisotropic_ekf.py`](use_numpy/friction_anisotropic_ekf.py) | A crawler on a friction-anisotropic pad: the isotropic/anisotropic and rotating-frame argument of `pointcloud_pose_tracking_empirical_note.md`, applied to *process* noise instead of measurement noise | Phase 4 |
 
 ### L3 - Legs: many contacts at once
 
 | Step | Read + run | The question | Builds on |
 | --- | --- | --- | --- |
-| L3.1 | [`hexapod_gait_ekf.md`](docs/filtering/hexapod_gait_ekf.md) + [README.md §19](README.md#19-hexapod-leg-odometry-what-the-gait-changes) - [`hexapod_gait_ekf.py`](use_numpy/hexapod_gait_ekf.py) | From one anchored segment to six legs: every stance foot is a velocity sensor, the gait decides how many there are, and a per-foot test catches a slipping leg | L2.1 |
-| L3.2 | [`hexapod_contact_inekf.md`](docs/filtering/hexapod_contact_inekf.md) + [README.md §20](README.md#20-contact-aided-invariant-ekf-on-a-hexapod-which-filter-knows-yaw-is-unobservable) - [`hexapod_contact_inekf.py`](use_numpy/hexapod_contact_inekf.py) | The same hexapod in 3D with an IMU: each stance foot's position joins the state ($`SE_{K+2}(3)`$, Hartley et al.'s contact-aided invariant EKF), and a world-frame EKF on the same data shows why the invariant error matters: yaw is unobservable, and only the invariant EKF's covariance keeps it so | L3.1, L1.2 |
+| L3.1 | [`hexapod_gait_ekf.md`](docs/filtering/hexapod_gait_ekf.md) + [README.md §20](README.md#20-hexapod-leg-odometry-what-the-gait-changes) - [`hexapod_gait_ekf.py`](use_numpy/hexapod_gait_ekf.py) | From one anchored segment to six legs: every stance foot is a velocity sensor, the gait decides how many there are, and a per-foot test catches a slipping leg | L2.1 |
+| L3.2 | [`hexapod_contact_inekf.md`](docs/filtering/hexapod_contact_inekf.md) + [README.md §21](README.md#21-contact-aided-invariant-ekf-on-a-hexapod-which-filter-knows-yaw-is-unobservable) - [`hexapod_contact_inekf.py`](use_numpy/hexapod_contact_inekf.py) | The same hexapod in 3D with an IMU: each stance foot's position joins the state ($`SE_{K+2}(3)`$, Hartley et al.'s contact-aided invariant EKF), and a world-frame EKF on the same data shows why the invariant error matters: yaw is unobservable, and only the invariant EKF's covariance keeps it so | L3.1, L1.2 |
 
 ### L4 - Gait timing: when does a foot land?
 
 | Step | Read + run | The question | Builds on |
 | --- | --- | --- | --- |
-| L4.1 | [`gait_phase_ekf.md`](docs/filtering/gait_phase_ekf.md) + [README.md §21](README.md#21-gait-phase-which-feet-are-on-the-ground-when-touchdowns-are-uncertain) - [`gait_phase_ekf.py`](use_numpy/gait_phase_ekf.py) | The hexapod's liftoffs are commanded but its touchdowns are not: which feet may the body filter read when a foot can land late and a detector can fire falsely? A schedule and a raw detector both read swinging feet; a learned touchdown offset or a small Kalman filter rejects triggers that come too early, if its acceptance window is the right width | L3.1 |
+| L4.1 | [`gait_phase_ekf.md`](docs/filtering/gait_phase_ekf.md) + [README.md §22](README.md#22-gait-phase-which-feet-are-on-the-ground-when-touchdowns-are-uncertain) - [`gait_phase_ekf.py`](use_numpy/gait_phase_ekf.py) | The hexapod's liftoffs are commanded but its touchdowns are not: which feet may the body filter read when a foot can land late and a detector can fire falsely? A schedule and a raw detector both read swinging feet; a learned touchdown offset or a small Kalman filter rejects triggers that come too early, if its acceptance window is the right width | L3.1 |
 
 A new locomotion type goes in the group whose question it shares, or in a new group (L5, ...) if it raises a new one.
 

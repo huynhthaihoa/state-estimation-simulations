@@ -98,7 +98,7 @@ For robotics we usually learn KF, EKF, ESKF and IEKF before spending much time o
 
 ## 2. Error-State Kalman Filter (ESKF)
 
-Widely used in SLAM and VIO (visual-inertial [odometry](../glossary.md#odometry)).
+Widely used in SLAM and VIO (visual-inertial [odometry](../glossary.md#odometry)). This section is the summary; [eskf.md](eskf.md) works through the filter step by step, with a simulation.
 
 An ESKF doesn't estimate the entire state directly. It separates a **nominal state** from a **small error state**. For example, the true rotation is the nominal one times a small correction ($`\delta\theta`$ is a small rotation vector, and $`^\wedge`$ turns a 3-vector into its skew-symmetric matrix, see [glossary](../glossary.md#hat-operator)):
 
@@ -131,7 +131,7 @@ The **MSCKF** (Multi-State Constraint Kalman Filter; Mourikis & Roumeliotis 2007
 
 They aren't competing alternatives: the IEKF *is* an error-state filter. In fact the ESKF rotation error above, $`\delta\theta = \mathrm{Log}(\hat R^{-1}R)`$, already *is* the left-invariant error (for the rotation only; position, velocity and biases stay additive, and that is where the estimate-dependence enters). With $`X`$ and $`\hat X`$ the true and estimated states as group elements, the left-invariant error is $`\eta = \hat X^{-1}X`$ and the right-invariant one is $`X\hat X^{-1}`$ (each expresses the truth relative to the estimate; "invariant" means it is unchanged when the same group element is applied to both $`X`$ and $`\hat X`$, see [left_right_invariant.md §1](left_right_invariant.md#1-the-setup)). What the IEKF adds is:
 
-- **Estimate-independent error dynamics.** For **group-affine** dynamics ([glossary](../glossary.md#group-affine-dynamics-trajectory-independence), [lie_algebra.md §11.1](../foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity)) and suitable invariant measurements, the error dynamics and their Jacobians don't depend on the current estimate. This can fail, for example with IMU biases in the state.
+- **Estimate-independent error dynamics.** For **group-affine** dynamics ([glossary](../glossary.md#group-affine-dynamics-trajectory-independence), [lie_algebra.md §11.1](../foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity)), the linearized error dynamics don't depend on the current estimate. With invariant-form measurements, the measurement Jacobian $`H`$ doesn't either. This can fail, for example with IMU biases in the state.
 - **Left vs right choice.** We pick the invariant error that matches the measurement.
 
 ---
@@ -169,7 +169,7 @@ Carrying $L$ avoids this in two ways:
 - $P$ has variances 1 and $10^{-8}$, so the spread of its entries is $10^8$. That is too much for float32 (about 7 digits).
 - $L$ has 1 and $10^{-4}$, so the spread is only $10^4$.
 
-A cheaper, common partial fix is the **Joseph form** of the update (an algebraically equivalent, rounding-robust rewrite), $`P \leftarrow (I-KH)P(I-KH)^\top + KRK^\top`$ ($`R`$ is the measurement noise covariance), which keeps $P$ symmetric positive semi-definite for any gain.
+A cheaper, common partial fix is the **Joseph form** of the update (a rounding-robust rewrite: equal to $`(I-KH)P`$ for the optimal gain, and still correct for any other gain), $`P \leftarrow (I-KH)P(I-KH)^\top + KRK^\top`$ ($`R`$ is the measurement noise covariance), which keeps $P$ symmetric positive semi-definite for any gain.
 
 The same idea appears on the optimization side: iSAM (incremental smoothing and mapping) keeps and updates the square-root [information matrix](../glossary.md#information-matrix) $R$ (with $R^\top R = H$) rather than $H$ itself ([isam_optimization.md](../optimization/isam_optimization.md)). Here $`R`$ is the square-root information factor and $`H`$ the information matrix, not the noise covariance $`R`$ and measurement Jacobian $`H`$ above.
 

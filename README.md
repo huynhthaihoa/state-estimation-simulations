@@ -15,7 +15,7 @@ A collection of from-scratch simulations exploring **pose/state estimation**, mo
  - How a **LiDAR front-end** registers scans: point-to-point and point-to-plane ICP against fitted planes and cylinders, and what a corridor's degeneracy does to each
  - How filtering copes with **non-smooth motion** (ground-contact events, anchor/extend gaits, slipping anchors, heading-dependent friction, uncertain touchdown times), checked with Monte Carlo NEES consistency tests
 
-Two implementation styles run side by side for 10 of the 23 simulation scripts (the other 13 are NumPy-only; §C says which and why), split into sibling directories with matching filenames:
+Two implementation styles run side by side for 10 of the 24 simulation scripts (the other 14 are NumPy-only; §C says which and why), split into sibling directories with matching filenames:
 - [use_numpy/](use_numpy/): skew-symmetric matrices, $Exp$/$`Log`$ maps, and Jacobians written out by hand (Rodrigues' formula, the $SE(3)$ exponential/logarithm, the analytical inverse right Jacobian), shared across scripts via [use_numpy/lie_utils.py](use_numpy/lie_utils.py).
 - [use_manif/](use_manif/): the same math delegated to the [`manif`](https://github.com/artivis/manif) Lie-theory library's Python bindings (`T.rplus`, `T.rminus`, `T.act`, all with analytical Jacobians returned as out-parameters), so no manifold formula is hand-rolled.
 
@@ -74,6 +74,7 @@ printers. `docs/frontend/lidar_primitives.md`.
   - a recursive **vanilla KF** (redundant 12-dim `[vec(R), t]` ambient state instead of the $SE(3)$ tangent state: exactly linear observation model, but needs a small-angle motion-model truncation and an explicit SVD re-projection back onto $SO(3)$ after every update).
 
   Reuses `lie_utils.py`'s $SE(3)$ $Exp$/$`Log`$/inverse-right-Jacobian math plus a hand-rolled adjoint/right-Jacobian for the motion-model Jacobians, and reports empirical per-step time and peak memory for each of the six approaches.
+- [eskf_imu_position_fix.py](use_numpy/eskf_imu_position_fix.py): an IMU-driven error-state Kalman filter with a 1 Hz position fix ([docs/filtering/eskf.md](docs/filtering/eskf.md)), against the same filter without bias states and against a full-state EKF that keeps a quaternion in its state, with and without mapping the covariance through the quaternion's renormalization.
 - [pose_graph.py](use_numpy/pose_graph.py): a small closed-loop 3D pose-graph relaxation (odometry drift + one loop closure), jointly optimized via Levenberg-Marquardt, reusing the same `lie_utils.py` $SE(3)$ $Exp$/$`Log`$/inverse-right-Jacobian/adjoint math as `pointcloud_pose_tracking.py`.
 - [pose_graph_incremental.py](use_numpy/pose_graph_incremental.py): the [iSAM](docs/optimization/isam_optimization.md) counterpart to `pose_graph.py`'s batch solver - a longer loop streams in one node at a time, and an incremental square-root-SAM solver (Givens-rotation QR row insertion via `qr_insert_row` in `utils.py`, plus periodic/loop-closure-triggered full relinearization) is timed against a from-scratch batch re-solve at every step.
 - [bayes_tree_construction.py](use_numpy/bayes_tree_construction.py): builds the elimination tree underlying the [Bayes tree](docs/optimization/bayes_tree.md) `iSAM2` relies on (one node per variable, not merged into cliques) - symbolic variable elimination (`symbolic_eliminate` in `utils.py`) over the same square-loop pose-graph topology, then a root-ward affected-path query (`bayes_tree_affected_path`) contrasting a local odometry edge against the loop-closure edge.
@@ -102,14 +103,15 @@ printers. `docs/frontend/lidar_primitives.md`.
 - [sliding_window_marginalization.py](use_numpy/sliding_window_marginalization.py): gives [docs/optimization/marginalization.md](docs/optimization/marginalization.md) its accompanying script - streams a pure odometry chain, marginalizes the oldest pose via the Schur complement whenever a `--window-size` cap would be exceeded, and compares the resulting bounded-memory solve against `run_full_batch_growing`'s unbounded re-solve-from-scratch baseline across a sweep of trajectory lengths, reusing `pose_graph.py`/`pose_graph_incremental.py`'s building blocks.
 - `*_v2.py` ([pointcloud_pose_tracking_v2.py](use_numpy/pointcloud_pose_tracking_v2.py), [saltation_matrix_ekf_v2.py](use_numpy/saltation_matrix_ekf_v2.py), [inchworm_zupt_ekf_v2.py](use_numpy/inchworm_zupt_ekf_v2.py), [inchworm_zupt_zaru_ekf_v2.py](use_numpy/inchworm_zupt_zaru_ekf_v2.py), [inchworm_slip_gate_ekf_v2.py](use_numpy/inchworm_slip_gate_ekf_v2.py), [inchworm_two_pad_ekf_v2.py](use_numpy/inchworm_two_pad_ekf_v2.py), [friction_anisotropic_ekf_v2.py](use_numpy/friction_anisotropic_ekf_v2.py), [invariant_saltation_ekf_v2.py](use_numpy/invariant_saltation_ekf_v2.py), [hexapod_gait_ekf_v2.py](use_numpy/hexapod_gait_ekf_v2.py)): class-based versions of those nine scripts. Each recursive filter is a class with `predict`/`measurement_update`/`step`/`state` methods (`hexapod_gait_ekf_v2.py`'s `GaitEKF`: `predict`/`update`/`step`/`get_state`), and its `run_*` function is a short loop over `step()`; `pointcloud_pose_tracking_v2.py`'s batch Gauss-Newton smoother is a `BatchGNSmoother` class instead (`linearize` with one method per factor type, `retract`, `solve`). Everything else is unchanged: same command-line flags, outputs bit-identical to the original. `tests/` and `generator/make_figures.py` use the originals.
 
-### [use_manif/](use_manif/) - `manifpy` counterparts (10 of the 23 simulation scripts)
+### [use_manif/](use_manif/) - `manifpy` counterparts (10 of the 24 simulation scripts)
 
-The other 13 scripts are NumPy-only:
+The other 14 scripts are NumPy-only:
 - `bayes_tree_construction.py`: pure index/graph bookkeeping, so the result is structurally identical in either backend.
 - `saltation_matrix_ekf.py`, `inchworm_zupt_ekf.py`, `inchworm_slip_gate_ekf.py`, `friction_anisotropic_ekf.py`, `hexapod_gait_ekf.py`, `gait_phase_ekf.py`: plain Euclidean states (no manifold question).
 - `inchworm_zupt_zaru_ekf.py`, `inchworm_two_pad_ekf.py`, `inchworm_two_pad_fusion_ekf.py`: plain vector states whose heading is a wrapped scalar angle (no manifold group helpers).
 - `pnp_estimation.py`, `sliding_window_marginalization.py`: single implementation; the PnP recipe and the bounded-vs-unbounded scaling result are backend-agnostic.
 - `hexapod_contact_inekf.py`: its state gains and loses one column per foot ($`SE_{K+2}(3)`$); manif has `SE_2_3` but no group with a varying number of columns, so it uses `lie_utils.py`'s `sek3_*` helpers only.
+- `eskf_imu_position_fix.py`: no `use_manif/` counterpart yet.
 
 - [manif_utils.py](use_manif/manif_utils.py): manif versions of `camera_project` and `pose_errors`, shared by `bundle_adjustment.py`, `bundle_adjustment_advanced.py`, `pointcloud_pose_tracking.py` and `pose_graph.py`.
 - [imu_integration_comparison.py](use_manif/imu_integration_comparison.py)
@@ -172,7 +174,7 @@ for f in $(find tests -name 'test_*.py' | sort); do uv run pytest -q "$f"; done
 
 ## E. Simulations
 
-21 simulations in five groups. Each entry says what the simulation does, lists its scripts, and gives a command that runs it at its defaults; the full flag list is folded under **All flags**.
+22 simulations in five groups. Each entry says what the simulation does, lists its scripts, and gives a command that runs it at its defaults; the full flag list is folded under **All flags**.
 
 | Group | # | Simulation | What it shows | `use_manif/` twin | Doc |
 |---|---|---|---|---|---|
@@ -180,23 +182,24 @@ for f in $(find tests -name 'test_*.py' | sort); do uv run pytest -q "$f"; done
 |  | 2 | [IMU + Gauss-Newton position fix](#2-imu-propagation--gauss-newton-position-correction) | IMU dead reckoning corrected each second by Gauss-Newton against a position fix; orientation stays uncorrected | yes | [imu_preintegration.md](docs/optimization/imu_preintegration.md) |
 |  | 3 | [IMU preintegration](#3-imu-preintegration-with-bias-jacobians) | One second of IMU samples compressed into one bundle; a bias update applied by a first-order correction instead of re-integration | yes | [imu_preintegration.md](docs/optimization/imu_preintegration.md) |
 | **Kalman filtering** | 4 | [Point-cloud pose tracking](#4-point-cloud-pose-tracking-ekf-vs-invariant-ekf-vs-batch-gauss-newton-vs-ukf-vs-vanilla-kf) | EKF, invariant EKF, UKF, vanilla KF and batch Gauss-Newton on the same $`SE(3)`$ tracking problem | yes | [pointcloud_pose_tracking_empirical_note.md](docs/filtering/pointcloud_pose_tracking_empirical_note.md) |
-| **Front-end** | 5 | [Perspective-n-Point (PnP)](#5-perspective-n-point-pnp-recovering-a-camera-pose-from-known-3d-2d-correspondences) | A camera pose from known 3D-2D correspondences: closed form, then Gauss-Newton |  | [triangulation_pnp.md](docs/frontend/triangulation_pnp.md) |
-|  | 6 | [LiDAR primitives](#6-lidar-primitives-planes-and-cylinders-for-scan-registration) | Point-to-point vs. point-to-plane ICP against fitted planes and cylinders, and a corridor's degeneracy | yes | [lidar_primitives.md](docs/frontend/lidar_primitives.md) |
-| **Factor graphs and smoothing** | 7 | [3D pose graph](#7-3d-pose-graph-relaxation) | Odometry drift corrected by a loop closure, with gauge fixing | yes | [pose_graph_optimization.md](docs/optimization/pose_graph_optimization.md) |
-|  | 8 | [Bundle adjustment](#8-bundle-adjustment-joint-pose--landmark-refinement) | Landmarks-only and poses-only refinement vs. joint refinement | yes | [bundle_adjustment.md](docs/optimization/bundle_adjustment.md) |
-|  | 9 | [Local + Global bundle adjustment](#9-local--global-bundle-adjustment-bounded-windows-vs-whole-map-re-solves) | Bounded local windows plus periodic whole-map passes | yes | [bundle_adjustment.md](docs/optimization/bundle_adjustment.md) |
-|  | 10 | [Incremental vs. batch pose graph](#10-incremental-square-root-sam-vs-batch-pose-graph-solving) | Square-root SAM updates vs. re-solving the whole graph at every new node | yes | [isam_optimization.md](docs/optimization/isam_optimization.md) |
-|  | 11 | [Bayes tree affected region](#11-bayes-tree-construction-and-affected-region-query) | Which variables a new edge invalidates: a loop closure vs. an ordinary edge |  | [bayes_tree.md](docs/optimization/bayes_tree.md) |
-|  | 12 | [Sliding-window marginalization](#12-sliding-window-marginalization-bounded-memory-pose-graph-smoothing) | A bounded window kept by the Schur complement vs. an unbounded re-solve |  | [marginalization.md](docs/optimization/marginalization.md) |
-| **Non-smooth and legged motion** | 13 | [Saltation-matrix EKF](#13-saltation-matrix-ekf-tracking-a-point-mass-through-discrete-ground-contact-events) | Carrying a point mass's covariance through a bounce |  | [hybrid_saltation_ekf.md](docs/filtering/hybrid_saltation_ekf.md) |
-|  | 14 | [Invariant EKF through a bounce](#14-invariant-ekf-on-se_23-through-a-bounce) | The same bounce with a right-invariant EKF on $`SE_2(3)`$ | yes | [invariant_saltation_ekf.md](docs/filtering/invariant_saltation_ekf.md) |
-|  | 15 | [Inchworm ZUPT](#15-inchworm-zupt-exploiting-a-known-anchordwell-schedule) | Zero-velocity updates on a known anchor schedule: at the right ticks, always, or never |  | [inchworm_zupt_ekf.md](docs/filtering/inchworm_zupt_ekf.md) |
-|  | 16 | [Two-pad inchworm](#16-two-pad-inchworm-trusting-the-anchored-pad-without-a-position-fix) | No position fix: fusing the anchored pad's measured displacement keeps the estimate accurate through slips |  | [inchworm_two_pad_ekf.md](docs/filtering/inchworm_two_pad_ekf.md) |
-|  | 17 | [Two-pad inchworm, both sensors](#17-two-pad-inchworm-reading-both-pad-sensors) | Cross-checking the two pad sensors before fusing removes most sensor faults |  | [inchworm_two_pad_fusion_ekf.md](docs/filtering/inchworm_two_pad_fusion_ekf.md) |
-|  | 18 | [Friction-anisotropic process noise](#18-friction-anisotropic-process-noise-fixed-vs-heading-aware-q) | Fixed vs. heading-aware process noise for a pad that slips more sideways than forward |  | [friction_anisotropic_ekf.md](docs/filtering/friction_anisotropic_ekf.md) |
-|  | 19 | [Hexapod leg odometry](#19-hexapod-leg-odometry-what-the-gait-changes) | Stance feet as velocity sensors: what the gait changes, and a per-foot slip test |  | [hexapod_gait_ekf.md](docs/filtering/hexapod_gait_ekf.md) |
-|  | 20 | [Contact-aided invariant EKF](#20-contact-aided-invariant-ekf-on-a-hexapod-which-filter-knows-yaw-is-unobservable) | Stance feet in the state; only the invariant EKF keeps yaw unobservable |  | [hexapod_contact_inekf.md](docs/filtering/hexapod_contact_inekf.md) |
-|  | 21 | [Gait phase](#21-gait-phase-which-feet-are-on-the-ground-when-touchdowns-are-uncertain) | Which feet to read when touchdowns are late or detectors fire falsely |  | [gait_phase_ekf.md](docs/filtering/gait_phase_ekf.md) |
+|  | 5 | [Error-state Kalman filter](#5-error-state-kalman-filter-eskf-vs-a-quaternion-in-the-state) | An IMU-driven ESKF with a position fix, against the same filter without bias states and an EKF with a quaternion in its state |  | [eskf.md](docs/filtering/eskf.md) |
+| **Front-end** | 6 | [Perspective-n-Point (PnP)](#6-perspective-n-point-pnp-recovering-a-camera-pose-from-known-3d-2d-correspondences) | A camera pose from known 3D-2D correspondences: closed form, then Gauss-Newton |  | [triangulation_pnp.md](docs/frontend/triangulation_pnp.md) |
+|  | 7 | [LiDAR primitives](#7-lidar-primitives-planes-and-cylinders-for-scan-registration) | Point-to-point vs. point-to-plane ICP against fitted planes and cylinders, and a corridor's degeneracy | yes | [lidar_primitives.md](docs/frontend/lidar_primitives.md) |
+| **Factor graphs and smoothing** | 8 | [3D pose graph](#8-3d-pose-graph-relaxation) | Odometry drift corrected by a loop closure, with gauge fixing | yes | [pose_graph_optimization.md](docs/optimization/pose_graph_optimization.md) |
+|  | 9 | [Bundle adjustment](#9-bundle-adjustment-joint-pose--landmark-refinement) | Landmarks-only and poses-only refinement vs. joint refinement | yes | [bundle_adjustment.md](docs/optimization/bundle_adjustment.md) |
+|  | 10 | [Local + Global bundle adjustment](#10-local--global-bundle-adjustment-bounded-windows-vs-whole-map-re-solves) | Bounded local windows plus periodic whole-map passes | yes | [bundle_adjustment.md](docs/optimization/bundle_adjustment.md) |
+|  | 11 | [Incremental vs. batch pose graph](#11-incremental-square-root-sam-vs-batch-pose-graph-solving) | Square-root SAM updates vs. re-solving the whole graph at every new node | yes | [isam_optimization.md](docs/optimization/isam_optimization.md) |
+|  | 12 | [Bayes tree affected region](#12-bayes-tree-construction-and-affected-region-query) | Which variables a new edge invalidates: a loop closure vs. an ordinary edge |  | [bayes_tree.md](docs/optimization/bayes_tree.md) |
+|  | 13 | [Sliding-window marginalization](#13-sliding-window-marginalization-bounded-memory-pose-graph-smoothing) | A bounded window kept by the Schur complement vs. an unbounded re-solve |  | [marginalization.md](docs/optimization/marginalization.md) |
+| **Non-smooth and legged motion** | 14 | [Saltation-matrix EKF](#14-saltation-matrix-ekf-tracking-a-point-mass-through-discrete-ground-contact-events) | Carrying a point mass's covariance through a bounce |  | [hybrid_saltation_ekf.md](docs/filtering/hybrid_saltation_ekf.md) |
+|  | 15 | [Invariant EKF through a bounce](#15-invariant-ekf-on-se_23-through-a-bounce) | The same bounce with a right-invariant EKF on $`SE_2(3)`$ | yes | [invariant_saltation_ekf.md](docs/filtering/invariant_saltation_ekf.md) |
+|  | 16 | [Inchworm ZUPT](#16-inchworm-zupt-exploiting-a-known-anchordwell-schedule) | Zero-velocity updates on a known anchor schedule: at the right ticks, always, or never |  | [inchworm_zupt_ekf.md](docs/filtering/inchworm_zupt_ekf.md) |
+|  | 17 | [Two-pad inchworm](#17-two-pad-inchworm-trusting-the-anchored-pad-without-a-position-fix) | No position fix: fusing the anchored pad's measured displacement keeps the estimate accurate through slips |  | [inchworm_two_pad_ekf.md](docs/filtering/inchworm_two_pad_ekf.md) |
+|  | 18 | [Two-pad inchworm, both sensors](#18-two-pad-inchworm-reading-both-pad-sensors) | Cross-checking the two pad sensors before fusing removes most sensor faults |  | [inchworm_two_pad_fusion_ekf.md](docs/filtering/inchworm_two_pad_fusion_ekf.md) |
+|  | 19 | [Friction-anisotropic process noise](#19-friction-anisotropic-process-noise-fixed-vs-heading-aware-q) | Fixed vs. heading-aware process noise for a pad that slips more sideways than forward |  | [friction_anisotropic_ekf.md](docs/filtering/friction_anisotropic_ekf.md) |
+|  | 20 | [Hexapod leg odometry](#20-hexapod-leg-odometry-what-the-gait-changes) | Stance feet as velocity sensors: what the gait changes, and a per-foot slip test |  | [hexapod_gait_ekf.md](docs/filtering/hexapod_gait_ekf.md) |
+|  | 21 | [Contact-aided invariant EKF](#21-contact-aided-invariant-ekf-on-a-hexapod-which-filter-knows-yaw-is-unobservable) | Stance feet in the state; only the invariant EKF keeps yaw unobservable |  | [hexapod_contact_inekf.md](docs/filtering/hexapod_contact_inekf.md) |
+|  | 22 | [Gait phase](#22-gait-phase-which-feet-are-on-the-ground-when-touchdowns-are-uncertain) | Which feet to read when touchdowns are late or detectors fire falsely |  | [gait_phase_ekf.md](docs/filtering/gait_phase_ekf.md) |
 
 ### IMU and manifolds
 
@@ -363,9 +366,61 @@ uv run python use_numpy/pointcloud_pose_tracking.py --duration 5.0 --dt 0.1 --n-
 
 </details>
 
+#### 5. Error-state Kalman filter: ESKF vs. a quaternion in the state
+
+**Purpose:** Shows how an error-state Kalman filter (ESKF) carries orientation: the full IMU model integrates a nominal state, and the filter estimates only a small 15-number error that it injects and resets after each update. Compares it with the same filter without bias states and with an EKF that keeps a quaternion in its state.
+
+| Input | Output |
+|---|---|
+| A 3D body driven by a noisy, biased 100 Hz IMU, with a noisy 1 Hz position fix | Prints Monte Carlo attitude and position RMSE and NEES per filter, plus an initial-attitude-error sweep; plots errors and NEES |
+
+| Variant | Meaning |
+|---|---|
+| `eskf` | Nominal state plus a 15-number error state, biases included |
+| `eskf_no_bias` | Same, biases assumed zero (9 error states) |
+| `qekf_naive` | Quaternion in the EKF state; renormalized, covariance unchanged |
+| `qekf_projected` | Same, covariance also mapped through the renormalization |
+
+**Details:** [eskf.md](docs/filtering/eskf.md)
+
+![Four panels from eskf_imu_position_fix.py at its defaults: attitude error RMSE and position error RMSE over 30 s for the ESKF, the ESKF without bias states, the naive quaternion EKF and the projected quaternion EKF; their average NEES over time against the consistent values 15 and 9; and their second-half NEES against the initial attitude error from 0.5 to 10 degrees](assets/eskf_imu_position_fix.png)
+
+**Scripts:**
+
+- [use_numpy/eskf_imu_position_fix.py](use_numpy/eskf_imu_position_fix.py)
+
+**Run:**
+
+```
+uv run python use_numpy/eskf_imu_position_fix.py --duration 30.0 --dt 0.01 --fix-rate 1.0 --rate-amp 0.4 --accel-amp 0.5 --gyro-noise-std 0.01 --accel-noise-std 0.05 --gyro-bias-std 0.01 --accel-bias-std 0.05 --gyro-bias-rw 1e-5 --accel-bias-rw 1e-4 --pos-noise-std 0.1 --init-pos-noise-std 0.1 --init-vel-noise-std 0.1 --init-att-noise-deg 2.0 --n-mc-trials 50 --sweep-att-deg 0.5 5.0 10.0 --n-sweep-trials 10 --seed 0 --out out.png
+```
+
+<details>
+<summary>All flags</summary>
+
+- `--duration`: run length, s (default `30.0`)
+- `--dt`: IMU sample interval, s (default `0.01`, i.e. 100 Hz)
+- `--fix-rate`: position-fix rate, Hz (default `1.0`)
+- `--rate-amp`: body-rate amplitude per axis, rad/s (default `0.4`)
+- `--accel-amp`: horizontal world-frame acceleration amplitude, m/s²; the vertical one is 0.4x (default `0.5`)
+- `--gyro-noise-std`, `--accel-noise-std`: per-sample IMU noise std-devs, rad/s and m/s² (defaults `0.01`, `0.05`)
+- `--gyro-bias-std`, `--accel-bias-std`: std-devs of the constant true biases, also the filters' bias prior, rad/s and m/s² (defaults `0.01`, `0.05`)
+- `--gyro-bias-rw`, `--accel-bias-rw`: bias random walk assumed by the filters, rad/s/√s and m/s²/√s (defaults `1e-5`, `1e-4`)
+- `--pos-noise-std`: position-fix noise std-dev per axis, m (default `0.1`)
+- `--init-pos-noise-std`, `--init-vel-noise-std`: initial position and velocity error std-devs, m and m/s (defaults `0.1`, `0.1`)
+- `--init-att-noise-deg`: initial attitude error std-dev per axis, deg (default `2.0`)
+- `--n-mc-trials`: Monte Carlo trials at `--init-att-noise-deg` (default `50`)
+- `--sweep-att-deg`: extra initial attitude errors for the sweep, deg; give none to skip the sweep (default `0.5 5.0 10.0`)
+- `--n-sweep-trials`: Monte Carlo trials per sweep value (default `10`)
+- `--no-reset-jacobian`: use $`G = I`$ at the ESKF reset (default: $`G = I - \tfrac12[\delta\theta]_\times`$)
+- `--seed`: RNG seed (default `0`)
+- `--out`: save the figure to this path instead of showing it (default: show)
+
+</details>
+
 ### Front-end
 
-#### 5. Perspective-n-Point (PnP): recovering a camera pose from known 3D-2D correspondences
+#### 6. Perspective-n-Point (PnP): recovering a camera pose from known 3D-2D correspondences
 
 **Purpose:** Recovers a camera pose from known 3D points and their observed pixels, the reverse of triangulation. A closed-form linear guess (DLT) is refined by Gauss-Newton.
 
@@ -401,7 +456,7 @@ uv run python use_numpy/pnp_estimation.py --n-points 20 --pixel-noise-std 1.0 --
 
 </details>
 
-#### 6. LiDAR primitives: planes and cylinders for scan registration
+#### 7. LiDAR primitives: planes and cylinders for scan registration
 
 **Purpose:** Registers two simulated LiDAR scans three ways in one $`SE(3)`$ Gauss-Newton loop, after fitting planes and cylinders to each scan. Also tests extraction, degeneracy and plane landmarks.
 
@@ -449,7 +504,7 @@ uv run python use_numpy/lidar_primitives.py --experiment all --n-trials 10 --n-p
 
 ### Factor graphs and smoothing
 
-#### 7. 3D pose-graph relaxation
+#### 8. 3D pose-graph relaxation
 
 **Purpose:** Shows how one loop-closure edge lets pose-graph optimization remove the drift of a noisy odometry loop.
 
@@ -487,7 +542,7 @@ uv run python use_numpy/pose_graph.py --side-length 2.0 --pos-noise-std 0.05 --r
 
 </details>
 
-#### 8. Bundle adjustment: joint pose + landmark refinement
+#### 9. Bundle adjustment: joint pose + landmark refinement
 
 **Purpose:** Compares refining only landmarks, only camera poses, or both together (bundle adjustment) from the same noisy start, to show why the joint solve is needed.
 
@@ -538,7 +593,7 @@ uv run python use_numpy/bundle_adjustment.py --n-cameras 8 --n-landmarks 60 --ca
 
 </details>
 
-#### 9. Local + Global bundle adjustment: bounded windows vs. whole-map re-solves
+#### 10. Local + Global bundle adjustment: bounded windows vs. whole-map re-solves
 
 **Purpose:** Compares Local BA (optimize only a small window of recent keyframes) with Local BA plus periodic Global BA (re-solve the whole map) as a keyframe path grows.
 
@@ -592,7 +647,7 @@ uv run python use_numpy/bundle_adjustment_advanced.py --n-keyframes 50 --path-ra
 uv run python use_numpy/bundle_adjustment_advanced.py --arc-span-deg 350 --n-keyframes 190 --seed 0 --out loop_closure.png
 ```
 
-#### 10. Incremental (square-root SAM) vs. batch pose-graph solving
+#### 11. Incremental (square-root SAM) vs. batch pose-graph solving
 
 **Purpose:** Compares incremental square-root SAM, which updates an existing factorization with each new node, against re-solving the whole pose graph at every node.
 
@@ -639,7 +694,7 @@ uv run python use_numpy/pose_graph_incremental.py --side-length 2.0 --nodes-per-
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run python use_numpy/pose_graph_incremental.py
 ```
 
-#### 11. Bayes tree construction and affected-region query
+#### 12. Bayes tree construction and affected-region query
 
 **Purpose:** Builds the elimination tree behind the Bayes tree for the pose-graph loop and shows which variables a new odometry edge or a loop-closure edge affects.
 
@@ -669,7 +724,7 @@ uv run python use_numpy/bayes_tree_construction.py --nodes-per-side 4 --out out.
 
 </details>
 
-#### 12. Sliding-window marginalization: bounded-memory pose-graph smoothing
+#### 13. Sliding-window marginalization: bounded-memory pose-graph smoothing
 
 **Purpose:** Compares a sliding window that marginalizes out its oldest pose with a full batch re-solve at every new node, to show how memory scales with trajectory length.
 
@@ -710,7 +765,7 @@ uv run python use_numpy/sliding_window_marginalization.py --nodes-per-side-sweep
 
 ### Non-smooth and legged motion
 
-#### 13. Saltation-matrix EKF: tracking a point mass through discrete ground-contact events
+#### 14. Saltation-matrix EKF: tracking a point mass through discrete ground-contact events
 
 **Purpose:** Isolates how an EKF should treat its covariance at a bounce, the sudden jump in a point mass's velocity when it hits the ground. The saltation matrix corrects for the shifted impact time of a perturbed trajectory.
 
@@ -761,9 +816,9 @@ uv run python use_numpy/saltation_matrix_ekf.py --duration 5.0 --dt 0.02 --resti
 
 </details>
 
-#### 14. Invariant EKF on $SE_2(3)$ through a bounce
+#### 15. Invariant EKF on $SE_2(3)$ through a bounce
 
-**Purpose:** Extends §13's bouncing point mass to a tumbling rigid body with an IMU (gyro and accelerometer), tracked by a right-invariant EKF (RIEKF). Compares five filters that treat the bounce covariance differently.
+**Purpose:** Extends §14's bouncing point mass to a tumbling rigid body with an IMU (gyro and accelerometer), tracked by a right-invariant EKF (RIEKF). Compares five filters that treat the bounce covariance differently.
 
 | Input | Output |
 |---|---|
@@ -815,7 +870,7 @@ uv run python use_numpy/invariant_saltation_ekf.py --duration 5.0 --dt 0.01 --me
 
 </details>
 
-#### 15. Inchworm ZUPT: exploiting a known anchor/dwell schedule
+#### 16. Inchworm ZUPT: exploiting a known anchor/dwell schedule
 
 **Purpose:** Asks whether a filter should use the free zero-velocity update (ZUPT) during the stationary phases of a known anchor/extend gait. Compares three ZUPT policies on a 1D point mass.
 
@@ -870,7 +925,7 @@ uv run python use_numpy/inchworm_zupt_ekf.py --duration 10.0 --dt 0.05 --t-ancho
 
 </details>
 
-#### 16. Two-pad inchworm: trusting the anchored pad without a position fix
+#### 17. Two-pad inchworm: trusting the anchored pad without a position fix
 
 **Purpose:** Asks how a planar inchworm with no position fix, whose two pads swap anchored and moving roles each phase, should treat its anchored pad when it can slip. Compares four policies, from assuming the pad is still to fusing its sensor.
 
@@ -928,17 +983,17 @@ uv run python use_numpy/inchworm_two_pad_ekf.py --duration 20.0 --dt 0.05 --t-ph
 
 </details>
 
-#### 17. Two-pad inchworm: reading both pad sensors
+#### 18. Two-pad inchworm: reading both pad sensors
 
-**Purpose:** Extends §16's `pad_fused` filter, which reads only the anchored pad's sensor, with the moving pad's sensor and sensor faults (spikes, dropouts). Compares five ways to move the moving pad, including a cross-check between the two sensors.
+**Purpose:** Extends §17's `pad_fused` filter, which reads only the anchored pad's sensor, with the moving pad's sensor and sensor faults (spikes, dropouts). Compares five ways to move the moving pad, including a cross-check between the two sensors.
 
 | Input | Output |
 |---|---|
-| §16's inchworm plus a moving-pad sensor and random sensor faults | Prints per-variant errors, Monte Carlo [NEES](docs/glossary.md#consistency-and-nees) (consistency check) and fault-detection counts; plots readings, error and NEES |
+| §17's inchworm plus a moving-pad sensor and random sensor faults | Prints per-variant errors, Monte Carlo [NEES](docs/glossary.md#consistency-and-nees) (consistency check) and fault-detection counts; plots readings, error and NEES |
 
 | Variant | Meaning |
 |---|---|
-| `random_walk` | No moving-pad model (§16's `pad_fused`) |
+| `random_walk` | No moving-pad model (§17's `pad_fused`) |
 | `encoder_model` | Anchored pad's motion plus the commanded stroke |
 | `moving_sensor` | The moving pad's own sensor reading |
 | `both` | Inverse-variance mix of the two above |
@@ -994,7 +1049,7 @@ uv run python use_numpy/inchworm_two_pad_fusion_ekf.py --duration 20.0 --dt 0.05
 
 </details>
 
-#### 18. Friction-anisotropic process noise: fixed vs. heading-aware Q
+#### 19. Friction-anisotropic process noise: fixed vs. heading-aware Q
 
 **Purpose:** Compares three ways of building the process-noise covariance $Q$ for a robot whose pad grips along its forward axis and slips sideways. The question is whether $Q$ must follow the robot's heading as it turns.
 
@@ -1040,7 +1095,7 @@ uv run python use_numpy/friction_anisotropic_ekf.py --duration 20.0 --dt 0.05 --
 
 </details>
 
-#### 19. Hexapod leg odometry: what the gait changes
+#### 20. Hexapod leg odometry: what the gait changes
 
 **Purpose:** Shows how the gait (tripod, ripple or wave) changes what a planar hexapod can estimate from its legs alone. It also tests slipping feet, foot drift and uncertain contact timing.
 
@@ -1090,7 +1145,7 @@ uv run python use_numpy/hexapod_gait_ekf.py --duration 12.0 --dt 0.02 --cycle-pe
 
 </details>
 
-#### 20. Contact-aided invariant EKF on a hexapod: which filter knows yaw is unobservable
+#### 21. Contact-aided invariant EKF on a hexapod: which filter knows yaw is unobservable
 
 **Purpose:** Compares an invariant EKF with a world-frame error-state EKF on the same data. Both keep stance-foot positions in the state, and the question is which one respects that yaw is unobservable.
 
@@ -1131,9 +1186,9 @@ uv run python use_numpy/hexapod_contact_inekf.py --duration 12.0 --dt 0.02 --cyc
 
 </details>
 
-#### 21. Gait phase: which feet are on the ground, when touchdowns are uncertain
+#### 22. Gait phase: which feet are on the ground, when touchdowns are uncertain
 
-**Purpose:** Compares four ways of deciding which feet are on the ground when touchdown times are uncertain, with the true stance as a reference. This drops the assumption of §19 that the filter is told the stance.
+**Purpose:** Compares four ways of deciding which feet are on the ground when touchdown times are uncertain, with the true stance as a reference. This drops the assumption of §20 that the filter is told the stance.
 
 | Input | Output |
 |---|---|
