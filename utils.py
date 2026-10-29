@@ -3,6 +3,24 @@ import tracemalloc
 import numpy as np
 
 
+def skew(v):
+    """Returns the skew-symmetric matrix of a 3-vector, which is used to compute
+    cross products and is essential in the exponential map for SO(3).
+    For a vector v = [vx, vy, vz], the skew-symmetric matrix is:
+    
+        [[ 0   -vz   vy]
+         [ vz   0   -vx]
+         [-vy   vx   0 ]]
+
+
+    """
+    return np.array([
+        [0, -v[2], v[1]],
+        [v[2], 0, -v[0]],
+        [-v[1], v[0], 0],
+    ])
+
+
 def true_body_rates(t):
     """Smooth, persistently-exciting angular & linear body-frame rate profile.
     Arguments:
@@ -102,6 +120,106 @@ def rotation_matrix_to_quaternion_xyzw(R):
         z = 0.25 * S
     quat = np.array([x, y, z, w])
     return quat / np.linalg.norm(quat)
+
+
+def quat_multiply(a, b):
+    """Hamilton product a (x) b of two scalar-first quaternions.
+    Arguments:
+        a, b: (4,) quaternions [w, x, y, z]
+    Returns:
+        (4,) quaternion a (x) b
+    """
+    w1, x1, y1, z1 = a
+    w2, x2, y2, z2 = b
+    return np.array([w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
+                     w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
+                     w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
+                     w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2])
+
+
+def quat_left_matrix(q):
+    """4x4 matrix L(q) with q (x) p = L(q) p.
+    Arguments:
+        q: (4,) quaternion [w, x, y, z]
+    Returns:
+        (4,4) left-multiplication matrix
+    """
+    w, x, y, z = q
+    return np.array([[w, -x, -y, -z], [x, w, -z, y], [y, z, w, -x], [z, -y, x, w]])
+
+
+def quat_right_matrix(q):
+    """4x4 matrix M(q) with p (x) q = M(q) p.
+    Arguments:
+        q: (4,) quaternion [w, x, y, z]
+    Returns:
+        (4,4) right-multiplication matrix
+    """
+    w, x, y, z = q
+    return np.array([[w, -x, -y, -z], [x, w, z, -y], [y, -z, w, x], [z, y, -x, w]])
+
+
+def quat_exp(phi):
+    """Unit quaternion of the rotation vector phi (axis * angle, rad).
+    Arguments:
+        phi: (3,) rotation vector
+    Returns:
+        (4,) unit quaternion [w, x, y, z]
+    """
+    theta = np.linalg.norm(phi)
+    if theta < 1e-12:
+        return np.array([1.0, *(0.5 * phi)])
+    return np.array([np.cos(theta / 2), *(np.sin(theta / 2) * phi / theta)])
+
+
+def quat_to_rotation(q):
+    """Homogeneous rotation-matrix form (w^2 - v.v) I + 2 v v^T + 2 w [v]x; equals the
+    rotation matrix of q when |q| = 1, and is the polynomial `d_rotate_dq` differentiates.
+    Arguments:
+        q: (4,) quaternion [w, x, y, z]
+    Returns:
+        (3,3) matrix
+    """
+    w, v = q[0], q[1:]
+    return (w * w - v @ v) * np.eye(3) + 2.0 * np.outer(v, v) + 2.0 * w * skew(v)
+
+
+def rotation_to_quat(R):
+    """Unit quaternion [w, x, y, z] of a rotation matrix, scalar part >= 0.
+    Arguments:
+        R: (3,3) rotation matrix
+    Returns:
+        (4,) unit quaternion
+    """
+    x, y, z, w = rotation_matrix_to_quaternion_xyzw(R)
+    q = np.array([w, x, y, z])
+    return q if q[0] >= 0 else -q
+
+
+def d_rotate_dq(q, a):
+    """Derivative of quat_to_rotation(q) @ a with respect to q.
+    Arguments:
+        q: (4,) quaternion [w, x, y, z]
+        a: (3,) vector
+    Returns:
+        (3,4) Jacobian
+    """
+    w, v = q[0], q[1:]
+    col_w = 2.0 * (w * a + np.cross(v, a))
+    cols_v = 2.0 * ((v @ a) * np.eye(3) + np.outer(v, a) - np.outer(a, v) - w * skew(a))
+    return np.column_stack([col_w, cols_v])
+
+
+def quat_error_jacobian(q):
+    """3x4 map from an additive quaternion error dq to the right rotation error
+    dtheta = 2 vec(q^* (x) dq), to first order.
+    Arguments:
+        q: (4,) unit quaternion [w, x, y, z]
+    Returns:
+        (3,4) Jacobian
+    """
+    q_conj = np.array([q[0], -q[1], -q[2], -q[3]])
+    return 2.0 * quat_left_matrix(q_conj)[1:, :]
 
 
 def umeyama_alignment(P_est, P_true):
@@ -336,3 +454,49 @@ def nees(err, P):
         scalar NEES value
     """
     return float(err @ np.linalg.solve(P, err))
+
+class Quaternion:
+    """Simple quaternion class for convenience in tests and examples."""
+    def __init__(self, w, x, y, z):
+        self.q = np.array([w, x, y, z])
+
+    @classmethod
+    def from_array(cls, arr):
+        return cls(arr[0], arr[1], arr[2], arr[3])
+
+    @classmethod
+    def from_rotation(cls, R):
+        return cls.from_array(rotation_to_quat(R))
+    
+    def as_array(self):
+        return self.q
+
+    def __mul__(self, other):
+        return Quaternion.from_array(quat_multiply(self.q, other.q))
+
+    def exp(self, phi):
+        return Quaternion.from_array(quat_exp(phi))
+    
+    def left_matrix(self):
+        return quat_left_matrix(self.q)
+    
+    def right_matrix(self):
+        return quat_right_matrix(self.q)
+    
+    def to_rotation(self):
+        return quat_to_rotation(self.q)
+    
+    def derivative_rotate(self, a):
+        return d_rotate_dq(self.q, a)
+    
+    def error_jacobian(self):
+        return quat_error_jacobian(self.q)
+    
+    def conjugate(self):
+        w, x, y, z = self.q
+        return Quaternion(w, -x, -y, -z)
+
+    def normalize(self):
+        norm = np.linalg.norm(self.q)
+        if norm > 0:
+            self.q /= norm

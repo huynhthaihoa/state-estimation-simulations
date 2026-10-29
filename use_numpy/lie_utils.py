@@ -1,21 +1,5 @@
 import numpy as np
-
-def skew(v):
-    """Returns the skew-symmetric matrix of a 3-vector, which is used to compute
-    cross products and is essential in the exponential map for SO(3).
-    For a vector v = [vx, vy, vz], the skew-symmetric matrix is:
-    
-        [[ 0   -vz   vy]
-         [ vz   0   -vx]
-         [-vy   vx   0 ]]
-
-
-    """
-    return np.array([
-        [0, -v[2], v[1]],
-        [v[2], 0, -v[0]],
-        [-v[1], v[0], 0],
-    ])
+from state_estimation_simulations.utils import skew
 
 
 def so3_exp(omega):
