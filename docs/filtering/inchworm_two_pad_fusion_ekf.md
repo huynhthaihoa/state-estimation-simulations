@@ -26,7 +26,7 @@ A real slip makes the two sensors **agree**; a faulty sensor makes them **disagr
 *Figure: `use_numpy/inchworm_two_pad_fusion_ekf.py` at its defaults (seed 0, 300 trials), plus a sweep of the moving sensor's noise (100 trials per point), plotted by `uv run python generator/make_figures.py inchworm_two_pad_fusion_ekf` (about 2 minutes). The numbers match the script's printout.*
 
 ### Scope
-The two-pad doc's planar toy (point pads, prescribed slip pulses, no position fix), with the additions above. The fault model, the fault rate and the moving sensor's noise are this repo's assumptions: the paper reads only the anchored pad's sensor and gives no reason, so whether a sliding pad's sensor is as reliable as an anchored one is **not verified** (§4 shows how much that matters). The cross-check is this repo's design.
+The two-pad doc's planar toy (point pads, prescribed slip pulses, no position fix), with the additions above. The fault model, the fault rate and the moving sensor's noise are this repo's assumptions: the paper reads each pad's sensor only while that pad anchors, because it uses the sensor to detect slip (motion of the anchoring pad), so whether a sliding pad's sensor is as reliable as an anchored one is **not verified** (§4 shows how much that matters). The cross-check is this repo's design.
 
 ---
 
@@ -266,4 +266,4 @@ Two pad sensors are worth more for checking each other than for measuring more. 
 
 ## 8. References
 
-1. Kubík, J. & Faigl, J. *Adaptive Friction-based Inchworm-like Locomotion*. CTU Computational Robotics Laboratory. https://comrob.fel.cvut.cz/papers/icra26looper.pdf - an inchworm robot with a laser-mouse displacement sensor in each pad, read on the anchored pad only, with a fixed slip threshold and a surface-quality output; lists Kalman fusion with motor and inertial data as future work.
+1. Kubík, J. & Faigl, J. (2026). *Adaptive Friction-based Inchworm-like Locomotion*. 2026 IEEE International Conference on Robotics and Automation (ICRA), 9951-9958. https://doi.org/10.1109/ICRA57385.2026.11696680 - an inchworm robot with a laser-mouse displacement sensor in each pad, read on the anchored pad only, with a fixed slip threshold and a surface-quality output; lists Kalman fusion with motor and inertial data as future work.
