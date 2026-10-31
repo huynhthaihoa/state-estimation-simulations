@@ -283,7 +283,7 @@ A conventional KF may be pulled toward that outlier. Robust filtering reduces th
 - A 3σ surprise gives $`\nu^\top S^{-1}\nu = 9`$.
 - The 99% chi-square bound for 1 degree of freedom is 6.63, and $9 > 6.63$, so the measurement is rejected.
 
-Particularly relevant to visual SLAM, feature tracking, GNSS (satellite positioning, e.g. GPS), LiDAR and multi-sensor fusion.
+Particularly relevant to visual SLAM, feature tracking, GNSS (satellite positioning, e.g. GPS), [LiDAR](../glossary.md#lidar) and multi-sensor fusion.
 
 In robotics, robust losses such as the **Huber loss** are also commonly used inside optimization-based estimators rather than relying exclusively on a robust KF.
 
@@ -479,7 +479,7 @@ Examples include:
 - Bundle Adjustment
 - Factor Graphs
 - iSAM/iSAM2
-- GTSAM-style smoothing
+- [GTSAM](../glossary.md#gtsam)-style smoothing
 - pose-graph optimization
 
 A useful learning progression:

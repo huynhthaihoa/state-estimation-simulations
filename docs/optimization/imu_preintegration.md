@@ -153,7 +153,7 @@ A preintegrated bundle becomes one **edge** in the sense of [pose_graph_optimiza
                       IMU factor
 ```
 
-A full visual-inertial odometry (VIO) back-end (GTSAM's `CombinedImuFactor`, ORB-SLAM3, VINS-Mono, etc.) builds a residual comparing this corrected bundle with what the two nodes' current estimates imply: the same "measured vs. predicted, then `Log`" pattern as [pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive). Because the bias correction is $O(1)$, the residual and its Jacobian can be re-evaluated at every optimizer iteration without revisiting the raw 100+ Hz stream.
+A full visual-inertial odometry (VIO) back-end ([GTSAM](../glossary.md#gtsam)'s `CombinedImuFactor`, [ORB-SLAM3](../glossary.md#orb-slam), [VINS-Mono](../glossary.md#vins-mono), etc.) builds a residual comparing this corrected bundle with what the two nodes' current estimates imply: the same "measured vs. predicted, then `Log`" pattern as [pose_graph_optimization.md §7](pose_graph_optimization.md#7-the-mathematics-is-actually-quite-intuitive). Because the bias correction is $O(1)$, the residual and its Jacobian can be re-evaluated at every optimizer iteration without revisiting the raw 100+ Hz stream.
 
 ---
 

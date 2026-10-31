@@ -311,7 +311,7 @@ And in SLAM:
 
 > **The factor graph tells us which variables interact; elimination turns those interactions into a sparse factor $L$.**
 
-This is why **variable ordering, fill-in, elimination trees, and sparse matrix structures** become so important in systems such as iSAM (an incremental-smoothing algorithm) and the optimization libraries GTSAM, g2o, and Ceres.
+This is why **variable ordering, fill-in, elimination trees, and sparse matrix structures** become so important in systems such as iSAM (an incremental-smoothing algorithm) and the optimization libraries [GTSAM](../glossary.md#gtsam), g2o, and Ceres.
 
 ---
 

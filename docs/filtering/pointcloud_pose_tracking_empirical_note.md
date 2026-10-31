@@ -57,7 +57,7 @@ Every filter compares the measured points $z_i$ with the predicted ones $T_{\tex
 | EKF | **world frame**: $`z_i - T_{\text{pred}}\cdot p_i`$ | $`R_{\text{pred}}\left[I \;\; -p_i^\wedge\right]`$, depends on the rotation estimate | every step | - |
 | IEKF | **body frame**: $`T_{\text{pred}}^{-1}\cdot z_i - p_i`$ | $`\left[I \;\; -p_i^\wedge\right]`$, depends only on the object's known geometry | once | - |
 | UKF | world frame, through fresh sigma points | none: the sigma points' spread gives the gain directly | - | - |
-| Vanilla KF | world frame, $`z_i - (R\,p_i + t)`$, exactly linear in the 12-dim state | linear in the literal sense | once (but $J(R)$ and $A$ every step, §4.5) | re-project $\text{vec}(R)$ onto $SO(3)$ by **SVD** |
+| Vanilla KF | world frame, $`z_i - (R\,p_i + t)`$, exactly linear in the 12-dim state | linear in the literal sense | once (but $J(R)$ and $A$ every step, §4.5) | re-project $\text{vec}(R)$ onto $SO(3)$ by **[SVD](../glossary.md#svd-singular-value-decomposition)** |
 
 - **IEKF's residual is left-invariant**: redefining the world frame (left-multiplying both the true and the estimated pose by the same fixed transform) doesn't change it. The measurement shape $h(T) = T\cdot p_i$ is the $`X b`$ row (a world-frame reading of a point fixed on the body) of [left_right_invariant.md §4](left_right_invariant.md#4-why-it-actually-matters-not-just-bookkeeping)'s table, which pairs with the left-invariant choice.
 - **Vanilla KF's fixed $H$ is stronger than IEKF's**: IEKF's is still the linearization of an $SE(3)$ model. The catch: nothing keeps $\text{vec}(R)$ orthonormal, so after every update it is re-projected onto $SO(3)$ via **SVD** (singular value decomposition, which finds the nearest valid rotation) (§4).

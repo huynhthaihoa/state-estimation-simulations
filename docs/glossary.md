@@ -72,6 +72,9 @@ Isotropic noise or uncertainty is the same in every direction: a covariance $\si
 ### Gaussian noise
 **Symbol:** $`\mathcal{N}(0, \Sigma)`$. Measurement noise modelled as a zero-mean normal distribution with covariance $\Sigma$. Under it, minimizing weighted squared errors gives the maximum-likelihood estimate (the unknowns that make the observed measurements most probable; a local one, since the problem is nonlinear). See [nonlinear_least_square.md §2](optimization/nonlinear_least_square.md#2-why-square-the-errors).
 
+### MAP (maximum a posteriori) estimate
+The state that is most probable given all measurements and priors: the peak of the posterior. With Gaussian noise and priors, it is the minimizer of the weighted least-squares cost, which is why factor-graph smoothing returns it (a local one, since the problem is nonlinear). See [filtering_smoothing.md §4](filtering_smoothing.md#4-smoothing-optimization-with-a-probabilistic-interpretation).
+
 ### Covariance
 **Symbols:** $P$ or $\Sigma$. A matrix describing how uncertain an estimate or a measurement is, and how its errors are correlated. See [kf_ekf_iekf.md §1](filtering/kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear).
 
@@ -94,7 +97,7 @@ An estimator is **consistent** when its reported covariance matches the errors i
 Repeating a randomized simulation many times with different noise to measure typical behavior instead of one lucky or unlucky run. For a NEES check, each trial should redraw every random source the filter models; this repo's saltation script at its defaults redraws only the initial error and measurement noise, plus detection-time jitter when `--detect-time-noise-std` > 0 (its truth has no process noise), so its NEES reads low. See [hybrid_saltation_ekf.md §1.1](filtering/hybrid_saltation_ekf.md#11-the-filter-math-concretely) and [§6](filtering/hybrid_saltation_ekf.md#6-the-empirical-finding-a-modest-real-gap-not-a-dramatic-one).
 
 ### RMSE (root-mean-square error)
-The square root of the mean squared error, $`\sqrt{\tfrac{1}{N}\sum_k \|e_k\|^2}`$, in the error's own units; it weights large errors more than the mean absolute error does. Each doc states what the mean runs over (ticks, Monte Carlo trials, poses or keyframes). For a trajectory RMSE taken after aligning to ground truth, see Umeyama alignment and trajectory RMSE (§5).
+The square root of the mean squared error, $`\sqrt{\tfrac{1}{N}\sum_k \|e_k\|^2}`$, in the error's own units; it weights large errors more than the mean absolute error does. Each doc states what the mean runs over (ticks, Monte Carlo trials, poses or keyframes). **RMS** (root mean square) is the same average applied to any quantity, e.g. a timing lag. For a trajectory RMSE taken after aligning to ground truth, see Umeyama alignment and trajectory RMSE (§5).
 
 ### Observability
 A direction of the state is observable if some measurement can determine it, and unobservable if none can. A solver that wrongly gains information in an unobservable direction becomes overconfident, the problem FEJ (§4) addresses. See [marginalization.md §6](optimization/marginalization.md#6-the-consistency-gotcha-why-fej-exists).
@@ -110,7 +113,7 @@ A direction of the state is observable if some measurement can determine it, and
 **Symbols:** $e$ or $r$. The difference between what the model predicts and what was measured. See [nonlinear_least_square.md §4](optimization/nonlinear_least_square.md#4-the-general-form).
 
 ### Nonlinear least squares
-Choosing the unknowns that minimize the sum of weighted squared residuals, $\sum_i e_i^\top \Omega_i e_i$, where residual $e_i$ has information matrix $\Omega_i$. It is *nonlinear* when the residuals depend nonlinearly on the unknowns, as they do in SLAM. See [nonlinear_least_square.md §3](optimization/nonlinear_least_square.md#3-then-what-makes-it-nonlinear).
+Choosing the unknowns that minimize the sum of weighted squared residuals, $\sum_i e_i^\top \Omega_i e_i$, where residual $e_i$ has information matrix $\Omega_i$. It is *nonlinear* when the residuals depend nonlinearly on the unknowns, as they do in SLAM. Abbreviated **NLS**. See [nonlinear_least_square.md §3](optimization/nonlinear_least_square.md#3-then-what-makes-it-nonlinear).
 
 ### Jacobian
 **Symbol:** $J$. The matrix of first derivatives of the residuals with respect to the unknowns: entry $(i,j)$ says how much residual $i$ changes when unknown $j$ is nudged. See [jacobian.md §2](foundations/jacobian.md#2-now-imagine-multiple-inputs-and-outputs).
@@ -128,7 +131,7 @@ The starting estimate an iterative solver refines, often from dead reckoning. A 
 The step $`\Delta x = -\alpha J^\top \Omega e`$ (or $-\alpha J^\top e$ for $\Omega = I$, as the linked doc writes it): straight downhill with step size $\alpha$. Safe with a small step, slow on badly scaled problems. See [levenberg_marquardt.md §3](optimization/levenberg_marquardt.md#3-gradient-descent-has-the-opposite-problem).
 
 ### Gauss-Newton
-An iteration that linearizes the residuals, solves the normal equations, updates the estimate and repeats. See [gauss_newton.md §1](optimization/gauss_newton.md#1-the-basic-idea).
+An iteration that linearizes the residuals, solves the normal equations, updates the estimate and repeats. Abbreviated **GN**. See [gauss_newton.md §1](optimization/gauss_newton.md#1-the-basic-idea).
 
 ### Levenberg-Marquardt (LM) and damping
 **Symbol:** $\lambda$. Gauss-Newton with a damping term added to $H$ ($\lambda I$, or $`\lambda\,\mathrm{diag}(H)`$ in Marquardt's form). Large $\lambda$ gives cautious, gradient-descent-like steps; small $\lambda$ gives Gauss-Newton steps. $\lambda$ goes down when a step lowers the cost, and up when it does not (the step is then retried); it does not track distance from the solution. LM is still a local method. See [levenberg_marquardt.md §4](optimization/levenberg_marquardt.md#4-the-damping-idea), [§6](optimization/levenberg_marquardt.md#6-how-does-lm-decide-whether-to-be-cautious) and [§10](optimization/levenberg_marquardt.md#10-marquardts-scaling).
@@ -137,7 +140,10 @@ An iteration that linearizes the residuals, solves the normal equations, updates
 Directions in which the whole solution can move without changing any residual, e.g. shifting and rotating the entire trajectory and map (plus scale, for monocular, i.e. single-camera, BA). It is removed by anchoring (a prior on, or fixing, the first pose, or the first two cameras in monocular BA) or handled at evaluation time by alignment. See [gauss_newton.md §4](optimization/gauss_newton.md#4-the-optimization-problem) and [bundle_adjustment.md §14](optimization/bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment).
 
 ### Outlier and robust kernel
-An outlier is a grossly wrong measurement, such as a false loop closure. Robust kernels (Huber, Cauchy, DCS, ...) down-weight large residuals so outliers can't dominate the solution. See [pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
+An outlier is a grossly wrong measurement, such as a false loop closure. Robust kernels (Huber, Cauchy, DCS (Dynamic Covariance Scaling), ...) down-weight large residuals so outliers can't dominate the solution. See [pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
+
+### RANSAC (random sample consensus)
+Robust model fitting: fit a model to a small random subset of the data, count how many points agree with it (the inliers), repeat, and keep the model with the most inliers. It rejects outliers before least squares refines the fit. This repo uses it to extract LiDAR planes and cylinders; PnP commonly runs inside it. See [lidar_primitives.md §1](frontend/lidar_primitives.md#1-extraction) and [triangulation_pnp.md §5](frontend/triangulation_pnp.md#5-what-the-accompanying-scripts-do-and-dont-do).
 
 ### Relinearization
 Recomputing the Jacobians at an updated estimate. iSAM2 does it selectively, only for variables whose estimate has moved enough (the iSAM2 paper calls this fluid relinearization). See [isam2_optimization.md §10](optimization/isam2_optimization.md#10-selective-relinearization).
@@ -153,13 +159,19 @@ A bipartite graph with **variable nodes** (the unknowns) and **factor nodes** (m
 One error term connecting the variables it involves, e.g. odometry between two poses, or a camera observing a landmark. See [factor_graph.md §3](optimization/factor_graph.md#3-a-factor-is-basically-an-error-function).
 
 ### Pose graph
-A factor graph whose variables are only poses, linked by relative-pose factors (e.g. odometry and loop closures). See [factor_graph.md §7](optimization/factor_graph.md#7-factor-graph-vs-pose-graph).
+A factor graph whose variables are only poses, linked by relative-pose factors (e.g. odometry and loop closures). Solving it is **pose-graph optimization (PGO)**. See [factor_graph.md §7](optimization/factor_graph.md#7-factor-graph-vs-pose-graph) and [pose_graph_optimization.md](optimization/pose_graph_optimization.md).
 
 ### Sparsity
 Most entries of $J$ and $H$ are zero, because each measurement involves only a few variables. Efficient solvers depend on it. See [sparse_cholesky_factorization.md §1](optimization/sparse_cholesky_factorization.md#1-why-does-sparsity-matter).
 
 ### Cholesky factorization
 **Symbol:** $L$. Writing $H = LL^\top$ with $L$ lower-triangular, so the solve becomes two cheap triangular solves. See [sparse_cholesky_factorization.md §2](optimization/sparse_cholesky_factorization.md#2-the-basic-idea).
+
+### QR factorization
+**Symbols:** $Q$, $R$. Writing a matrix as $A = QR$ with $Q$ orthogonal and $R$ upper-triangular ($R$ is not a rotation here). For a whitened Jacobian $A$, $`R^\top R = A^\top A = H`$, so $R$ is the transposed Cholesky factor (a square root of the information) and is obtained without forming $H$. iSAM updates $R$ incrementally with Givens rotations. See [isam_optimization.md §3](optimization/isam_optimization.md#3-why-is-this-possible).
+
+### SVD (singular value decomposition)
+**Symbols:** $U$, $D$, $V$. Factoring a matrix as $`U D V^\top`$ with $U$ and $V$ orthogonal and $D$ diagonal (the singular values, all $\ge 0$). The docs use it to solve homogeneous linear systems (the DLT) and to find the rotation closest to a given matrix: Umeyama alignment, and re-projecting an unconstrained $3\times3$ estimate onto $SO(3)$. See [umeyama_alignment.md §2](foundations/umeyama_alignment.md#2-what-it-actually-computes) and [triangulation_pnp.md §3](frontend/triangulation_pnp.md#3-pnp-as-the-inverse-problem).
 
 ### Back-substitution
 Solving a triangular system one row at a time, with no matrix inverse. After $H = LL^\top$, $Ly = -b$ is solved top-down (forward substitution), then $L^\top \Delta x = y$ bottom-up. See [pose_graph_optimization.md §15.5](optimization/pose_graph_optimization.md#155-solving-the-linear-system-gauss-newton-step).
@@ -171,7 +183,7 @@ Solving for one variable at a time in terms of its neighbors. It is the graph vi
 New nonzeros that elimination creates between variables that weren't directly connected. See [sparse_cholesky_factorization.md §3](optimization/sparse_cholesky_factorization.md#3-the-surprising-part-fill-in).
 
 ### Variable ordering
-The order in which variables are eliminated. It decides how much fill-in appears; heuristics such as AMD and COLAMD (approximate-minimum-degree orderings) choose it. See [sparse_cholesky_factorization.md §5](optimization/sparse_cholesky_factorization.md#5-ordering-becomes-extremely-important).
+The order in which variables are eliminated. It decides how much fill-in appears; heuristics such as AMD and COLAMD (approximate-minimum-degree orderings) choose it. iSAM2 uses **CCOLAMD** (constrained COLAMD), which also forces recently changed variables to the end of the order. See [sparse_cholesky_factorization.md §5](optimization/sparse_cholesky_factorization.md#5-ordering-becomes-extremely-important) and [isam2_optimization.md §12](optimization/isam2_optimization.md#12-variable-ordering-is-also-crucial).
 
 ### Elimination tree
 Records which variables must be eliminated before which. See [elimination_tree.md §2](optimization/elimination_tree.md#2-why-call-it-a-tree) and, for what this repo builds, [bayes_tree.md §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo).
@@ -181,6 +193,9 @@ A tree built from elimination whose nodes are **cliques** (groups of variables).
 
 ### Batch vs. incremental
 Batch optimization re-solves the whole problem from scratch; incremental methods (iSAM, iSAM2: incremental smoothing and mapping) update the previous solution as new measurements arrive. See [isam_optimization.md §1](optimization/isam_optimization.md#1-the-problem-with-ordinary-batch-optimization) and [§2](optimization/isam_optimization.md#2-the-incremental-idea).
+
+### SAM, iSAM and iSAM2 (smoothing and mapping)
+Solving SLAM as one sparse least-squares problem over the whole trajectory and map. **Square-root SAM** factors the whitened Jacobian in batch (QR or Cholesky); **iSAM** (incremental SAM) updates that factor with each new measurement, with periodic batch steps that reorder and relinearize; **iSAM2** stores it as a Bayes tree and reorders and relinearizes only the affected part. See [isam_optimization.md §2](optimization/isam_optimization.md#2-the-incremental-idea) and [isam2_optimization.md §7](optimization/isam2_optimization.md#7-bayes-tree---the-most-important-intuition).
 
 ### Schur complement
 The closed form for eliminating a block of variables from a linear system or an information-form Gaussian. For an information matrix $\Lambda$ (the $\Omega$ of §2) with blocks $a$ (eliminated) and $b$ (kept), so that $`\Lambda_{ab}`$ is the block coupling $`a`$ and $`b`$, the kept block becomes $\Lambda_b' = \Lambda_{bb} - \Lambda_{ba}\Lambda_{aa}^{-1}\Lambda_{ab}$. Production BA uses it to eliminate landmarks (this repo's scripts solve the dense system instead); marginalization uses the same formula and keeps the result as a prior. See [bundle_adjustment.md §12](optimization/bundle_adjustment.md#12-block-sparsity-and-the-schur-complement) and [marginalization.md §4](optimization/marginalization.md#4-the-math-turning-an-eliminated-pose-into-a-prior).
@@ -208,7 +223,7 @@ Estimating a robot's trajectory and a map of its environment at the same time. S
 The front-end turns raw sensor data into constraints (feature tracking, data association (matching measurements to the landmarks they observe), loop detection, keyframe selection); the back-end optimizes the trajectory and map from those constraints. See [frontend_backend.md §1](frontend_backend.md#1-slam-front-end---extracting-constraints) and [§2](frontend_backend.md#2-slam-back-end---solving-the-global-problem).
 
 ### Odometry
-An estimate of the robot's incremental motion between two nearby moments from onboard sensors (wheel, visual, or inertial). See [factor_graph.md §2](optimization/factor_graph.md#2-why-do-we-need-it).
+An estimate of the robot's incremental motion between two nearby moments from onboard sensors (wheel, visual, or inertial). From camera images it is **visual odometry (VO)**. See [factor_graph.md §2](optimization/factor_graph.md#2-why-do-we-need-it).
 
 ### Dead reckoning
 Chaining odometry steps into a trajectory with no external correction, so errors accumulate. See [factor_graph.md §2](optimization/factor_graph.md#2-why-do-we-need-it).
@@ -225,6 +240,12 @@ A point in the environment observed from several poses and estimated together wi
 ### Keyframe
 One of a selected subset of frames kept in the optimization, instead of every frame. See [bundle_adjustment.md §13](optimization/bundle_adjustment.md#13-local-vs-global-bundle-adjustment-real-systems).
 
+### LiDAR
+A laser range scanner: it measures distances along many beams and returns a **point cloud** (a set of 3D points) per scan. See [lidar_primitives.md §1](frontend/lidar_primitives.md#1-extraction).
+
+### ICP (iterative closest point)
+Scan registration that alternates two steps until the pose stops changing: pair each point of the new scan with the closest point of the reference scan (**point-to-point**) or with the reference's local surface (**point-to-plane**, where only the distance along the surface normal counts), then solve for the pose that best aligns the pairs. See [lidar_primitives.md](frontend/lidar_primitives.md#intuition) and [§3](frontend/lidar_primitives.md#3-three-residuals-one-solver).
+
 ### Bundle adjustment (BA)
 Jointly refining camera poses and 3D landmarks to minimize reprojection error. See [bundle_adjustment.md §5](optimization/bundle_adjustment.md#5-why-is-it-called-bundle-adjustment).
 
@@ -234,14 +255,20 @@ The pixel difference between where a landmark was observed in an image and where
 ### Triangulation and PnP
 Triangulation recovers a 3D point from known camera poses; PnP (Perspective-n-Point) recovers a camera pose from known 3D points. They are the same reprojection problem solved in opposite directions. See [triangulation_pnp.md §1](frontend/triangulation_pnp.md#1-the-two-problems-stated-symmetrically).
 
+### DLT (direct linear transform)
+A closed-form linear solution: the projection equations are rearranged into a homogeneous linear system $`A x = 0`$ and solved with the SVD. In this repo it gives PnP's initial camera pose (with known intrinsics, from at least 6 points), which Gauss-Newton then refines. See [triangulation_pnp.md §3](frontend/triangulation_pnp.md#3-pnp-as-the-inverse-problem).
+
+### SfM (structure from motion)
+Recovering camera poses and sparse 3D points from many images, typically offline and in batch. See [bundle_adjustment.md §13](optimization/bundle_adjustment.md#13-local-vs-global-bundle-adjustment-real-systems) and [vi_initialization.md §2](frontend/vi_initialization.md#2-the-classic-linear-alignment-pipeline).
+
 ### IMU (inertial measurement unit)
-A gyroscope plus an accelerometer, measuring the body's angular rate and specific force (acceleration minus gravity). **VIO (visual-inertial odometry)** estimates motion from a camera plus an IMU. See [imu_preintegration.md](optimization/imu_preintegration.md) and [vi_initialization.md](frontend/vi_initialization.md).
+A gyroscope plus an accelerometer, measuring the body's angular rate and specific force (acceleration minus gravity). **VIO (visual-inertial odometry)** estimates motion from a camera plus an IMU; **VI** (visual-inertial) labels anything that fuses the two. See [imu_preintegration.md](optimization/imu_preintegration.md) and [vi_initialization.md](frontend/vi_initialization.md).
 
 ### IMU preintegration
 Summarizing all IMU samples between two keyframes into one relative-motion measurement ($\Delta R$, $\Delta v$, $\Delta p$: the change in rotation, velocity and position), with bias Jacobians so a bias change can be corrected without re-integrating. See [imu_preintegration.md §3](optimization/imu_preintegration.md#3-what-gets-compressed) and [§5](optimization/imu_preintegration.md#5-the-payoff-correcting-for-a-bias-change-without-re-integrating).
 
 ### Umeyama alignment and trajectory RMSE
-Aligning an estimated trajectory to ground truth over only the directions the sensors cannot observe (7 DoF for monocular, 6 for stereo/RGB-D, 4 for visual-inertial), then reporting the position RMSE (root-mean-square error). See [umeyama_alignment.md §1](foundations/umeyama_alignment.md#1-why-an-alignment-step-is-needed-at-all) and [§1.1](foundations/umeyama_alignment.md#11-align-only-whats-actually-unobservable).
+Aligning an estimated trajectory to ground truth over only the directions the sensors cannot observe (7 DoF for monocular, 6 for stereo/RGB-D, 4 for visual-inertial), then reporting the position RMSE (root-mean-square error). After a rigid fit this RMSE is often called the **ATE** (absolute trajectory error). See [umeyama_alignment.md §1](foundations/umeyama_alignment.md#1-why-an-alignment-step-is-needed-at-all) and [§1.1](foundations/umeyama_alignment.md#11-align-only-whats-actually-unobservable).
 
 ---
 
@@ -263,13 +290,25 @@ Alternates a **predict** step (motion model) and an **update** step (measurement
 **Symbols:** $f$, $h$. The Kalman filter for a nonlinear motion model $x_{k+1} = f(x_k, u_k) + w$ (control input $u$) and measurement model $z = h(x) + v$ (measurement noise $v$, not the translation part $v$ of $\xi$, with covariance $R$), linearizing them with the Jacobians $`F = \partial f/\partial x`$ and $`H = \partial h/\partial x`$ at the current estimate. See [kf_ekf_iekf.md §2](filtering/kf_ekf_iekf.md#2-extended-kalman-filter-the-world-is-nonlinear-so-ill-approximate-it-locally).
 
 ### IEKF (Invariant EKF)
-An EKF that uses an invariant error $\eta$ defined on the Lie group (see Invariant and equivariant, §1). In this repo "IEKF" always means the Invariant EKF, not the Iterated EKF of [kf_ekf_iekf.md §9](filtering/kf_ekf_iekf.md#9-other-prominent-variants-worth-keeping-in-mind). See [kf_ekf_iekf.md §3](filtering/kf_ekf_iekf.md#3-invariant-ekf-lets-respect-the-geometry-of-the-problem).
+An EKF that uses an invariant error $\eta$ defined on the Lie group (see Invariant and equivariant, §1). In this repo "IEKF" always means the Invariant EKF, not the Iterated EKF of [kf_ekf_iekf.md §9](filtering/kf_ekf_iekf.md#9-other-prominent-variants-worth-keeping-in-mind). The right-invariant version is written **RIEKF**, and Hartley et al. abbreviate the invariant EKF as **InEKF**. See [kf_ekf_iekf.md §3](filtering/kf_ekf_iekf.md#3-invariant-ekf-lets-respect-the-geometry-of-the-problem).
 
 ### ESKF (Error-State Kalman Filter)
 **Symbol:** $\delta x$. Propagates a nominal state $\hat x$ with the full nonlinear model, while the filter estimates only a small error state $\delta x$, folded into $\hat x$ after each update and reset to zero. Its rotation error $`\delta\theta = \mathrm{Log}(\hat R^{-1}R)`$ is already the left-invariant one (the position/velocity errors stay additive). See [extra_kf_variants.md §2](filtering/extra_kf_variants.md#2-error-state-kalman-filter-eskf). Worked through step by step, with a simulation, in [eskf.md](filtering/eskf.md).
 
+### MEKF (multiplicative EKF)
+An attitude error-state filter: the estimated attitude is corrected by composing it with a small estimated rotation (a multiplicative error) instead of adding to its parameters. The ESKF applies the same idea to a full state. See [extra_kf_variants.md §2](filtering/extra_kf_variants.md#2-error-state-kalman-filter-eskf).
+
+### MSCKF (multi-state constraint Kalman filter)
+A visual-inertial ESKF whose state holds a sliding window of past camera poses but no landmarks: each landmark is used once, as a constraint among the poses that saw it, then discarded, so the state does not grow with the map. See [extra_kf_variants.md §2](filtering/extra_kf_variants.md#2-error-state-kalman-filter-eskf) and [kf_ekf_iekf.md §9](filtering/kf_ekf_iekf.md#9-other-prominent-variants-worth-keeping-in-mind).
+
 ### UKF (Unscented Kalman Filter)
 Pushes $2n+1$ deterministically chosen **sigma points** (for an $n$-dimensional state) through the nonlinear functions instead of linearizing them with Jacobians. See [extra_kf_variants.md §1](filtering/extra_kf_variants.md#1-unscented-kalman-filter-ukf).
+
+### Particle filter (PF)
+A Bayes filter whose belief is a set of weighted samples (**particles**), each a full state hypothesis. Each particle is pushed through the motion model and reweighted by how well it explains the measurement, and the set is periodically resampled. It needs no Gaussian assumption, at a cost that grows with the number of particles. See [extra_kf_variants.md §6](filtering/extra_kf_variants.md#6-particle-filter-pf).
+
+### RTS (Rauch-Tung-Striebel) smoother
+A Kalman smoother: a forward Kalman-filter pass followed by a backward pass that revises each state using the later measurements too. See [extra_kf_variants.md §9](filtering/extra_kf_variants.md#9-kalman-smoother).
 
 ---
 
@@ -291,9 +330,25 @@ A hybrid system making infinitely many jumps in a finite time, e.g. a lossy ball
 ### CPG (central pattern generator)
 An internal rhythm generator that produces a gait's repeating leg motion on its own, without a rhythmic input, like a metronome for the legs: a neural circuit in animals, usually coupled oscillators in robots. Sensor feedback such as touchdowns can pull its rhythm into sync with the actual walking (**entrainment**). This repo's `cpg` approach keeps only one idea from it: learning at which point of the rhythm contact usually comes. See [gait_phase_ekf.md §1.3](filtering/gait_phase_ekf.md#13-four-ways-to-set-the-stance-flags).
 
+### ZUPT and ZARU
+**Symbols:** $v$, $\omega$. Pseudo-measurements applied while a sensor is known to be still: a **zero-velocity update** (ZUPT, velocity $`v = 0`$) and a **zero-angular-rate update** (ZARU, angular rate $`\omega = 0`$). They hold only during the still phase (a foot's stance, an inchworm's anchor); applied while moving, they feed the filter a false measurement with high confidence. See [inchworm_zupt_ekf.md](filtering/inchworm_zupt_ekf.md#intuition) and [§5](filtering/inchworm_zupt_ekf.md#5-side-extension-heading-and-zaru).
+
 ---
 
-## 9. References
+## 9. Named systems and libraries
+
+### GTSAM
+An open-source factor-graph optimization library (Georgia Tech Smoothing and Mapping) with batch solvers and iSAM2. This repo does not use it. See [filtering_smoothing.md §10](filtering_smoothing.md#10-where-the-modern-systems-fit).
+
+### ORB-SLAM
+A feature-based visual SLAM system (Mur-Artal et al.) built on ORB image features, with tracking, local mapping (local BA over covisible keyframes) and loop closing (pose-graph optimization) in separate threads. ORB-SLAM2 adds stereo and RGB-D cameras; ORB-SLAM3 adds visual-inertial and multi-map SLAM. See [bundle_adjustment.md §13](optimization/bundle_adjustment.md#13-local-vs-global-bundle-adjustment-real-systems) and [frontend_backend.md](frontend_backend.md).
+
+### VINS-Mono
+A monocular visual-inertial estimator (Qin et al.) that optimizes a sliding window of keyframes with IMU preintegration factors and marginalizes old states into a prior. See [marginalization.md §7](optimization/marginalization.md#7-sliding-window-and-fixed-lag-smoothing-the-payoff) and [vi_initialization.md §2](frontend/vi_initialization.md#2-the-classic-linear-alignment-pipeline).
+
+---
+
+## 10. References
 
 1. Solà, J., Deray, J., & Atchuthan, D. (2018). *A micro Lie theory for state estimation in robotics*. arXiv:1812.01537. https://doi.org/10.48550/arXiv.1812.01537 - the $SO(3)$/$`SE(3)`$, Exp/Log and hat conventions behind §1.
 2. Thrun, S., Burgard, W., & Fox, D. (2005). *Probabilistic Robotics*. MIT Press. - the probabilistic and filtering vocabulary behind §2 and §6.

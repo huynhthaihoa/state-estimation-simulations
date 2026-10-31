@@ -283,7 +283,7 @@ flowchart TD
     G --> H["Corrected trajectory"]
 ```
 
-- Input sensors: **LiDAR** is a laser scanner that measures distances to surrounding surfaces.
+- Input sensors: **[LiDAR](../glossary.md#lidar)** is a laser scanner that measures distances to surrounding surfaces.
 - The [**front-end**](../glossary.md#front-end-and-back-end) says: "I think I moved like this."
 - The **back-end** says: "Let's see whether all those estimates make sense together."
 - Keeping the two separate is a core design choice in [SLAM](../glossary.md#slam-simultaneous-localization-and-mapping).
@@ -371,7 +371,7 @@ The full state vector containing all $N$ pose [keyframes](../glossary.md#keyfram
 
 #### Relative Edge Measurements
 
-An edge $`(i, j)`$ between nodes $`i`$ and $`j`$ represents a relative transformation measurement $`\tilde{T}_{ij} \in \mathrm{SE}(3)`$ (e.g., from ICP scan matching, i.e. iterative closest point: repeatedly match nearest points, then re-align; or from visual odometry), accompanied by an information matrix $`\Omega_{ij} = \Sigma_{ij}^{-1} \in \mathbb{R}^{6 \times 6}`$ representing measurement confidence.
+An edge $`(i, j)`$ between nodes $`i`$ and $`j`$ represents a relative transformation measurement $`\tilde{T}_{ij} \in \mathrm{SE}(3)`$ (e.g., from [ICP](../glossary.md#icp-iterative-closest-point) scan matching, i.e. iterative closest point: repeatedly match nearest points, then re-align; or from visual odometry), accompanied by an information matrix $`\Omega_{ij} = \Sigma_{ij}^{-1} \in \mathbb{R}^{6 \times 6}`$ representing measurement confidence.
 
 ### 15.2 Residual Vector Formulation on $\mathrm{SE}(3)$
 
@@ -475,7 +475,7 @@ Here $J_{ij}$ is edge $(i,j)$'s block row of $J$ (6 rows): $J_i$ sits in node $i
 
 Here $F$ has no $\frac{1}{2}$ (as in the code's `cost`), while $b$ is the gradient of $\frac{1}{2}F$. The factor 2 cancels on both sides of the step, so $H\boldsymbol{\delta}^* = -b$ is unchanged.
 
-Because edges only connect adjacent or loop-closing keyframes, $H$ is extremely [**sparse**](../glossary.md#sparsity) and block-structured. It is typically solved using Sparse Cholesky Factorization (${\mathrm{LL}^\top}$ or ${\mathrm{LDL}^\top}$) or Conjugate Gradients (an iterative linear solver) in solvers like GTSAM or g2o (open-source graph-optimization libraries) - see [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) for the full derivation.
+Because edges only connect adjacent or loop-closing keyframes, $H$ is extremely [**sparse**](../glossary.md#sparsity) and block-structured. It is typically solved using Sparse Cholesky Factorization (${\mathrm{LL}^\top}$ or ${\mathrm{LDL}^\top}$) or Conjugate Gradients (an iterative linear solver) in solvers like [GTSAM](../glossary.md#gtsam) or g2o (open-source graph-optimization libraries) - see [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) for the full derivation.
 
 **What that factorization is doing:** $H$ is symmetric positive-definite once the gauge is fixed (§7: e.g. the node-0 anchor; it is singular otherwise), and Cholesky factorization writes it as $H = LL^\top$ with $L$ lower-triangular. Solving $H\boldsymbol{\delta}^* = -b$ then becomes two cheap triangular solves instead of one general one:
 
@@ -670,7 +670,7 @@ At $\Phi = 12.59$, $s_{ij}$ is $1$ up to $e_{ij}^2 = \Phi$, then $0.7726$ at $e_
 | **Standard $L_2$** | Unbounded Quadratic ($e^2$) | Constant ($1.0$) | **None** (1 outlier ruins the map) |
 | **Huber** | Unbounded Linear ($\delta e$) | $\propto \frac{1}{e}$ | **Low/Moderate** (Dampens, but still pulls graph) |
 | **Cauchy** | Logarithmic ($\ln e^2$) | $\propto \frac{1}{e^2}$ | **High** |
-| **DCS** | Saturating (GM-equivalent, see below) | $\propto \frac{1}{e^4}$ | **Very High** (Effectively turns off bad edges) |
+| **DCS** | Saturating (Geman-McClure-equivalent, see below) | $\propto \frac{1}{e^4}$ | **Very High** (Effectively turns off bad edges) |
 | **Geman-McClure** | Saturation/Bounded | $\propto \frac{1}{(1 + e^2)^2}$ | **Very High** |
 
 **Geman-McClure** is a bounded loss that flattens for large $e$: at scale 1, $\rho(e) = \frac{1}{2}\frac{e^2}{1+e^2}$ approaches $\frac{1}{2}$, and its weight is $w(e) = \frac{1}{(1+e^2)^2}$ (at $e = 10$: $1/101^2 \approx 9.8 \times 10^{-5}$, the value quoted above).

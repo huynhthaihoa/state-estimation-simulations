@@ -209,7 +209,7 @@ The tricky part is:
 
 > **A quaternion does not live in ordinary 4D Euclidean space.**
 
-It lives on the **unit quaternion [manifold](../glossary.md#manifold)**. That's why modern VIO/SLAM systems often estimate a **small rotational error** $\delta q$ rather than directly adding a 4D quaternion error. This $\delta q$ is itself a unit quaternion near the identity, $`\delta q \approx (1, \tfrac{1}{2}\delta\theta)`$, parameterized by a small rotation vector $\delta\theta$ (axis times angle, in radians; hence the $\tfrac{1}{2}$, the half angle of §2): the error state of the **error-state Kalman filter ([ESKF](../glossary.md#eskf-error-state-kalman-filter))**. The filter estimates this correction instead of $q$ itself and applies it by quaternion multiplication, hence the **multiplicative EKF (MEKF)** idea.
+It lives on the **unit quaternion [manifold](../glossary.md#manifold)**. That's why modern VIO/SLAM systems often estimate a **small rotational error** $\delta q$ rather than directly adding a 4D quaternion error. This $\delta q$ is itself a unit quaternion near the identity, $`\delta q \approx (1, \tfrac{1}{2}\delta\theta)`$, parameterized by a small rotation vector $\delta\theta$ (axis times angle, in radians; hence the $\tfrac{1}{2}$, the half angle of §2): the error state of the **error-state Kalman filter ([ESKF](../glossary.md#eskf-error-state-kalman-filter))**. The filter estimates this correction instead of $q$ itself and applies it by quaternion multiplication, hence the **multiplicative EKF ([MEKF](../glossary.md#mekf-multiplicative-ekf))** idea.
 
 The small error can be attached on either side, and both are common ($`\hat q`$ is the estimated orientation):
 

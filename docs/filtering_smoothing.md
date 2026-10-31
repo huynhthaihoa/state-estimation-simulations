@@ -13,7 +13,7 @@ Suppose a robot moves through a room:
 At every time step, it gets:
 
 - [IMU](glossary.md#imu-inertial-measurement-unit) (inertial measurement unit) measurements
-- camera/LiDAR (laser range scanner) observations
+- camera/[LiDAR](glossary.md#lidar) (laser range scanner) observations
 - wheel [odometry](glossary.md#odometry), etc.
 
 The robot wants to estimate:
@@ -388,9 +388,9 @@ A rough map is:
 Examples:
 
 - **EKF-SLAM** → filtering
-- **MSCKF** (Multi-State Constraint Kalman Filter) → an EKF-based filter for visual-inertial estimation, run over a sliding window of poses. Landmarks never enter the state; each is used once as a constraint between window poses, then dropped. Because of the window it fits the fixed-lag box only loosely.
-- **VINS-Mono/VINS-Fusion** → nonlinear optimization + sliding window
-- **ORB-SLAM** → heavily optimization-based
+- **[MSCKF](glossary.md#msckf-multi-state-constraint-kalman-filter)** (Multi-State Constraint Kalman Filter) → an EKF-based filter for visual-inertial estimation, run over a sliding window of poses. Landmarks never enter the state; each is used once as a constraint between window poses, then dropped. Because of the window it fits the fixed-lag box only loosely.
+- **[VINS-Mono](glossary.md#vins-mono)/VINS-Fusion** → nonlinear optimization + sliding window
+- **[ORB-SLAM](glossary.md#orb-slam)** → heavily optimization-based
 - **GTSAM-based systems** (GTSAM is a factor-graph optimization library) → factor-graph optimization
 - **iSAM/iSAM2** → incremental smoothing/optimization
 

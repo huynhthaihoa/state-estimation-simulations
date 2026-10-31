@@ -69,7 +69,7 @@ The 15 m prediction vs. 14 m GPS from the start of this doc.
 The standard KF is a straight ruler for a world that behaves like a straight line. It doesn't work directly for rotations, camera poses, or nonlinear robot dynamics.
 
 ### A concrete data point
-This repo's own `run_vanilla_kf` (same point-cloud pose-tracking benchmark referenced in [§7](#7-geometry-aware-is-not-the-same-as-more-accurate)) is exactly this: a standard linear KF applied directly to a pose, via a redundant **ambient** ([glossary](../glossary.md#minimal-vs-ambient-redundant-parameterization)) `[vec(R), t]` state (`vec` taken row-major, as `R.flatten()` does) rather than the minimal $SE(3)$ tangent every other method there uses. It pays three costs for that: a first-order truncation of the motion model, a 12×12 covariance that isn't directly comparable to the 6×6 tangent one, and a post-hoc SVD re-projection (snapping the matrix back to the nearest valid rotation) after every update. See [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) for the measured cost of skipping the manifold structure.
+This repo's own `run_vanilla_kf` (same point-cloud pose-tracking benchmark referenced in [§7](#7-geometry-aware-is-not-the-same-as-more-accurate)) is exactly this: a standard linear KF applied directly to a pose, via a redundant **ambient** ([glossary](../glossary.md#minimal-vs-ambient-redundant-parameterization)) `[vec(R), t]` state (`vec` taken row-major, as `R.flatten()` does) rather than the minimal $SE(3)$ tangent every other method there uses. It pays three costs for that: a first-order truncation of the motion model, a 12×12 covariance that isn't directly comparable to the 6×6 tangent one, and a post-hoc [SVD](../glossary.md#svd-singular-value-decomposition) re-projection (snapping the matrix back to the nearest valid rotation) after every update. See [pointcloud_pose_tracking_empirical_note.md §4](pointcloud_pose_tracking_empirical_note.md#4-vanilla-kf-vs-ekfiekfukf-diverges-by-construction-not-just-approximation) for the measured cost of skipping the manifold structure.
 
 ---
 
@@ -123,7 +123,7 @@ R_x(90^\circ)\,R_y(90^\circ) \neq R_y(90^\circ)\,R_x(90^\circ)
 
 3D rotations don't commute, and there is no simple "add the numbers" operation as for positions on a line. They live on a **Lie group**: $SO(3)$ for rotations, $SE(3)$ for 3D poses.
 
-Representing rotations awkwardly isn't the deep problem, though. Plain EKF already has workarounds: quaternions, Euler angles, or multiplicative (small-rotation) perturbations around them, known as the **MEKF** (multiplicative EKF; see Lefferts, Markley, and Shuster, 1982).
+Representing rotations awkwardly isn't the deep problem, though. Plain EKF already has workarounds: quaternions, Euler angles, or multiplicative (small-rotation) perturbations around them, known as the **[MEKF](../glossary.md#mekf-multiplicative-ekf)** (multiplicative EKF; see Lefferts, Markley, and Shuster, 1982).
 
 The full-state version of that workaround is the **error-state Kalman filter** (**ESKF**). It integrates a nominal state (rotation, velocity, position, sensor biases) with the full nonlinear model, and the filter estimates only a small error state, with the rotation error as a 3-vector, $`R = \hat R\,\mathrm{Exp}(\delta\theta)`$. After each update, the estimated error is injected into the nominal state and reset to zero. This fixes the representation problem, but not the one below: the ESKF's error dynamics still depend on the estimate (§5). [eskf.md](eskf.md) explains it step by step and runs it against an EKF that keeps a quaternion in its state.
 
@@ -324,7 +324,7 @@ KF, EKF, and IEKF aren't the whole landscape. A few others come up constantly in
 | **ESKF** | a nominal state plus a small error state kept near zero | only a near-zero error is linearized; rotations become small rotations | the error estimate must be folded into the nominal state and reset after every update | [extra_kf_variants.md §2](extra_kf_variants.md#2-error-state-kalman-filter-eskf) |
 | **MSCKF** | keep past camera poses, not landmarks; use each landmark once, then discard it | state size no longer grows with the number of landmarks | covariance cost grows as the cube of the window of poses | - |
 | **Iterated EKF** | relinearize the measurement at the updated estimate and repeat (Gauss-Newton inside one update) | linearization error for very nonlinear or very informative measurements | several update passes per step | - |
-| **EqF** | the invariant idea for any symmetry, not just matrix Lie groups | systems whose state is not a Lie group but is acted on by one | the system's symmetry (group action, §5) must be found first | - |
+| **EqF** (Equivariant Filter) | the invariant idea for any symmetry, not just matrix Lie groups | systems whose state is not a Lie group but is acted on by one | the system's symmetry (group action, §5) must be found first | - |
 
 ### UKF (Unscented Kalman Filter) - "Don't linearize the function, sample around it instead"
 

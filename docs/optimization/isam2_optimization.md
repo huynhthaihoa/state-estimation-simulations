@@ -312,7 +312,7 @@ Partially. The Bayes-tree construction is implemented; the rest is not:
 **§10 selective relinearization and §12 variable reordering (CCOLAMD) remain unimplemented.** No numeric solve is integrated with the tree above.
 
 [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`) implements the **original iSAM** mechanism from [`isam_optimization.md`](isam_optimization.md) instead:
-- incremental Givens-rotation QR row insertion into a running square-root-information matrix;
+- incremental Givens-rotation [QR](../glossary.md#qr-factorization) row insertion into a running square-root-information matrix;
 - periodic and loop-closure-triggered full relinearization;
 - no Bayes tree.
 

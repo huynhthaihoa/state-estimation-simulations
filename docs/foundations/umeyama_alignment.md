@@ -8,7 +8,7 @@ It is not a [SLAM](../glossary.md#slam-simultaneous-localization-and-mapping) al
 
 The same closed-form fit also runs *inside* SLAM pipelines:
 
-- point-to-point **ICP** (iterative closest point: repeatedly match each point to its nearest neighbor, then re-align) uses it as the per-iteration alignment step (scale fixed to 1); this is general background, as this repo's ICP (`lidar_primitives.py`) does not call it
+- point-to-point **[ICP](../glossary.md#icp-iterative-closest-point)** (iterative closest point: repeatedly match each point to its nearest neighbor, then re-align) uses it as the per-iteration alignment step (scale fixed to 1); this is general background, as this repo's ICP (`lidar_primitives.py`) does not call it
 - **monocular** (single-camera) systems use the similarity version to align two maps at a [loop closure](../glossary.md#loop-closure)
 
 ---
@@ -38,7 +38,7 @@ The 7-DoF similarity transform is right for monocular output, but not for every 
 | Sensor setup | Unobservable | Alignment |
 | --- | --- | --- |
 | Monocular camera | position, orientation, scale | 7-DoF similarity (this doc's full Umeyama) |
-| Stereo, RGB-D, LiDAR | position, orientation | 6-DoF rigid: the same algorithm with $s$ fixed to 1 (the classic Kabsch/Horn fit) |
+| Stereo, RGB-D, [LiDAR](../glossary.md#lidar) | position, orientation | 6-DoF rigid: the same algorithm with $s$ fixed to 1 (the classic Kabsch/Horn fit) |
 | Visual-inertial (camera + [IMU](../glossary.md#imu-inertial-measurement-unit)) | position, yaw | 4-DoF: translation plus rotation about gravity only, because gravity makes roll and pitch observable |
 
 Zhang & Scaramuzza (2018) derive the monocular, stereo and visual-inertial rows (their Table I); the RGB-D and LiDAR entries follow the same argument, since both sensors measure metric scale.
@@ -150,7 +150,7 @@ Here $X$ and $Y$ are the raw points (one per row); step 1 centers them. Running 
 
 ## 6. Where this is (and isn't) used in this repo
 
-- **[`bundle_adjustment.py`](../../use_numpy/bundle_adjustment.py)** (both `use_numpy/` and `use_manif/`) calls `umeyama_alignment` on the *camera positions* after solving, then applies the recovered $(s, R, t)$ to **both** the camera poses and the landmark positions before computing `pose_errors` (per-pose rotation error in degrees and position error in metres) and `landmark_errors` (per-landmark position error in metres) against ground truth. This is standard practice for evaluating monocular BA/SfM (Structure from Motion) output; see [bundle_adjustment.md](../optimization/bundle_adjustment.md) for how it fits into that script.
+- **[`bundle_adjustment.py`](../../use_numpy/bundle_adjustment.py)** (both `use_numpy/` and `use_manif/`) calls `umeyama_alignment` on the *camera positions* after solving, then applies the recovered $(s, R, t)$ to **both** the camera poses and the landmark positions before computing `pose_errors` (per-pose rotation error in degrees and position error in metres) and `landmark_errors` (per-landmark position error in metres) against ground truth. This is standard practice for evaluating monocular BA/[SfM](../glossary.md#sfm-structure-from-motion) (Structure from Motion) output; see [bundle_adjustment.md](../optimization/bundle_adjustment.md) for how it fits into that script.
   - Reprojection error is unaffected by the alignment (a similarity transform leaves every projected pixel unchanged), so only the absolute pose/landmark errors depend on this step.
 - **[`bundle_adjustment_advanced.py`](../../use_numpy/bundle_adjustment_advanced.py)** does **not** call it. It hard-fixes **two** [keyframes](../glossary.md#keyframe) (poses 0 and 1) as a gauge anchor instead of using a soft gauge-prior factor (a [prior](../glossary.md#prior-unary-factor) on the first two camera poses that softly pins the gauge):
   - One fixed keyframe removes only the 6 rigid DoF. Scale stays unobservable, since the reconstruction rescaled about that pose satisfies every constraint equally well.

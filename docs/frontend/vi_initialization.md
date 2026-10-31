@@ -12,7 +12,7 @@ This builds on:
 
 ## 1. The bootstrapping problem
 
-Every other doc in this repo assumes a decent initial guess already exists: `pose_graph.py`'s optimizer starts from [dead reckoning](../optimization/factor_graph.md#2-why-do-we-need-it), `bundle_adjustment_advanced.py`'s Gauss-Newton starts from a triangulated point, `pnp_estimation.py`'s Gauss-Newton starts from a linear DLT solve ([triangulation_pnp.md](triangulation_pnp.md)). Visual-inertial initialization has *no* such starting point yet. Four unknowns must be pinned down before anything else can proceed:
+Every other doc in this repo assumes a decent initial guess already exists: `pose_graph.py`'s optimizer starts from [dead reckoning](../optimization/factor_graph.md#2-why-do-we-need-it), `bundle_adjustment_advanced.py`'s Gauss-Newton starts from a triangulated point, `pnp_estimation.py`'s Gauss-Newton starts from a linear [DLT](../glossary.md#dlt-direct-linear-transform) solve ([triangulation_pnp.md](triangulation_pnp.md)). Visual-inertial initialization has *no* such starting point yet. Four unknowns must be pinned down before anything else can proceed:
 
 - **Scale:** a monocular camera recovers structure and motion only up to an unknown positive scale factor. "This camera moved some distance $d$" could mean 1 meter or 100, and vision alone can't say which.
 - **Gravity direction:** the accelerometer senses specific force ([glossary](../glossary.md#imu-inertial-measurement-unit)), so gravity enters the preintegration residual (see the "Implementation notes" in [imu_preintegration.md §4](../optimization/imu_preintegration.md#implementation-notes), which state that the demo omits it). Handling it requires knowing which way gravity points in the estimator's frame.
@@ -80,7 +80,7 @@ The other estimators in this doc set (§1's list) linearize *around* an existing
 
 It isn't the only design real systems use:
 - VINS-Mono's gravity refinement (Step 2) is itself a short iterative loop over a tangent-plane reparameterization. The 2 parameters move along the plane that touches, at the current estimate, the sphere of gravity vectors with the known magnitude.
-- ORB-SLAM3 (a visual-inertial SLAM system) instead estimates scale, gravity direction, velocities and IMU biases with an inertial-only MAP (maximum a posteriori: the most probable state given data and priors) optimization over keyframes from a vision-only initialization (introduced by Campos et al., 2020, in ORB-SLAM Visual-Inertial; see References), then refined jointly.
+- [ORB-SLAM3](../glossary.md#orb-slam) (a visual-inertial SLAM system) instead estimates scale, gravity direction, velocities and IMU biases with an inertial-only [MAP](../glossary.md#map-maximum-a-posteriori-estimate) (maximum a posteriori: the most probable state given data and priors) optimization over keyframes from a vision-only initialization (introduced by Campos et al., 2020, in ORB-SLAM Visual-Inertial; see References), then refined jointly.
 
 ---
 

@@ -420,7 +420,7 @@ Real scenes usually have far more points than cameras, so solvers use the **Schu
 
 It is the same style of sparsity exploitation that makes [`sparse_cholesky_factorization.md`](sparse_cholesky_factorization.md) tractable at scale.
 
-`bundle_adjustment.py` doesn't need this trick. Its toy scenes are small (8 cameras and 48 landmarks by default), so `run_bundle_adjustment` solves the full dense joint system every iteration. Schur-complement marginalization is what a production solver (COLMAP for SfM; g2o, GTSAM and Ceres as general sparse least-squares libraries) does at real scene sizes, not something this demo implements.
+`bundle_adjustment.py` doesn't need this trick. Its toy scenes are small (8 cameras and 48 landmarks by default), so `run_bundle_adjustment` solves the full dense joint system every iteration. Schur-complement marginalization is what a production solver (COLMAP for SfM; g2o, [GTSAM](../glossary.md#gtsam) and Ceres as general sparse least-squares libraries) does at real scene sizes, not something this demo implements.
 
 $H = J^\top J$ above is the plain textbook form. The scripts' actual $H$ adds pixel weights, the gauge prior and a small diagonal term in `run_bundle_adjustment` ([§6.1](#61-the-ba-math-concretely)). `run_windowed_gn_lm` in `bundle_adjustment_advanced.py` is unweighted but solves $`(H + \lambda\,\mathrm{diag}(H))\,\delta = g`$ (see [§13.6](#136-in-this-repo)), where $`\lambda`$ is the **LM damping** factor ([glossary](../glossary.md#levenberg-marquardt-lm-and-damping)). None of these changes the sparsity pattern: the prior and damping touch only diagonal blocks, and the weights rescale blocks that already exist.
 
@@ -488,7 +488,7 @@ The right measure of coupling falls out of §12:
 
 But fixing a pose treats it as exactly known, which throws its uncertainty away. Two ways to handle the border:
 
-- **Marginalize it**, keeping what it knew as a prior on the window ([marginalization.md §2](marginalization.md#2-marginalization-keep-the-information-drop-the-variable)), as sliding-window visual-inertial estimators such as OKVIS and VINS-Mono do. That keeps the information, but the prior is dense ([marginalization.md §5](marginalization.md#5-the-fill-in-consequence)) and its linearization point is frozen, which causes the consistency problem in [marginalization.md §6](marginalization.md#6-the-consistency-gotcha-why-fej-exists).
+- **Marginalize it**, keeping what it knew as a prior on the window ([marginalization.md §2](marginalization.md#2-marginalization-keep-the-information-drop-the-variable)), as sliding-window visual-inertial estimators such as OKVIS and [VINS-Mono](../glossary.md#vins-mono) do. That keeps the information, but the prior is dense ([marginalization.md §5](marginalization.md#5-the-fill-in-consequence)) and its linearization point is frozen, which causes the consistency problem in [marginalization.md §6](marginalization.md#6-the-consistency-gotcha-why-fej-exists).
 - **Fix it** - ORB-SLAM's cheaper route: accept the drift that causes, and correct the drift when it closes a loop.
 
 

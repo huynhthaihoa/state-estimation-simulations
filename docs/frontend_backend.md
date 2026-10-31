@@ -44,7 +44,7 @@ Typical front-end tasks:
 - **[Keyframe](glossary.md#keyframe) selection** (choosing a subset of frames to keep for optimization)
 - **[Loop-closure](glossary.md#loop-closure) detection**
 
-With a LiDAR instead of a camera, feature matching and motion estimation become **scan registration**: aligning one point cloud with another, point by point or through fitted planes and cylinders. See [frontend/lidar_primitives.md](frontend/lidar_primitives.md).
+With a [LiDAR](glossary.md#lidar) instead of a camera, feature matching and motion estimation become **scan registration**: aligning one point cloud with another, point by point or through fitted planes and cylinders. See [frontend/lidar_primitives.md](frontend/lidar_primitives.md).
 
 For example, suppose the camera sees:
 

@@ -275,7 +275,7 @@ Updated Bayes Tree
 
 **Relinearize** means recomputing the Jacobians at the updated estimate ([glossary](../glossary.md#relinearization)); **reorder** means choosing a new elimination order for the affected part to limit fill-in ([ordering](sparse_cholesky_factorization.md#5-ordering-becomes-extremely-important)).
 
-This is the core mechanism behind **[iSAM2](isam2_optimization.md)'s incremental efficiency**. The older [iSAM](isam_optimization.md) algorithm uses no Bayes tree. It gets its incremental updates from Givens row insertion (a rotation-based update of a QR factorization when a row is added) plus periodic batch steps.
+This is the core mechanism behind **[iSAM2](isam2_optimization.md)'s incremental efficiency**. The older [iSAM](isam_optimization.md) algorithm uses no Bayes tree. It gets its incremental updates from Givens row insertion (a rotation-based update of a [QR](../glossary.md#qr-factorization) factorization when a row is added) plus periodic batch steps.
 
 ---
 

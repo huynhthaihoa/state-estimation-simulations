@@ -12,7 +12,7 @@ This doc builds on two earlier ones:
 
 Full batch optimization (plain [bundle_adjustment.md](bundle_adjustment.md)/[pose_graph_optimization.md](pose_graph_optimization.md)) keeps every pose ever seen in the optimization, so the problem grows without bound as the robot keeps moving. [isam2_optimization.md](isam2_optimization.md) fixes the *recompute* cost (only touch the part of the Bayes tree a new factor actually affects) but not the *memory* cost - every variable is still in the graph, just efficiently re-solved.
 
-A real-time visual-inertial odometry (VIO) or visual-inertial SLAM (VI-SLAM) estimator, which fuses camera and [IMU](../glossary.md#imu-inertial-measurement-unit) data (MSCKF = Multi-State Constraint Kalman Filter, VINS-Mono, OKVIS = Open Keyframe-based Visual-Inertial SLAM), can afford neither. It has fixed onboard memory and fixed per-frame compute, and it runs forever. It must **forget** old states: drop the *variable* but keep the *information* it contributed. That is marginalization.
+A real-time visual-inertial odometry (VIO) or visual-inertial SLAM (VI-SLAM) estimator, which fuses camera and [IMU](../glossary.md#imu-inertial-measurement-unit) data ([MSCKF](../glossary.md#msckf-multi-state-constraint-kalman-filter) = Multi-State Constraint Kalman Filter, VINS-Mono, OKVIS = Open Keyframe-based Visual-Inertial SLAM), can afford neither. It has fixed onboard memory and fixed per-frame compute, and it runs forever. It must **forget** old states: drop the *variable* but keep the *information* it contributed. That is marginalization.
 
 ---
 
