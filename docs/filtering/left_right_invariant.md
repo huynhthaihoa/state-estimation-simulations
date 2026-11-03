@@ -79,10 +79,8 @@ $$(\omega^b)^\wedge = R^\top\dot R \qquad (\omega^s)^\wedge = \dot RR^\top$$
 The geometric terms in the last row name the motion with that velocity held constant, by the side it is invariant under. So $(\omega^b)^\wedge$ plays the same role as $\eta_L$ above (indifferent to how we label the world) and $(\omega^s)^\wedge$ plays the same role as $\eta_R$ (indifferent to how we label the body).
 
 #### Picture (gyro vs. ground watcher)
-- $`\omega^b`$ is what a gyro bolted to the robot reads: how fast I spin, in my own axes.
-- Rename the map axes ($`R\mapsto R_0R`$) and the gyro reading does not change: $`(R_0R)^\top R_0\dot R = R^\top\dot R`$.
-- $`\omega^s`$ is what an observer standing on the ground sees: how fast the robot spins, in map axes.
-- Re-bolt the body axes ($`R\mapsto RR_0`$) and that view does not change: $`\dot RR_0\,R_0^\top R^\top = \dot RR^\top`$.
+- $`\omega^b`$ is what a gyro bolted to the robot reads: how fast I spin, in my own axes. Rename the map axes ($`R\mapsto R_0R`$) and the gyro reading does not change: $`(R_0R)^\top R_0\dot R = R^\top\dot R`$.
+- $`\omega^s`$ is what an observer standing on the ground sees: how fast the robot spins, in map axes. Re-bolt the body axes ($`R\mapsto RR_0`$) and that view does not change: $`\dot RR_0\,R_0^\top R^\top = \dot RR^\top`$.
 
 ![Animation, two 3D panels of a spinning box with its sensor axes and the gray map axes: left, the map axes turn and the printed body angular velocity stays constant while the spatial one changes; right, the sensor axes turn on the box and the spatial angular velocity stays constant while the body one changes](../../assets/left_right_invariant_angular_velocity.gif)
 
