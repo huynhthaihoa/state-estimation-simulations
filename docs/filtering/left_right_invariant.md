@@ -46,11 +46,21 @@ Each error is unaffected by one specific kind of frame change, and the name says
 - $\eta_R$ is unchanged if we right-multiply both by $g$ (we redefine the *body* frame convention: recalibrate where the robot frame origin sits, e.g. **sensor extrinsics**, the fixed sensor-to-body pose). That cancels out too: $(Xg)(\hat Xg)^{-1} = X\hat X^{-1}$. So it's invariant to **body-frame redefinition**.
 
 ### Picture (re-drawing the map)
+#### Left-invariant error
 - Redraw the world map: move the origin or rotate the axes. The true pose and our estimate both get new coordinates.
 - But "where the truth sits as seen from my estimate" does not change, because both moved together. That is $`\eta_L`$.
+
+#### Right-invariant error 
+
 - Now re-bolt the sensor to a different spot on the robot body (new body frame). Both poses shift in the same body way.
-- The world positions now move by different amounts (each pose carries the offset in its own heading), so the plain distance between them changes.
+- The world positions now move **in different directions** (each pose carries the offset in its own heading), so the plain distance between them changes.
 - But the world-frame move that carries our estimate onto the truth, $`X\hat X^{-1}`$, does not change. That is $`\eta_R`$.
+
+#### Illustration
+
+![Animation, two panels with a true pose and an estimate in the plane: left, the map axes rotate and shift while both robots stay put, and the printed left-invariant error stays constant while the right-invariant error changes; right, each robot's frame origin slides to a new spot on its body along its own heading, the distance between the two origins changes, and the right-invariant error stays constant while the left-invariant error changes](../../assets/left_right_invariant.gif)
+
+*Animation: the two pictures above in SE(2), each error recomputed from the matrices every frame; rendered by `uv run python generator/animate_left_right_invariant.py --out assets/left_right_invariant.gif`.*
 
 ### 3.1 Same story, one level down: angular velocity on $SO(3)$
 
@@ -73,6 +83,10 @@ The geometric terms in the last row name the motion with that velocity held cons
 - Rename the map axes ($`R\mapsto R_0R`$) and the gyro reading does not change: $`(R_0R)^\top R_0\dot R = R^\top\dot R`$.
 - $`\omega^s`$ is what an observer standing on the ground sees: how fast the robot spins, in map axes.
 - Re-bolt the body axes ($`R\mapsto RR_0`$) and that view does not change: $`\dot RR_0\,R_0^\top R^\top = \dot RR^\top`$.
+
+![Animation, two 3D panels of a spinning box with its sensor axes and the gray map axes: left, the map axes turn and the printed body angular velocity stays constant while the spatial one changes; right, the sensor axes turn on the box and the spatial angular velocity stays constant while the body one changes](../../assets/left_right_invariant_angular_velocity.gif)
+
+*Animation: the gyro and ground-watcher pictures, both angular velocities recomputed from $`R`$ and $`\dot R`$ every frame; rendered by `uv run python generator/animate_left_right_invariant_angular_velocity.py --out assets/left_right_invariant_angular_velocity.gif`.*
 
 ---
 
