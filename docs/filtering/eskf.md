@@ -166,6 +166,12 @@ What goes wrong in the naive version:
 - The position fixes then appear to measure it, and the filter gains confidence in its attitude that it has not earned. In one check (5 trials, outside the script), the naive filter's reported attitude standard deviation at 30 s was 0.77° against an actual RMSE of 1.26°; the projected filter's was 0.98° against 0.68°.
 - Removing only that coupling from the transition matrix (15 trials, outside the script) brought the naive filter's NEES from 52.3 to 15.7.
 
+
+![Two panels: left, a 2D slice of quaternion space with the unit circle of real rotations; an additive update leaves q off the circle at length 1.12 and renormalizing brings it back; the naive filter keeps its covariance as a circle with spread along q itself (the length direction), while the projected filter's covariance is a segment along the circle's tangent; right, the rotated specific force norm equals the squared length of q times 9.81, with slope about 20 m/s squared at length 1](../../assets/quaternion_renormalization_concept.png)
+
+*Figure: an illustrative 2D slice (the covariance is a made-up isotropic one; the projection is the script's $`(I - uu^\top)/\lVert q\rVert`$), plotted by `uv run python generator/make_figures.py quaternion_renormalization_concept`.*
+
+
 So a quaternion EKF can be made to work, but it needs this repair: its 4-number attitude has a direction (the length of $`q`$) that has to be kept out of $`P`$. The ESKF's 3-vector rotation error has no such direction and nothing to renormalize.
 
 A single run can mislead here: in the script's single run, `qekf_naive` happened to end with a smaller attitude error (0.43°) than the ESKF (0.84°). Only the Monte Carlo average shows the gap.

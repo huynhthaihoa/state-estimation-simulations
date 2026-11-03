@@ -127,6 +127,12 @@ print(np.abs(res.mean(0)) / np.sqrt(np.diag(R)),  # mean bias, in sensor sigmas
 
 This prints a bias of about 2.7σ and an extra spread of about 3.9σ at 2 m: clearly nonlinear. The bias is a little above §4.1's 0.25 m estimate because terms beyond second order still matter when $\sigma_p / r = 0.5$. With `x_hat = [50, 0]` it prints about 0.1σ and 0.14σ: effectively linear.
 
+
+![Four panels: top, 5000 position samples around the estimate with the true constant-range circles about the landmark and the EKF's straight constant-range lines, at 2 m (circles strongly curved over the cloud) and at 50 m (circles almost straight); bottom, histograms of the residual the linearization drops, in units of the 0.1 m sensor noise: at 2 m a one-sided tail with mean 2.7 sigma and spread 3.88 sigma, at 50 m everything within 1 sigma](../../assets/linearization_range_concept.png)
+
+*Figure: the §4.2 snippet at 2 m and at 50 m (seed 0, 5000 samples), plotted by `uv run python generator/make_figures.py linearization_range_concept`.*
+
+
 For a cheaper version, use $`2n+1`$ ($`n`$ = the state dimension) [sigma points](../glossary.md#ukf-unscented-kalman-filter) instead of 5000 samples. If the UKF's predicted mean and covariance differ noticeably from the EKF's, nonlinearity matters.
 
 ### 4.3 Jacobian drift

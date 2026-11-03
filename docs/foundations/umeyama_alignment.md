@@ -22,6 +22,10 @@ A monocular camera looking at a static scene can recover the *shape* of the scen
 
 **Tiny example (toy case: pinhole camera, ignoring the principal point, the pixel where the optical axis lands):** a point at $`(X, Z) = (1, 5)`$ and another at $`(2, 10)`$ both land at $`u = f_x X / Z = f_x/5`$ (where $`f_x`$ is the focal length in pixels, $`u`$ the horizontal pixel coordinate, and $`X, Z`$ the point's lateral and depth coordinates). Doubling the whole scene changes no pixel.
 
+![Two side-view panels: one camera whose ray passes through (X, Z) = (1, 5) and (2, 10), both landing at u = 160 px; and two cameras 1 m apart viewing a point, overlaid with the whole scene doubled (cameras 2 m apart, point twice as far), giving the same pixels in both cameras](../../assets/umeyama_scale_concept.png)
+
+*Figure: the tiny example with $`f_x`$ = 800 px, and the same idea for two cameras (pixels 100 and −100 px before and after doubling), plotted by `uv run python generator/make_figures.py umeyama_scale_concept`.*
+
 Together, that is a **7-parameter similarity ambiguity**: 3 translation + 3 rotation + 1 scale. It is a **gauge freedom** ([glossary](../glossary.md#gauge-freedom)); see the "one subtlety this formula hides" note in [pose_graph_optimization.md](../optimization/pose_graph_optimization.md).
 
 The difference from pose graphs is scale:
@@ -109,6 +113,11 @@ s = \frac{\text{tr}(DS)}{\text{var}(X)}, \qquad \text{var}(X) = \frac{1}{n}\sum 
 - **Tiny example:** for the §5 data, $`\text{tr}(DS) = 0.5+0.5+0.125 = 1.125`$ and $`\text{var}(X) = 0.5625`$, so $`s = 1.125/0.5625 = 2`$.
 
 These are the four steps `umeyama_alignment` runs, in order.
+
+
+![Five 3D panels on the section 5 tetrahedron: the estimate and the truth in different places and sizes; both centered on their centroids; the estimate rotated by R; then scaled by s = 2, now matching the centered truth; then moved by t onto the raw truth](../../assets/umeyama_alignment_concept.png)
+
+*Figure: the four steps on §5's data (recovered $`s = 2`$, a 90° yaw and $`t = (1, 2, 3)`$), plotted by `uv run python generator/make_figures.py umeyama_alignment_concept`.*
 
 ---
 

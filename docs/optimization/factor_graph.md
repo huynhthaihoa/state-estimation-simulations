@@ -77,6 +77,11 @@ That's the essence of factor-graph optimization.
 
 Worked number: the optimizer only sees the measurements, the three 1 m odometry steps and the 3.03 m loop closure (the true 1.02/0.97/1.05 m are unknown to it). Weighting all four equally, least squares lengthens each step by $`0.0075`$ m to 1.0075 m, so $`x_3 = 3.0225`$ m: a compromise between the odometry's 3.00 m and the loop closure's 3.03 m, and closer to the true 3.04 m than odometry alone.
 
+
+![Two panels: top, poses x0 to x3 on a line for odometry only (0, 1, 2, 3 m), after least squares (0, 1.0075, 2.015, 3.0225 m) and the truth (0, 1.02, 1.99, 3.04 m), with the 3.03 m loop closure as an arrow; bottom, a zoom on x3: 3.0000 m, 3.0225 m and 3.0400 m against the loop closure's 3.03 m](../../assets/factor_graph_loop_concept.png)
+
+*Figure: the worked number above, solved by linear least squares, plotted by `uv run python generator/make_figures.py factor_graph_loop_concept`.*
+
 ---
 
 ## 3. A factor is basically an error function

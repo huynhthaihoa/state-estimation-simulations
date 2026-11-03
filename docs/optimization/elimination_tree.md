@@ -78,6 +78,11 @@ We want $`H=LL^\top`$, where $`H`$ is the Hessian of the linearized problem and 
 
 The result is the same chain as §1's tree, but for a different reason. §1's chain came from a graph that was already a chain; here the 3–4 link exists only because eliminating 2 created it. That is §2's point: the tree is not the original graph.
 
+
+![Four panels: the graph 1-2-3 with 4 hanging off 2; eliminating 1 adds no fill-in; eliminating 2 adds the fill-in edge 3-4; eliminating 3 leaves 4; the resulting elimination tree is the chain 1, 2, 3, 4 with 4 at the root](../../assets/elimination_tree_fill_in_concept.png)
+
+*Figure: the three steps above, computed with `symbolic_eliminate`, plotted by `uv run python generator/make_figures.py elimination_tree_fill_in_concept`.*
+
 ---
 
 ## 4. The really useful intuition: information flows upward
@@ -236,6 +241,11 @@ The elimination tree is:
 The tree depends on the elimination ordering:
 
 > **There isn't one universally fixed elimination tree for a problem. Change the ordering, and you can change the tree.**
+
+
+![Two elimination trees of the same SLAM graph: with the doc's order the tree has height 5, no fill-in and separators of 1, with x2 holding x1, l1 and l2 as children and x4 holding x3 and l3; with poses first it is a single chain of 8, with 10 fill-in edges and a largest separator of 4](../../assets/elimination_tree_orderings_concept.png)
+
+*Figure: both orders computed with `symbolic_eliminate`, plotted by `uv run python generator/make_figures.py elimination_tree_orderings_concept`.*
 
 ---
 

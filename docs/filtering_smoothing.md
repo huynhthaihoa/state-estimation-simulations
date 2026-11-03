@@ -339,6 +339,11 @@ flowchart TB
 - The filter's past gets **compressed**.
 - The smoother's past is **kept around so it can be reconsidered**.
 
+
+![Three rows of poses x0 to x4 when a loop closure between x4 and x0 arrives: a filter keeps only x4; a fixed-lag smoother with a window of 3 keeps x2 to x4, with x0 and x1 marginalized into a prior; a full smoother keeps all five, so the loop closure can revise every pose](../assets/filtering_smoothing_timeline_concept.png)
+
+*Figure: a conceptual sketch (the window of 3 is an example size), plotted by `uv run python generator/make_figures.py filtering_smoothing_timeline_concept`.*
+
 ---
 
 ## 9. The precise distinction

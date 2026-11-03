@@ -116,6 +116,10 @@ with $`p^\wedge`$ the skew-symmetric matrix of $p$ ([glossary](../glossary.md#ha
 | primitives, plane | $`n^\top Tp + d`$ | the source point's plane, matched to a target plane |
 | primitives, cylinder | $`\lVert (I - aa^\top)(Tp - c) \rVert - r`$ | the source point's cylinder, matched to a target cylinder |
 
+![Three panels in a 2-D cross-section of a wall sampled by target points: point-to-point pulls the source point to its nearest target point; point-to-plane keeps only the component along that point's normal, so sliding along the wall is free; primitives measure the distance to the fitted plane, and for a second point the distance to a fitted cylinder's surface](../../assets/lidar_residuals_concept.png)
+
+*Figure: the table's residuals for one source point $`Tp`$ (and $`Tp'`$ near a pillar), in a 2-D cross-section with made-up coordinates, plotted by `uv run python generator/make_figures.py lidar_residuals_concept`.*
+
 **Association happens at every iteration**, from the current estimate; nothing is handed over. Primitives are matched one-to-one, cheapest first, inside **gates** (limits on how different matched primitives may be): normals within 20° and offsets within 1 m for planes; axes within 20°, axis distance within 1 m and radii within 0.1 m for cylinders.
 
 ### A coarse-to-fine pairing gate

@@ -536,6 +536,10 @@ EKF vs VKF: max pos diff = 1.349e-02 m (at k = 1)   final pos diff = 1.4e-03 m  
 - The bigger difference is at the end: after convergence UKF agrees with EKF to micrometers, while vanilla KF is still 1.4 mm away, about 45% of the final error.
 - The script's printed "Final/RMS errors" table makes this easy to miss: at default args, EKF's final rot/pos reads `0.289 deg/0.0031 m` against vanilla KF's `0.314 deg/0.0026 m`, which looks like noise at 3-4 decimal places. Vanilla KF happens to land slightly closer to the truth in position at this final pose, but it follows a different trajectory, not the same one with rounding.
 
+![Two log-scale panels over the 50 poses of one run: the position and rotation gap of IEKF, UKF and vanilla KF to the EKF trajectory. IEKF stays at floating-point rounding; UKF peaks at the first update and falls to micrometers; vanilla KF stays about a millimeter away, close to the EKF's own error](../../assets/pose_tracking_gap_concept.png)
+
+*Figure: the per-pose gap behind §3.3's and §4.3's maxima (seed 0, 5 s, $`\Delta t = 0.1`$). IEKF stays at floating-point rounding (exactly 0 at 9 of 50 poses); UKF peaks at the first update (1.4 mm) and ends 3.8 µm away; vanilla KF peaks at 13 mm and ends 1.4 mm away, against the EKF's own final error of 3.1 mm. Plotted by `uv run python generator/make_figures.py pose_tracking_gap_concept`.*
+
 ### 4.4 How the gap moves as the step size changes
 
 Same sweep and split rule as §3.4 ("first 1 s" = the first $`\lfloor 1/\Delta t \rfloor`$ poses, so the pose at exactly 1 s counts as "after"; $\Delta t = 0.4$ puts $k = 0..1$, up to 0.4 s, in the first group):

@@ -405,6 +405,11 @@ Pts   │ coupling │     block-     │
       └──────────┴────────────────┘
 ```
 
+
+![Two panels: left, the nonzero pattern of H for the default scene, 8 cameras with 6 degrees of freedom and 48 points with 3, showing block-diagonal camera and point blocks and dense camera-point coupling, an arrow-head; right, the 8 by 8 reduced camera matrix after the Schur complement at block level, every block nonzero, each labeled with how many points the two cameras share (25 to 40)](../../assets/ba_schur_sparsity_concept.png)
+
+*Figure: patterns built from `bundle_adjustment.py`'s default scene and observations (seed 0), plotted by `uv run python generator/make_figures.py ba_schur_sparsity_concept`. In this small scene every pair of cameras shares points, so the reduced camera matrix is dense; camera pairs that share no point would leave zero blocks.*
+
 Real scenes usually have far more points than cameras, so solvers use the **Schur complement trick**:
 
 1. [Marginalize](../glossary.md#marginalization) out the point block (cheap, since it is block-diagonal and each point's small block inverts independently). With $c$ the camera block and $p$ the point block, this leaves the reduced camera matrix $`H_{cc} - H_{cp} H_{pp}^{-1} H_{pc}`$, the [Schur complement](../glossary.md#schur-complement).

@@ -352,6 +352,11 @@ The same run, animated. The two estimates stay close; what differs is the uncert
   - With `--duration 12` (seed 0), post-bounce mean NEES is $\approx 3{,}600$ (naive) and $\approx 5{,}100$ (saltation), peaking near $56{,}000$ for both. We first attributed the blow-up to many bounces per tick, but up to 12 s the true trajectory never bounces twice in one tick (checked), so neither that nor the 20-bounce cap is involved; the last bounces are only about 3-4 ticks apart. The cause was not isolated. Both filters share it, for reasons unrelated to the saltation matrix.
   - `--duration`'s default stops after 3 clean, well-separated bounces, before the 4th starts crowding the settling regime.
 
+
+![Two panels: left, height against time for the default drop, bounces shrinking and piling up before the settling time of 12.45 s, with the last 0.4 s shaded; right, the interval between consecutive bounces against bounce number on a log axis, a straight line falling by a factor 0.85 per bounce, crossing 3 times the filter step near bounce 22 and the 0.02 s step itself at bounce 29](../../assets/zeno_bounces_concept.png)
+
+*Figure: exact bounce times at `saltation_matrix_ekf.py`'s defaults from its own `crossing_time`, `flow` and `reset_map` (the first interval shorter than $`\Delta t`$ is bounce 29; the formula above reaches $`\Delta t`$ at $`n \approx 28.4`$), plotted by `uv run python generator/make_figures.py zeno_bounces_concept`.*
+
 ---
 
 ## 8. Quantifying contact-detection timing jitter

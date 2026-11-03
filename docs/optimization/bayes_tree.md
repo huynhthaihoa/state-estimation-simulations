@@ -159,6 +159,11 @@ The node $`\{v\} \cup S(v)`$ is what the docstring calls a clique (a group of va
 
 The result is a straight chain `0 → 1 → 2 → 3 → 4`. Each separator holds at most 2 variables, because the loop edge keeps dragging node 4 along. The script's 16-node ring gives the same shape, and it prints "Largest separator: 2".
 
+
+![Six panels: the 5-node ring with each elimination step: eliminating 0 adds fill-in 1-4, eliminating 1 adds 2-4, then no more fill-in; each panel lists the separator and parent; the last panel shows the resulting chain with 4 at the root](../../assets/elimination_game_ring_concept.png)
+
+*Figure: the table above, replayed with `symbolic_eliminate`, plotted by `uv run python generator/make_figures.py elimination_game_ring_concept`.*
+
 **Affected-path query** (`bayes_tree_affected_path`). Given the variables a new factor touches, walk `parent` pointers from each one up to the root and return the union of all nodes visited. A walk stops early when it reaches a node that is already in the set. In the ring above, the odometry edge (3, 4) affects {3, 4}. The loop-closure edge (4, 0) starts from the deepest leaf, 0, so it affects all five nodes. This is §8's case.
 
 ---

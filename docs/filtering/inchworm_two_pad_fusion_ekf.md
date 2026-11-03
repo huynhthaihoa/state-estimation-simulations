@@ -117,6 +117,10 @@ What that rule gets right, case by case:
 
 An anchored-sensor dropout with no slip needs no rule: the pad barely moved, so a 0 reading is nearly right and the sensors agree.
 
+![Two scatter plots of the anchored pad's reading against the moving pad's reading minus the commanded stroke, one dot per tick: on the left colored by what happened (healthy, slip, spike, dropout), on the right by what cross_check decided. Slips sit on the diagonal and are fused; spikes fall off it and are blamed on the right sensor](../../assets/inchworm_cross_check_concept.png)
+
+*Figure: one dot per tick from the first 10 trials at the defaults (seed 0); along-body parts only, while the test uses both axes. Slips, healthy ticks and anchored dropouts without a slip sit on the diagonal and are fused. Every spike is blamed on the right sensor (111 of 111 anchored, 129 of 129 moving). The 28 anchored-dropout ticks blamed on the moving sensor all fall inside slips: the table's wrong case. 30 of 3025 healthy ticks (1%) fail the test by chance. Plotted by `uv run python generator/make_figures.py inchworm_cross_check_concept`.*
+
 **Admitting the doubt.** The rule can blame the wrong sensor, and the two choices differ in where both pads moved by exactly $`r`$. So on every disagreement, $`r\,r^\top`$ (the disagreement times its own transpose, a 2×2 matrix whose size is that of $`r`$ squared) is added to the covariance of both pads' increments (and to their cross-covariance): the filter says "the pads are here, or $`r`$ away". The increments themselves are unchanged, and at the defaults the final error stays at 2.4%. It is on by default; `--no-cross-check-inflate` turns it off. §3 shows why it matters.
 
 **Slip flags.** The paper's detector, here `threshold`, flags a slip when $`|d_a|`$ exceeds 3 standard deviations of a still pad's reading (2.12 mm per tick, as in the two-pad doc). `cross_check` flags it when the anchored-pad motion it actually used exceeds the same threshold.

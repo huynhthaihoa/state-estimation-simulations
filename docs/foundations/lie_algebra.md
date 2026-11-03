@@ -21,6 +21,11 @@ An analogy:
 
 No flat map covers the whole globe without distortion, but the local one is much easier to do calculus with.
 
+
+![A sphere with a tangent plane touching it at the current pose; a tangent vector in the plane; plain addition of that vector lands off the sphere, while Exp bends the same length onto the sphere along a great-circle arc](../../assets/lie_group_tangent_concept.png)
+
+*Figure: the globe analogy (a 2D sphere stands in for the 3D group), plotted by `uv run python generator/make_figures.py lie_group_tangent_concept`.*
+
 ---
 
 ## 2. Why do we need Lie algebra?
@@ -74,6 +79,11 @@ Turning 10° and then another 10° about the *same* axis is harmless: the angles
 - 90° around X then 90° around Y is generally not the same as 90° around Y then 90° around X.
 
 So rotation space is curved, not Euclidean.
+
+
+![Two rows of three 3D panels showing a flat box with its body axes: top row, 90 degrees about X then 90 degrees about Y; bottom row, 90 degrees about Y then 90 degrees about X; the two final orientations differ](../../assets/rotation_order_concept.png)
+
+*Figure: both orders about the fixed world axes (computed with `so3_exp`), plotted by `uv run python generator/make_figures.py rotation_order_concept`.*
 
 ---
 

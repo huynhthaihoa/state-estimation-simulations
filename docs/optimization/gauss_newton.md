@@ -34,6 +34,11 @@ So we fit a simple **bowl** to that nearby ground and jump straight to the botto
 
 Each jump uses the *shape* of the ground, not just its slope. That is what lets Gauss-Newton take big, well-aimed steps (§10).
 
+
+![The cost curve one half of (x squared minus 4) squared, with a dashed bowl fitted at x = 3 whose bottom is at x = 2.167, and a second bowl fitted there whose bottom is at x = 2.006, close to the true minimum at x = 2](../../assets/gauss_newton_bowl_concept.png)
+
+*Figure: the bowls for the §6 example $`r(x) = x^2 - 4`$ from $`x = 3`$, plotted by `uv run python generator/make_figures.py gauss_newton_bowl_concept`.*
+
 ---
 
 ## 3. Where does the "linear" part come from?

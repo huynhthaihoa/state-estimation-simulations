@@ -72,6 +72,12 @@ Instead of approximating the nonlinear function with a tangent line like the EKF
        •                         •
 ```
 
+
+![Two panels: left, a range-and-bearing Gaussian (range 1 m plus or minus 0.02 m, bearing 90 degrees plus or minus 20 degrees) with its 5 sigma points; right, the samples and sigma points pushed through x = r cos(bearing), y = r sin(bearing), forming a curved band; the true mean (y = 0.940 m) and the UKF mean (y = 0.941 m) sit below the band's top, while the EKF mean (y = 1.000 m) sits on it; 2-sigma ellipses for the true, EKF and UKF covariances](../../assets/ukf_sigma_points_concept.png)
+
+*Figure: the unscented transform with this repo's `unscented_weights` and `unscented_sigma_offsets` (n = 2, α = 1, β = 2, κ = 1, so n + λ = 3) against the EKF's tangent, plotted by `uv run python generator/make_figures.py ukf_sigma_points_concept`.*
+
+
 **Why care?**
 
 - **Accuracy.** For a Gaussian input, the transformed mean is accurate to second order, while the EKF's tangent line is only first-order accurate. So the UKF captures the bias that curvature adds to the mean, which the EKF misses entirely. [linear_nonlinear.md §4](linear_nonlinear.md#4-how-do-you-know-whether-its-nonlinear-over-your-uncertainty-region) shows how big that bias can get, and its §4.2 mentions a sigma-point comparison as a cheaper nonlinearity check.

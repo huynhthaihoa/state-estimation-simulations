@@ -64,6 +64,11 @@ x_2 & x_1 \end{bmatrix}}
 
 That's the **Jacobian**. Notice the convention: each **row** is one output ($y_i$), each **column** is one input ($x_j$) - $J_{ij} = \partial y_i/\partial x_j$.
 
+
+![Two panels: left, a small square grid around x-hat = (1, 0.5) in the input plane; right, its true image under f, a curved patch, and the Jacobian's prediction, a straight-edged parallelogram that matches the patch near the center point; the two columns of J drawn as arrows from the center](../../assets/jacobian_local_map_concept.png)
+
+*Figure: this example at $`\hat x = (1, 0.5)`$, plotted by `uv run python generator/make_figures.py jacobian_local_map_concept`.*
+
 ---
 
 ## 3. Think of it as a "sensitivity map"
@@ -256,6 +261,11 @@ So $J_l$ and $J_r$ are still Jacobians in the sense of §10, applied to the expo
 
 - **Right Jacobian** $J_r(\varphi)$: the extra rotation multiplies $\mathrm{Exp}(\varphi)$ on the right, so it's a rotation about the object's **own current (body) axes**. Like turning a car's steering wheel a bit more - "a bit more" is relative to however the car is already pointed.
 - **Left Jacobian** $J_l(\varphi)$: the extra rotation multiplies $\mathrm{Exp}(\varphi)$ on the left, so it's a rotation about the **fixed world/global axes**. Like someone nudging our heading by a fixed compass bearing, regardless of which way we're facing.
+
+
+![Three 3D panels: a box with body axes at a starting rotation; the same extra 40-degree turn composed on the right turns it about its own body x-axis, which stays put; composed on the left it turns about the world X axis, giving a different orientation](../../assets/jacobian_left_right_concept.png)
+
+*Figure: the same extra rotation $`\mathrm{Exp}(\delta)`$ composed on the right and on the left (computed with `so3_exp`), plotted by `uv run python generator/make_figures.py jacobian_left_right_concept`.*
 
 Near the identity ($\varphi \to 0$) there's no rotation yet to disagree about "whose frame," so $J_l(0) = J_r(0) = I$. This is the flat-tangent-plane picture of [lie_algebra.md §6](lie_algebra.md#6-lie-algebra-zoom-in-locally): at the identity the manifold looks flat. The distinction only shows up when we linearize away from the identity, around some existing rotation.
 

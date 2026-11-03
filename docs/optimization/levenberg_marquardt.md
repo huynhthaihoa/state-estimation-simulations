@@ -66,6 +66,11 @@ Current
        diverge
 ```
 
+
+![Two panels: left, the curve r(x) = atan(x) with Gauss-Newton tangents from x0 = 1.5: the first tangent's root is x1 = -1.69, past the true root at 0, the next one x2 = 2.32, further out each time; damped steps from x0 land at -0.05 (lambda 0.1) and 1.22 (lambda 1); right, the distance to the root per iteration on a log axis: Gauss-Newton grows without bound, damping with lambda 0.1 converges fast and with lambda 1 slowly](../../assets/lm_overshoot_concept.png)
+
+*Figure: an illustrative residual $`r(x) = \arctan x`$ (not from a script), with $`\lambda`$ held fixed; plotted by `uv run python generator/make_figures.py lm_overshoot_concept`.*
+
 The step's *direction* is still downhill whenever $J$ has full column rank: for $`f = \tfrac12\|e\|^2`$, $`\Delta x^\top\nabla f = -\|J\Delta x\|^2 < 0`$ unless we're already at a stationary point. The problem is the step's *length*. When $J^\top J$ is singular or nearly so, the step can also become huge or not exist at all.
 
 ---

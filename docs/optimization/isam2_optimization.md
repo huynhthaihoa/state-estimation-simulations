@@ -242,6 +242,11 @@ new measurement → affected variables → reorder them → re-eliminate affecte
 
 This aims to keep both the fill-in and the next update small.
 
+
+![Four elimination trees of the 16-node ring, all chains: eliminated oldest first, a new odometry edge affects 2 of 16 variables and the loop closure all 16; with x0 and x15 eliminated last, the odometry edge affects 3 and the loop closure only 2; the largest separator stays 2 in both orders](../../assets/isam2_reordering_concept.png)
+
+*Figure: `bayes_tree_construction.py`'s ring under its oldest-first order and under a hand-chosen order with $`x_0`$ and $`x_{15}`$ last (what CCOLAMD's constraint aims for, not CCOLAMD itself), computed with `symbolic_eliminate` and `bayes_tree_affected_path`, plotted by `uv run python generator/make_figures.py isam2_reordering_concept`.*
+
 ---
 
 ## 13. The complete iSAM2 picture

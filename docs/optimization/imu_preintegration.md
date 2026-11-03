@@ -141,6 +141,10 @@ After the bundle has absorbed, say, 100 raw samples, the optimizer updates the b
 - **Cost:** five small matrix-vector multiplies (one per Jacobian: $`J_{R,b_g}`$, $`J_{v,b_g}`$, $`J_{v,b_a}`$, $`J_{p,b_g}`$, $`J_{p,b_a}`$), independent of how many samples fed the bundle: $O(1)$ instead of $O(N)$.
 - **Caveat on the script's claim:** it prints "took less than 1 microsecond to solve, completely bypassing the need to loop through the 100 raw sensor inputs again." That is a hard-coded string, not a measurement; the script never times anything.
 
+![Two log-log panels from imu_preintegration.py: as the bias update grows from 0.1 to 300 times the script's default, the change it causes in Δp and ΔR grows in proportion, while the error of the first-order correction against full re-integration grows as its square](../../assets/imu_bias_sweep_concept.png)
+
+*Figure: the first-order correction against re-integrating the 100 samples, with the script's default bias update (gyro and accelerometer together) scaled by 0.1 to 300. At the default the Δp error is 2.3e-6 m, 0.09% of the 2.6 mm change it corrects; at 300× ($`|\delta b_g|`$ = 0.9 rad/s) it is 27%. Plotted by `uv run python generator/make_figures.py imu_bias_sweep_concept`.*
+
 ---
 
 ## 6. Where this fits in a SLAM back-end

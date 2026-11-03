@@ -2725,6 +2725,1242 @@ def fig_robust_kernel_weights():
            bottom=0.12)
 
 
+def gauss_pdf(x, mean, var):
+    return np.exp(-0.5 * (x - mean) ** 2 / var) / np.sqrt(2.0 * np.pi * var)
+
+
+def fig_kf_update_concept():
+    """kf_ekf_iekf.md §1: the 1D tiny example (prediction 15 m, variance 3; GPS 14 m, variance 7).
+    Pure-math concept figure (no simulation)."""
+    x_pred, P, z, R = 15.0, 3.0, 14.0, 7.0
+    K = P / (P + R)
+    x_post, P_post = x_pred + K * (z - x_pred), (1 - K) * P
+    xs = np.linspace(6, 23, 800)
+
+    fig, (ax, ax_k) = plt.subplots(1, 2, figsize=(13, 5.0), gridspec_kw=dict(width_ratios=[1.5, 1]))
+    for mean, var, col, lab in [(x_pred, P, C["blue"], f"prediction: {x_pred:g} m, variance {P:g}"),
+                                (z, R, C["orange"], f"GPS: {z:g} m, variance {R:g}"),
+                                (x_post, P_post, C["green"], f"update: {x_post:.1f} m, variance {P_post:.1f}")]:
+        y = gauss_pdf(xs, mean, var)
+        ax.plot(xs, y, color=col, lw=2.2, label=lab)
+        ax.fill_between(xs, y, color=col, alpha=0.12)
+        ax.axvline(mean, color=col, lw=1, ls=":")
+    ax.annotate(f"K = {P:g}/({P:g}+{R:g}) = {K:.1f}:\n{1 - K:.0%} prediction + {K:.0%} GPS",
+                xy=(x_post, gauss_pdf(x_post, x_post, P_post)), xytext=(17.5, 0.25), fontsize=9.5,
+                arrowprops=dict(arrowstyle="-", color=PRIOR))
+    ax.set(title="One update: the blend is narrower than both inputs", xlabel="car position x (m)",
+           ylabel="probability density", xlim=(6, 23), ylim=(0, 0.33))
+    ax.legend(loc="upper left")
+
+    ratio = np.logspace(-2, 2, 400)
+    ax_k.plot(ratio, ratio / (1 + ratio), color=TRUTH, lw=2)
+    ax_k.scatter([P / R], [K], color=C["green"], s=60, zorder=4)
+    ax_k.annotate(f"P/R = {P:g}/{R:g}, K = {K:.1f}", xy=(P / R, K), xytext=(0.6, 0.12), fontsize=9.5,
+                  arrowprops=dict(arrowstyle="-", color=PRIOR))
+    ax_k.text(0.012, 0.9, "trust the measurement →", fontsize=9, color="#555555")
+    ax_k.text(0.012, 0.05, "← trust the prediction", fontsize=9, color="#555555")
+    ax_k.set_xscale("log")
+    ax_k.set(title="Kalman gain K = P/(P+R) in 1D", xlabel="prediction variance / measurement variance  (P/R)",
+             ylabel="K (weight on the measurement)", ylim=(0, 1))
+    finish(fig, "kf_update_concept", "Kalman filter update, 1D (kf_ekf_iekf.md §1)",
+           "Toy numbers from the doc: predicted 15 m (variance 3), GPS 14 m (variance 7)")
+
+
+def fig_linearization_range_concept():
+    """linear_nonlinear.md §4.1-4.2: the range sensor h = ||p - L|| linearized at 2 m and at 50 m, sigma_p = 1 m.
+    Uses the doc's §4.2 snippet (seed 0, 5000 samples), so the printed bias and spread are the doc's numbers."""
+    L = np.array([0.0, 0.0])
+    sig_range = 0.1
+    fig, axes = plt.subplots(2, 2, figsize=(13, 9.0), gridspec_kw=dict(height_ratios=[1.25, 1]))
+    for col, r in enumerate((2.0, 50.0)):
+        rng = np.random.default_rng(SEED)
+        x_hat = np.array([r, 0.0])
+        u = (x_hat - L) / np.linalg.norm(x_hat - L)
+        X = rng.multivariate_normal(x_hat, np.eye(2), 5000)
+        rng_true = np.linalg.norm(X - L, axis=1)
+        res = rng_true - r - (X - x_hat) @ u
+        bias, spread = abs(res.mean()) / sig_range, res.std() / sig_range
+
+        ax = axes[0, col]
+        ax.scatter(X[:, 0] - r, X[:, 1], s=2, color=C["blue"], alpha=0.25)
+        ax.plot([], [], "o", ms=4, color=C["blue"], alpha=0.6, label="position samples, σp = 1 m")
+        th = np.linspace(-np.pi, np.pi, 1000)
+        for k, d in enumerate(np.arange(-2.0, 2.01, 1.0)):
+            rr = r + d
+            if rr <= 0:
+                continue
+            ax.plot(rr * np.cos(th) - r, rr * np.sin(th), color=TRUTH, lw=1.2,
+                    label="true constant-range lines (circles about L)" if k == 2 else None)
+            ax.axvline(d, color=C["red"], lw=1.1, ls="--", label="EKF's constant-range lines (straight)" if k == 2 else None)
+        if r < 5:
+            ax.scatter([L[0] - r], [L[1]], marker="*", s=180, color=C["gold"], ec="black", zorder=5, label="landmark L")
+        ax.scatter([0], [0], marker="x", s=60, color=TRUTH, zorder=5, label="estimate x̂")
+        ax.set_aspect("equal")
+        ax.set(xlim=(-3.2, 3.2), ylim=(-3.2, 3.2), title=f"Range r = {r:g} m from the landmark",
+               xlabel="position offset along the line of sight (m)", ylabel="across (m)")
+        if col == 0:
+            ax.legend(loc="upper left", fontsize=8, frameon=True, framealpha=0.92)
+
+        ax = axes[1, col]
+        ax.hist(res / sig_range, bins=80, color=C["gold"], alpha=0.85)
+        ax.axvline(0, color=TRUTH, lw=1)
+        ax.axvline(res.mean() / sig_range, color=C["red"], lw=2, label=f"mean = {bias:.1f}σ (bias)")
+        ax.axvspan(-1, 1, color=C["green"], alpha=0.12, lw=0, label="±1σ of the range sensor (0.1 m)")
+        if r < 5:
+            ax.set_xlim(-2, 20)
+            ax.text(19.5, ax.get_ylim()[1] * 0.55, f"tail continues to {res.max() / sig_range:.0f}σ", ha="right",
+                    fontsize=8.5, color="#555555")
+        ax.set(title=f"What the linearization drops, at {r:g} m: bias {bias:.1f}σ, spread {spread:.2f}σ",
+               xlabel="h(x) − h(x̂) − J(x − x̂)  (sensor σ = 0.1 m)", ylabel="samples")
+        ax.legend(loc="upper right")
+    finish(fig, "linearization_range_concept", "Same range model, nonlinear at 2 m, effectively linear at 50 m "
+           "(linear_nonlinear.md §4)",
+           "The doc's §4.2 check: 5000 samples (seed 0) of N(x̂, 1 m²), residual of h = ‖p − L‖ against its tangent at x̂, "
+           "in units of the 0.1 m sensor noise")
+
+
+def fig_ukf_sigma_points_concept():
+    """extra_kf_variants.md §1: the unscented transform vs the EKF tangent on polar -> Cartesian, n = 2
+    (alpha = 1, beta = 2, kappa = 1, so n + lambda = 3). Uses utils.unscented_weights / unscented_sigma_offsets."""
+    from state_estimation_simulations.utils import unscented_weights, unscented_sigma_offsets
+    mu = np.array([1.0, np.pi / 2])               # range 1 m, bearing 90°
+    P = np.diag([0.02 ** 2, 0.35 ** 2])           # tight range, wide bearing
+    f = lambda s: np.array([s[0] * np.cos(s[1]), s[0] * np.sin(s[1])])
+    J = np.array([[np.cos(mu[1]), -mu[0] * np.sin(mu[1])], [np.sin(mu[1]), mu[0] * np.cos(mu[1])]])
+    lam, w_m, w_c = unscented_weights(2, 1.0, 2.0, 1.0)
+    S = mu + unscented_sigma_offsets(P, lam)
+    Y = np.array([f(s) for s in S])
+    m_ukf = w_m @ Y
+    P_ukf = sum(w * np.outer(y - m_ukf, y - m_ukf) for w, y in zip(w_c, Y))
+    m_ekf, P_ekf = f(mu), J @ P @ J.T
+    rng = np.random.default_rng(SEED)
+    Xs = rng.multivariate_normal(mu, P, 20000)
+    Ys = np.array([f(s) for s in Xs])
+    m_mc, P_mc = Ys.mean(0), np.cov(Ys.T)
+
+    fig, (ax_in, ax_out) = plt.subplots(1, 2, figsize=(13, 6.4), gridspec_kw=dict(width_ratios=[1, 1.35]))
+    ax_in.scatter(np.degrees(Xs[:2000, 1]), Xs[:2000, 0], s=2, color=PRIOR, alpha=0.4, label="samples of the input")
+    ax_in.scatter(np.degrees(S[:, 1]), S[:, 0], s=70, color=C["purple"], ec="black", zorder=4,
+                  label=f"{len(S)} sigma points (2n+1, n = 2)")
+    ax_in.set(title="Input: range and bearing", xlabel="bearing (deg)", ylabel="range (m)")
+    legend_below(ax_in, ncol=1)
+
+    ax_out.scatter(Ys[:4000, 0], Ys[:4000, 1], s=2, color=PRIOR, alpha=0.4, label="samples pushed through f")
+    ax_out.scatter(Y[:, 0], Y[:, 1], s=70, color=C["purple"], ec="black", zorder=4, label="sigma points pushed through f")
+    cov_ellipse(ax_out, m_mc, P_mc, 2, fill=False, ec=TRUTH, lw=2)
+    cov_ellipse(ax_out, m_ekf, P_ekf, 2, fill=False, ec=C["red"], lw=2, ls="--")
+    cov_ellipse(ax_out, m_ukf, P_ukf, 2, fill=False, ec=C["purple"], lw=2, ls=":")
+    for m, col, mk, lab in [(m_mc, TRUTH, "o", f"true mean (Monte Carlo), y = {m_mc[1]:.3f} m"),
+                            (m_ekf, C["red"], "s", f"EKF mean f(μ), y = {m_ekf[1]:.3f} m"),
+                            (m_ukf, C["purple"], "D", f"UKF mean, y = {m_ukf[1]:.3f} m")]:
+        ax_out.scatter([m[0]], [m[1]], marker=mk, s=60, color=col, zorder=5, label=lab)
+    ax_out.plot([], [], color=TRUTH, lw=2, label="2σ: true")
+    ax_out.plot([], [], color=C["red"], lw=2, ls="--", label="2σ: EKF (tangent)")
+    ax_out.plot([], [], color=C["purple"], lw=2, ls=":", label="2σ: UKF")
+    ax_out.set(title="Output: x = r cos(bearing), y = r sin(bearing)", xlabel="x (m)", ylabel="y (m)",
+               xlim=(-0.95, 0.95), ylim=(0.5, 1.12))
+    legend_below(ax_out, ncol=2)
+    finish(fig, "ukf_sigma_points_concept", "Unscented transform vs. EKF tangent (extra_kf_variants.md §1)",
+           "Range 1 ± 0.02 m, bearing 90° ± 20°; α = 1, β = 2, κ = 1 (n + λ = 3); 20000 samples, seed 0. "
+           "The bend pulls the true mean down: the UKF sees it, the EKF does not", bottom=0.02)
+    return m_mc, m_ekf, m_ukf
+
+
+def fig_quaternion_renormalization_concept():
+    """eskf.md §4.2: a 2D slice of quaternion space. After an additive update q leaves the unit circle;
+    renormalizing q but not P leaves uncertainty along q itself (its length), which no rotation has.
+    Pure-math concept figure: P is an illustrative isotropic 2x2 covariance, the projection is the script's
+    (I - u u^T)/|q|."""
+    q = np.array([np.cos(np.radians(40)), np.sin(np.radians(40))]) * 1.12   # after an additive update
+    u = q / np.linalg.norm(q)
+    P = np.eye(2) * 0.06 ** 2
+    Jn = (np.eye(2) - np.outer(u, u)) / np.linalg.norm(q)
+    P_proj = Jn @ P @ Jn.T
+
+    fig, (ax, ax_r) = plt.subplots(1, 2, figsize=(13, 5.6), gridspec_kw=dict(width_ratios=[1.2, 1]))
+    th = np.linspace(0, np.pi / 2, 300)
+    ax.plot(np.cos(th), np.sin(th), color=TRUTH, lw=2, label="unit quaternions (|q| = 1): real rotations")
+    ax.plot([0, 1.3 * u[0]], [0, 1.3 * u[1]], color=PRIOR, lw=1, ls=":")
+    ax.scatter(*q, color=C["orange"], s=50, zorder=5, label="q after the additive update (|q| = 1.12)")
+    ax.scatter(*u, color=C["green"], s=50, zorder=5, label="q / |q| after renormalizing")
+    ax.annotate("", xy=u, xytext=q, arrowprops=dict(arrowstyle="->", color=C["green"], lw=1.5))
+    cov_ellipse(ax, u, P, 2, fill=False, ec=C["red"], lw=2, ls="--")
+    vals, vecs = np.linalg.eigh(P_proj)          # rank 1: all spread along the circle's tangent
+    tang = vecs[:, -1] * 2 * np.sqrt(vals[-1])
+    ax.plot([u[0] - tang[0], u[0] + tang[0]], [u[1] - tang[1], u[1] + tang[1]], color=C["green"], lw=3)
+    ax.plot([], [], color=C["red"], lw=2, ls="--", label="naive: P kept as it was (has a length direction)")
+    ax.plot([], [], color=C["green"], lw=2.5, label="projected: P mapped through (I − uuᵀ)/|q|")
+    ax.annotate("length of q:\nno rotation changes it", xy=1.08 * u, xytext=(0.98, 0.98), fontsize=9,
+                color="#555555", arrowprops=dict(arrowstyle="-", color=PRIOR))
+    ax.set_aspect("equal")
+    ax.set(xlim=(0.35, 1.2), ylim=(0.3, 1.15), title="A 2D slice of quaternion space",
+           xlabel="w (scalar part)", ylabel="one vector component")
+    legend_below(ax, ncol=1)
+
+    s = np.linspace(0.97, 1.03, 200)
+    a = 9.81
+    ax_r.plot(s, s ** 2 * a, color=TRUTH, lw=2, label="‖R(q) a‖ = |q|² ‖a‖ (unnormalized q)")
+    ax_r.plot(s, a + 2 * a * (s - 1), color=C["red"], lw=1.5, ls="--", label=f"slope 2‖a‖ ≈ {2 * a:.0f} m/s² at |q| = 1")
+    ax_r.axvline(1.0, color=PRIOR, lw=1, ls=":")
+    ax_r.set(title="Why it matters: a length error looks like an acceleration", xlabel="|q|",
+             ylabel="rotated specific force (m/s²), ‖a‖ = 9.81")
+    ax_r.legend(loc="upper left")
+    finish(fig, "quaternion_renormalization_concept", "Quaternion EKF: renormalize q, and P too (eskf.md §4.2)",
+           "Illustrative 2D slice (w and one vector component); the ESKF's 3-vector rotation error has no length "
+           "direction, so there is nothing to project")
+
+
+AXIS_RGB = ("#d1495b", "#2a9d8f", "#2e86de")  # body x, y, z
+
+
+def draw_frame3d(ax, R, length=1.0, lw=2.5, box=True, alpha=1.0):
+    """Body axes (columns of R) as colored arrows, plus an optional flat box."""
+    for k in range(3):
+        v = length * R[:, k]
+        ax.quiver(0, 0, 0, *v, color=AXIS_RGB[k], lw=lw, arrow_length_ratio=0.15, alpha=alpha)
+    if box:
+        B = np.array([[x, y, z] for x in (-0.5, 0.5) for y in (-0.3, 0.3) for z in (-0.12, 0.12)])
+        pts = (R @ B.T).T
+        for i in range(8):
+            for j in range(i + 1, 8):
+                if np.sum(B[i] != B[j]) == 1:
+                    ax.plot(*zip(pts[i], pts[j]), color="0.35", lw=1, alpha=alpha)
+
+
+def clean3d(ax, lim=1.0):
+    ax.set(xlim=(-lim, lim), ylim=(-lim, lim), zlim=(-lim, lim), xticks=[], yticks=[], zticks=[])
+    ax.set_box_aspect((1, 1, 1))
+    ax.view_init(elev=20, azim=-55)
+
+
+def fig_lie_group_tangent_concept():
+    """lie_algebra.md §1: the globe analogy. A sphere stands in for the curved group, a tangent plane for the
+    algebra; Exp wraps a tangent vector onto the surface (a great-circle arc of the same length), while plain
+    addition leaves the surface. Pure-geometry concept figure (no simulation)."""
+    p = np.array([0.0, 0.0, 1.0]) @ np.array([[1, 0, 0], [0, np.cos(0.6), -np.sin(0.6)], [0, np.sin(0.6), np.cos(0.6)]]).T
+    e1 = np.array([1.0, 0.0, 0.0])
+    e2 = np.cross(p, e1)
+    v = 0.9 * (np.cos(0.5) * e1 + np.sin(0.5) * e2)          # tangent vector, length 0.9 rad
+    th = np.linalg.norm(v)
+    t = np.linspace(0, 1, 60)
+    arc = np.array([np.cos(s * th) * p + np.sin(s * th) * v / th for s in t])
+
+    fig = plt.figure(figsize=(9.5, 7.0))
+    ax = fig.add_subplot(111, projection="3d")
+    uu, vv = np.meshgrid(np.linspace(0, 2 * np.pi, 40), np.linspace(0, np.pi, 20))
+    ax.plot_wireframe(np.cos(uu) * np.sin(vv), np.sin(uu) * np.sin(vv), np.cos(vv), color="0.75", lw=0.5)
+    a, b = np.meshgrid(np.linspace(-0.8, 0.8, 2), np.linspace(-0.8, 0.8, 2))
+    plane = p[:, None, None] + e1[:, None, None] * a + e2[:, None, None] * b
+    ax.plot_surface(*plane, color=C["gold"], alpha=0.35, lw=0)
+    ax.scatter(*p, color=TRUTH, s=40)
+    ax.quiver(*p, *v, color=C["blue"], lw=2.5, arrow_length_ratio=0.12)
+    ax.plot(*arc.T, color=C["green"], lw=3)
+    ax.scatter(*arc[-1], color=C["green"], s=40)
+    ax.scatter(*(p + v), color=C["red"], s=40)
+    ax.plot(*zip(arc[-1], p + v), color=C["red"], lw=1, ls=":")
+    ax.text(*(p - 0.55 * e1 + 0.12 * p), "current pose R", fontsize=10)
+    ax.text(*(p + v + 0.05 * p), "  R + v: off the surface", color=C["red"], fontsize=10)
+    ax.text(*(arc[-1] - 0.25 * p), "R Exp(v): on it", color=C["green"], fontsize=10)
+    ax.text(*(p - 0.75 * e1 - 0.75 * e2 + 0.05 * p), "tangent plane\n(the Lie algebra)", color="#9a7a1a", fontsize=10)
+    ax.plot([], [], color=C["blue"], lw=2.5, label="tangent vector v (a small motion, in the algebra)")
+    ax.plot([], [], color=C["green"], lw=3, label="Exp: same length, bent onto the surface")
+    ax.plot([], [], "o", color=C["red"], label="plain addition: leaves the surface")
+    ax.legend(loc="lower left", fontsize=9)
+    clean3d(ax, 1.1)
+    ax.view_init(elev=25, azim=-35)
+    finish(fig, "lie_group_tangent_concept", "Lie group and Lie algebra: the globe analogy (lie_algebra.md §1)",
+           "Globe = group, flat map = algebra, Exp wraps the map onto the globe (a 2D sphere stands in for SO(3), "
+           "which is 3D)", tight=False)
+
+
+def fig_rotation_order_concept():
+    """lie_algebra.md §4: 90° about X then 90° about Y vs the reverse, both about the fixed world axes.
+    Uses lie_utils.so3_exp."""
+    from state_estimation_simulations.use_numpy.lie_utils import so3_exp
+    Rx, Ry = so3_exp(np.array([np.pi / 2, 0, 0])), so3_exp(np.array([0, np.pi / 2, 0]))
+    rows = [("X then Y", [np.eye(3), Rx, Ry @ Rx], ["start", "after 90° about X", "then 90° about Y"]),
+            ("Y then X", [np.eye(3), Ry, Rx @ Ry], ["start", "after 90° about Y", "then 90° about X"])]
+    fig = plt.figure(figsize=(12, 8.2))
+    for r, (name, Rs, titles) in enumerate(rows):
+        for c, (R, ttl) in enumerate(zip(Rs, titles)):
+            ax = fig.add_subplot(2, 3, 3 * r + c + 1, projection="3d")
+            draw_frame3d(ax, R)
+            clean3d(ax)
+            ax.set_title(f"{name}: {ttl}" if c else f"{name}: {ttl}", fontsize=10.5)
+    fig.text(0.5, 0.02, "Body axes: x red, y green, z blue. Rotations are about the fixed world axes. The two orders "
+             "end in different orientations: RyRx ≠ RxRy.", ha="center", fontsize=10, color="#444444")
+    finish(fig, "rotation_order_concept", "Rotation order matters (lie_algebra.md §4)",
+           "Same two 90° turns, two orders, two different results", bottom=0.05)
+
+
+def fig_jacobian_local_map_concept():
+    """jacobian.md §2: f(x1, x2) = (x1 + x2², x1·x2) maps a small square around x̂ = (1, 0.5) to a curved patch;
+    the Jacobian maps it to a parallelogram that matches near x̂. Pure-math concept figure."""
+    f = lambda x1, x2: (x1 + x2 ** 2, x1 * x2)
+    x0 = np.array([1.0, 0.5])
+    J = np.array([[1.0, 2 * x0[1]], [x0[1], x0[0]]])
+    h = 0.25
+    s = np.linspace(-h, h, 5)
+    fig, (ax_in, ax_out) = plt.subplots(1, 2, figsize=(13, 5.8))
+    y0 = np.array(f(*x0))
+    for k, c in enumerate(s):
+        lw = 1.6 if k in (0, len(s) - 1) else 0.6
+        for line in (np.stack([x0[0] + s, x0[1] + c * np.ones_like(s)]), np.stack([x0[0] + c * np.ones_like(s), x0[1] + s])):
+            ax_in.plot(*line, color=C["blue"], lw=lw)
+            fine = np.linspace(-h, h, 60)
+            if line[1, 0] == line[1, -1]:
+                X1, X2 = x0[0] + fine, x0[1] + c * np.ones_like(fine)
+            else:
+                X1, X2 = x0[0] + c * np.ones_like(fine), x0[1] + fine
+            ax_out.plot(*f(X1, X2), color=C["blue"], lw=lw)
+            lin = y0[:, None] + J @ np.stack([X1 - x0[0], X2 - x0[1]])
+            ax_out.plot(*lin, color=C["red"], lw=lw, ls="--")
+    for ax, pt in ((ax_in, x0), (ax_out, y0)):
+        ax.scatter(*pt, color=TRUTH, s=40, zorder=5)
+        ax.set_aspect("equal")
+    for k, (col, name) in enumerate(((C["purple"], "∂y/∂x1 = (1, 0.5)"), (C["orange"], "∂y/∂x2 = (1, 1)"))):
+        ax_out.annotate("", xy=y0 + h * J[:, k], xytext=y0, arrowprops=dict(arrowstyle="-|>", color=col, lw=2.2))
+        ax_out.annotate(f"column {k + 1}: {name}", xy=y0 + h * J[:, k], xytext=(8, -14 if k == 0 else 4),
+                        textcoords="offset points", color=col, fontsize=9.5,
+                        bbox=dict(fc="white", ec="none", alpha=0.85, pad=1))
+    ax_in.set(title="Input: a small square around x̂ = (1, 0.5)", xlabel="x1", ylabel="x2")
+    ax_out.set(title="Output: f bends it, J keeps it straight", xlabel="y1 = x1 + x2²", ylabel="y2 = x1·x2")
+    ax_out.plot([], [], color=C["blue"], label="true image f(square)")
+    ax_out.plot([], [], color=C["red"], ls="--", label="Jacobian prediction f(x̂) + J (x − x̂)")
+    ax_out.legend(loc="upper left")
+    finish(fig, "jacobian_local_map_concept", "The Jacobian is the best straight-line stand-in near one point "
+           "(jacobian.md §2)", "y1 = x1 + x2², y2 = x1·x2 at x̂ = (1, 0.5): J = [[1, 1], [0.5, 1]]; each column is "
+           "where one input direction moves the output")
+
+
+def fig_jacobian_left_right_concept():
+    """jacobian.md §11.3: the same extra 40° rotation about 'x', composed on the right (body x) and on the left
+    (world x). Uses lie_utils.so3_exp."""
+    from state_estimation_simulations.use_numpy.lie_utils import so3_exp
+    R0 = so3_exp(np.array([0.0, 0.0, np.radians(60)])) @ so3_exp(np.array([0.0, np.radians(-30), 0.0]))
+    D = so3_exp(np.array([np.radians(40), 0.0, 0.0]))
+    cases = [("start: Exp(φ)", R0, None), ("right: Exp(φ)·Exp(δ), about the body x-axis", R0 @ D, R0[:, 0]),
+             ("left: Exp(δ)·Exp(φ), about the world x-axis", D @ R0, np.array([1.0, 0, 0]))]
+    fig = plt.figure(figsize=(13.5, 5.4))
+    for i, (ttl, R, axis) in enumerate(cases):
+        ax = fig.add_subplot(1, 3, i + 1, projection="3d")
+        for k, lab in enumerate("XYZ"):
+            v = np.eye(3)[:, k] * 1.25
+            ax.quiver(0, 0, 0, *v, color="0.7", lw=1, arrow_length_ratio=0.08)
+            ax.text(*(v * 1.08), lab, color="0.5", fontsize=9)
+        if i:
+            draw_frame3d(ax, R0, alpha=0.25, box=False)
+            ax.plot(*zip(-1.3 * axis, 1.3 * axis), color=TRUTH, lw=1.5, ls="--")
+        draw_frame3d(ax, R)
+        clean3d(ax, 1.2)
+        ax.set_title(ttl, fontsize=10)
+    fig.text(0.5, 0.02, "Gray X, Y, Z = world axes; colored = body axes (x red, y green, z blue); faded = start; dashed = "
+             "the axis of the extra 40° turn.\nSame δ, different result: the side decides whose x-axis it turns about.",
+             ha="center", fontsize=10, color="#444444")
+    finish(fig, "jacobian_left_right_concept", "Steering wheel vs compass: composing on the right or the left "
+           "(jacobian.md §11.3)", "Start: 60° about Z after −30° about Y; extra turn δ = 40° about x", bottom=0.09)
+
+
+def fig_quaternion_sandwich_concept():
+    """quaternion.md §13 Step 2: q = 90° about Z; one-sided q⊗v vs the sandwich q⊗v⊗q*. Uses utils.quat_multiply."""
+    from state_estimation_simulations.utils import quat_multiply
+    q = np.array([np.cos(np.pi / 4), 0.0, 0.0, np.sin(np.pi / 4)])
+    qc = q * np.array([1, -1, -1, -1])
+    out = {}
+    for name, v in (("X", [1.0, 0, 0]), ("Z", [0, 0, 1.0])):
+        pv = np.array([0.0, *v])
+        one = quat_multiply(q, pv)
+        out[name] = (pv, one, quat_multiply(one, qc))
+    fig, (ax, ax_b) = plt.subplots(1, 2, figsize=(13, 5.6), gridspec_kw=dict(width_ratios=[1, 1.25]))
+    th = np.linspace(0, np.pi / 2, 100)
+    ax.plot(np.cos(th), np.sin(th), color=PRIOR, lw=1, ls=":")
+    for (vec, col, lab) in ((out["X"][0][1:3], TRUTH, "X-axis (1, 0, 0)"),
+                            (out["X"][1][1:3], C["orange"], "after q⊗v: rotated 45°"),
+                            (out["X"][2][1:3], C["green"], "after q⊗v⊗q*: rotated 90°")):
+        ax.annotate("", xy=vec, xytext=(0, 0), arrowprops=dict(arrowstyle="-|>", color=col, lw=2.5))
+        ax.plot([], [], color=col, lw=2.5, label=f"{lab}: ({vec[0]:.3f}, {vec[1]:.3f})")
+    for a0, a1, txt in ((0, 45, "first half"), (45, 90, "second half")):
+        tt = np.radians(np.linspace(a0, a1, 30))
+        ax.plot(0.35 * np.cos(tt), 0.35 * np.sin(tt), color=C["purple"], lw=1.5)
+        m = np.radians(0.5 * (a0 + a1))
+        ax.text(0.42 * np.cos(m), 0.42 * np.sin(m), f"{txt}\n45°", fontsize=9, color=C["purple"])
+    ax.set_aspect("equal")
+    ax.set(xlim=(-0.15, 1.15), ylim=(-0.15, 1.15), xlabel="x", ylabel="y",
+           title="A vector across the axis: each side does half")
+    legend_below(ax, ncol=1)
+    labels = ["w", "x", "y", "z"]
+    xs = np.arange(4)
+    for k, (arr, col, lab) in enumerate(zip(out["Z"], (TRUTH, C["orange"], C["green"]),
+                                            ("Z-axis as (0, 0, 0, 1)", "after q⊗v", "after q⊗v⊗q*"))):
+        ax_b.bar(xs + (k - 1) * 0.25, arr, width=0.24, color=col, label=lab)
+    ax_b.annotate("w ≠ 0: not a pure quaternion,\nno longer a 3D vector", xy=(-0.0, -0.707), xytext=(0.6, -0.6),
+                  fontsize=9.5, arrowprops=dict(arrowstyle="-", color=PRIOR))
+    ax_b.axhline(0, color=PRIOR, lw=0.8)
+    ax_b.set_xticks(xs, labels)
+    ax_b.set(title="The rotation axis itself: one side leaks, the sandwich fixes it", ylabel="component", ylim=(-0.9, 1.15))
+    legend_below(ax_b, ncol=3)
+    finish(fig, "quaternion_sandwich_concept", "Why the quaternion sandwich (quaternion.md §13)",
+           "q = (0.707, 0, 0, 0.707), 90° about Z; products computed with utils.quat_multiply", bottom=0.02)
+
+
+def fig_factor_graph_loop_concept():
+    """factor_graph.md §2: three 1 m odometry steps and a 3.03 m loop closure, equal weights, x0 fixed at 0.
+    Solved by linear least squares (the 1D problem is linear)."""
+    A = np.array([[1, 0, 0], [-1, 1, 0], [0, -1, 1], [0, 0, 1.0]])   # unknowns x1, x2, x3
+    b = np.array([1.0, 1.0, 1.0, 3.03])
+    x_opt = np.concatenate([[0.0], np.linalg.lstsq(A, b, rcond=None)[0]])
+    x_odo = np.array([0.0, 1.0, 2.0, 3.0])
+    x_true = np.concatenate([[0.0], np.cumsum([1.02, 0.97, 1.05])])
+    fig, (ax, ax_z) = plt.subplots(2, 1, figsize=(13, 6.6), gridspec_kw=dict(height_ratios=[1.3, 1], hspace=0.75))
+    rows = [(2, x_odo, PRIOR, "odometry only (dead reckoning)"), (1, x_opt, C["blue"], "after least squares"),
+            (0, x_true, TRUTH, "true (unknown to the optimizer)")]
+    for y, xs, col, lab in rows:
+        ax.plot(xs, [y] * 4, "-o", color=col, lw=2, ms=9, label=lab)
+        for i, x in enumerate(xs):
+            ax.text(x, y + 0.22, f"x{i}", ha="center", fontsize=9, color=col)
+    ax.annotate("", xy=(3.03, 2.55), xytext=(0, 2.55), arrowprops=dict(arrowstyle="<->", color=C["red"], lw=1.5))
+    ax.text(1.5, 2.65, "loop closure x0 → x3: 3.03 m", color=C["red"], ha="center", fontsize=9.5)
+    ax.set(ylim=(-0.5, 3.0), xlim=(-0.2, 3.3), yticks=[], xlabel="position (m)",
+           title="Each pose along a 1D corridor")
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.22), ncol=3)
+    for y, xs, col, _ in rows:
+        ax_z.scatter([xs[3]], [y], color=col, s=70, zorder=4)
+        ax_z.text(xs[3] + 0.002, y + 0.2, f"x3 = {xs[3]:.4f} m", color=col, fontsize=9.5)
+    ax_z.axvline(3.03, color=C["red"], lw=1.2, ls="--", label="loop closure says 3.03 m")
+    ax_z.set(xlim=(2.99, 3.05), ylim=(-0.5, 2.7), yticks=[], xlabel="x3 (m), zoomed",
+             title=f"Zoom on x3: the error is spread over the steps (each lengthened by {x_opt[1] - 1:.4f} m)")
+    ax_z.legend(loc="lower right")
+    finish(fig, "factor_graph_loop_concept", "A loop closure spreads the drift over the whole chain "
+           "(factor_graph.md §2)", "Three 1 m odometry steps and one 3.03 m loop closure, all weighted equally, x0 "
+           "fixed at 0; true steps 1.02 / 0.97 / 1.05 m")
+    return x_opt
+
+
+def fig_gauss_newton_bowl_concept():
+    """gauss_newton.md §2: cost f(x) = ½ r(x)², r = x² − 4 (the §6 example), and the Gauss-Newton bowl
+    ½ (r + J Δx)² fitted at each iterate; each step jumps to the bowl's bottom. Pure-math concept figure."""
+    r = lambda x: x ** 2 - 4.0
+    J = lambda x: 2.0 * x
+    f = lambda x: 0.5 * r(x) ** 2
+    g = np.linspace(1.6, 3.3, 400)
+    fig, ax = plt.subplots(figsize=(11, 5.8))
+    ax.plot(g, f(g), color=TRUTH, lw=2.4, label="true cost f(x) = ½ (x² − 4)²")
+    x = 3.0
+    for k, col in enumerate((C["red"], C["blue"])):
+        bowl = 0.5 * (r(x) + J(x) * (g - x)) ** 2
+        x_new = x - r(x) / J(x)
+        ax.plot(g, bowl, color=col, lw=1.8, ls="--", label=f"bowl fitted at x = {x:.3f}: bottom at x = {x_new:.3f}")
+        ax.scatter([x], [f(x)], color=col, s=60, zorder=5)
+        ax.annotate("", xy=(x_new, f(x_new)), xytext=(x, f(x)),
+                    arrowprops=dict(arrowstyle="-|>", color=col, lw=1.6, connectionstyle="arc3,rad=0.3"))
+        ax.plot([x_new, x_new], [0, f(x_new)], color=col, lw=1, ls=":")
+        x = x_new
+    ax.scatter([2.0], [0.0], marker="*", s=200, color=C["gold"], ec=TRUTH, zorder=6, label="true minimum x = 2")
+    ax.set(xlim=(1.6, 3.3), ylim=(-0.3, 14), xlabel="x", ylabel="cost",
+           title="Fit a bowl to the ground nearby, jump to its bottom, repeat")
+    ax.legend(loc="upper left")
+    finish(fig, "gauss_newton_bowl_concept", "Gauss-Newton as 'fit a bowl, jump to its bottom' (gauss_newton.md §2)",
+           "The §6 example r(x) = x² − 4 from x = 3; the bowl is ½ (r + J Δx)², the cost of the linearized residual")
+
+
+def fig_lm_overshoot_concept():
+    """levenberg_marquardt.md §2: an illustrative 1D residual r(x) = atan(x) (root 0) from x = 1.5, where the
+    undamped Gauss-Newton step overshoots further every time, and the damped step -J r / (J² + λ) does not.
+    Pure-math concept figure; λ is held fixed here, while real LM adapts it (§4)."""
+    r = np.arctan
+    J = lambda x: 1.0 / (1.0 + x ** 2)
+    def iterate(lam, x=1.5, n=6):
+        xs = [x]
+        for _ in range(n):
+            x = x - J(x) * r(x) / (J(x) ** 2 + lam)
+            xs.append(x)
+        return np.array(xs)
+    gn = iterate(0.0, n=3)
+    fig, (ax, ax_k) = plt.subplots(1, 2, figsize=(13, 5.4), gridspec_kw=dict(width_ratios=[1.3, 1]))
+    g = np.linspace(-6, 6, 600)
+    ax.plot(g, r(g), color=TRUTH, lw=2.2, label="r(x) = atan(x), root at x = 0")
+    for k in range(2):
+        x0 = gn[k]
+        ax.plot(g, r(x0) + J(x0) * (g - x0), color=C["red"], lw=1.3, ls="--", alpha=0.9 if k == 0 else 0.5,
+                label="Gauss-Newton tangents" if k == 0 else None)
+        ax.annotate("", xy=(gn[k + 1], 0), xytext=(x0, r(x0)),
+                    arrowprops=dict(arrowstyle="-|>", color=C["red"], lw=1.5))
+    ax.scatter(gn[:3], r(gn[:3]), color=C["red"], zorder=5)
+    for k, x in enumerate(gn[:3]):
+        ax.annotate(f"x{k} = {x:.2f}", (x, r(x)), {0: (8, -16), 1: (6, -16), 2: (6, 10)}[k], textcoords="offset points", fontsize=9,
+                    color=C["red"])
+    for lam, col in ((0.1, C["green"]), (1.0, C["blue"])):
+        x1 = iterate(lam, n=1)[1]
+        ax.annotate("", xy=(x1, r(x1)), xytext=(1.5, r(1.5)), arrowprops=dict(arrowstyle="-|>", color=col, lw=2))
+        ax.plot([], [], color=col, lw=2, label=f"damped step, λ = {lam:g}: x1 = {x1:.2f}")
+    ax.axhline(0, color=PRIOR, lw=0.8)
+    ax.set(xlim=(-6, 6), ylim=(-1.7, 1.7), xlabel="x", ylabel="r(x)",
+           title="Far from the root, the tangent is flat, so its root is far away")
+    ax.legend(loc="upper left", fontsize=8.5)
+    for lam, col, lab in ((0.0, C["red"], "Gauss-Newton (λ = 0)"), (0.1, C["green"], "damped, λ = 0.1"),
+                          (1.0, C["blue"], "damped, λ = 1")):
+        xs = iterate(lam)
+        ax_k.semilogy(np.arange(len(xs)), np.abs(xs) + 1e-16, "o-", color=col, lw=2, label=lab)
+    ax_k.set(title="Distance to the root |x_k|", xlabel="iteration k", ylabel="|x_k|", ylim=(1e-6, 1e4))
+    ax_k.legend(loc="lower left")
+    finish(fig, "lm_overshoot_concept", "Why Gauss-Newton can overshoot, and what damping does "
+           "(levenberg_marquardt.md §2)", "Illustrative residual r(x) = atan(x) from x = 1.5; damped step Δx = −J r / "
+           "(J² + λ) with λ held fixed (real LM adapts it, §4)")
+
+
+def fig_filtering_smoothing_timeline_concept():
+    """filtering_smoothing.md §8: what each method can still change when a loop closure x4 -> x0 arrives.
+    Conceptual drawing; the fixed-lag window size (3) is an example."""
+    fig, ax = plt.subplots(figsize=(13, 5.2))
+    rows = [("Filter", [4], "keeps only the current state; x0-x3 are folded into it"),
+            ("Fixed-lag smoother\n(window of 3)", [2, 3, 4], "x0, x1 marginalized into a prior: no longer revisable"),
+            ("Full smoother", [0, 1, 2, 3, 4], "keeps every pose: the loop closure can revise all of them")]
+    for r_i, (name, live, note) in enumerate(rows):
+        y = 2 - r_i
+        for k in range(5):
+            on = k in live
+            ax.plot(k, y, "o", ms=22, mfc=C["blue"] if on else "white", mec=C["blue"] if on else PRIOR, mew=2, zorder=3)
+            ax.text(k, y, f"x{k}", ha="center", va="center", fontsize=10, color="white" if on else PRIOR, zorder=4)
+        ax.plot([0, 4], [y, y], color=PRIOR, lw=1, zorder=1)
+        ax.text(-0.6, y, name, ha="right", va="center", fontsize=10.5, fontweight="bold")
+        ax.text(4.5, y, note, ha="left", va="center", fontsize=9.5, color="#444444")
+        if r_i == 2:
+            ax.annotate("", xy=(0, y - 0.22), xytext=(4, y - 0.22),
+                        arrowprops=dict(arrowstyle="<->", color=C["red"], lw=1.6, connectionstyle="arc3,rad=-0.25"))
+            ax.text(2, y - 0.85, "loop closure x4 ↔ x0", color=C["red"], ha="center", fontsize=9.5)
+    ax.plot([], [], "o", ms=12, mfc=C["blue"], mec=C["blue"], label="still in the state: can change")
+    ax.plot([], [], "o", ms=12, mfc="white", mec=PRIOR, mew=2, label="compressed / marginalized: fixed")
+    ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.02), ncol=2)
+    ax.set(xlim=(-3.2, 10.5), ylim=(-1.2, 2.6))
+    ax.axis("off")
+    finish(fig, "filtering_smoothing_timeline_concept", "When a loop closure arrives at x4: who can change their "
+           "mind about the past? (filtering_smoothing.md §8)", "Conceptual; the window of 3 is an example size",
+           bottom=0.04)
+
+
+def fig_yaw_unobservable_concept():
+    """hexapod_contact_inekf.md Intuition: rotating the whole world about gravity changes no body-frame reading,
+    so yaw is unobservable; tilting changes the accelerometer's reading of gravity. Conceptual drawing."""
+    from state_estimation_simulations.use_numpy import hexapod_gait_ekf as m
+    fig, axes = plt.subplots(1, 3, figsize=(14, 5.4), gridspec_kw=dict(width_ratios=[1, 1, 0.9]))
+    for ax, yaw, ttl in ((axes[0], 0.0, "World as it is (top view)"),
+                         (axes[1], np.radians(50), "Whole world rotated 50° about gravity")):
+        Rz = np.array([[np.cos(yaw), -np.sin(yaw)], [np.sin(yaw), np.cos(yaw)]])
+        feet = (Rz @ m.NOMINAL_FOOT_OFFSETS.T).T
+        ax.add_patch(Ellipse((0, 0), 0.42, 0.24, angle=np.degrees(yaw), fc="#e8eef6", ec="#5b6b7f", lw=1.4, zorder=2))
+        arrow(ax, (0, 0), Rz @ np.array([0.17, 0.0]), "#5b6b7f", lw=1.2, ms=8, zorder=3)
+        for f in feet:
+            ax.plot([0, f[0]], [0, f[1]], color="#5b6b7f", lw=1.4, zorder=1)
+            ax.plot(*f, "s", ms=9, mfc=C["gold"], mec=TRUTH, zorder=4)
+        ax.annotate("", xy=(-0.36, 0.36), xytext=(-0.36, 0.2), arrowprops=dict(arrowstyle="-|>", color="0.5"))
+        ax.text(-0.36, 0.38, "map north", ha="center", fontsize=8.5, color="0.45")
+        ax.text(0, -0.36, "gyro: same rates\naccelerometer: same (gravity still straight down)\nfeet in the body "
+                "frame: same", ha="center", va="top", fontsize=9, color=C["green"])
+        ax.set_aspect("equal")
+        ax.set(xlim=(-0.45, 0.45), ylim=(-0.6, 0.45), xticks=[], yticks=[], title=ttl)
+    ax = axes[2]
+    for tilt, col, lab in ((0.0, C["blue"], "level"), (np.radians(20), C["red"], "rolled 20°")):
+        R = np.array([[np.cos(tilt), -np.sin(tilt)], [np.sin(tilt), np.cos(tilt)]])
+        body = (R @ np.array([[-0.3, 0.3, 0.3, -0.3, -0.3], [-0.04, -0.04, 0.04, 0.04, -0.04]])).T
+        ax.plot(*body.T, color=col, lw=2, label=lab)
+        up = R @ np.array([0, 0.18])
+        ax.annotate("", xy=up, xytext=(0, 0), arrowprops=dict(arrowstyle="-|>", color=col, lw=1.5))
+    ax.text(0.04, 0.19, "body up", fontsize=8.5, color="0.4")
+    ax.annotate("", xy=(0, -0.38), xytext=(0, -0.1), arrowprops=dict(arrowstyle="-|>", color=TRUTH, lw=2))
+    ax.text(0.03, -0.32, "gravity", fontsize=9)
+    ax.text(0, 0.3, "In body axes, gravity is (0, −g) level,\n(−g sin 20°, −g cos 20°) rolled:\nthe accelerometer "
+            "sees the tilt", ha="center", fontsize=9, color=C["red"])
+    ax.set_aspect("equal")
+    ax.set(xlim=(-0.45, 0.45), ylim=(-0.45, 0.45), xticks=[], yticks=[], title="Tilt is different (side view)")
+    ax.legend(loc="lower right", fontsize=8.5)
+    finish(fig, "yaw_unobservable_concept", "Why yaw is unobservable from IMU + legs (hexapod_contact_inekf.md)",
+           "Turning the robot and its footholds (squares) together about the vertical changes no reading; a tilt does")
+
+
+def fig_zeno_bounces_concept():
+    """hybrid_saltation_ekf.md §7: bounce times of saltation_matrix_ekf.py's defaults (e = 0.85, drop 5 m),
+    from the script's own crossing_time / flow / reset_map, against the filter step Δt = 0.02 s."""
+    from state_estimation_simulations.use_numpy import saltation_matrix_ekf as m
+    e, g, dt = 0.85, 9.81, 0.02
+    x = np.array([0.0, 0.0, 5.0, 1.0, 0.5, 0.0])
+    t0, times, ts, zs = 0.0, [], [], []
+    for _ in range(60):
+        tau = m.crossing_time(x, g)
+        if tau is None or tau < 1e-6:
+            break
+        for s in np.linspace(0, tau, 80):
+            ts.append(t0 + s)
+            zs.append(m.flow(x, s, g)[0][2])
+        x, _ = m.flow(x, tau, g)
+        t0 += tau
+        times.append(t0)
+        x = m.reset_map(x, e)
+    times = np.array(times)
+    v1 = g * times[0]
+    t_settle = times[0] + 2 * e * v1 / (g * (1 - e))
+    gaps = np.diff(times)
+    n = np.arange(1, len(gaps) + 1)
+    n_dt = int(n[np.argmax(gaps < dt)])
+    fig, (ax, ax_g) = plt.subplots(1, 2, figsize=(13, 5.2))
+    ax.plot(ts, zs, color=C["blue"], lw=1.4)
+    ax.axvline(t_settle, color=C["red"], ls="--", lw=1.2, label=f"settling time {t_settle:.2f} s")
+    ax.axvspan(t_settle - 0.4, t_settle, color=C["orange"], alpha=0.25, lw=0, label="last 0.4 s: intervals ≲ 3Δt")
+    ax.set(xlabel="time (s)", ylabel="height (m)", title="Height: bounces pile up before a finite time",
+           xlim=(0, 13.2))
+    ax.legend(loc="upper right")
+    ax_g.semilogy(n, gaps, "o", color=C["blue"], ms=4, label="interval between bounce n and n+1")
+    ax_g.semilogy(n, 2 * v1 * e ** n / g, color=TRUTH, lw=1, label="2 v₁ eⁿ / g")
+    ax_g.axhline(dt, color=C["red"], ls="--", label="filter step Δt = 0.02 s")
+    ax_g.axhline(3 * dt, color=C["orange"], ls=":", label="3Δt")
+    ax_g.axvline(n_dt, color=PRIOR, lw=1)
+    ax_g.text(n_dt + 0.5, 1.0, f"first interval < Δt:\nn = {n_dt}", fontsize=9)
+    ax_g.set(xlabel="bounce n", ylabel="interval (s)", title="Intervals shrink geometrically (×0.85 each bounce)")
+    ax_g.legend(loc="lower left")
+    finish(fig, "zeno_bounces_concept", "The Zeno regime of a lossy bounce (hybrid_saltation_ekf.md §7)",
+           f"saltation_matrix_ekf.py's defaults (e = {e}, drop from 5 m, first impact at {times[0]:.2f} s, "
+           f"speed {v1:.2f} m/s); exact event times from its crossing_time / flow / reset_map")
+    return times, t_settle, n_dt
+
+
+def elimination_steps(n, edges, order):
+    """Replays symbolic elimination step by step. Returns a list of
+    (eliminated_so_far, current_edges, fill_edges_so_far, separator_of_v) after each step, plus the parent map."""
+    from state_estimation_simulations.utils import symbolic_eliminate
+    adj = {v: set() for v in range(n)}
+    for i, j in edges:
+        adj[i].add(j); adj[j].add(i)
+    orig = {frozenset(e) for e in edges}
+    fill, done, steps = set(), [], []
+    for v in order:
+        nb = set(adj[v])
+        for a in nb:
+            for b in nb:
+                if a < b and frozenset((a, b)) not in orig and b not in adj[a]:
+                    fill.add(frozenset((a, b)))
+            adj[a] |= nb - {a}
+            adj[a].discard(v)
+        adj[v] = set()
+        done.append(v)
+        cur = {frozenset((a, b)) for a in adj for b in adj[a]}
+        steps.append((list(done), cur, set(fill), sorted(nb)))
+    _, parent = symbolic_eliminate(n, edges, order)
+    return steps, parent
+
+
+def draw_elim_graph(ax, pos, names, edges, cur_edges, fill, done, current, sep):
+    """One elimination-game panel: original edges gray, fill-in red dashed, eliminated nodes hollow,
+    the node just eliminated gold, its separator outlined in red."""
+    for e in {frozenset(x) for x in edges} | fill:
+        a, b = tuple(e)
+        alive = e in cur_edges
+        ax.plot(*zip(pos[a], pos[b]), color=C["red"] if e in fill else "0.45", lw=2 if alive else 0.8,
+                ls="--" if e in fill else "-", alpha=1.0 if alive else 0.25, zorder=1)
+    for v, xy in pos.items():
+        if v == current:
+            fc, ec = C["gold"], TRUTH
+        elif v in done:
+            fc, ec = "white", "0.7"
+        else:
+            fc, ec = "#e8eef6", C["red"] if v in sep else "#5b6b7f"
+        ax.scatter(*xy, s=520, color=fc, edgecolor=ec, linewidth=2.2 if v in sep else 1.3, zorder=3)
+        ax.text(*xy, names[v], ha="center", va="center", fontsize=10, color="0.6" if v in done and v != current else TRUTH,
+                zorder=4)
+    ax.set_aspect("equal")
+    ax.axis("off")
+
+
+def draw_tree(ax, parent, names, vertical=True, highlight=(), size=480, fontsize=9.5):
+    """Elimination tree with the root on top, children below, via bayes_tree_construction.layout_tree."""
+    from state_estimation_simulations.use_numpy import bayes_tree_construction as m
+    root = next(v for v, p in parent.items() if p is None)
+    children = {}
+    for v in sorted(parent):
+        if parent[v] is not None:
+            children.setdefault(parent[v], []).append(v)
+    pos = {v: ((y, -x) if vertical else (x, y)) for v, (x, y) in m.layout_tree(children, root).items()}
+    for v, p in parent.items():
+        if p is not None:
+            on = v in highlight and p in highlight
+            ax.plot(*zip(pos[v], pos[p]), color=C["red"] if on else "0.5", lw=2.4 if on else 1.4, zorder=1)
+    for v, xy in pos.items():
+        ax.scatter(*xy, s=size, color=C["red"] if v in highlight else "#e8eef6", edgecolor=TRUTH, lw=1.2, zorder=2)
+        ax.text(*xy, names[v], ha="center", va="center", fontsize=fontsize, color="white" if v in highlight else TRUTH,
+                zorder=3)
+    ax.axis("off")
+    ax.margins(0.15)
+    return pos
+
+
+def fig_elimination_game_ring_concept():
+    """bayes_tree.md §4.1: the 5-node ring eliminated oldest first, step by step, with utils.symbolic_eliminate's
+    rule (separator, fill-in, parent), and the resulting tree."""
+    n = 5
+    edges = [(k, k + 1) for k in range(n - 1)] + [(n - 1, 0)]
+    order = list(range(n))
+    steps, parent = elimination_steps(n, edges, order)
+    ang = np.pi / 2 + 2 * np.pi * np.arange(n) / n
+    pos = {v: (np.cos(a), np.sin(a)) for v, a in zip(range(n), ang)}
+    names = [str(v) for v in range(n)]
+    fig, axes = plt.subplots(1, n + 1, figsize=(15, 4.7))
+    for k, (done, cur, fill, sep) in enumerate(steps):
+        v = order[k]
+        draw_elim_graph(axes[k], pos, names, edges, cur, fill, done, v, sep)
+        par = parent[v]
+        new = [tuple(sorted(e)) for e in fill if e not in (steps[k - 1][2] if k else set())]
+        axes[k].set_title(f"eliminate {v}\nS = {{{', '.join(map(str, sep))}}}, "
+                          f"fill {', '.join(f'{a}–{b}' for a, b in new) or 'none'}\n"
+                          f"parent = {par if par is not None else 'root'}", fontsize=9.5)
+        axes[k].set(xlim=(-1.45, 1.45), ylim=(-1.4, 1.4))
+    draw_tree(axes[n], parent, names)
+    axes[n].set_title("result: a chain\n(root 4 on top)", fontsize=9.5)
+    finish(fig, "elimination_game_ring_concept", "The elimination game on a 5-node ring (bayes_tree.md §4.1)",
+           "Order 0, 1, 2, 3, 4 (oldest first), replaying utils.symbolic_eliminate: gold = just eliminated, red "
+           "outline = its separator S, red dashed = fill-in")
+
+
+def fig_elimination_tree_fill_in_concept():
+    """elimination_tree.md §3: graph 1-2-3 with 2-4, eliminated 1, 2, 3, 4; fill-in 3-4 appears."""
+    edges = [(0, 1), (1, 2), (1, 3)]
+    names = ["1", "2", "3", "4"]
+    pos = {0: (0, 1), 1: (1, 1), 2: (2, 1), 3: (1, 0)}
+    order = [0, 1, 2, 3]
+    steps, parent = elimination_steps(4, edges, order)
+    fig, axes = plt.subplots(1, 4, figsize=(13, 4.5))
+    for k in range(3):
+        done, cur, fill, sep = steps[k]
+        draw_elim_graph(axes[k], pos, names, edges, cur, fill, done, order[k], sep)
+        axes[k].set_title(f"eliminate {names[order[k]]}: parent = {names[parent[order[k]]]}"
+                          + ("\nfill-in 3–4 appears" if k == 1 else "\nno fill-in"), fontsize=10)
+        axes[k].set(xlim=(-0.5, 2.5), ylim=(-0.5, 1.5))
+    draw_tree(axes[3], parent, names)
+    axes[3].set_title("elimination tree: 1 → 2 → 3 → 4\n(a chain, though the graph is not)", fontsize=10)
+    finish(fig, "elimination_tree_fill_in_concept", "Fill-in builds the tree (elimination_tree.md §3)",
+           "Gold = just eliminated, red outline = its remaining neighbors, red dashed = fill-in; computed with "
+           "utils.symbolic_eliminate")
+
+
+def fig_elimination_tree_orderings_concept():
+    """elimination_tree.md §8: the SLAM example (poses x1..x5, landmarks l1 on x2, l2 on x2, l3 on x4) under the
+    doc's order (x1 and landmarks first) and under poses-first."""
+    names = ["x1", "x2", "x3", "x4", "x5", "l1", "l2", "l3"]
+    edges = [(0, 1), (1, 2), (2, 3), (3, 4), (5, 1), (6, 1), (7, 3)]
+    orders = {"the doc's order: x1, l1, l2, l3, x2, x3, x4, x5": [0, 5, 6, 7, 1, 2, 3, 4],
+              "poses first: x1 … x5, then l1, l2, l3": [0, 1, 2, 3, 4, 5, 6, 7]}
+    fig, axes = plt.subplots(1, 2, figsize=(13, 6.4))
+    for ax, (ttl, order) in zip(axes, orders.items()):
+        steps, parent = elimination_steps(8, edges, order)
+        fill = steps[-1][2]
+        depth = {}
+        for v in order[::-1]:
+            depth[v] = 0 if parent[v] is None else depth[parent[v]] + 1
+        draw_tree(ax, parent, names)
+        sep = max(len(s[3]) for s in steps)
+        ax.set_title(f"{ttl}\ntree height {max(depth.values()) + 1}, fill-in edges {len(fill)}, largest separator {sep}",
+                     fontsize=10)
+    finish(fig, "elimination_tree_orderings_concept", "Same graph, two orderings, two trees (elimination_tree.md §8)",
+           "Computed with utils.symbolic_eliminate; root (eliminated last) on top. Landmarks first keeps the tree "
+           "short and wide; poses first makes one tall chain")
+
+
+def fig_isam2_reordering_concept():
+    """isam2_optimization.md §12: the 16-node ring of bayes_tree_construction.py eliminated oldest first vs a
+    hand-chosen order that puts the loop-closure variables x0, x15 last (what CCOLAMD's constraint aims for)."""
+    from state_estimation_simulations.utils import symbolic_eliminate, bayes_tree_affected_path
+    n = 16
+    odom = [(k, k + 1) for k in range(n - 1)]
+    loop = (n - 1, 0)
+    names = [f"x{v}" for v in range(n)]
+    cases = [("oldest first (as the script)", list(range(n))),
+             ("x0 and x15 last (hand-chosen, CCOLAMD-like)", list(range(1, n - 1)) + [0, n - 1])]
+    fig, axes = plt.subplots(2, 2, figsize=(14, 4.6))
+    for r, (lab, order) in enumerate(cases):
+        sep, parent = symbolic_eliminate(n, odom + [loop], order)
+        for c, (edge, what) in enumerate(((odom[-1], f"new odometry edge x{n - 2}–x{n - 1}"),
+                                          (loop, f"loop closure x{n - 1}–x0"))):
+            aff = bayes_tree_affected_path(parent, edge)
+            draw_tree(axes[r, c], parent, names, vertical=False, highlight=aff, size=210, fontsize=6.5)
+            axes[r, c].set_ylim(-1, 1)
+            axes[r, c].set_title(f"{lab}: {what}\n{len(aff)}/{n} variables affected, largest separator "
+                                 f"{max(len(s) for s in sep.values())}", fontsize=10)
+    finish(fig, "isam2_reordering_concept", "Reordering keeps loop-closure updates small (isam2_optimization.md §12)",
+           "Elimination trees of the 16-node ring, root (eliminated last) on the left; red = must be re-eliminated. "
+           "The second order is hand-chosen, not CCOLAMD")
+
+
+def fig_umeyama_alignment_concept():
+    """umeyama_alignment.md §3 and §5: the four steps on §5's tetrahedron (s = 2, 90° yaw, t = (1, 2, 3)),
+    using utils.umeyama_alignment and its intermediate quantities."""
+    from state_estimation_simulations.utils import umeyama_alignment
+    X = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1.0]])
+    R_true = np.array([[0, -1, 0], [1, 0, 0], [0, 0, 1.0]])
+    Y = 2.0 * (R_true @ X.T).T + np.array([1.0, 2.0, 3.0])
+    s, R, t = umeyama_alignment(X, Y)
+    mx, my = X.mean(0), Y.mean(0)
+    stages = [("1. raw: estimate X, truth Y", X, Y),
+              ("2. centered on their centroids", X - mx, Y - my),
+              ("3. rotate: R (X − μX)", ((R @ (X - mx).T).T), Y - my),
+              ("4. scale by s = %.2f" % s, s * (R @ (X - mx).T).T, Y - my),
+              ("5. add back μY: s R X + t", s * (R @ X.T).T + t, Y)]
+    E = [(a, b) for a in range(4) for b in range(a + 1, 4)]
+    fig = plt.figure(figsize=(15, 4.6))
+    for k, (ttl, A, B) in enumerate(stages):
+        ax = fig.add_subplot(1, 5, k + 1, projection="3d")
+        for P, col, lab in ((B, TRUTH, "truth"), (A, C["red"], "estimate")):
+            for a, b in E:
+                ax.plot(*zip(P[a], P[b]), color=col, lw=1.6, ls="-" if col == TRUTH else "--")
+            ax.scatter(*P.T, color=col, s=18)
+        allp = np.vstack(stages[k][1:])
+        c, r = allp.mean(0), 0.6 * np.ptp(allp, axis=0).max() + 0.3
+        ax.set(xlim=(c[0] - r, c[0] + r), ylim=(c[1] - r, c[1] + r), zlim=(c[2] - r, c[2] + r),
+               xticklabels=[], yticklabels=[], zticklabels=[])
+        ax.set_box_aspect((1, 1, 1))
+        ax.view_init(elev=22, azim=-60)
+        ax.set_title(ttl, fontsize=9.5)
+    fig.subplots_adjust(left=0.01, right=0.99, top=0.8, bottom=0.12, wspace=0.05)
+    fig.text(0.5, 0.03, f"Black = truth Y, red dashed = estimate X. Recovered: s = {s:.3f}, yaw = "
+             f"{np.degrees(np.arctan2(R[1, 0], R[0, 0])):.1f}°, t = ({t[0]:.2f}, {t[1]:.2f}, {t[2]:.2f}); max error "
+             f"{np.abs(s * (R @ X.T).T + t - Y).max():.1e}", ha="center", fontsize=10, color="#444444")
+    finish(fig, "umeyama_alignment_concept", "Umeyama alignment, step by step (umeyama_alignment.md §3, §5's data)",
+           "Center, rotate, scale, translate: the steps of utils.umeyama_alignment on §5's tetrahedron "
+           "(s = 2, 90° yaw, t = (1, 2, 3))", bottom=0.06, tight=False)
+    return s, R, t
+
+
+def fig_ba_schur_sparsity_concept():
+    """bundle_adjustment.md §12: block sparsity of H for the default BA scene (same scene as
+    fig_sparse_fill_in_orderings), and the reduced camera matrix after the Schur complement, whose (i, k) block is
+    nonzero exactly when cameras i and k observe a common landmark."""
+    from state_estimation_simulations.use_numpy import bundle_adjustment as m
+    rng = np.random.default_rng(SEED)
+    K = (800.0, 800.0, 320.0, 240.0)
+    T_true, P_all = m.generate_ground_truth_scene(8, 60, 5.0, 180.0, 2.0, rng)
+    P_true, obs = m.build_observations(T_true, P_all, K, 1.0, 2, rng)
+    nc, nl = len(T_true), len(P_true)
+    pairs = sorted({(i, j) for i, j, _ in obs})
+    n = 6 * nc + 3 * nl
+    H = np.zeros((n, n), dtype=bool)
+    ci = lambda i: slice(6 * i, 6 * i + 6)
+    li = lambda j: slice(6 * nc + 3 * j, 6 * nc + 3 * j + 3)
+    for i in range(nc):
+        H[ci(i), ci(i)] = True
+    for j in range(nl):
+        H[li(j), li(j)] = True
+    for i, j in pairs:
+        H[ci(i), li(j)] = H[li(j), ci(i)] = True
+    seen = {i: {j for a, j in pairs if a == i} for i in range(nc)}
+    shared = np.array([[len(seen[i] & seen[k]) for k in range(nc)] for i in range(nc)])
+    fig, (ax, ax_s) = plt.subplots(1, 2, figsize=(13, 6.2), gridspec_kw=dict(width_ratios=[1.35, 1]))
+    ax.imshow(H, cmap="Greys", interpolation="nearest")
+    ax.axhline(6 * nc - 0.5, color=C["red"], lw=1.2)
+    ax.axvline(6 * nc - 0.5, color=C["red"], lw=1.2)
+    ax.set_xticks([3 * nc, 6 * nc + 1.5 * nl], ["cameras", "points"])
+    ax.set_yticks([3 * nc, 6 * nc + 1.5 * nl], ["cameras", "points"])
+    ax.set_title(f"H: {nc} cameras (6 dof) + {nl} points (3 dof), {100 * H.mean():.1f}% nonzero\n"
+                 "the arrow-head: diagonal blocks + camera–point coupling", fontsize=10)
+    im = ax_s.imshow(np.where(shared > 0, shared, np.nan), cmap="Blues", vmin=0)
+    for i in range(nc):
+        for k in range(nc):
+            ax_s.text(k, i, shared[i, k], ha="center", va="center", fontsize=8.5,
+                      color="white" if shared[i, k] > 0.6 * shared.max() else TRUTH)
+    ax_s.set_xticks(range(nc), [f"c{k}" for k in range(nc)])
+    ax_s.set_yticks(range(nc), [f"c{k}" for k in range(nc)])
+    ax_s.grid(False)
+    ax_s.set_title("Reduced camera matrix H_cc − H_cp H_pp⁻¹ H_pc (block level)\n"
+                   "block (i, k) ≠ 0 iff cameras share a point (here: every pair does)", fontsize=10)
+    fig.colorbar(im, ax=ax_s, shrink=0.75, label="shared points")
+    finish(fig, "ba_schur_sparsity_concept", "Bundle adjustment sparsity and the Schur complement "
+           "(bundle_adjustment.md §12)", f"Default scene of bundle_adjustment.py (seed 0): {len(obs)} observations, "
+           f"{len(pairs)} camera–point pairs; patterns from the observations, not numeric values")
+
+
+def fig_imu_bias_sweep_concept():
+    """imu_preintegration.md §5: error of get_corrected_measurement vs full re-integration as the bias update grows
+    (the script's default update scaled by k), for Δp and ΔR."""
+    from state_estimation_simulations.use_numpy import imu_preintegration as m
+    from state_estimation_simulations.use_numpy.lie_utils import rotation_geodesic_error
+
+    hz = 100
+    b_g, b_a = np.array([0.01, -0.01, 0.02]), np.array([0.05, 0.0, -0.05])
+    a_cmd, w_cmd = np.array([1.0, 0.1, 0.0]), np.array([0.0, 0.0, 0.5])
+    dbg = np.array([0.008, -0.009, 0.018]) - b_g     # the script's default bias update
+    dba = np.array([0.045, 0.002, -0.048]) - b_a
+    dt = 1.0 / hz
+
+    def integrate(bg, ba):
+        bundle = m.PreintegratedIMUBundle(bg, ba)
+        for _ in range(hz):
+            bundle.integrate_measurement(a_cmd + b_a, w_cmd + b_g, dt)
+        return bundle
+
+    bundle = integrate(b_g, b_a)
+    ks = np.unique(np.r_[np.logspace(-1, np.log10(300), 25), 1.0])     # includes the default update, k = 1
+    rows = []                                       # k: shift Δp, error Δp, shift ΔR, error ΔR
+    for k in ks:
+        c_R, _, c_p = bundle.get_corrected_measurement(b_g + k * dbg, b_a + k * dba)
+        ref = integrate(b_g + k * dbg, b_a + k * dba)
+        rows.append((np.linalg.norm(ref.delta_p - bundle.delta_p), np.linalg.norm(c_p - ref.delta_p),
+                     np.degrees(rotation_geodesic_error(bundle.delta_R, ref.delta_R)),
+                     np.degrees(rotation_geodesic_error(c_R, ref.delta_R))))
+    rows = np.array(rows)
+    i1 = int(np.flatnonzero(ks == 1.0)[0])
+    for k, r in zip(ks[[0, i1, -1]], rows[[0, i1, -1]]):
+        print(f"    k = {k:6.2f}: |dbg| = {k * np.linalg.norm(dbg):.4f} rad/s  dp shift {r[0]:.2e}  err {r[1]:.2e}"
+              f"  ({100 * r[1] / r[0]:.2f}%)  dR shift {r[2]:.2e}  err {r[3]:.2e} deg")
+
+    x = ks * np.linalg.norm(dbg)
+    fig, axes = plt.subplots(1, 2)
+    for ax, (s_col, e_col), unit, what in ((axes[0], (0, 1), "m", "Δp"), (axes[1], (2, 3), "deg", "ΔR")):
+        ax.plot(x, rows[:, s_col], color=C["orange"], lw=2, label="change caused by the bias update")
+        ax.plot(x, rows[:, e_col], color=C["green"], lw=2, marker="o", ms=3.5,
+                label="error of the first-order correction vs. re-integration")
+        ax.plot(x, rows[i1, e_col] * (x / x[i1]) ** 2, color=PRIOR, lw=1, ls="--", label="reference slope ∝ |δb|²")
+        ax.axvline(x[i1], color="#555555", ls=":", lw=1.1)
+        ax.annotate("script's default update", (x[i1], 1), xycoords=("data", "axes fraction"), xytext=(4, -12),
+                    textcoords="offset points", fontsize=9, color="#555555")
+        ax.set(xscale="log", yscale="log", xlabel="size of the gyro-bias update |δb_g| (rad/s)",
+               ylabel=f"{what} ({unit})", title=f"{what}: correction error grows as the square of the update")
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=3, fontsize=9)
+    finish(fig, "imu_bias_sweep_concept", "When the first-order bias correction stops being enough "
+           "(imu_preintegration.md §5)",
+           "imu_preintegration.py defaults; its bias update (gyro and accelerometer) scaled by 0.1 to 300. Δp error: "
+           f"{100 * rows[i1, 1] / rows[i1, 0]:.2f}% of the change at the default, {100 * rows[-1, 1] / rows[-1, 0]:.0f}% "
+           "at 300×", bottom=0.08)
+
+
+def fig_pose_tracking_gap_concept():
+    """pointcloud_pose_tracking_empirical_note.md §3.3/§4.3: per-pose gap of IEKF, UKF and vanilla KF to the EKF
+    trajectory over one default run (seed 0, 5 s, dt = 0.1)."""
+    from state_estimation_simulations.use_numpy import pointcloud_pose_tracking as m
+    from state_estimation_simulations.use_numpy.lie_utils import se3_exp, rotation_geodesic_error
+
+    duration, dt, n_points = 5.0, 0.1, 20
+    vel_std, gyro_std, point_std, init_std = 0.05, 0.02, 0.03, 0.1
+    rng = np.random.default_rng(SEED)
+    body, T_true, u_meas, z = m.generate_ground_truth_and_data(duration, dt, n_points, vel_std, gyro_std, point_std, rng)
+    T_init = T_true[0] @ se3_exp(rng.normal(0.0, init_std, 6))
+    P_init = init_std ** 2 * np.eye(6)
+    Q = dt ** 2 * np.diag([vel_std ** 2] * 3 + [gyro_std ** 2] * 3)
+    T_ekf = m.run_ekf(T_init, P_init, u_meas, z, body, dt, Q, point_std)
+    others = [("IEKF", m.run_iekf(T_init, P_init, u_meas, z, body, dt, Q, point_std), C["green"]),
+              ("UKF", m.run_ukf(T_init, P_init, u_meas, z, body, dt, Q, point_std, 1.0, 2.0, -3.0), C["purple"]),
+              ("Vanilla KF", m.run_vanilla_kf(T_init, P_init, u_meas, z, body, dt, Q, point_std), C["orange"])]
+    _, ekf_err = m.pose_errors(T_true, T_ekf)
+    floor = 1e-16                                   # log axes: exact zeros are drawn at this floor
+    k = np.arange(len(T_ekf))
+
+    fig, (ax_p, ax_r) = plt.subplots(1, 2)
+    ax_p.plot(k[1:], ekf_err[1:], color=TRUTH, lw=1.4, ls=":", label="for scale: EKF's own position error to the truth")
+    for name, T_x, col in others:
+        pos = np.array([np.linalg.norm(a[:3, 3] - b[:3, 3]) for a, b in zip(T_ekf, T_x)])
+        rot = np.degrees([rotation_geodesic_error(a[:3, :3], b[:3, :3]) for a, b in zip(T_ekf, T_x)])
+        print(f"    {name:<10s} max pos {pos.max():.3e} m (k = {pos.argmax()})  final {pos[-1]:.1e} m  "
+              f"max rot {rot.max():.1e} deg  exact zeros {int(np.sum(pos[1:] == 0))}/{len(pos) - 1}")
+        ax_p.plot(k[1:], np.maximum(pos[1:], floor), color=col, lw=1.9, marker="o", ms=3, label=name)
+        ax_r.plot(k[1:], np.maximum(rot[1:], floor), color=col, lw=1.9, marker="o", ms=3, label=name)
+    print(f"    EKF final position error {ekf_err[-1]:.4f} m")
+    for ax, unit in ((ax_p, "m"), (ax_r, "deg")):
+        ax.axhspan(floor * 0.5, 1e-12, color=PRIOR, alpha=0.15, lw=0,
+                   label="floating-point rounding (≤ 1e-12; exact 0 drawn at 1e-16)")
+        ax.set(yscale="log", ylim=(floor * 0.5, 1.0), xlabel="pose index k (dt = 0.1 s)", xlim=(0, len(k)))
+        ax.set_ylabel(f"gap to EKF ({unit})")
+    ax_p.set_title("Position gap to the EKF trajectory")
+    ax_r.set_title("Rotation gap to the EKF trajectory")
+    handles, labels = ax_p.get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=3, fontsize=9)
+    finish(fig, "pose_tracking_gap_concept", "Same data, three filters, distance to the EKF at every pose",
+           "pointcloud_pose_tracking.py defaults (seed 0, 5 s, dt = 0.1, 51 poses); k = 0 is the shared start, "
+           "k = 1 the first update (the largest correction)", bottom=0.11)
+
+
+def fig_inchworm_cross_check_concept():
+    """inchworm_two_pad_fusion_ekf.md §1.4: along-body anchored reading vs moving reading minus the commanded stroke,
+    per tick, for the first 10 trials of the script's defaults; what happened vs what cross_check decided."""
+    from state_estimation_simulations.use_numpy import inchworm_two_pad_fusion_ekf as m
+
+    n_trials = 10
+    args = m.build_parser().parse_args([])           # script defaults, seed 0, same draw order as its main()
+    rng = np.random.default_rng(args.seed)
+    setup = m.build_setup(args, rng)
+    pts = []                                         # x, y (mm per tick), truth class, verdict
+    for _ in range(n_trials):
+        tr = m.simulate_trial(args, setup, rng)
+        _, _, _, verdicts = m.run_trial(tr, args, setup, "cross_check")
+        for k in range(len(tr["back"])):
+            s = 1.0 if tr["back"][k] else -1.0
+            e = m.commanded_change(tr["e_cmd"][k], tr["z"][k][0])   # as run_ekf computes it
+            slip = m.slip_speed((k + 0.5) * args.dt, setup["episodes"], args.t_ramp, args.v_slip) > 0.0
+            fa, fm = tr["fault_a"][k], tr["fault_m"][k]
+            if fa != m.NO_FAULT and fm != m.NO_FAULT:
+                cls = "both sensors faulty"
+            elif fa != m.NO_FAULT:
+                cls = "anchored " + ("spike" if fa == m.SPIKE else "dropout")
+            elif fm != m.NO_FAULT:
+                cls = "moving " + ("spike" if fm == m.SPIKE else "dropout")
+            else:
+                cls = "slip, no fault" if slip else "healthy, no slip"
+            pts.append((tr["d_a"][k][0] * 1e3, (tr["d_m"][k][0] - s * e[0]) * 1e3, cls, verdicts[k] or "agree"))
+    x = np.array([p[0] for p in pts])
+    y = np.array([p[1] for p in pts])
+    cls = np.array([p[2] for p in pts])
+    ver = np.array([p[3] for p in pts])
+    for c in dict.fromkeys(cls):
+        sel = cls == c
+        print(f"    {c:<20s} {sel.sum():5d} ticks; verdicts " +
+              ", ".join(f"{v} {int(np.sum(ver[sel] == v))}" for v in ("agree", "anchored", "moving")))
+
+    styles = {"healthy, no slip": (PRIOR, "o", 7), "slip, no fault": (C["red"], "o", 14),
+              "anchored spike": (C["purple"], "s", 16), "moving spike": (C["purple"], "^", 18),
+              "anchored dropout": (TRUTH, "s", 16), "moving dropout": (TRUTH, "^", 18),
+              "both sensors faulty": (C["gold"], "D", 16)}
+    vstyle = {"agree": (PRIOR, "sensors agree: fuse both"),
+              "anchored": (C["blue"], "anchored sensor blamed"),
+              "moving": (C["orange"], "moving sensor blamed")}
+    fig, (ax_t, ax_v) = plt.subplots(1, 2, figsize=(12, 7.4))
+    for c, (col, mk, sz) in styles.items():
+        sel = cls == c
+        ax_t.scatter(x[sel], y[sel], s=sz, marker=mk, color=col, alpha=0.75, lw=0, label=f"{c} ({sel.sum()})")
+    for v, (col, lab) in vstyle.items():
+        sel = ver == v
+        ax_v.scatter(x[sel], y[sel], s=7 if v == "agree" else 14, color=col, alpha=0.75, lw=0,
+                     label=f"{lab} ({sel.sum()})")
+    lim = (min(x.min(), y.min()) - 0.5, max(x.max(), y.max()) + 0.5)
+    for ax in (ax_t, ax_v):
+        ax.plot(lim, lim, color="#555555", lw=1, ls="--", zorder=0)
+        ax.text(lim[0] + 0.3, lim[0] + 1.0, "agree: y = x", rotation=45, fontsize=9, color="#555555")
+        ax.set(xlim=lim, ylim=lim, xlabel="anchored pad's reading (mm per tick)",
+               ylabel="moving pad's reading − commanded stroke (mm per tick)")
+        ax.set_aspect("equal")
+        legend_below(ax, ncol=2)
+    ax_t.set_title("What happened")
+    ax_v.set_title("What cross_check decided")
+    finish(fig, "inchworm_cross_check_concept", "Slips lie on the diagonal, most single-sensor faults off it "
+           "(inchworm_two_pad_fusion_ekf.md §1.4)",
+           f"inchworm_two_pad_fusion_ekf.py defaults, seed 0, first {n_trials} trials, one dot per tick; along-body "
+           "parts, backward < 0 (the test uses both body axes)", bottom=0.13)
+
+
+def fig_triangulation_baseline_concept():
+    """triangulation_pnp.md §2 tiny example: two rectified cameras, f = 800 px, Z = 10 m, disparity noise 1 px,
+    baseline 1 m vs 0.1 m; repeated closed-form triangulate_landmark solves vs the Z²σ/(fB) estimate."""
+    from state_estimation_simulations.use_numpy import bundle_adjustment_advanced as ba
+
+    K = (800.0, 800.0, 320.0, 240.0)
+    f, Z, sigma, n = K[0], 10.0, 1.0, 2000
+    P_true = np.array([0.0, 0.0, Z])
+    rng = np.random.default_rng(SEED)
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5.6), gridspec_kw={"width_ratios": [1, 1, 1.1]})
+    ax_h = axes[2]
+    for ax, B, col in zip(axes, (1.0, 0.1), (C["blue"], C["purple"])):
+        T_obs = []
+        for cx in (-B / 2, B / 2):                   # camera-to-world poses, both looking along +z
+            T = np.eye(4)
+            T[0, 3] = cx
+            T_obs.append(T)
+        z_true = [np.array([f * (P_true[0] - T[0, 3]) / Z + K[2], K[3]]) for T in T_obs]
+        P = np.array([ba.triangulate_landmark(T_obs, [zt + rng.normal(0.0, sigma / np.sqrt(2), 2) for zt in z_true], K)
+                      for _ in range(n)])            # sigma/sqrt(2) per image -> disparity noise std = sigma
+        pred = Z ** 2 * sigma / (f * B)
+        print(f"    B = {B:g} m: depth std {P[:, 2].std():.3f} m (formula {pred:.3f}), lateral std {P[:, 0].std():.4f} m,"
+              f" depth 5-95% [{np.percentile(P[:, 2], 5):.2f}, {np.percentile(P[:, 2], 95):.2f}] m")
+        for T in T_obs:
+            c = T[:3, 3]
+            ax.plot([c[0], P_true[0]], [c[2], P_true[2]], color=C["orange"], lw=1)
+            ax.scatter([c[0]], [c[2]], marker="s", s=50, color=TRUTH, zorder=4)
+        ax.scatter(P[:, 0], P[:, 2], s=4, color=col, alpha=0.35, lw=0, zorder=5,
+                   label=f"{n} noisy triangulations: depth std {P[:, 2].std():.2f} m")
+        ax.scatter([P_true[0]], [P_true[2]], marker="*", s=200, facecolor="none", edgecolor=TRUTH, lw=1.2, zorder=6,
+                   label="true point (Z = 10 m)")
+        ax_h.hist(P[:, 2], bins=np.arange(5.0, 15.01, 0.1), color=col, alpha=0.6,
+                  label=f"B = {B:g} m: std {P[:, 2].std():.2f} m (formula {pred:.3f} m)")
+        ax.plot([], [], color="none", label=f"Z²σ/(fB) = {pred:.3f} m")
+        ax.set(xlim=(-1.0, 1.0), ylim=(-0.5, 15.0), xlabel="x (m)", ylabel="depth z (m)",
+               title=f"Baseline B = {B:g} m (cameras = squares)")
+        ax.tick_params(axis="x", labelsize=8.5)
+        legend_below(ax, ncol=1)
+    ax_h.axvline(Z, color=TRUTH, lw=1, ls="--")
+    ax_h.set(xlabel="triangulated depth z (m)", ylabel=f"count (of {n})", title="Depth of the same point, both baselines")
+    legend_below(ax_h, ncol=1)
+    finish(fig, "triangulation_baseline_concept", "A shorter baseline stretches the depth uncertainty "
+           "(triangulation_pnp.md §2)",
+           "Two rectified cameras, f = 800 px, 1 px disparity noise; triangulate_landmark from "
+           "bundle_adjustment_advanced.py, seed 0; top view, x and z drawn at different scales")
+
+
+def fig_gait_phase_window_concept():
+    """gait_phase_ekf.md §4: detector-trigger times relative to the expected detection (true lag + mean delay),
+    for terrain spread 30/60/100 ms (40 trials each, seed 0), against the CPG window and the phase-EKF gates."""
+    from state_estimation_simulations.use_numpy import gait_phase_ekf as m
+
+    n_trials, levels = 40, (0.03, 0.06, 0.10)
+    fig, axes = plt.subplots(len(levels), 1, figsize=(12, 8.2), sharex=True)
+    bins = np.arange(-0.45, 0.45001, 0.02)
+    for ax, terr in zip(axes, levels):
+        args = m.build_parser().parse_args(["--terrain-std", str(terr)])
+        rng = np.random.default_rng(args.seed)
+        true_off, false_off, blocked_off, ekf_std = [], [], [], []
+        for _ in range(n_trials):
+            *_, info = m.simulate_trial(args, rng)
+            for j, ((_, _, d, _), trig, f) in enumerate(zip(info["steps"], info["triggers"], info["false_ticks"])):
+                expected = d * args.dt + info["lag"][j] + args.det_delay
+                for k in trig:
+                    off = k * args.dt - expected
+                    if f is not None and k == f:
+                        false_off.append(off)
+                    elif info["is_blocked"][j]:
+                        blocked_off.append(off)
+                    else:
+                        true_off.append(off)
+            late = np.array([d * args.dt for (_, _, d, _) in info["steps"]]) > 5.0      # past the initial transient
+            ekf_std.append(info["ekf_std"][late])
+        R = terr ** 2 + args.det_delay_std ** 2 + args.dt ** 2 / 12.0
+        sqrt_S = np.sqrt(np.median(np.concatenate(ekf_std)) ** 2 + R)
+        true_off, false_off = np.array(true_off), np.array(false_off)
+        print(f"    terrain {terr * 1e3:.0f} ms: {len(true_off)} true, {len(false_off)} false "
+              f"[{false_off.min():.3f}, {false_off.max():.3f}] s, {len(blocked_off)} blocked; sqrt(S) {sqrt_S * 1e3:.0f} ms "
+              f"(sqrt(R) {np.sqrt(R) * 1e3:.0f}); false inside 3σ {np.mean(false_off >= -3 * sqrt_S):.0%}, "
+              f"2σ {np.mean(false_off >= -2 * sqrt_S):.0%}, CPG {np.mean(false_off >= -args.cpg_window):.0%}; "
+              f"true outside CPG {np.mean(true_off < -args.cpg_window):.1%}")
+        ax.hist(true_off, bins=bins, color=C["green"], alpha=0.75, label="true detections")
+        ax.hist(false_off, bins=bins, color=C["red"], alpha=0.85, label="false triggers")
+        ax.hist(blocked_off, bins=bins, color=C["gold"], alpha=0.9, label="blocked leg (late)")
+        for x, ls, col, lab in ((-args.cpg_window, "-", TRUTH, "cpg window (0.1 s)"),
+                                (-3 * sqrt_S, "--", C["blue"], "phase_ekf gate 3σ (default)"),
+                                (-2 * sqrt_S, ":", C["blue"], "phase_ekf gate 2σ")):
+            ax.axvline(x, color=col, ls=ls, lw=1.8, label=lab)
+        ax.set_yscale("log")
+        ax.set_ylim(0.7, 3000)
+        ax.set_ylabel("triggers")
+        ax.set_title(f"Terrain spread {terr * 1e3:.0f} ms:  √S ≈ {sqrt_S * 1e3:.0f} ms, so 3σ reaches "
+                     f"{3 * sqrt_S:.2f} s and 2σ {2 * sqrt_S:.2f} s", loc="left", fontsize=10.5)
+    axes[-1].set_xlabel("trigger time − expected detection (s);  a gate accepts what lies right of its line")
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="lower center", ncol=6, fontsize=9)
+    finish(fig, "gait_phase_window_concept", "Where the acceptance window must sit (gait_phase_ekf.md §4)",
+           f"gait_phase_ekf.py defaults except terrain spread, {n_trials} trials each, seed 0. Expected detection = "
+           "commanded touchdown + true lag + mean delay", bottom=0.05)
+
+
+def fig_ekf_unobservable_concept():
+    """kf_ekf_iekf.md "But here's the problem with EKF": schematic only, no simulation and no numbers. Covariance
+    ellipses over successive updates when one direction (global yaw) is unobservable."""
+    n_upd = 5
+    obs_sd = 1.6 * 0.62 ** np.arange(n_upd)          # the observable direction tightens with each update
+    yaw_honest = np.full(n_upd, 1.6)
+    yaw_ekf = 1.6 * 0.72 ** np.arange(n_upd)          # spurious shrinking along yaw
+    err = np.array([1.05, 0.12])                     # one possible true error, fixed for the picture
+    fig, axes = plt.subplots(1, 2, figsize=(12.5, 5.6))
+    for ax, yaw_sd, title in ((axes[0], yaw_honest, "Consistent filter (e.g. invariant EKF)"),
+                              (axes[1], yaw_ekf, "Standard EKF, linearized at drifting estimates")):
+        for k in range(n_upd):
+            last = k == n_upd - 1
+            ax.add_patch(Ellipse((0, 0), 2 * 2 * yaw_sd[k], 2 * 2 * obs_sd[k], fill=False,
+                                 ec=C["blue"] if last else PRIOR, lw=2.2 if last else 1.0, alpha=1 if last else 0.7))
+        ax.plot(*err, "*", ms=15, color=C["red"], zorder=5)
+        inside = (err[0] / (2 * yaw_sd[-1])) ** 2 + (err[1] / (2 * obs_sd[-1])) ** 2 <= 1
+        ax.annotate("true error" + (": inside, covered" if inside else ": outside, overconfident"), err,
+                    xytext=(10, 22), textcoords="offset points", fontsize=9.5, color=C["red"])
+        ax.set(xlim=(-3.6, 3.6), ylim=(-3.6, 3.6), xticks=[], yticks=[], title=title,
+               xlabel="global yaw offset (unobservable: no sensor sees it)",
+               ylabel="an observed direction")
+        ax.set_aspect("equal")
+    axes[0].plot([], [], color=PRIOR, lw=1, label="covariance after earlier updates")
+    axes[0].plot([], [], color=C["blue"], lw=2.2, label="covariance now")
+    fig.legend(*axes[0].get_legend_handles_labels(), loc="lower center", ncol=2, fontsize=9)
+    axes[0].set_title("Consistent filter (e.g. invariant EKF)\nstays wide along yaw")
+    axes[1].set_title("Standard EKF, linearized at drifting estimates\nshrinks along yaw although nothing measured it")
+    finish(fig, "ekf_unobservable_concept", "An EKF can become confident about what it never measured "
+           "(kf_ekf_iekf.md, the problem with EKF)",
+           "Schematic, not a simulation: shapes and sizes are made up; only the trend is the point", bottom=0.06)
+
+
+def fig_lidar_residuals_concept():
+    """lidar_primitives.md §3: the three residuals of the doc's table for one source point, in a 2-D cross-section
+    (formulas only, no scan)."""
+    tq = np.array([[x, 0.0] for x in np.arange(-1.2, 1.21, 0.4)])     # target scan points on a wall (rings)
+    p = np.array([0.32, 0.45])                                       # one source point, mapped by T
+    q = tq[np.argmin(np.linalg.norm(tq - p, axis=1))]
+    n_q = np.array([0.0, 1.0])
+    pillar_c, pillar_r = np.array([0.55, 1.65]), 0.3
+    p_cyl = np.array([0.05, 1.25])
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5.2))
+    for ax in axes:
+        ax.plot([-1.5, 1.5], [0, 0], color=PRIOR, lw=6, alpha=0.35, solid_capstyle="butt")
+        ax.scatter(tq[:, 0], tq[:, 1], s=28, color=TRUTH, zorder=3)
+        ax.plot(*p, "o", ms=9, color=C["orange"], mec=TRUTH, zorder=5)
+        ax.annotate("Tp", p, xytext=(8, 4), textcoords="offset points", fontsize=10.5)
+        ax.set(xlim=(-1.5, 1.5), ylim=(-0.45, 2.15), xticks=[], yticks=[])
+        ax.set_aspect("equal")
+        ax.text(-1.45, -0.32, "wall (target surface)", fontsize=9, color="#555555")
+    arrow = dict(arrowstyle="-|>", lw=2.2, mutation_scale=16)
+    # (a) point-to-point: the full vector to the nearest target point
+    axes[0].annotate("", q, p, arrowprops=dict(arrow, color=C["red"]))
+    axes[0].annotate("q (nearest target point)", q, xytext=(-6, -16), textcoords="offset points", fontsize=9)
+    axes[0].set_title(f"(a) point-to-point: Tp − q (3 rows), length {np.linalg.norm(p - q):.2f}", fontsize=10.5)
+    # (b) point-to-plane: only the component along the target normal n_q
+    foot = p - n_q * (n_q @ (p - q))
+    axes[1].annotate("", foot, p, arrowprops=dict(arrow, color=C["red"]))
+    axes[1].annotate("", q + 0.35 * n_q, q, arrowprops=dict(arrowstyle="-|>", color=C["blue"], lw=1.6))
+    axes[1].annotate("n_q", q + 0.35 * n_q, xytext=(6, -10), textcoords="offset points", fontsize=9.5,
+                     color=C["blue"])
+    axes[1].plot([q[0], foot[0]], [q[1], foot[1]], ":", color=TRUTH, lw=1)
+    axes[1].annotate("", (p[0] + 0.45, p[1]), (p[0] - 0.45, p[1]),
+                     arrowprops=dict(arrowstyle="<->", color=C["green"], lw=1.6))
+    axes[1].text(p[0], p[1] + 0.12, "sliding along the wall: free", ha="center", fontsize=9, color=C["green"])
+    axes[1].set_title(f"(b) point-to-plane: n_qᵀ(Tp − q) = {n_q @ (p - q):.2f}", fontsize=10.5)
+    # (c) primitives: distance to the fitted plane, and to a fitted cylinder (axis out of the page)
+    axes[2].annotate("", (p[0], 0.0), p, arrowprops=dict(arrow, color=C["red"]))
+    axes[2].text(1.45, 0.08, "fitted plane: nᵀx + d = 0", ha="right", fontsize=9, color="#555555")
+    axes[2].add_patch(plt.Circle(pillar_c, pillar_r, fill=False, ec=PRIOR, lw=4, alpha=0.6))
+    axes[2].plot(*pillar_c, "+", ms=10, color=TRUTH)
+    axes[2].text(*(pillar_c + [0.36, 0.12]), "fitted cylinder\n(axis a, centre c, radius r)", fontsize=9, color="#555555")
+    u = (p_cyl - pillar_c) / np.linalg.norm(p_cyl - pillar_c)
+    axes[2].plot(*p_cyl, "o", ms=9, color=C["orange"], mec=TRUTH, zorder=5)
+    axes[2].annotate("Tp′", p_cyl, xytext=(-26, -4), textcoords="offset points", fontsize=10.5)
+    axes[2].annotate("", pillar_c + pillar_r * u, p_cyl, arrowprops=dict(arrow, color=C["red"]))
+    axes[2].set_title(f"(c) primitives: plane nᵀTp + d = {p[1]:.2f}\ncylinder ‖(I − aaᵀ)(Tp′ − c)‖ − r = "
+                      f"{np.linalg.norm(p_cyl - pillar_c) - pillar_r:.2f}", fontsize=10.5)
+    finish(fig, "lidar_residuals_concept", "Three residuals for one point (lidar_primitives.md §3)",
+           "2-D cross-section with made-up coordinates; red = the residual each method minimizes. "
+           "The planar wall's fitted plane is drawn on the wall itself")
+
+
+def fig_umeyama_scale_concept():
+    """umeyama_alignment.md §1 tiny example: (X, Z) = (1, 5) and (2, 10) land on the same pixel; doubling a
+    two-camera scene changes no pixel either (f_x = 800 px, principal point ignored as in the doc)."""
+    f = 800.0
+
+    def pixel(cam_x, P):                             # cameras at (cam_x, 0), looking along +Z, no rotation
+        return f * (P[0] - cam_x) / P[1]
+
+    fig, (ax_a, ax_b) = plt.subplots(1, 2, figsize=(13, 5.0))
+    P1, P2 = np.array([1.0, 5.0]), np.array([2.0, 10.0])
+    ax_a.plot([0, P2[1] * 1.1], [0, P2[0] * 1.1], color=C["orange"], lw=1.4)
+    ax_a.plot(0, 0, "s", ms=11, color=TRUTH)
+    for P, col, lab in ((P1, C["blue"], "(1, 5)"), (P2, C["purple"], "(2, 10)")):
+        ax_a.plot(P[1], P[0], "o", ms=10, color=col, zorder=4)
+        ax_a.annotate(f"(X, Z) = {lab}: u = {pixel(0, P):.0f} px", (P[1], P[0]), xytext=(-40, 14),
+                      textcoords="offset points", fontsize=9.5, color=col)
+    ax_a.set(title="(a) One camera: a point twice as far and twice as wide, same pixel", xlabel="depth Z (m)",
+             ylabel="lateral X (m)", xlim=(-0.5, 12), ylim=(-0.8, 3.0))
+
+    cams, P = np.array([0.0, 1.0]), np.array([0.5, 4.0])
+    for s, col, ls, mfc in ((2.0, C["purple"], "--", "none"), (1.0, C["blue"], "-", C["blue"])):
+        u = [pixel(s * c, s * P) for c in cams]
+        for c in cams:
+            ax_b.plot([0, s * P[1]], [s * c, s * P[0]], color=col, ls=ls, lw=1.3)
+            ax_b.plot(0, s * c, "s", ms=14 if s > 1 else 8, color=col, mfc=mfc, mew=2)
+        ax_b.plot(s * P[1], s * P[0], "o", ms=10, color=col, zorder=4,
+                  label=f"scene × {s:g}: baseline {s * (cams[1] - cams[0]):g} m, pixels u = {u[0]:.0f}, {u[1]:.0f} px")
+    ax_b.set(title="(b) Two cameras: doubling everything changes no pixel", xlabel="depth Z (m)",
+             ylabel="lateral X (m)", xlim=(-0.5, 9), ylim=(-0.5, 2.6))
+    legend_below(ax_b, ncol=1)
+    ax_a.plot([], [], " ", label="the pixel fixes only the ray's direction X/Z")
+    legend_below(ax_a, ncol=1)
+    finish(fig, "umeyama_scale_concept", "Why scale is not observable from images alone (umeyama_alignment.md §1)",
+           "Pinhole cameras with f_x = 800 px, principal point ignored as in the doc's tiny example; side view")
+
+
 FIGURES = {
     "pose_tracking": fig_pose_tracking,
     "imu_propagation_position_fix": fig_imu_propagation_position_fix,
@@ -2769,6 +4005,35 @@ FIGURES = {
     "lm_gradient_descent": fig_lm_gradient_descent,
     "sparse_fill_in_orderings": fig_sparse_fill_in_orderings,
     "robust_kernel_weights": fig_robust_kernel_weights,
+    "kf_update_concept": fig_kf_update_concept,
+    "linearization_range_concept": fig_linearization_range_concept,
+    "ukf_sigma_points_concept": fig_ukf_sigma_points_concept,
+    "quaternion_renormalization_concept": fig_quaternion_renormalization_concept,
+    "lie_group_tangent_concept": fig_lie_group_tangent_concept,
+    "rotation_order_concept": fig_rotation_order_concept,
+    "jacobian_local_map_concept": fig_jacobian_local_map_concept,
+    "jacobian_left_right_concept": fig_jacobian_left_right_concept,
+    "quaternion_sandwich_concept": fig_quaternion_sandwich_concept,
+    "factor_graph_loop_concept": fig_factor_graph_loop_concept,
+    "gauss_newton_bowl_concept": fig_gauss_newton_bowl_concept,
+    "lm_overshoot_concept": fig_lm_overshoot_concept,
+    "filtering_smoothing_timeline_concept": fig_filtering_smoothing_timeline_concept,
+    "yaw_unobservable_concept": fig_yaw_unobservable_concept,
+    "zeno_bounces_concept": fig_zeno_bounces_concept,
+    "elimination_game_ring_concept": fig_elimination_game_ring_concept,
+    "elimination_tree_fill_in_concept": fig_elimination_tree_fill_in_concept,
+    "elimination_tree_orderings_concept": fig_elimination_tree_orderings_concept,
+    "isam2_reordering_concept": fig_isam2_reordering_concept,
+    "umeyama_alignment_concept": fig_umeyama_alignment_concept,
+    "ba_schur_sparsity_concept": fig_ba_schur_sparsity_concept,
+    "imu_bias_sweep_concept": fig_imu_bias_sweep_concept,
+    "pose_tracking_gap_concept": fig_pose_tracking_gap_concept,
+    "inchworm_cross_check_concept": fig_inchworm_cross_check_concept,
+    "triangulation_baseline_concept": fig_triangulation_baseline_concept,
+    "gait_phase_window_concept": fig_gait_phase_window_concept,
+    "ekf_unobservable_concept": fig_ekf_unobservable_concept,
+    "lidar_residuals_concept": fig_lidar_residuals_concept,
+    "umeyama_scale_concept": fig_umeyama_scale_concept,
 }
 
 

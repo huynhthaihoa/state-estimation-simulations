@@ -12,6 +12,11 @@ What can such a robot know? Picture the whole world, robot and footholds include
 
 No reading changes, so **yaw** (the heading, the rotation about gravity) is **unobservable**, and so is **absolute position** (shift the whole world sideways: same argument). **Roll** and **pitch**, together the body's **tilt**, are **observable**, because gravity points one way ([glossary](../glossary.md#observability)).
 
+
+![Three panels: top views of the hexapod with its six footholds, as it is and with the whole scene rotated 50 degrees about gravity, both labeled with the same gyro, accelerometer and foot readings; and a side view of the body level and rolled 20 degrees, where gravity's components in body axes change](../../assets/yaw_unobservable_concept.png)
+
+*Figure: the argument above as a drawing, plotted by `uv run python generator/make_figures.py yaw_unobservable_concept`.*
+
 So a correct filter can only ever *lose* information about yaw. The experiments below check which filter respects that:
 
 - the **invariant EKF**, whose error dynamics do not depend on the estimate;

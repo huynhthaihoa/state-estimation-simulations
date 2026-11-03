@@ -146,9 +146,13 @@ What this shows:
 
 ![Three panels from invariant_saltation_ekf.py: height of the bouncing body for the ground truth and the filters (the dashed saltation + timing noise line coincides with saltation here); single-run position error; Monte Carlo average NEES over time with the consistent value of 9 and its 95% interval, the invariant-naive filter spiking after each bounce and the world-frame EKF elevated before the first bounce](../../assets/invariant_saltation_ekf.png)
 
+*Figure: `use_numpy/invariant_saltation_ekf.py` at its defaults (seed 0, 200 trials), plotted by `uv run python use_numpy/invariant_saltation_ekf.py --out assets/invariant_saltation_ekf.png`.*
+
 The same run, animated. The top panel shows the tumbling body bouncing among the four landmarks, with a sight line to each landmark whenever a measurement arrives. After the first measurements (about 0.2 s), all four position estimates stay within a few centimeters of the truth, so their markers overlap. The difference is in the bottom panel: the invariant-naive filter's NEES jumps to about 18 at the first bounce and needs about 1 s to fall back inside the 95% band (about 0.4 s after the next two bounces, whose spikes are smaller). No single state component's standard deviation is plotted, because none shows the problem. The naive filter's mistake is the missing rotation-velocity coupling of §4. Its horizontal-velocity standard deviation after a bounce is actually *larger* than the others' (just after the first one, the root-sum-square of the world-frame x and y standard deviations is 0.067 vs. 0.049 m/s; per axis, 0.047 vs. 0.035 m/s).
 
 ![Animation of the default run: top, a 3D view of the tumbling box bouncing on the ground among four landmarks, with dashed sight lines at each landmark measurement and overlapping position-estimate markers; bottom, the Monte Carlo average NEES of the four filters drawn up to the current time, with the invariant-naive filter spiking after each bounce and the world-frame EKF elevated before the first one](../../assets/invariant_saltation_ekf.gif)
+
+*Animation: `generator/animate_invariant_saltation_ekf.py` at its defaults (seed 0, 200 trials), rendered by `uv run python generator/animate_invariant_saltation_ekf.py --out assets/invariant_saltation_ekf.gif`.*
 
 ## 7. Contact-detection jitter
 
@@ -187,6 +191,8 @@ at each bounce. That is the fifth filter, "saltation + timing noise" (reset mode
 A tick is 10 ms, so 5 ms is half a tick. NEES before the first bounce does not change with the detection error (9.50 for the RIEKFs and 14.54 for the world-frame EKF, 4-seed means), and 0.14-0.21% of (trial, tick) pairs are excluded as mode-mismatched in every run.
 
 ![Three panels from invariant_saltation_ekf.py with 5 ms contact-detection jitter: height of the bouncing body; single-run position error; Monte Carlo average NEES over time, where every filter except saltation + timing noise jumps to between about 18 and 45 after each bounce and decays until the next one, while saltation + timing noise stays near 9](../../assets/invariant_saltation_ekf_jitter.png)
+
+*Figure: `use_numpy/invariant_saltation_ekf.py` with 5 ms detection jitter (seed 0, 200 trials), plotted by `uv run python use_numpy/invariant_saltation_ekf.py --detect-time-noise-std 0.005 --out assets/invariant_saltation_ekf_jitter.png`.*
 
 What this shows:
 - **Without the timing term, every filter becomes overconfident after bounces**, more so as the jitter grows. That is expected: none of their covariances contains the detection error.

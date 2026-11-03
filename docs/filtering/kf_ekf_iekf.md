@@ -66,6 +66,12 @@ The 15 m prediction vs. 14 m GPS from the start of this doc.
 - New variance: $`(1-K)P = 0.7 \cdot 3 = 2.1`$, smaller than both $`3`$ and $`7`$. A measurement never leaves us less sure.
 - The prediction step does the opposite: $P$ grows by $`Q`$, so we get less sure while we coast.
 
+
+![Two panels: left, three bell curves for the car's position, the prediction at 15 m with variance 3, the GPS reading at 14 m with variance 7, and the updated estimate at 14.7 m with variance 2.1, narrower than both; right, the 1D Kalman gain K = P/(P+R) against P/R on a log axis, rising from 0 (trust the prediction) to 1 (trust the measurement), with the example's point at P/R = 3/7, K = 0.3](../../assets/kf_update_concept.png)
+
+*Figure: the tiny example above, plotted by `uv run python generator/make_figures.py kf_update_concept`.*
+
+
 The standard KF is a straight ruler for a world that behaves like a straight line. It doesn't work directly for rotations, camera poses, or nonlinear robot dynamics.
 
 ### A concrete data point
@@ -133,6 +139,10 @@ The real problem is more subtle: **the EKF's Jacobians are evaluated at the curr
 - Each new linearization point acts like a slightly different ruler. Those small differences make the filter feel it measured yaw a little, so its covariance shrinks along a direction nobody observes. (Picture only, no number.)
 - **The result:** the EKF can inject spurious information into directions that should stay unobservable (for example, a global orientation offset no sensor can see). The filter is then overconfident in exactly those directions: its covariance claims less error than it really has, which makes it **inconsistent** ([consistency](../glossary.md#consistency-and-nees)). Huang, Mourikis, and Roumeliotis (2010) analyzed this consistency problem for EKF-SLAM.
 - The Invariant EKF goes back to Bonnabel (2007), and Barrau and Bonnabel (2017) proved its stability. Barrau and Bonnabel (2015) showed that an invariant EKF-SLAM keeps the unobservable directions unobservable, which gives it better consistency properties than the standard EKF.
+
+![Schematic with two panels of covariance ellipses over successive updates, global yaw on the horizontal axis and an observed direction on the vertical axis. A consistent filter's ellipse narrows only vertically and stays wide along yaw, so the true error stays inside it; the standard EKF's ellipse also shrinks along yaw, leaving the true error outside](../../assets/ekf_unobservable_concept.png)
+
+*Figure: schematic only, as above (no simulation; sizes are made up), plotted by `uv run python generator/make_figures.py ekf_unobservable_concept`.*
 
 That is where the Invariant EKF becomes interesting.
 

@@ -302,6 +302,11 @@ Two things to notice:
 
 So each side of the sandwich does **half** of the rotation. That is the reason for the half angle in §2.
 
+
+![Two panels: left, the X-axis vector rotated 45 degrees after one multiplication and 90 degrees after the full sandwich; right, bar charts of the Z-axis as a quaternion, which gains w = -0.707 after one multiplication and is back to (0, 0, 0, 1) after the sandwich](../../assets/quaternion_sandwich_concept.png)
+
+*Figure: the table above, computed with `quat_multiply`, plotted by `uv run python generator/make_figures.py quaternion_sandwich_concept`.*
+
 ### Step 3: why the sandwich rotates by exactly $\theta$
 
 The example generalizes. From here on, a vector inside a product means its pure quaternion, e.g. $\mathbf{v}$ stands for $(0, \mathbf{v})$.
