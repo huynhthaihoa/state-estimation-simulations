@@ -107,6 +107,8 @@ Think of a curved road: we don't need to understand the whole curve, only to app
 
 *Figure: the tangent is an excellent stand-in when the uncertainty is small (σ = 5°: 0.3 cm gap, means 0.863 vs. 0.866 m) and a poor one when it is large (σ = 40°: 17.5 cm gap, true mean 0.678 m vs. the EKF's 0.866 m). Plotted by `uv run python generator/make_figures.py ekf_linearization_concept`.*
 
+An animation of the same figure, with $`\sigma`$ sweeping from 1° to 40°, is in [the Jacobian doc, §6](../foundations/jacobian.md#6-the-mountain-picture).
+
 Concretely, the EKF plugs the Jacobian into §1's same two-step cycle, for $x_k = f(x_{k-1}, u_{k-1}) + w_{k-1}$ and $z_k = h(x_k) + v_k$, where $`f`$ is the nonlinear motion model driven by the control input $`u`$, and $`h`$ is the nonlinear measurement model ([glossary](../glossary.md#ekf-extended-kalman-filter)).
 
 ### Prediction step

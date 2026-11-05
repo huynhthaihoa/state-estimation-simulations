@@ -159,6 +159,12 @@ We can still ask local questions: "If I take one tiny step north, what happens t
 
 *Figure: $`\cos\theta`$ is the x-step of a robot moving 1 m at heading $`\theta`$. The tangent at the estimate (30°) is an excellent stand-in for the curve when the uncertainty is small (5°: 0.3 cm gap) and a poor one when it is large (40°: 17.5 cm gap).*
 
+The animation sweeps the heading uncertainty $`\sigma`$ (the standard deviation of $`\theta`$) from 1° to 40° in log-spaced steps, with a short pause at 5°, then holds at 40°. Left: the same curve and tangent, the band $`\hat\theta \pm \sigma`$ widening, and the **tangent gap** (the vertical distance between curve and tangent) at $`\hat\theta + \sigma`$, printed in cm. Right: the **Monte Carlo** histogram of $`\cos\theta`$ for $`\theta \sim \mathcal{N}(\hat\theta, \sigma^2)`$ (draw many headings, push each through $`\cos`$) against the EKF's Gaussian, whose mean is $`\cos\hat\theta`$ and whose standard deviation is $`|\sin\hat\theta|\,\sigma`$, with the true Monte Carlo mean next to the EKF mean. All numbers are the static figure's math (200 000 draws, seed 0); the same draws are reused at every $`\sigma`$ and only scaled, so the histogram morphs smoothly. The generator asserts that at 5° and 40° the numbers match the captions above (0.3 cm and 17.5 cm gaps; means 0.863 vs. 0.866 m at 5°, 0.678 vs. 0.866 m at 40°). Illustrative: the right panel's axes rescale every frame so the small-$`\sigma`$ histogram stays visible.
+
+![Animation: as σ grows from 1° to 40°, the band around θ̂ = 30° widens, the gap between cos θ and its tangent at θ̂ + σ grows from 0 to 17.5 cm, and the Monte Carlo histogram of cos θ moves away from the EKF's Gaussian: the true mean falls from 0.866 m to 0.678 m while the EKF's stays at 0.866 m](../../assets/ekf_linearization.gif)
+
+*Animation: `uv run python generator/animate_ekf_linearization.py --out assets/ekf_linearization.gif` (seed 0, 15 fps, 80 dpi).*
+
 The EKF does exactly this around its current estimate.
 
 ---
