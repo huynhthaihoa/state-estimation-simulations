@@ -1,6 +1,6 @@
 # Glossary
 
-Short definitions of the terms used by more than one doc in this folder, grouped by topic. A term only one doc uses is defined in that doc. Each entry gives a definition, the symbol the docs use for it (if any), and a link to the section that explains it fully. Each term is its own heading, so other docs link to the exact entry, e.g. `glossary.md#information-matrix`.
+Short definitions of the terms used by more than one doc in this folder, plus some key terms of single docs, grouped by topic. Any other term only one doc uses is defined in that doc. Each entry gives a definition, the symbol the docs use for it (if any), and a link to the section that explains it fully. Each term is its own heading, so other docs link to the exact entry, e.g. `glossary.md#information-matrix`.
 
 Notation follows the docs. These symbols are shared by many entries: $^\top$ is transpose, $I$ the identity, $\hat x$ an estimate, $\Delta x$ a solver step, $e$ or $r$ a residual, $J$ a Jacobian, $P$ or $\Sigma$ a covariance, $\Omega$ an information matrix, and $`H = J^\top \Omega J`$ the Gauss-Newton Hessian. A pose $T$ is updated as $T\cdot\mathrm{Exp}(\Delta x)$, and a pose's tangent vector is $\xi = [v, \omega]$ (translation part $`v`$ first, then rotation part $`\omega`$). Two letters change meaning by section: in the Kalman-filter entries (§6) $H$ is the measurement matrix and $R$ the measurement-noise covariance, and in §7 $R$ is the reset map; elsewhere $R$ is a rotation. Any other symbol is defined in the entry that uses it.
 
@@ -93,6 +93,9 @@ An estimator is **consistent** when its reported covariance matches the errors i
 ### Chi-square distribution
 **Symbol:** $`\chi^2_k`$. The distribution of a sum of $k$ squared independent standard-normal values ($k$ degrees of freedom); its mean is $k$. A consistent filter's NEES and NIS follow it, and so, roughly, does a correctly weighted squared error $`e^\top \Omega\, e`$. That is why optimizers print their weighted cost as "chi-squared error", and why consistency bounds and outlier-gating thresholds are its quantiles (e.g. 6.63 is the 99% point for $k = 1$). See [linear_nonlinear.md §4.4](filtering/linear_nonlinear.md#44-after-the-fact-consistency-tests).
 
+### Gating (chi-square gate)
+Rejecting a measurement whose NIS $`\nu^\top S^{-1}\nu`$ (see Innovation and Kalman gain, §6) is above a chi-square quantile, e.g. the 99% point (11.34 for 3 dimensions), because a correct measurement would rarely be that far from the prediction. It protects the filter from outliers such as a slipping foot or a camera's pose jump. If the outlier persists, almost every later reading can fail the gate too, so the sensor is all but shut out (a **lockout**). See [hexapod_gait_ekf.md §3](filtering/hexapod_gait_ekf.md#3-one-slipping-leg-the-gait-barely-matters-gating-does) and [hexapod_camera_fusion_inekf.md §4](filtering/hexapod_camera_fusion_inekf.md#4-experiment-2-one-pose-jump-and-one-dropout-per-run).
+
 ### Monte Carlo trials
 Repeating a randomized simulation many times with different noise to measure typical behavior instead of one lucky or unlucky run. For a NEES check, each trial should redraw every random source the filter models; this repo's saltation script at its defaults redraws only the initial error and measurement noise, plus detection-time jitter when `--detect-time-noise-std` > 0 (its truth has no process noise), so its NEES reads low. See [hybrid_saltation_ekf.md §1.1](filtering/hybrid_saltation_ekf.md#11-the-filter-math-concretely) and [§6](filtering/hybrid_saltation_ekf.md#6-the-empirical-finding-a-modest-real-gap-not-a-dramatic-one).
 
@@ -104,6 +107,24 @@ A direction of the state is observable if some measurement can determine it, and
 
 ### Bias
 **Symbols:** $b_g$, $b_a$. The slowly varying offset in an IMU's gyroscope and accelerometer readings, usually estimated as part of the state. See [vi_initialization.md §1](frontend/vi_initialization.md#1-the-bootstrapping-problem) and [imu_preintegration.md §4](optimization/imu_preintegration.md#4-the-bias-sensitivity-jacobians).
+
+### Quantization noise
+The error from rounding a reading to a fixed step $`\Delta`$, such as an encoder's resolution. If the true value falls anywhere within a step with equal chance, the error is spread evenly over one step, with std $`\Delta/\sqrt{12}`$. It is often modeled as white noise of that std. For the AX-12A servo's 0.29° step that is 0.084°. When each reading is the difference of two rounded counts, such as wheel-encoder ticks per interval, the errors cancel when the readings are summed, so white noise of that size overstates how the error grows ([skid_steer_odometry_ekf.md §3](filtering/skid_steer_odometry_ekf.md#3-experiment-1-slip-coefficient-1875-30-trials)). See [hexapod_redundant_leg_inekf.md §1.2](filtering/hexapod_redundant_leg_inekf.md#12-encoder-readings).
+
+### Noise density
+How strong a sensor's white noise is per square root of bandwidth, e.g. a gyro's °/s/√Hz. Read every $`\Delta t`$ seconds, each sample's noise std is the density divided by $`\sqrt{\Delta t}`$: 0.03 °/s/√Hz read at 50 Hz gives 0.21 °/s. See [skid_steer_odometry_ekf.md §2](filtering/skid_steer_odometry_ekf.md#2-filters).
+
+### Half-normal distribution
+The size of a normal draw with its sign removed: $`|z|\,\sigma`$, with $`z`$ standard normal. Its mean is $`\sigma\sqrt{2/\pi} \approx 0.80\,\sigma`$, so a sum of such draws grows in proportion to their number, while a sum of zero-mean noise grows only with its square root. See [magnetic_inchworm_odometry_ekf.md §1.2](filtering/magnetic_inchworm_odometry_ekf.md#12-the-simulated-robot).
+
+### Log-odds
+For a probability $`p`$, the number $`\log\big(p/(1-p)\big)`$: 0 at $`p = 0.5`$, positive above, negative below, and unbounded as $`p`$ nears 0 or 1. Evidence from independent sources adds in log-odds, which is why probabilities are often combined this way. See [gait_phase_torque_ekf.md §2](filtering/gait_phase_torque_ekf.md#2-detectors).
+
+### Logistic function and logistic regression
+**Symbols:** $`\beta_0`$, $`\beta_1`$. The logistic function $`1/(1 + e^{-z})`$ turns any log-odds $`z`$ back into a probability between 0 and 1. **Logistic regression** fits $`z = \beta_1 x + \beta_0`$ (a slope and an offset in a measured quantity $`x`$) to labeled examples, giving $`P(\text{yes} \mid x)`$. Camurri et al. use it for a foot's contact probability given its estimated force. See [gait_phase_torque_ekf.md §2](filtering/gait_phase_torque_ekf.md#2-detectors).
+
+### Base rate
+The fraction of labeled examples that are positive, e.g. the share of training samples taken after a true touchdown. A classifier fitted to those examples carries the base rate inside it as a built-in prior. So before its output is combined with another prior, the base rate's log-odds are subtracted, to avoid counting a prior twice. See [gait_phase_torque_ekf.md §2](filtering/gait_phase_torque_ekf.md#2-detectors).
 
 ---
 
@@ -117,6 +138,9 @@ Choosing the unknowns that minimize the sum of weighted squared residuals, $\sum
 
 ### Jacobian
 **Symbol:** $J$. The matrix of first derivatives of the residuals with respect to the unknowns: entry $(i,j)$ says how much residual $i$ changes when unknown $j$ is nudged. See [jacobian.md §2](foundations/jacobian.md#2-now-imagine-multiple-inputs-and-outputs).
+
+### Null space
+**Symbol:** $`n`$ with $`J n = 0`$. The set of input directions a matrix maps to zero: moving the unknowns along them does not change the output, so no measurement through that matrix can tell where along them they are. A wide matrix (more inputs than outputs) always has one. A 4-joint leg's 3×4 Jacobian has a one-dimensional null space, a joint combination that does not move the foot; in PnP by the DLT (§5), the stacked constraint matrix needs a one-dimensional null space, whose vector is the solution. See [hexapod_redundant_leg_inekf.md §1.1](filtering/hexapod_redundant_leg_inekf.md#11-hantrs-legs) and [triangulation_pnp.md §3](frontend/triangulation_pnp.md#3-pnp-as-the-inverse-problem).
 
 ### Linearization
 Replacing a nonlinear function by its first-order approximation around the current estimate (the **linearization point**), $e(x+\Delta x) \approx e(x) + J\Delta x$. See [nonlinear_least_square.md §7](optimization/nonlinear_least_square.md#7-the-key-trick-make-the-nonlinear-problem-locally-linear).
@@ -231,6 +255,9 @@ Chaining odometry steps into a trajectory with no external correction, so errors
 ### Drift
 The build-up of small errors over a long trajectory, as in dead reckoning. See [pose_graph_optimization.md §3](optimization/pose_graph_optimization.md#3-why-do-we-need-optimization).
 
+### Skid steering and the ICR coefficient
+**Symbols:** $`\chi`$, $`B`$. A **skid-steer** robot has wheels (or tracks) that do not steer; it turns by driving its left and right sides at different speeds, and its wheels skid sideways in every turn. The **ICR** (instantaneous center of rotation) is the point a body turns about at one instant. Because of the skid, each side's ICR lies outside its wheel line, so the robot turns as if its track $`B`$ were wider by the **ICR coefficient** $`\chi \ge 1`$: $`\omega = (v_r - v_l)/(\chi B)`$, with $`\chi = 1`$ for no slip (ideal differential drive). See [skid_steer_odometry_ekf.md §1](filtering/skid_steer_odometry_ekf.md#1-the-robot).
+
 ### Loop closure
 Recognizing a previously visited place, which adds a constraint between two distant poses and corrects drift. See [pose_graph_optimization.md §4](optimization/pose_graph_optimization.md#4-the-really-important-event-loop-closure).
 
@@ -264,6 +291,9 @@ Recovering camera poses and sparse 3D points from many images, typically offline
 ### IMU (inertial measurement unit)
 A gyroscope plus an accelerometer, measuring the body's angular rate and specific force (acceleration minus gravity). **VIO (visual-inertial odometry)** estimates motion from a camera plus an IMU; **VI** (visual-inertial) labels anything that fuses the two. See [imu_preintegration.md](optimization/imu_preintegration.md) and [vi_initialization.md](frontend/vi_initialization.md).
 
+### Tracking camera
+A camera module that runs VIO on board and reports its own pose and velocity, e.g. the Intel RealSense T265 (200 Hz). The pose is given in the module's own odometry frame, fixed where it started, which drifts away from the world as the robot travels. With pose jumping enabled, it may **jump** its position suddenly when it finds its pose inconsistent with an earlier one. See [hexapod_camera_fusion_inekf.md §1](filtering/hexapod_camera_fusion_inekf.md#1-the-camera).
+
 ### IMU preintegration
 Summarizing all IMU samples between two keyframes into one relative-motion measurement ($\Delta R$, $\Delta v$, $\Delta p$: the change in rotation, velocity and position), with bias Jacobians so a bias change can be corrected without re-integrating. See [imu_preintegration.md §3](optimization/imu_preintegration.md#3-what-gets-compressed) and [§5](optimization/imu_preintegration.md#5-the-payoff-correcting-for-a-bias-change-without-re-integrating).
 
@@ -271,6 +301,9 @@ Summarizing all IMU samples between two keyframes into one relative-motion measu
 Aligning an estimated trajectory to ground truth over only the directions the sensors cannot observe (7 DoF for monocular, 6 for stereo/RGB-D, 4 for visual-inertial), then reporting the position RMSE (root-mean-square error). After a rigid fit this RMSE is often called the **ATE** (absolute trajectory error). See [umeyama_alignment.md §1](foundations/umeyama_alignment.md#1-why-an-alignment-step-is-needed-at-all) and [§1.1](foundations/umeyama_alignment.md#11-align-only-whats-actually-unobservable).
 
 ---
+
+### RPE (relative pose error)
+The error of the motion between two poses some distance apart along the trajectory, instead of the error of each pose in a common frame (the ATE, see Umeyama alignment and trajectory RMSE above). The KITTI odometry benchmark's version, used for wheel and LiDAR odometry, averages the translation error over path segments of fixed lengths and gives it in percent of the segment length. See [skid_steer_odometry_ekf.md §1](filtering/skid_steer_odometry_ekf.md#1-the-robot).
 
 ## 6. Kalman-filter family
 
@@ -291,6 +324,9 @@ Alternates a **predict** step (motion model) and an **update** step (measurement
 
 ### IEKF (Invariant EKF)
 An EKF that uses an invariant error $\eta$ defined on the Lie group (see Invariant and equivariant, §1). In this repo "IEKF" always means the Invariant EKF, not the Iterated EKF of [kf_ekf_iekf.md §9](filtering/kf_ekf_iekf.md#9-other-prominent-variants-worth-keeping-in-mind). The right-invariant version is written **RIEKF**, and Hartley et al. abbreviate the invariant EKF as **InEKF**. See [kf_ekf_iekf.md §3](filtering/kf_ekf_iekf.md#3-invariant-ekf-lets-respect-the-geometry-of-the-problem).
+
+### Invariant observation
+A measurement of the form $`y = X^{-1} b`$ (+ noise) for a known vector $`b`$, or $`y = X b`$. A right-invariant EKF handles the first kind with a residual whose Jacobian does not depend on the estimate; the second kind pairs the same way with the left-invariant error. Examples here, with the extended pose $`X`$ holding rotation $`R`$, velocity $`v`$, position $`p`$ and a foot $`d`$: a leg-kinematics reading $`R^\top(d - p)`$ and a body-frame velocity $`R^\top v`$ are of the first kind; a world-frame position reading $`p`$ is of the second, so a right-invariant filter's Jacobian for it depends on the estimate. See [left_right_invariant.md §4](filtering/left_right_invariant.md#4-why-it-actually-matters-not-just-bookkeeping) and [hexapod_camera_fusion_inekf.md §2](filtering/hexapod_camera_fusion_inekf.md#2-filters).
 
 ### ESKF (Error-State Kalman Filter)
 **Symbol:** $\delta x$. Propagates a nominal state $\hat x$ with the full nonlinear model, while the filter estimates only a small error state $\delta x$, folded into $\hat x$ after each update and reset to zero. Its rotation error $`\delta\theta = \mathrm{Log}(\hat R^{-1}R)`$ is already the left-invariant one (the position/velocity errors stay additive). See [extra_kf_variants.md §2](filtering/extra_kf_variants.md#2-error-state-kalman-filter-eskf). Worked through step by step, with a simulation, in [eskf.md](filtering/eskf.md).
@@ -333,7 +369,37 @@ An internal rhythm generator that produces a gait's repeating leg motion on its 
 ### ZUPT and ZARU
 **Symbols:** $v$, $\omega$. Pseudo-measurements applied while a sensor is known to be still: a **zero-velocity update** (ZUPT, velocity $`v = 0`$) and a **zero-angular-rate update** (ZARU, angular rate $`\omega = 0`$). They hold only during the still phase (a foot's stance, an inchworm's anchor); applied while moving, they feed the filter a false measurement with high confidence. See [inchworm_zupt_ekf.md](filtering/inchworm_zupt_ekf.md#intuition) and [§5](filtering/inchworm_zupt_ekf.md#5-side-extension-heading-and-zaru).
 
+### Stance and swing
+A leg in **stance** has its foot on the ground and carries the body; in **swing** it is lifted and moved to its next foothold. The swing ends with the **swing-down**, its last part, when the foot moves down toward the ground. A **gait** is the pattern of which legs swing together: in the **tripod** gait three legs (every other one around the body) are down at a time, in **ripple** four and in **wave** five. A **touchdown** starts a stance and a **liftoff** ends it. See [hexapod_gait_ekf.md](filtering/hexapod_gait_ekf.md#intuition) (gaits) and [gait_phase_ekf.md](filtering/gait_phase_ekf.md#intuition) (swing-down).
+
+### Contact detector
+The part of a legged robot that decides when a foot has touched down, from the robot's own sensors, e.g. the servo's position error (the gap between the commanded and the measured joint angle) or the joint torque. It fires some time after the true touchdown (its **delay**) and can fire when the foot is still in the air (a **false trigger**). See [gait_phase_ekf.md §1.2](filtering/gait_phase_ekf.md#12-the-contact-detector) (position error) and [gait_phase_torque_ekf.md §1](filtering/gait_phase_torque_ekf.md#1-the-torque-signal) (joint torque).
+
+### Forward and inverse kinematics
+**Forward kinematics** (FK) maps a leg's or arm's joint angles $`q`$ to the position of its end (here the foot): $`y = \mathrm{FK}(q)`$. **Inverse kinematics** (IK) goes the other way, from a desired foot position to joint angles. It can have several solutions (e.g. knee up or knee down), or, when the leg has more joints than the foot has coordinates (a **redundant** leg), infinitely many, so a rule must pick one. The derivative $`J = \partial\,\mathrm{FK}/\partial q`$ is the leg's Jacobian. See [hexapod_joint_kinematics_inekf.md §1.1](filtering/hexapod_joint_kinematics_inekf.md#11-daisys-legs) and [hexapod_redundant_leg_inekf.md §1.1](filtering/hexapod_redundant_leg_inekf.md#11-hantrs-legs).
+
+### Denavit-Hartenberg (DH) parameters
+**Symbols:** $`\alpha`$, $`a`$, $`d`$, $`\theta_\text{off}`$. A standard way to describe a chain of joints with four numbers per joint. Each gives how joint $`i`$'s frame sits on the previous one: turn by the joint angle plus a fixed offset $`\theta_\text{off}`$ about the previous $`z`$ axis, slide $`d`$ along it, slide $`a`$ (the link length) along the new $`x`$ axis, then tilt by the twist $`\alpha`$ about that $`x`$ axis. Each joint turns about the previous frame's $`z`$ axis. See [hexapod_redundant_leg_inekf.md §1.1](filtering/hexapod_redundant_leg_inekf.md#11-hantrs-legs).
+
+### Joint encoder and zero offset
+**Symbols:** $`\tilde q`$, $`b`$. A **joint encoder** measures a joint's angle, giving the reading $`\tilde q`$. Its **zero offset** $`b`$ is a constant error in that reading (a calibration error): every reading of the joint is off by the same angle. Unlike white noise it does not average out, and through the forward kinematics it shifts the foot reading by $`J b`$. A filter can estimate it as a constant state. See [hexapod_joint_kinematics_inekf.md §1.2](filtering/hexapod_joint_kinematics_inekf.md#12-encoder-readings) and [hexapod_redundant_leg_inekf.md §1.2](filtering/hexapod_redundant_leg_inekf.md#12-encoder-readings).
+
+### Load share
+The part of the body's weight that one foot carries. With the body's weight spread evenly over the feet on the ground, it is the weight divided by their number, e.g. a third in the tripod gait. It sets how large a landed foot's force becomes, and so how high a force-based contact detector can put its threshold. See [gait_phase_torque_ekf.md §1.2](filtering/gait_phase_torque_ekf.md#12-what-the-signal-is-made-of).
+
+### Series-elastic actuator
+A motor module with a spring between its gearbox and its output. The spring's measured deflection times its stiffness gives the output torque, so the joint senses torque. The spring also makes the joint slightly compliant. HEBI's X-Series actuators (the Daisy hexapod) are built this way. See [gait_phase_torque_ekf.md](filtering/gait_phase_torque_ekf.md#intuition) and [hexapod_joint_kinematics_inekf.md §5](filtering/hexapod_joint_kinematics_inekf.md#5-what-this-toy-does-not-show).
+
 ---
+
+### Inchworm gait and anchor
+Moving like an inchworm: one end holds the surface (the **anchor**) while the other end moves, then they swap. While it holds, the anchor is a fixed point the estimate can rely on, until it slips. See [inchworm_zupt_ekf.md](filtering/inchworm_zupt_ekf.md) and [magnetic_inchworm_odometry_ekf.md](filtering/magnetic_inchworm_odometry_ekf.md).
+
+### Hybrid electromagnet
+A magnet with a permanent-magnet core and an electromagnet winding: it holds without power, holds harder with current one way, and lets go with current the other way (about 300 N, 600 N and 0 N on the MinchW climbing robot). See [magnetic_inchworm_odometry_ekf.md §1.1](filtering/magnetic_inchworm_odometry_ekf.md#11-what-the-sources-give).
+
+### Hall sensor
+A sensor whose output voltage follows the magnetic field through it. In a magnetic foot pad, a change in that field can mark the moment the pad slides. See [magnetic_inchworm_odometry_ekf.md §1.1](filtering/magnetic_inchworm_odometry_ekf.md#11-what-the-sources-give).
 
 ## 9. Named systems and libraries
 

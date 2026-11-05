@@ -5,7 +5,7 @@ Scripts that draw the figures, GIFs and SVGs of this repo. Run everything from t
 | Script | Writes | Used by |
 | --- | --- | --- |
 | [make_figures.py](make_figures.py) | `assets/<name>.png`: one static figure per simulation (and a `_concept` figure for the docs that have one), from the simulations' own output | the docs' result figures |
-| `animate_<simulation>.py` (14) | an animated GIF of one simulation's default run, `--out assets/<simulation>.gif` | the matching doc, next to its static figure |
+| `animate_<simulation>.py` (20) | an animated GIF of one simulation's default run, `--out assets/<simulation>.gif` | the matching doc, next to its static figure |
 | [animate_left_right_invariant.py](animate_left_right_invariant.py), [animate_left_right_invariant_angular_velocity.py](animate_left_right_invariant_angular_velocity.py) | `assets/left_right_invariant.gif`, `assets/left_right_invariant_angular_velocity.gif`: the frame-change pictures (no simulation) | [docs/filtering/left_right_invariant.md](../docs/filtering/left_right_invariant.md) §3, §3.1 |
 | [make_frontend_backend_svgs.py](make_frontend_backend_svgs.py) | `docs/images/frontend_backend.svg`, `docs/images/frontend_backend_loop_closure.svg` | [docs/frontend_backend.md](../docs/frontend_backend.md) |
 | [make_factor_graph_svgs.py](make_factor_graph_svgs.py) | `docs/images/factor_graph.svg`, `docs/images/factor_graph_vs_pose_graph.svg` | [docs/optimization/factor_graph.md](../docs/optimization/factor_graph.md) |

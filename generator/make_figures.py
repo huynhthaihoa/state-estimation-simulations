@@ -3961,6 +3961,75 @@ def fig_umeyama_scale_concept():
            "Pinhole cameras with f_x = 800 px, principal point ignored as in the doc's tiny example; side view")
 
 
+def fig_hexapod_joint_kinematics_concept():
+    """hexapod_joint_kinematics_inekf.py: Daisy's legs at the nominal stance with each foot's encoder-noise
+    ellipse (top view), and how far a 1 deg offset on each joint moves one foot (side view)."""
+    from state_estimation_simulations.use_numpy import hexapod_joint_kinematics_inekf as m
+
+    sigma_q, scale, off = 1e-3, 150.0, np.radians(1.0)
+    fig, (ax_t, ax_s) = plt.subplots(1, 2, figsize=(14, 6.2), gridspec_kw={"width_ratios": [1.15, 1]})
+
+    # (a) top view: hips, joints, feet, and the foot-noise ellipse (1 sigma, x-y part, scaled)
+    hips = np.array([[m.HIP_OFFSET[i] * np.cos(m.HIP_ANGLE[i]), m.HIP_OFFSET[i] * np.sin(m.HIP_ANGLE[i])]
+                     for i in (0, 1, 2, 5, 4, 3)])
+    ax_t.fill(hips[:, 0], hips[:, 1], color="0.85", ec="0.4", lw=1.2, zorder=1)
+    for leg in range(6):
+        q = m.stance_ik(leg)
+        origins, _, foot = m.leg_frames(q, leg)
+        pts = np.vstack([origins, foot])
+        ax_t.plot(pts[:, 0], pts[:, 1], "-o", color=C["blue"] if m.IS_LEFT[leg] else C["purple"], ms=4, lw=2, zorder=3)
+        cov = m.nominal_joint_cov(leg, sigma_q)[:2, :2]
+        w, V = np.linalg.eigh(cov)
+        ang = np.degrees(np.arctan2(V[1, 1], V[0, 1]))
+        ax_t.add_patch(Ellipse(foot[:2], 2 * scale * np.sqrt(w[1]), 2 * scale * np.sqrt(w[0]), angle=ang,
+                               fill=False, ec=C["red"], lw=1.8, zorder=4))
+        ax_t.annotate(m.LEG_NAMES[leg], foot[:2], xytext=(8, -14 if foot[1] < 0 else 8), textcoords="offset points",
+                      fontsize=9.5)
+    ax_t.arrow(-0.05, 0, 0.18, 0, width=0.008, color=TRUTH, zorder=5)
+    ax_t.text(0.15, 0.02, "forward", fontsize=9)
+    ax_t.plot([], [], "-o", color=C["blue"], ms=4, label="left legs: joints 1-3, foot")
+    ax_t.plot([], [], "-o", color=C["purple"], ms=4, label="right legs")
+    ax_t.plot([], [], color=C["red"], lw=1.8, label=f"foot noise, 1σ at {sigma_q * 1e3:g} mrad, drawn ×{scale:g}")
+    ax_t.set(title="(a) Daisy at the nominal stance, seen from above", xlabel="x (m)", ylabel="y (m)")
+    ax_t.set_aspect("equal")
+    legend_below(ax_t, ncol=2)
+
+    # (b) side view of leg L2 in its own vertical plane: foot shift J[:, i] * 1 deg for each joint
+    leg = 1
+    q = m.stance_ik(leg)
+    origins, _, foot = m.leg_frames(q, leg)
+    J = m.leg_jacobian(q, leg)
+    u = np.array([np.cos(m.HIP_ANGLE[leg]), np.sin(m.HIP_ANGLE[leg]), 0.0])      # outward along the leg's plane
+    side = lambda pnt: np.array([pnt @ u, pnt[2]])                               # (outward, up)
+    pts = np.array([side(pp) for pp in np.vstack([origins, foot])])
+    ax_s.plot(pts[:, 0], pts[:, 1], "-o", color=C["blue"], lw=3, ms=7)
+    ax_s.axhline(foot[2], color="0.6", lw=4, alpha=0.4)
+    names = ("joint 1 (X8-9, vertical axis)", "joint 2 (X8-16, horizontal axis)", "joint 3 (X8-9, horizontal axis)")
+    cols = (C["gold"], C["green"], C["red"])
+    f2 = side(foot)
+    for i in range(3):
+        dv = J[:, i] * off
+        if np.linalg.norm(side(dv)) > 0.3 * np.linalg.norm(dv):
+            ax_s.annotate("", f2 + side(dv) * 40.0, f2, arrowprops=dict(arrowstyle="-|>", color=cols[i], lw=2.2))
+        else:
+            ax_s.plot(*f2, "o", ms=13, mfc="none", mec=cols[i], mew=2.2)
+            ax_s.annotate("joint 1 moves the foot\nout of the page", f2, xytext=(-120, 6), textcoords="offset points",
+                          fontsize=9, color="#555555")
+        ax_s.plot([], [], color=cols[i], lw=2.2,
+                  label=f"{names[i]}: 1° offset moves the foot {np.linalg.norm(dv) * 1e3:.1f} mm")
+    for k, pp in enumerate(pts[:3]):
+        ax_s.annotate(f"joint {k + 1}", pp, xytext=(-14, 10), textcoords="offset points", fontsize=9)
+    ax_s.set(title="(b) Leg L2 from the side: foot shift from a 1° joint offset (arrows ×40)",
+             xlabel="outward from the body centre (m)", ylabel="height above the body frame (m)")
+    ax_s.set(xlim=(0.1, 0.82), ylim=(-0.5, 0.17))
+    ax_s.set_aspect("equal")
+    legend_below(ax_s, ncol=1)
+    finish(fig, "hexapod_joint_kinematics_concept", "Foot readings from joint encoders on HEBI's Daisy "
+           "(hexapod_joint_kinematics_inekf.md)",
+           "Geometry from HEBI's Daisy.hrdf; stance from its hex_config.xml (feet on a 0.55 m radius, 0.21 m below "
+           "the body); knee-up inverse kinematics")
+
+
 FIGURES = {
     "pose_tracking": fig_pose_tracking,
     "imu_propagation_position_fix": fig_imu_propagation_position_fix,
@@ -4034,6 +4103,7 @@ FIGURES = {
     "ekf_unobservable_concept": fig_ekf_unobservable_concept,
     "lidar_residuals_concept": fig_lidar_residuals_concept,
     "umeyama_scale_concept": fig_umeyama_scale_concept,
+    "hexapod_joint_kinematics_concept": fig_hexapod_joint_kinematics_concept,
 }
 
 

@@ -89,7 +89,7 @@ After all nine phases (and, optionally, [Track L](#track-l---hybrid-and-bio-insp
 
 ## Track L - Hybrid and bio-inspired locomotion (optional)
 
-**Needs:** Phase 4. Every script here is a filter for motion that is *not* smooth between measurements: something switches (a bounce, an anchor, a foot touching down), and the question is what the filter may assume at that switch. The groups go from one contact event, to one anchor, to many legs; within a group, go top to bottom.
+**Needs:** Phase 4. Every script in L1-L4 is a filter for motion that is *not* smooth between measurements: something switches (a bounce, an anchor, a foot touching down), and the question is what the filter may assume at that switch. The groups go from one contact event, to one anchor, to many legs; L5 adds wheels that slip. Within a group, go top to bottom.
 
 ### L1 - Contact events: a reset in the motion
 
@@ -115,6 +115,7 @@ Not a discontinuous reset like L1, but an ordinary switched-linear system: the q
 | L2.4 | [`inchworm_two_pad_ekf.md`](docs/filtering/inchworm_two_pad_ekf.md) + [README.md §17](README.md#17-two-pad-inchworm-trusting-the-anchored-pad-without-a-position-fix) - [`inchworm_two_pad_ekf.py`](use_numpy/inchworm_two_pad_ekf.py) | Two pads, turning, no position fix: a slip the filter does not track is never corrected, so only fusing the anchored pad's measured displacement keeps the estimate accurate and consistent | L2.3 |
 | L2.5 | [`inchworm_two_pad_fusion_ekf.md`](docs/filtering/inchworm_two_pad_fusion_ekf.md) + [README.md §18](README.md#18-two-pad-inchworm-reading-both-pad-sensors) - [`inchworm_two_pad_fusion_ekf.py`](use_numpy/inchworm_two_pad_fusion_ekf.py) | The moving pad has a sensor too, and sensors fail: a real slip moves both pads so the two sensors agree, a fault makes them disagree, so a cross-check before fusing removes most faults (reading the second sensor blindly adds them) | L2.4 |
 | L2.6 | [`friction_anisotropic_ekf.md`](docs/filtering/friction_anisotropic_ekf.md) + [README.md §19](README.md#19-friction-anisotropic-process-noise-fixed-vs-heading-aware-q) - [`friction_anisotropic_ekf.py`](use_numpy/friction_anisotropic_ekf.py) | A crawler on a friction-anisotropic pad: the isotropic/anisotropic and rotating-frame argument of `pointcloud_pose_tracking_empirical_note.md`, applied to *process* noise instead of measurement noise | Phase 4 |
+| L2.7 | [`magnetic_inchworm_odometry_ekf.md`](docs/filtering/magnetic_inchworm_odometry_ekf.md) + [README.md §28](README.md#28-magnetic-climbing-inchworm-odometry-that-cannot-see-the-slide) - [`magnetic_inchworm_odometry_ekf.py`](use_numpy/magnetic_inchworm_odometry_ekf.py) | A magnetic climbing inchworm (CTU MinchW) has only its servos, and its holding pad slides sideways on a wall. What can servo odometry, a slip flag and an occasional outside fix tell about a slide no servo sees? | L2.3 |
 
 ### L3 - Legs: many contacts at once
 
@@ -122,14 +123,26 @@ Not a discontinuous reset like L1, but an ordinary switched-linear system: the q
 | --- | --- | --- | --- |
 | L3.1 | [`hexapod_gait_ekf.md`](docs/filtering/hexapod_gait_ekf.md) + [README.md §20](README.md#20-hexapod-leg-odometry-what-the-gait-changes) - [`hexapod_gait_ekf.py`](use_numpy/hexapod_gait_ekf.py) | From one anchored segment to six legs: every stance foot is a velocity sensor, the gait decides how many there are, and a per-foot test catches a slipping leg | L2.1 |
 | L3.2 | [`hexapod_contact_inekf.md`](docs/filtering/hexapod_contact_inekf.md) + [README.md §21](README.md#21-contact-aided-invariant-ekf-on-a-hexapod-which-filter-knows-yaw-is-unobservable) - [`hexapod_contact_inekf.py`](use_numpy/hexapod_contact_inekf.py) | The same hexapod in 3D with an IMU: each stance foot's position joins the state ($`SE_{K+2}(3)`$, Hartley et al.'s contact-aided invariant EKF), and a world-frame EKF on the same data shows why the invariant error matters: yaw is unobservable, and only the invariant EKF's covariance keeps it so | L3.1, L1.2 |
+| L3.3 | [`hexapod_joint_kinematics_inekf.md`](docs/filtering/hexapod_joint_kinematics_inekf.md) + [README.md §23](README.md#23-joint-encoders-on-an-18-dof-hexapod-when-the-leg-kinematics-noise-model-matters) - [`hexapod_joint_kinematics_inekf.py`](use_numpy/hexapod_joint_kinematics_inekf.py) | Where the foot readings come from: joint encoders through the leg kinematics of an 18-DOF hexapod (HEBI Daisy). Does the pose-dependent shape of their error matter, and what do fixed joint zero offsets do to the filter? | L3.2 |
+| L3.4 | [`hexapod_redundant_leg_inekf.md`](docs/filtering/hexapod_redundant_leg_inekf.md) + [README.md §25](README.md#25-four-joints-per-leg-which-joint-offsets-a-walking-hexapod-can-learn) - [`hexapod_redundant_leg_inekf.py`](use_numpy/hexapod_redundant_leg_inekf.py) | A fourth joint per leg (CTU HAntR): one joint combination never moves the foot at a given pose. Can walking still reveal its encoder offset, and which offsets stay hidden? | L3.3 |
+| L3.5 | [`hexapod_camera_fusion_inekf.md`](docs/filtering/hexapod_camera_fusion_inekf.md) + [README.md §26](README.md#26-legs-plus-a-tracking-camera-how-to-use-a-pose-that-drifts) - [`hexapod_camera_fusion_inekf.py`](use_numpy/hexapod_camera_fusion_inekf.py) | Legs and an IMU cannot see position or yaw; a tracking camera reports both, but in a frame that drifts. How should the filter use it, and what do its pose jumps do? | L3.2 |
 
 ### L4 - Gait timing: when does a foot land?
 
 | Step | Read + run | The question | Builds on |
 | --- | --- | --- | --- |
 | L4.1 | [`gait_phase_ekf.md`](docs/filtering/gait_phase_ekf.md) + [README.md §22](README.md#22-gait-phase-which-feet-are-on-the-ground-when-touchdowns-are-uncertain) - [`gait_phase_ekf.py`](use_numpy/gait_phase_ekf.py) | The hexapod's liftoffs are commanded but its touchdowns are not: which feet may the body filter read when a foot can land late and a detector can fire falsely? A schedule and a raw detector both read swinging feet; a learned touchdown offset or a small Kalman filter rejects triggers that come too early, if its acceptance window is the right width | L3.1 |
+| L4.2 | [`gait_phase_torque_ekf.md`](docs/filtering/gait_phase_torque_ekf.md) + [README.md §24](README.md#24-torque-based-contact-detection-what-decides-it-and-when-the-gait-phase-helps) - [`gait_phase_torque_ekf.py`](use_numpy/gait_phase_torque_ekf.py) | The detector itself: on a robot that measures joint torque (HEBI Daisy), what decides when the contact detector fires, and does the gait-phase filter still help? | L4.1, L3.3 |
 
-A new locomotion type goes in the group whose question it shares, or in a new group (L5, ...) if it raises a new one.
+### L5 - Wheels: slip in turns
+
+The motion here is smooth (nothing switches); it sits in Track L with the CTU lab's other robots because, like an anchor or a foot, the wheels' contact with the ground decides what the odometry may assume.
+
+| Step | Read + run | The question | Builds on |
+| --- | --- | --- | --- |
+| L5.1 | [`skid_steer_odometry_ekf.md`](docs/filtering/skid_steer_odometry_ekf.md) + [README.md §27](README.md#27-skid-steer-wheel-odometry-slip-as-a-filter-state) - [`skid_steer_odometry_ekf.py`](use_numpy/skid_steer_odometry_ekf.py) | A skid-steer robot (Clearpath Husky) turns slower than its wheel speeds say. How wrong is wheel odometry with the wrong slip coefficient, does a gyro fix it, and can the filter learn the coefficient? | Phase 4 |
+
+A new locomotion type goes in the group whose question it shares, or in a new group (L6, ...) if it raises a new one.
 
 ---
 

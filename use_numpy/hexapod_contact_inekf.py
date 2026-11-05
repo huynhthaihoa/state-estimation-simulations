@@ -66,6 +66,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.linalg import block_diag
 
 from state_estimation_simulations.utils import measure_performance, averaged_nees_bounds, nees  # noqa: E402
 from state_estimation_simulations.use_numpy.lie_utils import skew, so3_exp, so3_log, sek3_make, sek3_exp, sek3_log, sek3_inv, sek3_adjoint  # noqa: E402
@@ -169,7 +170,7 @@ def simulate_body(cfg, rng):
     return R, v, p, yaw, gyro, accel
 
 
-def simulate_feet(cfg, R, p, yaw, gait, contact_noise, slip=None):
+def simulate_feet(cfg, R, p, yaw, gait, contact_noise, slip=None, foot_offsets=NOMINAL_FOOT_OFFSETS):
     """World positions of the stance feet, per tick. A foot lands at its
     nominal offset shifted forward by half a stride (heading frame, on
     z = 0), then moves only by contact noise, d+ = d + R w_d dt, and by the
@@ -183,6 +184,8 @@ def simulate_feet(cfg, R, p, yaw, gait, contact_noise, slip=None):
         slip: None, or (leg_index, t_start, t_end, slip_vel (3,)): while in
             stance and t_start <= t < t_end that foot also slides at slip_vel
             (heading frame, m/s)
+        foot_offsets: (6, 2) nominal foot offsets from the body centre
+            (heading frame, x forward, y left, LEG_NAMES order)
     Returns:
         stance: (N, 6) bool
         d: (N, 6, 3) foot world positions (NaN in swing)
@@ -192,7 +195,7 @@ def simulate_feet(cfg, R, p, yaw, gait, contact_noise, slip=None):
     stance = stance_mask(n_pts, tpc, gait)
     psi = gait_phase(n_pts, tpc, gait)
     stride = cfg.nominal_speed * duty * tpc * dt
-    touchdown = NOMINAL_FOOT_OFFSETS + np.array([stride / 2.0, 0.0])
+    touchdown = foot_offsets + np.array([stride / 2.0, 0.0])
     d = np.full((n_pts, 6, 3), np.nan)
     for k in range(n_pts):
         for i in np.flatnonzero(stance[k]):
@@ -306,11 +309,18 @@ class ContactEKF:
         self.d = np.delete(self.d, j, axis=0)
         del self.legs[j]
 
+    def kin_noise(self, leg, y):
+        """(3,3) covariance of a kinematic reading's noise as it enters the
+        residual and a new foot's error. Here isotropic, cfg.kin_noise_std per
+        axis, which every rotation leaves unchanged; a subclass can model it
+        from the leg's joints."""
+        return self.cfg.kin_noise_std ** 2 * np.eye(3)
+
     def augment(self, leg, y):
         """Touchdown: add d = p_hat + R_hat y with its error rows M (P_new =
         [[P, P M^T], [M P, M P M^T + N]], N = kin noise in the error frame)."""
         M = self.touchdown_jacobian(y)
-        N = self.cfg.kin_noise_std ** 2 * np.eye(3)
+        N = self.kin_noise(leg, y)
         PM = self.P @ M.T
         self.P = np.block([[self.P, PM], [PM.T, M @ PM + N]])
         self.d = np.vstack([self.d, self.p + self.R @ y])
@@ -327,17 +337,17 @@ class ContactEKF:
         accepted = np.ones(m, dtype=bool)
         if m == 0:
             return accepted
-        N3 = self.cfg.kin_noise_std ** 2 * np.eye(3)
+        Ns = [self.kin_noise(leg, y) for leg, y in zip(legs, ys)]
         rs, Hs = zip(*[self.measurement(self.legs.index(leg), y) for leg, y in zip(legs, ys)])
         if self.gating:
             for j in range(m):
-                S = Hs[j] @ self.P @ Hs[j].T + N3
+                S = Hs[j] @ self.P @ Hs[j].T + Ns[j]
                 accepted[j] = rs[j] @ np.linalg.solve(S, rs[j]) <= self.cfg.gate
             if not accepted.any():
                 return accepted
         H = np.vstack([Hs[j] for j in range(m) if accepted[j]])
         r = np.concatenate([rs[j] for j in range(m) if accepted[j]])
-        N = self.cfg.kin_noise_std ** 2 * np.eye(len(r))
+        N = block_diag(*[Ns[j] for j in range(m) if accepted[j]])
         S = H @ self.P @ H.T + N
         K = np.linalg.solve(S, H @ self.P).T
         self.correct(K @ r)
