@@ -71,6 +71,12 @@ The 15 m prediction vs. 14 m GPS from the start of this doc.
 
 *Figure: the tiny example above, plotted by `uv run python generator/make_figures.py kf_update_concept`.*
 
+The animation repeats the same 1D predict/update cycle 6 times. The left panel shows the Gaussian belief about the car's position: **predict** shifts the previous estimate by the car's motion and widens it by $`Q`$ (blue, variance $P^-$); the GPS reading appears (orange, variance $`R`$); **update** blends the two into a narrower estimate (green, variance $P$). The right panels show this cycle's $P^-$, $K$, $P$ and the variance per cycle. Cycle 1 is exactly the example above ($`x^- = 15`$ m, $`P^- = 3`$, $`z = 14`$ m, $`R = 7`$, $`K = 0.3`$, $`x = 14.7`$ m, $`P = 2.1`$, asserted in the script). The rest is **illustrative** and labelled on every frame: the car moves 5 m per cycle (the 5 m/s and 1 s from the start of this section), $`Q = 1`$ and a previous variance of 2 (chosen so that $P^- = 2 + 1 = 3$ in cycle 1), and the GPS readings of cycles 2-6 are drawn with seed 0 from $`N(\text{true position}, R)`$. With these values $P^-$ settles near $`(Q + \sqrt{Q^2 + 4QR})/2 = 3.19`$ and $P$ near $`2.19`$ (the predict step's growth and the update step's shrinkage balance); that steady state depends on $`Q`$ and $`R`$ only, not on the readings. The motion between beats is interpolated for readability.
+
+![Animation of a 1D Kalman filter over 6 cycles: a Gaussian for the car's position shifts by 5 m and widens (prediction, blue), the GPS Gaussian (orange) appears, and the update (green) is narrower than both; cycle 1 shows the doc's numbers (variance 3, K = 0.3, 14.7 m, variance 2.1), and the variance per cycle settles near 3.19 before the update and 2.19 after it](../../assets/kf_predict_update.gif)
+
+*Animation: `uv run python generator/animate_kf_predict_update.py --out assets/kf_predict_update.gif` (seed 0 for the cycle 2-6 GPS readings; `--seed` changes them).*
+
 
 The standard KF is a straight ruler for a world that behaves like a straight line. It doesn't work directly for rotations, camera poses, or nonlinear robot dynamics.
 

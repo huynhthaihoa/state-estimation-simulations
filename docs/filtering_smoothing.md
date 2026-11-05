@@ -187,6 +187,8 @@ So the error can be distributed over all poses. The figure shows this for the re
 
 *Figure: `use_numpy/pose_graph.py` at its defaults (seed 0), a four-pose square loop with one loop-closure edge, plotted by `uv run python generator/make_figures.py pose_graph`. The position RMSE drops from 6.6 cm to 5.2 cm: X3 improves most, while X1 and X2 end slightly worse, because the error is shared among all poses.*
 
+The same run, step by step (dead-reckoned poses, the loop-closure edge, then each optimizer iteration), is animated in [pose_graph_optimization.md §5](optimization/pose_graph_optimization.md#5-pose-graph-optimization-resolves-the-conflict).
+
 The important point is:
 
 **Optimization can revise the past.**

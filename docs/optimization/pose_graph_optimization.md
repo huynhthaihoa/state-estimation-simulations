@@ -116,6 +116,12 @@ The scripts' four-pose square shows this: the optimizer spreads the loop error o
 
 *Figure: `use_numpy/pose_graph.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py pose_graph` (the same figure is used in §15.7). Error at the loop-closure node 0.1035 m to 0.0494 m; RMS position error 6.6 cm to 5.2 cm. X1 and X2 get slightly worse while X3 improves.*
 
+The animation below replays the same run (seed 0) step by step. First the dead-reckoned poses X0 to X3 appear one by one next to the ground truth and the drift builds. Then the loop-closure edge X3-X0 appears: composing X3 with the edge's measurement predicts a position for X0 that is 8.1 cm away from where X0 is. Then the optimizer's steps 1, 2, 3, ... move all poses together. The top view is drawn to scale, so the centimeter-sized errors are hard to see there; the three panels on the right carry them: the error vector (estimate minus truth, split into x, y, z) of every pose, the position error per pose (3-D distance to the truth), and the **total chi-squared error** (the sum over all edges of the squared residual, here with an identity information matrix) after each iteration. Every pose and number comes from `pose_graph.py`'s own functions: iteration $k$ is the pose list returned by `run_pose_graph_optimization` with `gn_max_iters` $= k$, shown as a discrete state (nothing is interpolated or magnified). The chi-squared values are checked against the optimizer's own printout: 0.007156, 0.000838, 0.000828. After iteration 3 the poses no longer move at the precision shown, and the run stops at iteration 5 (step size below $10^{-6}$). X1 and X2 end slightly worse (3.33 to 3.95 cm and 7.61 to 8.25 cm), while X3 (10.35 to 4.94 cm) and the RMS position error (6.64 to 5.20 cm) improve.
+
+![Animation of pose_graph.py at its defaults: dead-reckoned poses appear one by one next to the ground-truth square, the loop-closure edge X3-X0 appears, and the optimizer's iterations move the poses while the per-pose error vectors, the per-pose position errors and the chi-squared per iteration update](../../assets/pose_graph.gif)
+
+*Animation: `uv run python generator/animate_pose_graph.py --out assets/pose_graph.gif` (seed 0, the script's defaults).*
+
 ---
 
 ## 6. Imagine stretching a rubber band

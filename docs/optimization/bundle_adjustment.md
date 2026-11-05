@@ -535,6 +535,12 @@ Use **Global BA** for offline reconstruction - meshes, NeRF/Gaussian-Splatting i
 
 *Figure: `use_numpy/bundle_adjustment_advanced.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py bundle_adjustment_advanced`.*
 
+The animation below replays the Local-only run of that script at its defaults (seed 0), one frame per new keyframe $`k = 2, \dots, 49`$. Panel (a) is the top-down scene: the ground-truth keyframes (black), the Local-BA estimate of every keyframe so far (purple line), and the current window drawn at ground-truth positions, with the **new keyframe** in red, the other **active keyframes** (poses being optimized) in blue, the **fixed anchors** (earlier keyframes that observe the active landmarks and are held constant) in orange, and the **active landmarks** (the landmarks being optimized) in green. Panel (b) magnifies the window; the view follows it and is not to the scale of (a), which is illustrative. Panel (c) counts the window against the whole map: keyframes (active, fixed, map so far) and landmarks (active, triangulated so far). Every number comes from the script's own `build_active_window` calls, recorded without changing the script; the final trailing RMSE of this recorded run (2.1359 m) is asserted equal to the unrecorded run's. The animation makes no accuracy claim and shows no solve times; whether Global BA helps is settled by the 20-seed sweep below (11 of 20), not by this seed.
+
+![Three panels of the Local-BA-only run at the defaults, one frame per new keyframe 2 to 49: the top-down scene with the new keyframe, active keyframes, fixed anchors and active landmarks and the Local-BA estimate against ground truth; a magnified view of the current window; and the window size (at most 6 active keyframes, 5 to 59 active landmarks) against the whole map growing to 50 keyframes and 203 landmarks](../../assets/bundle_adjustment_advanced.gif)
+
+*Animation: `uv run python generator/animate_bundle_adjustment_advanced.py --out assets/bundle_adjustment_advanced.gif` (default seed 0, Local BA only).*
+
 
 **What it confirms:** the "Scaling" row above. In the default run (one BLAS thread), the measured wall-clock solve time of the local window stays bounded (8-470 ms, set by how many landmarks the window holds, with no trend in map size), while Global BA's grows from 0.36 s at keyframe 8 to about 1.4-1.9 s at keyframes 40-49.
 

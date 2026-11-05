@@ -99,6 +99,9 @@ Rejecting a measurement whose NIS $`\nu^\top S^{-1}\nu`$ (see Innovation and Kal
 ### Monte Carlo trials
 Repeating a randomized simulation many times with different noise to measure typical behavior instead of one lucky or unlucky run. For a NEES check, each trial should redraw every random source the filter models; this repo's saltation script at its defaults redraws only the initial error and measurement noise, plus detection-time jitter when `--detect-time-noise-std` > 0 (its truth has no process noise), so its NEES reads low. See [hybrid_saltation_ekf.md §1.1](filtering/hybrid_saltation_ekf.md#11-the-filter-math-concretely) and [§6](filtering/hybrid_saltation_ekf.md#6-the-empirical-finding-a-modest-real-gap-not-a-dramatic-one).
 
+### Common random numbers
+Reusing the same random draws in every case that is being compared (here, every camera baseline), so differences between the cases come from the case itself and not from new noise. In an animation it also makes the picture change smoothly instead of re-rolling every frame. See [triangulation_pnp.md §2](frontend/triangulation_pnp.md#2-triangulation-worked-from-the-real-code).
+
 ### RMSE (root-mean-square error)
 The square root of the mean squared error, $`\sqrt{\tfrac{1}{N}\sum_k \|e_k\|^2}`$, in the error's own units; it weights large errors more than the mean absolute error does. Each doc states what the mean runs over (ticks, Monte Carlo trials, poses or keyframes). **RMS** (root mean square) is the same average applied to any quantity, e.g. a timing lag. For a trajectory RMSE taken after aligning to ground truth, see Umeyama alignment and trajectory RMSE (§5).
 

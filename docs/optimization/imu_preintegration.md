@@ -189,6 +189,12 @@ A full visual-inertial odometry (VIO) back-end ([GTSAM](../glossary.md#gtsam)'s 
 
 *Figure: `use_numpy/imu_integration_comparison.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py imu_integration_comparison`.*
 
+The animation replays that run (`use_numpy/imu_integration_comparison.py` at its defaults, seed 0, 20 s). The two 3D panels show the attitude of a body at the origin, naive on the left and Exp-map in the middle: a pale box with pale axes for the truth, a thin dashed box with dashed axes for the estimate (axes: x red, y green, z blue). Each estimate is drawn against **its own ground truth** (§7.1, "Ground truths"): the naive estimate against $`R^{gt}_{\text{naive}}`$ and the Exp-map estimate against $`R^{gt}_{\text{exp}}`$, so the two pale boxes are not the same attitude (they differ by 0.45° at the end, invisible at this scale). The right column draws the rotation error and position error of the static figure progressively. The rotation errors end at 70.78° (naive; it peaks near 180° within the first seconds) and 0.47° (Exp-map), and the position errors at 11.5 m and 0.029 m, all printed by the generator from the script's own histories (checked equal to `run_simulation`'s). Only the orientation is drawn; the box (1.0 × 0.6 × 0.3) and the axis length are chosen shapes, and the frames are subsampled to every 0.125 s.
+
+![Animation of imu_integration_comparison.py over 20 s: two 3D panels with the true (pale) and estimated (dashed) body box and axes for naive Euler-angle integration and for the SO(3) Exp-map update, next to rotation error and position error curves growing to 70.78 deg versus 0.47 deg](../../assets/imu_integration_comparison.gif)
+
+*Animation: `uv run python generator/animate_imu_integration_comparison.py --out assets/imu_integration_comparison.gif` (seed 0, the script's default; 161 frames).*
+
 ### 7.1 The comparison and correction math, concretely
 
 The scripts share `lie_utils.py`. The $SO(3)$ exponential `so3_exp` is Rodrigues' formula, with the $I + [\phi]_\times$ fallback below $\theta < 10^{-6}$ noted in §4:

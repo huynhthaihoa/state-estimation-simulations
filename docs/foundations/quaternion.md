@@ -47,7 +47,7 @@ So a quaternion reads as **"rotate around this axis by this amount."** The four 
 
 > **Watch the component order and the convention.**
 >
-> - **Component order.** This doc writes quaternions scalar-first, $(w, x, y, z)$. Many libraries store them scalar-last, $[x, y, z, w]$: scipy's `Rotation.as_quat()`, ROS (Robot Operating System) messages, and this repo's own `utils.py`. Reading one ordering as the other silently gives a different rotation.
+> - **Component order.** This doc writes quaternions scalar-first, $(w, x, y, z)$. Many libraries store them scalar-last, $[x, y, z, w]$: scipy's `Rotation.as_quat()`, ROS (Robot Operating System) messages, and this repo's `utils.rotation_matrix_to_quaternion_xyzw` (used to hand rotations to manif); the other quaternion helpers in `utils.py` (`quat_multiply`, `quat_exp`, `quat_to_rotation`, ...) use $(w, x, y, z)$. Reading one ordering as the other silently gives a different rotation.
 > - **Multiplication convention.** **Hamilton** (used here, and by many robotics libraries, e.g. Eigen, ROS and Ceres) and **JPL** (mostly used in aerospace, and in the visual-inertial odometry (VIO) papers of Mourikis, Roumeliotis and colleagues) compose in opposite orders. Solà (2017) compares them.
 >   Under Hamilton, $`q \otimes \mathbf{v} \otimes q^{\ast}`$ actively rotates the vector $\mathbf{v}$ ($`\otimes`$ is quaternion multiplication, $`q^{\ast}`$ the conjugate of $`q`$, and $`\mathbf{v}`$ is written as a pure quaternion; all three are defined in §13), and $q$ maps body coordinates to world coordinates, like $X$ in [left_right_invariant.md](../filtering/left_right_invariant.md). JPL reverses the product order and encodes the inverse (frame) rotation.
 > - Always check both before mixing code or equations from different sources.
@@ -182,6 +182,12 @@ This matters for **optimization, SLAM, [EKF](../glossary.md#ekf-extended-kalman-
 
 - **Additive updates break the unit-norm constraint.** Adding a small correction to $q$ leaves the unit sphere (the set of quaternions with norm 1).
 - **The double cover makes averaging and differencing ambiguous.** The **double cover** means each rotation has two quaternions, $`q`$ and $`-q`$. Averaging $q$ and $-q$ (the same rotation) gives $(0,0,0,0)$, which is not a rotation. Their component-wise difference is as large as possible.
+
+The animation below turns a box about Z from 0° to 720°. The left panel shows the box, oriented by `quat_to_rotation(q)` (`utils.py`). The right panel shows $`q = (\cos\frac{\theta}{2}, 0, 0, \sin\frac{\theta}{2})`$ (the §2 formula with axis $`(0,0,1)`$) as a point on the unit circle in the $`(w, z)`$ plane, together with $`-q`$ (hollow), the opposite point. At every frame $`q`$ and $`-q`$ give the same box (asserted in the generator). Because of the half angle in §2, the box is back at its start after $`	heta = 360°`$ (a full turn), but $`q`$ has only reached $`(-1, 0, 0, 0) = -q_{\text{start}}`$; $`q`$ itself returns to $`(+1, 0, 0, 0)`$ only after $`\theta = 720°`$. The numbers are exact (no simulation, no randomness); the box shape, camera angle, 10° step per frame and the pauses at 360° and 720° are illustrative.
+
+![A box turning about Z from 0 to 720 degrees next to its unit quaternion (w, z) moving once around the unit circle; at 360 degrees the box is back at its start but q equals -q of the start](../../assets/quaternion_double_cover.gif)
+
+*Animation: `uv run python generator/animate_quaternion_double_cover.py --out assets/quaternion_double_cover.gif` (exact math, no seed).*
 
 ---
 
