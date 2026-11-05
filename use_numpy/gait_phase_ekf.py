@@ -195,6 +195,7 @@ def starts_phase_ekf(steps, triggers, dt, det_delay, R, q, P0, gate):
     starts, flags, est, est_std = [], [], [], []
     for (i, up, d, nxt), trig in zip(steps, triggers):
         g = GROUP_OF[i]
+        # Predict once per tripod touchdown (state [lag, lag rate], s and s/s); skipped at the group's first touchdown
         if last_d[g] is not None and d != last_d[g]:
             dtau = (d - last_d[g]) * dt
             F = np.array([[1.0, dtau], [0.0, 1.0]])
@@ -203,6 +204,7 @@ def starts_phase_ekf(steps, triggers, dt, det_delay, R, q, P0, gate):
         last_d[g] = d
         est.append(s[g][0])
         est_std.append(np.sqrt(P[g][0, 0]))
+        # Update with the first trigger that is not too early (gate on S); a too-late one is flagged as mistimed and only sets the start
         S = P[g][0, 0] + R
         ok = [k for k in trig if ((k - d) * dt - det_delay - s[g][0]) / np.sqrt(S) >= -gate]
         if not ok:

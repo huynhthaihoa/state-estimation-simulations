@@ -178,6 +178,7 @@ def run_filter(row, trial, cfg):
     r_q = COUNT ** 2 / 12 * np.eye(6)
     xs, Ps = [x[:3].copy()], [P[:3, :3].copy()]
     for k, (extend, wall) in enumerate(plan):
+# Predict: the holding foot is x[:3] with covariance P[:3, :3]
         slip_noise = (row == "wall_noise" and wall) or (row in ("hall_flag", "ext_fix", "ext_fix_bias")
                                                         and trial.flag[k])
         if slip_noise:
@@ -202,6 +203,7 @@ def run_filter(row, trial, cfg):
         Ju[:3, :3] = [[c, -s, 0.0], [s, c, 0.0], [0.0, 0.0, 1.0]]
         x[:3] = se2_compose(x[:3], rel)
         P = Jx @ P @ Jx.T + Ju @ (Jr @ r_q @ Jr.T) @ Ju.T
+# Update: the holding foot is x[:3] with covariance P[:3, :3]        
         if row in ("ext_fix", "ext_fix_bias") and not np.isnan(trial.fix[k, 0]):
             H = np.zeros((2, len(x)))
             H[0, 0] = H[1, 1] = 1.0
