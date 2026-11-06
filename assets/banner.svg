@@ -4,7 +4,7 @@
 <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16213b"/><stop offset="1" stop-color="#0b1222"/></linearGradient><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#94a3b8"/></marker></defs>
 <rect width="1200" height="440" rx="18" fill="url(#bg)"/>
 <text x="48.0" y="64.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="34" font-weight="700" fill="#e2e8f0" text-anchor="start">State Estimation Simulations</text>
-<text x="48.0" y="96.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="17" font-weight="400" fill="#94a3b8" text-anchor="start">From-scratch pose estimation on Lie groups (SO(3), SE(3), SE₂(3)) · NumPy and manif side by side</text>
+<text x="48.0" y="96.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="17" font-weight="400" fill="#94a3b8" text-anchor="start">From-scratch pose estimation, mostly on manifolds (SO(3), SE(3), SE₂(3)) · NumPy and manif side by side</text>
 <rect x="48" y="170" width="190" height="132" rx="14" fill="#facc15" fill-opacity=".10" stroke="#facc15" stroke-opacity=".65" stroke-width="2"/>
 <text x="66.0" y="200.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="14" font-weight="700" fill="#facc15" text-anchor="start" letter-spacing="1.5">SENSORS</text>
 <text x="66.0" y="228.0" font-family="Inter, Segoe UI, Helvetica, Arial, sans-serif" font-size="16" font-weight="400" fill="#e2e8f0" text-anchor="start">IMU · camera</text>

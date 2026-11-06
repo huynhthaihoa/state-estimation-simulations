@@ -8,7 +8,7 @@
 
 A collection of from-scratch simulations exploring **pose/state estimation**, mostly on manifolds:
 
- - How **orientation** and **pose** should be integrated and corrected on $SO(3)$ and $`SE(3)`$ rather than treated as flat vectors
+ - How **orientation** and **pose** should be integrated and corrected on $`SO(3)`$ and $`SE(3)`$ rather than treated as flat vectors
  - How a **prior** (a motion model driven by noisy control/odometry inputs) can be fused with **measurements** either **recursively** (Kalman filtering) or in **batch** (Gauss-Newton/Levenberg-Marquardt optimization over factor graphs)
  - How batch smoothing **scales** to a growing problem: incremental solving (iSAM, Bayes tree), sliding-window marginalization, and Local + Global bundle adjustment
  - How the **front-end** turns camera observations into poses for the estimator: Perspective-n-Point (PnP) pose recovery, and triangulation inside bundle adjustment

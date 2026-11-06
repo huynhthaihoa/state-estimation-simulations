@@ -24,7 +24,7 @@ INK, MUTED = "#e2e8f0", "#94a3b8"
 YEL, BLUE, PURP, GREEN, SLATE = "#facc15", "#38bdf8", "#a78bfa", "#34d399", "#64748b"
 
 TITLE = "State Estimation Simulations"
-SUBTITLE = "From-scratch pose estimation on Lie groups (SO(3), SE(3), SE\u2082(3)) \u00b7 NumPy and manif side by side"
+SUBTITLE = "From-scratch pose estimation, mostly on manifolds (SO(3), SE(3), SE\u2082(3)) \u00b7 NumPy and manif side by side"
 DESC = 'Pipeline overview: sensors (including contact signals) feed a front-end (PnP, triangulation, visual-inertial initialization, LiDAR primitives), whose constraints go to two back-end families - Kalman filtering (including crawling and legged robots) and factor-graph optimization - producing a trajectory and map estimate, all built on Lie-group and Jacobian foundations.'
 DEFS = '<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16213b"/><stop offset="1" stop-color="#0b1222"/></linearGradient><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#94a3b8"/></marker></defs>'
 
