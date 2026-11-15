@@ -145,7 +145,7 @@ The map $(\cdot)^\wedge : \mathbb{R}^3 \rightarrow \mathfrak{so}(3)$ is the hat 
 
 $$\delta\theta^\wedge v = \delta\theta \times v$$
 
-so the matrix is the cross product written as a matrix.
+So the matrix is the cross product written as a matrix.
 
 ---
 
@@ -163,7 +163,7 @@ In symbols:
 
 $$R = \exp(\delta\theta^\wedge)$$
 
-Here $`\exp`$ is the **matrix exponential**, the series $`\exp(A) = I + A + A^2/2! + A^3/3! + \cdots`$ applied to a square matrix $`A`$. For $`A = \delta\theta^\wedge`$ the series sums to Rodrigues' formula below, and the same series on the $4\times4$ matrix $`\xi^\wedge`$ gives the $SE(3)$ case (§11). The **matrix logarithm** is its inverse (§9).
+Here $`\exp`$ is the **matrix exponential**, the series $`\exp(A) = I + A + A^2/2! + A^3/3! + \cdots`$ applied to a square matrix $`A`$. For $`A = \delta\theta^\wedge`$, the series sums to Rodrigues' formula below, and the same series on the $4\times4$ matrix $`\xi^\wedge`$ gives the $SE(3)$ case (§11). The **matrix logarithm** is its inverse (§9).
 
 ```text
 Lie algebra                     Lie group
@@ -221,7 +221,7 @@ R = \exp(\delta\theta^\wedge) = \begin{bmatrix} 0 & -1 & 0\\
 \mathrm{Log}(R) = (0,\,0,\,\pi/2)
 ```
 
-so Exp builds the matrix and Log recovers the original 3-vector (checked numerically).
+so Exp builds the matrix, and Log recovers the original 3-vector (checked numerically).
 
 This is how we turn "the difference between two poses" into a plain vector we can measure, weight, and feed into a least-squares solver, which is what pose-graph optimization does with every edge residual.
 
@@ -372,7 +372,7 @@ Filters use $`\mathrm{Ad}`$ to carry a covariance from one frame to another, and
 \mathrm{ad}_\xi = \begin{bmatrix} \phi^\wedge & \rho^\wedge \\ 0 & \phi^\wedge \end{bmatrix}
 ```
 
-- It measures how two small motions fail to commute. $`\mathrm{ad}_{\xi_1}\,\xi_2`$ is the **Lie bracket** $`[\xi_1, \xi_2]`$, the vee of $`\xi_1^\wedge \xi_2^\wedge - \xi_2^\wedge \xi_1^\wedge`$. For rotations it is the cross product $`\phi_1 \times \phi_2`$.
+- It measures how two small motions fail to commute. $`\mathrm{ad}_{\xi_1}\,\xi_2`$ is the **Lie bracket** $`[\xi_1, \xi_2]`$, the vee of $`\xi_1^\wedge \xi_2^\wedge - \xi_2^\wedge \xi_1^\wedge`$. For rotations, it is the cross product $`\phi_1 \times \phi_2`$.
 - **Example:** rotating 0.01 rad about $`x`$ then about $`y`$, versus in the other order, ends about $`10^{-4}`$ rad apart, about $`z`$: $`(0.01, 0, 0) \times (0, 0.01, 0) = (0, 0, 10^{-4})`$.
 - It is what the series for the Jacobians are built from, e.g. $`J_r(\xi) = \sum_{n \ge 0} \frac{(-\mathrm{ad}_\xi)^n}{(n+1)!}`$ ([jacobian.md §11](jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space)).
 
@@ -443,7 +443,7 @@ $$\boxed{SE(3) \underset{\exp}{\overset{\log}{\rightleftarrows}} \mathfrak{se}(3
 
 ## 15. The connection to Jacobians
 
-In optimization we typically have an error $\text{error} = f(T)$ and want to know: "if I slightly change the pose, how does the error change?" So we introduce $\delta\xi \in \mathbb{R}^6$ and approximate
+In optimization, we typically have an error $\text{error} = f(T)$ and want to know: "if I slightly change the pose, how does the error change?" So we introduce $\delta\xi \in \mathbb{R}^6$ and approximate
 
 $$f(T\exp(\delta\xi^\wedge)) \approx f(T)+J\delta\xi$$
 
