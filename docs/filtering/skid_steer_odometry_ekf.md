@@ -19,8 +19,8 @@ One established way to model the skid scales the track by an **ICR coefficient**
 
 - **A wrong $`\chi`$ ruins wheel odometry.** On a 60 m run, ideal differential drive (`odo_chi1`) on a robot whose true $`\chi`$ is 1.875 has a position [RMSE](../glossary.md#rmse-root-mean-square-error) of 5.5 m and a heading RMSE of 102°. The driver's 1.875 on a robot whose true $`\chi`$ is 1.47 gives 10.4 m.
 - **With the right $`\chi`$, the wheels are nearly perfect here.** 0.01 cm RMSE. The only wheel error in this model is the encoder's rounding, and a constant, known skid adds nothing.
-- **A gyro in an EKF does not rescue a wrong $`\chi`$.** `ekf_fixed` follows the wheels (10.4 m RMSE at a true $`\chi`$ of 1.47) and reports millimeters ([NEES](../glossary.md#consistency-and-nees) 2.4 × 10⁷, where 3 is consistent). In its model the gyro reading is 31 times noisier, in variance, than the wheels' yaw reading (about 108 times per unit of yaw rate, at $`\chi`$ = 1.875), so it trusts the wheels over the gyro.
-- **Estimating $`\chi`$ works.** `ekf_chi` learns $`\chi`$ within about 2 s of the first turn (to 0.001 by the end), for every true $`\chi`$ from 1.0 to 2.0. Its position RMSE stays at about 3 cm, made in those first seconds: started with the true $`\chi`$, it drops to 0.05 cm.
+- **A gyro in an EKF does not rescue a wrong $`\chi`$.** `ekf_fixed` follows the wheels (10.4 m RMSE at a true $`\chi`$ of 1.47) and reports millimeters ([NEES](../glossary.md#consistency-and-nees) 2.4 × 10⁷, where 3 is consistent). In its model, the gyro reading is 31 times noisier, in variance, than the wheels' yaw reading (about 108 times per unit of yaw rate, at $`\chi`$ = 1.875), so it trusts the wheels over the gyro.
+- **Estimating $`\chi`$ works.** `ekf_chi` learns $`\chi`$ within about 2 s of the first turn (to 0.001 by the end), for every true $`\chi`$ from 1.0 to 2.0. Its position RMSE stays at about 3 cm, made in those first seconds: starting with the true $`\chi`$, it drops to 0.05 cm.
 - **Real Husky wheel odometry drifts 2.6-4.9%** ([RPE](../glossary.md#rpe-relative-pose-error) over path segments of 1-100 m; measured, ref. 9). This model's odometry with the correct $`\chi`$ drifts almost nothing. So the real drift comes from a $`\chi`$ that is wrong or changes with the path and the ground, or from what the model leaves out (sideways slip, rough ground); ref. 9 does not say which $`\chi`$ its odometry used.
 
 ![Four panels from skid_steer_odometry_ekf.py: one run's path for the truth and the four rows; position RMSE over time over 30 trials; the chi estimate of ekf_chi with its reported 2-sigma band; position RMSE of the four rows for true chi of 1.0, 1.25, 1.47, 1.875 and 2.0](../../assets/skid_steer_odometry_ekf.png)
@@ -78,7 +78,7 @@ Also **assumed**: no sideways slip (the symmetric case of ref. 6's model), an ex
 - **Two readings every 20 ms:**
   - the gyro, $`z_g = \omega + b`$ + noise;
   - the wheels' yaw reading, $`z_w = (v_r - v_l)/B = \chi\,\omega`$ + noise.
-- **Why both parameters can be learned** ([observability](../glossary.md#observability)): on a straight part $`\omega \approx 0`$, so the gyro shows its bias alone. In a turn the wheels' reading is $`\chi`$ times the yaw rate.
+- **Why both parameters can be learned** ([observability](../glossary.md#observability)): on a straight part $`\omega \approx 0`$, so the gyro shows its bias alone. In a turn, the wheels' reading is $`\chi`$ times the yaw rate.
 - **Noise levels:**
   - gyro 0.0037 rad/s per sample, from the noise density;
   - wheels' yaw reading 0.00067 rad/s, from the encoder step (0.00064 m/s per 20 ms) treated as white **[quantization noise](../glossary.md#quantization-noise)**;
@@ -127,13 +127,13 @@ NEES is 0.02 for `ekf_fixed` and 1.12 for `ekf_chi`, below the band. The filters
 
 With the encoder rounding, `ekf_chi`'s NEES is higher than `ekf_fixed`'s because most of its error comes from learning $`\chi`$, which its covariance does cover: started with the true $`\chi`$, its NEES falls to 0.03 (from 1.78 over the same 10 trials).
 
-With white wheel noise of the same size instead (`--white-wheel-noise --n-mc-trials 10`), both are consistent: NEES 2.48 (`ekf_fixed`) and 2.02 (`ekf_chi`), band [1.68, 4.70]; a test checks it for `ekf_chi`.
+With white-wheel noise of the same size instead (`--white-wheel-noise --n-mc-trials 10`), both are consistent: NEES 2.48 (`ekf_fixed`) and 2.02 (`ekf_chi`), band [1.68, 4.70]; a test checks it for `ekf_chi`.
 
 ---
 
 ## 4. Experiment 2: sweep of the slip coefficient (20 trials each)
 
-Position RMSE (cm), and NEES for the EKFs:
+Position RMSE (cm) and NEES for the EKFs:
 
 | True $`\chi`$ | `odo_chi1` | `odo_driver` | `ekf_fixed` (NEES) | `ekf_chi` (NEES) |
 | --- | --- | --- | --- | --- |
@@ -155,7 +155,7 @@ Position RMSE (cm), and NEES for the EKFs:
 - **Sideways slip, wheel radius error, rough ground.** All left out (§1.2). With them, even the correct-$`\chi`$ rows would drift. The measured 2.6-4.9% (ref. 9) cannot be split between these effects and a wrong $`\chi`$ from the information given.
 - **A wheel reading with slip noise.** `ekf_fixed` trusts the wheels' yaw reading because its noise is only the encoder step. A filter that adds noise for slip would lean more on the gyro; that tuning is not run here.
 - **The in-run gyro drift** (18 °/h, ref. 8) and the IMU's other axes.
-- **LiDAR.** The lab fuses LiDAR, the IMU and visual odometry in a graph (ref. 2), and LiDAR odometry can also correct the wheels (ref. 9). Neither is run here.
+- **LiDAR.** The lab fuses LiDAR, the IMU, and visual odometry in a graph (ref. 2), and LiDAR odometry can also correct the wheels (ref. 9). Neither is run here.
 
 ---
 
@@ -175,5 +175,5 @@ In this model, the slip coefficient, not the sensors' noise, decides the error: 
 6. Wang, T., Wu, Y., Liang, J., Han, C., Chen, J., & Zhao, Q. (2015). *Analysis and Experimental Kinematics of a Skid-Steering Wheeled Robot Based on a Laser Scanner Sensor*. Sensors, 15(5), 9681. https://doi.org/10.3390/s150509681 - the ICR model and coefficient $`\chi`$ (Eq. 15); tread ICRs "always lie outside of the tread centerlines because of slippage"; Table 3: $`\chi`$ from 1.4662 to 1.4115 measured on a Pioneer P3-AT with an external laser scanner, as $`\lambda`$ goes from 0 to 7, where the turn radius is $`\lambda`$ times half the effective track (Eq. 14). The text calls increasing $`\lambda`$ "increasing the path curvature", which conflicts with Eq. 14; this doc follows the equation.
 7. Mandow, A., Martínez, J. L., Morales, J., Blanco, J. L., García-Cerezo, A., & González, J. (2007). *Experimental kinematics for wheeled skid-steer mobile robots*. IEEE/RSJ IROS, 1222-1227. https://doi.org/10.1109/IROS.2007.4399139 - origin of the ICR-based skid-steer model that ref. 6 builds on; the full text was not read for this doc (closed access).
 8. Xsens. *MTi 10-series* product leaflet (third-party copy; Xsens's own specification page could not be read). https://hkjdwchip.com/image//files/xsenstechnologies-mti202a5g4-datasheets-0241.pdf - gyroscope: noise density 0.03 °/s/√Hz (typical), bias repeatability (1 yr) 0.2 °/s, in-run bias stability 18 °/h.
-9. Guadagnino, T., Mersch, B., Vizzo, I., Gupta, S., Malladi, M. V. R., Lobefaro, L., Doisy, G., & Stachniss, C. (2024). *Kinematic-ICP: Enhancing LiDAR Odometry with Kinematic Constraints for Wheeled Mobile Robots Moving on Planar Surfaces*. arXiv:2410.10277v3. https://arxiv.org/abs/2410.10277 - §IV (metrics: the KITTI average translation error over segments of 1-100 m) and Table II, Clearpath Husky A200 with a total-station ground truth: wheel odometry RPE 4.93, 4.71, 2.63 and 2.98% on four runs (Campus 0-2 on pavement, Palace in a park).
+9. Guadagnino, T., Mersch, B., Vizzo, I., Gupta, S., Malladi, M. V. R., Lobefaro, L., Doisy, G., & Stachniss, C. (2024). *Kinematic-ICP: Enhancing LiDAR Odometry with Kinematic Constraints for Wheeled Mobile Robots Moving on Planar Surfaces*. arXiv:2410.10277v3. https://arxiv.org/abs/2410.10277 - §IV (metrics: the KITTI average translation error over segments of 1-100 m) and Table II, Clearpath Husky A200 with a total-station ground truth: wheel odometry RPE 4.93, 4.71, 2.63, and 2.98% on four runs (Campus 0-2 on pavement, Palace in a park).
 10. AgileX Robotics. *hunter_ros*, `hunter_base/include/hunter_base/hunter_params.hpp`. https://github.com/agilexrobotics/hunter_ros - `HunterSEParams`: track 0.52 m, wheelbase 0.55 m, wheel radius 0.1375 m, maximum central steering angle 0.283 rad.
