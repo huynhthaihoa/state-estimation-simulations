@@ -64,7 +64,7 @@ Stance always ends at the commanded liftoff. The approaches differ only in when 
 
 `oracle` uses the true stance and is shown as a reference, not as an approach.
 
-**`cpg`** follows the idea of Szadkowski et al. (2021), much simplified. Their CPG, kept in sync with the touchdowns, learns *at which phase* of its rhythm (point in its cycle) contact usually comes. Here that is one number $`\mu`$ per tripod group. After each accepted trigger it moves $`\mu`$ a fraction (0.3) of the way toward the observed offset. An error above 0.1 s is flagged as a **mistiming** and not learned from. The paper's CPG is a **Matsuoka oscillator** (a pair of model neurons that inhibit each other and so produce a rhythm) with learned neuron models on top; here it is one number per group.
+**`cpg`** follows the idea of Szadkowski et al. (2021), much simplified. Their CPG, kept in sync with the touchdowns, learns *at which phase* of its rhythm (point in its cycle) contact usually comes. Here, that is one number $`\mu`$ per tripod group. After each accepted trigger, it moves $`\mu`$ a fraction (0.3) of the way toward the observed offset. An error above 0.1 s is flagged as a **mistiming** and not learned from. The paper's CPG is a **Matsuoka oscillator** (a pair of model neurons that inhibit each other and so produce a rhythm) with learned neuron models on top; here it is one number per group.
 
 **`phase_ekf`** is a two-state Kalman filter per tripod group, in the style of the gait-phase EKFs used for prostheses and exoskeletons (Medrano et al. 2023), but driven by touchdown events:
 
@@ -85,7 +85,7 @@ Here $`F`$ is the state transition, $`Q`$ its **process noise** (the uncertainty
 
 ## 2. Sanity check: nothing perturbed
 
-With no lag, no terrain spread, no blocked leg and a perfect detector (40 [Monte Carlo trials](../glossary.md#monte-carlo-trials)), all four approaches produce exactly the true stance flags, and the body NEES is 6.92 for all of them (the band a consistent 40-run average falls in 95% of the time: [4.97, 7.12]). So every difference below comes from touchdown timing.
+With no lag, no terrain spread, no blocked leg, and a perfect detector (40 [Monte Carlo trials](../glossary.md#monte-carlo-trials)), all four approaches produce exactly the true stance flags, and the body NEES is 6.92 for all of them (the band a consistent 40-run average falls in 95% of the time: [4.97, 7.12]). So every difference below comes from touchdown timing.
 
 ---
 
@@ -108,7 +108,7 @@ Whenever a foot lands late, the schedule flags it as planted before it touches d
 A detector never flags a real touchdown early, so with no false triggers it would be safe (§4). But each false trigger starts the stance 0.12-0.2 s before the commanded touchdown, while the foot is still lowering. With false triggers on 10% of steps, that is enough for NEES 50.
 
 #### A rhythm model rejects triggers that come too early
-`cpg` and `phase_ekf` know roughly when a detection should come. A trigger far earlier than that is rejected, so they almost never read a swinging foot. Both track the growing lag to about 16 ms RMS (figure, top right), against a per-step terrain scatter of 30 ms.
+`cpg` and `phase_ekf` know roughly when a detection should come. A trigger far earlier than that is rejected, so they rarely read a swinging foot. Both track the growing lag to about 16 ms RMS (figure, top right), against a per-step terrain scatter of 30 ms.
 
 #### The price: readings lost to the detection delay
 Every detection-based approach starts stance only after the detector fires, about 2 ticks after the true touchdown on average. That costs about 240 readings per run (2 ticks × 120 steps), but the other two or three feet in stance still pin down the body, so the forward-speed RMSE barely changes (0.0039-0.0040 vs 0.0038 with the true stance).
@@ -144,7 +144,7 @@ Even with no lag, the schedule reads late landings from the terrain spread and t
 | `cpg` | 7.04 | 7.04 | 7.04 |
 | `phase_ekf` | 7.04 | 7.69 | 12.3 |
 
-Without false triggers the raw detector is as good as the rhythm models: the delay alone never makes it read a swinging foot.
+Without false triggers, the raw detector is as good as the rhythm models: the delay alone never makes it read a swinging foot.
 
 **Rougher ground and the width of the window.** Both rhythm models accept a trigger only if it is not too much earlier than expected. Too narrow, and they reject true early landings (lost readings, safe). Too wide, and false triggers get in (swinging feet read, overconfident).
 
@@ -163,7 +163,7 @@ Why the 3σ gate fails on rough ground: its width comes from the predicted sprea
 
 ![Three stacked log-scale histograms, one per terrain spread (30, 60, 100 ms), of detector-trigger times relative to the expected detection: true detections in a hump around zero that widens with terrain, false triggers 0.16-0.36 s early, and the blocked leg's late detections. Vertical lines mark the CPG's fixed 0.1 s window and the phase EKF's 3σ and 2σ gates, which move left as the terrain spread grows](../../assets/gait_phase_window_concept.png)
 
-*Figure: real trigger times from `simulate_trial` (defaults except the terrain spread, 40 trials each, seed 0), measured from the commanded touchdown plus the true lag plus the mean delay. Each gate accepts what lies right of its line; the gates are drawn at the median $`\sqrt{S}`$ after the first 5 s (41, 69 and 109 ms). The CPG window stays right of every false trigger. The 3σ gate takes in 12% of them at 60 ms terrain and 91% at 100 ms, the 2σ gate 0% and 20%. Plotted by `uv run python generator/make_figures.py gait_phase_window_concept`.*
+*Figure: real trigger times from `simulate_trial` (defaults except the terrain spread, 40 trials each, seed 0), measured from the commanded touchdown plus the true lag plus the mean delay. Each gate accepts what lies right of its line; the gates are drawn at the median $`\sqrt{S}`$ after the first 5 s (41, 69 and 109 ms). The CPG window stays right of every false trigger. The 3σ gate takes in 12% of them at 60 ms terrain and 91% at 100 ms; the 2σ gate takes in 0% and 20%. Plotted by `uv run python generator/make_figures.py gait_phase_window_concept`.*
 
 **A fairness note:** the CPG's 0.1 s window works at every terrain level here because it reaches 0.1 s before the expected detection, short of the false triggers (at least 0.16 s before it), and both numbers are this toy's choices. Its success means "a window that matches the false-trigger zone works", not "a CPG beats a Kalman filter".
 
@@ -173,7 +173,7 @@ Why the 3σ gate fails on rough ground: its width comes from the predicted sprea
 
 Both rhythm models flag a detection that comes much later than expected as a **mistiming**: a possible obstacle, which a controller could answer with a reflex. At the defaults (100 trials), `cpg` flags 400 of the 400 blocked steps with 99 false alarms among 11600 other steps (0.9%); `phase_ekf` flags 387 of 400 with 78 false alarms.
 
-On rougher ground (40 trials: 160 blocked steps, 4640 others) the same window-width trade-off appears:
+On rougher ground (40 trials: 160 blocked steps, 4640 others), the same window-width trade-off appears:
 
 | Terrain | `cpg` (0.1 s): hits / false alarms | `phase_ekf` 3σ: hits / false alarms | `phase_ekf` 2σ: hits / false alarms |
 | --- | --- | --- | --- |
@@ -205,6 +205,6 @@ When touchdowns are uncertain, the commanded schedule and a raw detector both en
 ## 8. References
 
 1. Faigl, J. & Čížek, P. (2019). *Adaptive locomotion control of hexapod walking robot for traversing rough terrains with position feedback only*. Robotics and Autonomous Systems, 116, 136-147. Preprint: https://comrob.fel.cvut.cz/papers/ras19adaptive.pdf - the position-error contact detector (femur only, during the swing-down) and its start-of-swing-down error peak; reports no detection delays or error rates.
-2. Szadkowski, R., Prágr, M., & Faigl, J. (2021). *Self-Learning Event Mistiming Detector Based on Central Pattern Generator*. Frontiers in Neurorobotics, 15. https://doi.org/10.3389/fnbot.2021.629652 - a CPG entrained to touchdowns acts as an estimator of when contact happens, and flags mistimings; no Kalman filter.
+2. Szadkowski, R., Prágr, M., & Faigl, J. (2021). *Self-Learning Event Mistiming Detector Based on Central Pattern Generator*. Frontiers in Neurorobotics, 15. https://doi.org/10.3389/fnbot.2021.629652 - A CPG entrained to touchdowns acts as an estimator of when contact happens, and flags mistimings; no Kalman filter.
 3. Medrano, R. L., Thomas, G. C., Keais, C. G., Rouse, E. J., & Gregg, R. D. (2023). *Real-Time Gait Phase and Task Estimation for Controlling a Powered Ankle Exoskeleton on Extremely Uneven Terrain*. IEEE Transactions on Robotics, 39(3), 2170-2182. https://doi.org/10.1109/TRO.2023.3235584 - an EKF with gait phase and phase rate in its state, on a wearable robot.
 4. Thatte, N., Shah, T., & Geyer, H. (2019). *Robust and Adaptive Lower Limb Prosthesis Stance Control via Extended Kalman Filter-Based Gait Phase Estimation*. IEEE Robotics and Automation Letters, 4(4), 3129-3136. https://doi.org/10.1109/LRA.2019.2924841 - EKF gait-phase estimation for a prosthesis, more robust than threshold-based event detection.
