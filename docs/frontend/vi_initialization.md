@@ -5,7 +5,7 @@
 Before a visual-inertial estimator can run its normal loop ([preintegrate](../glossary.md#imu-preintegration) IMU, optimize against camera constraints), it has to solve a chicken-and-egg bootstrapping problem. It must find **metric scale** (real-world units such as meters), gravity direction, initial velocity, and [IMU bias](../glossary.md#bias). A **monocular** (single) camera or a bias-corrupted IMU cannot give all of these on its own.
 
 This builds on:
-- **IMU preintegration** ($\Delta R, \Delta v, \Delta p$, the relative rotation, velocity and position between keyframes computed from the IMU samples, and their bias [Jacobians](../glossary.md#jacobian)) from [imu_preintegration.md](../optimization/imu_preintegration.md). This doc covers what must happen *before* that machinery can be trusted.
+- **IMU preintegration** ($\Delta R, \Delta v, \Delta p$, the relative rotation, velocity, and position between keyframes computed from the IMU samples, and their bias [Jacobians](../glossary.md#jacobian)) from [imu_preintegration.md](../optimization/imu_preintegration.md). This doc covers what must happen *before* that machinery can be trusted.
 - **Factor graphs** from [factor_graph.md](../optimization/factor_graph.md), the optimizer we hand off to (§4).
 
 ---
@@ -46,7 +46,7 @@ With a single (monocular) camera, SfM translations and structure are correct onl
 **Intuition for Step 1** (toy case: one keyframe pair, 1 s apart):
 - SfM says the camera turned 10.0°. The preintegrated gyroscope says 10.5°.
 - The 0.5° gap, spread over 1 s, is a gyroscope bias of about 0.5°/s.
-- The real step does this fit jointly over all keyframe pairs in the window.
+- The real step is to fit this jointly over all keyframe pairs in the window.
 
 **Step 1 - gyroscope bias.**
 - Short vision-only SfM gives relative rotations between keyframes that don't depend on scale.
@@ -57,7 +57,7 @@ With a single (monocular) camera, SfM translations and structure are correct onl
 **Step 2 - gravity, scale, and velocities.**
 - **Tiny example (toy case: ignores gravity and starting velocity):** vision says the camera moved 2 units, and the IMU says the same move was 1 m. So the scale is $`s = 1\,\text{m} / 2\,\text{units} = 0.5`$ m/unit.
 - The real solve repeats this match over many keyframe pairs. That also pins down gravity and the velocities.
-- With the gyroscope bias corrected, $\Delta v$ and $\Delta p$ are IMU measurements (they depend only on the raw samples and the bias). The unknown scale $s$ sits in the vision positions, and gravity $g$ enters the equations that link the two. Each keyframe pair therefore gives equations tying the measured $\Delta v$, $\Delta p$ to $s$, $g$ and the velocities, and together with the vision-only relative poses these form a second linear system.
+- With the gyroscope bias corrected, $\Delta v$ and $\Delta p$ are IMU measurements (they depend only on the raw samples and the bias). The unknown scale $s$ sits in the vision positions, and gravity $g$ enters the equations that link the two. Each keyframe pair therefore gives equations tying the measured $\Delta v$, $\Delta p$ to $s$, $g$, and the velocities, and together with the vision-only relative poses, these form a second linear system.
 - It is solved jointly for $s$, $g$, and every keyframe's velocity.
 - The true gravity magnitude is known (~9.81 m/s²), so the raw linear $g$ is then refined by re-parameterizing it as a magnitude-constrained direction (2 degrees of freedom on a sphere) instead of a free 3-vector.
 - Without this refinement, noise in the linear solve can give $g$ the wrong magnitude, which plausibly also degrades the recovered scale because $s$ and $g$ are solved together (our inference, not a claim from the sources).
@@ -66,8 +66,8 @@ With a single (monocular) camera, SfM translations and structure are correct onl
 
 **What the alignment needs from the data.** The solve only works if the motion reveals the unknowns, so real systems check before trusting it:
 
-- **Enough acceleration.** At constant velocity the accelerometer senses only gravity, and a scaled-up trajectory moving at a scaled-up constant speed fits the IMU data equally well, so scale is [unobservable](../glossary.md#observability). The window needs acceleration that is both non-zero and sufficiently varied.
-- **Enough translation.** Under pure rotation the vision-only SfM has no [parallax](triangulation_pnp.md#2-triangulation-worked-from-the-real-code) (the angle between the viewing rays to one point from different camera positions) to recover structure and translation from, so there is nothing for the IMU to align against.
+- **Enough acceleration.** At constant velocity, the accelerometer senses only gravity, and a scaled-up trajectory moving at a scaled-up constant speed fits the IMU data equally well, so scale is [unobservable](../glossary.md#observability). The window needs acceleration that is both non-zero and sufficiently varied.
+- **Enough translation.** Under pure rotation, the vision-only SfM has no [parallax](triangulation_pnp.md#2-triangulation-worked-from-the-real-code) (the angle between the viewing rays to one point from different camera positions) to recover structure and translation from, so there is nothing for the IMU to align against.
 - **Known camera-IMU extrinsics.** The alignment needs the rotation and offset between camera and IMU; VINS-Mono can estimate the extrinsic rotation online if it isn't calibrated.
 
 VINS-Mono, for example, initializes only with stable feature tracking and sufficient parallax (here measured in pixels, as a proxy for the angle above; the paper requires more than 30 tracked features and 20 rotation-compensated pixels, i.e. average feature displacement between frames after removing the apparent shift caused by camera rotation; the released code's `relativePose` instead checks more than 20 matched features and an average displacement of the normalized image points, times a hard-coded 460, above 30), and otherwise waits for new frames. The paper notes that acceleration excitation is needed for scale to be observable; the released code computes an IMU-excitation statistic but only logs a warning when it is low.
@@ -76,7 +76,7 @@ VINS-Mono, for example, initializes only with stable feature tracking and suffic
 
 ## 3. Why a mostly linear pipeline
 
-The other estimators in this doc set (§1's list) linearize *around* an existing decent guess and take a Gauss-Newton/Levenberg-Marquardt step. At initialization there is no guess to linearize around, for scale or gravity in particular. So we solve mostly with **linear systems**: a cheap, robust way to get *some* usable estimate before anything trustworthy exists to seed an iterative solve.
+The other estimators in this doc set (§1's list) linearize *around* an existing decent guess and take a Gauss-Newton/Levenberg-Marquardt step. At initialization, there is no guess to linearize around, for scale or gravity in particular. So we solve mostly with **linear systems**: a cheap, robust way to get *some* usable estimate before anything trustworthy exists to seed an iterative solve.
 
 It isn't the only design real systems use:
 - VINS-Mono's gravity refinement (Step 2) is itself a short iterative loop over a tangent-plane reparameterization. The 2 parameters move along the plane that touches, at the current estimate, the sphere of gravity vectors with the known magnitude.
