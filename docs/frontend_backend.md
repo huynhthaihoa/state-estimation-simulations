@@ -81,7 +81,7 @@ $$z_{11},\ z_{12},\ z_{21},\ \ldots$$
 
 where $z_{ij}$ is the pixel measurement of landmark $j$ from pose $i$ (the bundle-adjustment $z_{ij}$, not the relative-pose $z_{ij}$ of the pose-graph docs).
 
-Two more kinds of constraint reach the back-end: **IMU bundles** (preintegrated IMU measurements between keyframes) and **priors** (single-variable constraints, such as one that pins the first pose).
+Two more kinds of constraints reach the back-end: **IMU bundles** (preintegrated IMU measurements between keyframes) and **priors** (single-variable constraints, such as one that pins the first pose).
 
 The back-end asks:
 
@@ -144,11 +144,11 @@ So the estimated trajectory [drifts](glossary.md#drift), and the final pose does
       D ─────────C
 ```
 
-Call the poses $x_0$ (A), $x_1$ (B), $x_2$ (C), $x_3$ (D) and $x_4$ (A′, the estimate of the final pose). The step D → A′ is just another odometry constraint. When the robot is back at A, the **front-end detects a loop closure**:
+Call the poses $x_0$ (A), $x_1$ (B), $x_2$ (C), $x_3$ (D), and $x_4$ (A′, the estimate of the final pose). The step D → A′ is just another odometry constraint. When the robot is back at A, the **front-end detects a loop closure**:
 
 > "This place looks like somewhere I've seen before."
 
-It generates a constraint between the *non-consecutive* poses $x_0$ and $x_4$: a measured relative pose $\tilde T_{04}$, which is close to the identity if the robot returned to exactly the same spot.
+It generates a constraint between the *non-consecutive* poses $x_0$ and $x_4$: a measured relative pose $\tilde T_{04}$, which is close to the identity if the robot returned to the same spot.
 
 The **back-end then optimizes the entire trajectory** so that all constraints are satisfied as well as possible.
 
@@ -195,5 +195,5 @@ In modern SLAM systems, both stages can operate online (see the pipeline in §1)
 
 1. Cadena, C., Carlone, L., Carrillo, H., Latif, Y., Scaramuzza, D., Neira, J., Reid, I., & Leonard, J. J. (2016). *Past, Present, and Future of Simultaneous Localization and Mapping: Toward the Robust-Perception Age*. IEEE Transactions on Robotics, 32(6), 1309–1332. https://doi.org/10.1109/TRO.2016.2624754 - the standard survey that frames the front-end/back-end split used throughout this doc (§1, §2, §4).
 2. Grisetti, G., Kümmerle, R., Stachniss, C., & Burgard, W. (2010). *A Tutorial on Graph-Based SLAM*. IEEE Intelligent Transportation Systems Magazine, 2(4), 31–43. https://doi.org/10.1109/MITS.2010.939925 - the back-end/pose-graph optimization tutorial behind §2 and §4.
-3. Mur-Artal, R., Montiel, J. M. M., & Tardós, J. D. (2015). *ORB-SLAM: A Versatile and Accurate Monocular SLAM System*. IEEE Transactions on Robotics, 31(5), 1147–1163. https://doi.org/10.1109/TRO.2015.2463671 - a concrete system using ORB features, local BA and pose-graph loop closing; its Tracking / Local Mapping / Loop Closing threads only roughly follow the front-end/back-end split. Relevant to §1's ORB mention and as a worked loop-closure example for §3.
+3. Mur-Artal, R., Montiel, J. M. M., & Tardós, J. D. (2015). *ORB-SLAM: A Versatile and Accurate Monocular SLAM System*. IEEE Transactions on Robotics, 31(5), 1147–1163. https://doi.org/10.1109/TRO.2015.2463671 - a concrete system using ORB features, local BA, and pose-graph loop closing; its Tracking / Local Mapping / Loop Closing threads only roughly follow the front-end/back-end split. Relevant to §1's ORB mention and as a worked loop-closure example for §3.
 4. Gálvez-López, D., & Tardós, J. D. (2012). *Bags of Binary Words for Fast Place Recognition in Image Sequences*. IEEE Transactions on Robotics, 28(5), 1188–1197. https://doi.org/10.1109/TRO.2012.2197158 - the DBoW2 place-recognition method, an example of the place-recognition step in §3's account of loop-closure *detection*.
