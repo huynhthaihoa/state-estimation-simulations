@@ -8,7 +8,7 @@
 
 "Anisotropic friction" means **a surface grips well along one axis and slides easily along the perpendicular one**. The classic biological example is a snake's belly scales, which slide easily along the body and grip sideways (Hu et al. 2009). Our pad is the mirror image: it grips along its forward axis and slips sideways. Swapping the axes would only rotate the noise ellipse by 90°.
 
-That noise ellipse is fixed *to the pad*, i.e. to the robot's body frame. The catch: as the robot turns, the ellipse turns with it in the world frame. Its long (slip) axis in world coordinates:
+That noise ellipse is fixed *to the pad*, i.e., to the robot's body frame. The catch: as the robot turns, the ellipse turns with it in the world frame. Its long (slip) axis in world coordinates:
 
 ```text
 heading = 0°        heading = 45°        heading = 90°
@@ -24,7 +24,7 @@ So a filter that fixes the ellipse orientation once (say at $t = 0$) is right on
 - `isotropic`: no directional claim at all, the safe fallback.
 
 ### Where the question comes from
-Hybrid-systems filtering usually models friction as discrete contact modes (stuck or sliding), each switch with its own saltation matrix ([glossary](../glossary.md#saltation-matrix)). Kong et al. (2024, §V-F) derive that matrix for stick-slip under **Coulomb friction** (the textbook law: friction can reach a fixed coefficient times the normal force, and equals that bound while sliding), whose two coefficients (static and kinetic) have no preferred direction. For an anisotropic pad that is not enough: slip variance depends on the heading relative to the pad's own friction axes, not only on the active mode. A filter that switches modes correctly but keeps an isotropic process-noise [covariance](../glossary.md#covariance) $`Q`$ (defined in §1.1) treats slip along the low-friction axis like slip along the high-friction one.
+Hybrid-systems filtering usually models friction as discrete contact modes (stuck or sliding), each switch with its own saltation matrix ([glossary](../glossary.md#saltation-matrix)). Kong et al. (2024, §V-F) derive that matrix for stick-slip under **Coulomb friction** (the textbook law: friction can reach a fixed coefficient times the normal force, and equals that bound while sliding), whose two coefficients (static and kinetic) have no preferred direction. For an anisotropic pad, that is not enough: slip variance depends on the heading relative to the pad's own friction axes, not only on the active mode. A filter that switches modes correctly but keeps an isotropic process-noise [covariance](../glossary.md#covariance) $`Q`$ (defined in §1.1) treats slip along the low-friction axis like slip along the high-friction one.
 
 We work through the simplest concrete version, using [`friction_anisotropic_ekf.py`](../../use_numpy/friction_anisotropic_ekf.py)'s crawling unicycle.
 
@@ -142,7 +142,7 @@ At predict step $k$ (propagating from tick $k-1$ to tick $k$), `predict` branche
 | `heading_aware` | $`Q_{\text{pos}}^{\text{aniso}}(\hat\theta_{k-1})`$ | $\hat\theta_{k-1}$, the filter's own heading estimate after the previous tick's update (`x[2]` before this step's propagation), so the ellipse follows the estimated heading |
 
 - `heading_aware` uses the estimate, not the true heading, because a real filter has no access to the truth.
-- It uses the heading at the *start* of the step rather than the propagated $\theta^{-}$. With the defaults the heading changes by only $\omega\Delta t \approx 0.9°$ per step, so this makes no practical difference.
+- It uses the heading at the *start* of the step rather than the propagated $\theta^{-}$. With the defaults, the heading changes by only $\omega\Delta t \approx 0.9°$ per step, so this makes no practical difference.
 
 This mirrors how the simulator generates the truth (`generate_ground_truth_and_data`): each tick it draws slip in the body frame with standard deviations $\sigma_{\text{grip}}$ and $\sigma_{\text{slip}}$ (scaled by $\Delta t$) and rotates it by the *true* heading. `heading_aware` is the only variant whose noise model has nearly the same shape and orientation as that process (0.9° offset, §1.1), apart from its own heading-estimate error.
 
@@ -173,7 +173,7 @@ Two consequences follow directly from these formulas:
 
 ## 2. The dominant finding: `fixed_anisotropic` is dramatically worse, everywhere
 
-[Monte Carlo](../glossary.md#monte-carlo-trials) NEES over 500 trials (seed 0, $`dt = 0.05\,\text{s}`$, one full loop over $`20\,\text{s}`$, all script defaults), binned by how far the true heading has rotated away from `fixed_anisotropic`'s fixed reference heading. Each trial draws a fresh slip realization, initial error and measurement noise. Redrawing the slip matters because slip is the process noise whose model $Q$ is being tested.
+[Monte Carlo](../glossary.md#monte-carlo-trials) NEES over 500 trials (seed 0, $`dt = 0.05\,\text{s}`$, one full loop over $`20\,\text{s}`$, all script defaults), binned by how far the true heading has rotated away from `fixed_anisotropic`'s fixed reference heading. Each trial draws a fresh slip realization, initial error, and measurement noise. Redrawing the slip matters because slip is the process noise whose model $Q$ is being tested.
 
 ![Two panels from friction_anisotropic_ekf.py: the circular path with the per-step slip covariance ellipse turning with the heading, and Monte Carlo NEES over one full turn for isotropic, frozen anisotropic and heading-aware process noise](../../assets/friction_anisotropic_ekf.png)
 
@@ -223,7 +223,7 @@ Past the peak, NEES recovers only partly: 18.2 in the 135-180° bin, still about
 | 15 s (270°) | 10 | 11 |
 | 20 s (360°) | 2 | 10 |
 
-The position part follows the ellipse mismatch: it peaks at 90° and 270° and returns to nearly consistent at 180° and 360°. The heading part doesn't come back.
+The position part follows the ellipse mismatch: it peaks at 90° and 270° and returns to near-consistency at 180° and 360°. The heading part doesn't come back.
 
 Likely mechanism (not isolated): while the ellipse is misaligned, the filter explains real slip with the wrong position noise and pushes part of that error into its heading estimate. Heading is never measured directly, so the error would drain away only slowly through the position-heading cross-covariance. That is consistent with it persisting long after the ellipse realigns. The figure's NEES curve shows both effects: two humps a half-turn apart, on a floor that doesn't return to 3.
 
@@ -242,6 +242,6 @@ Both findings point the same way for modeling a friction-anisotropic pad's slip 
 
 References 1 and 2 are cited above; reference 3 is further reading.
 
-1. Hu, D. L., Nirody, J., Scott, T., & Shelley, M. J. (2009). *The Mechanics of Slithering Locomotion*. Proceedings of the National Academy of Sciences, 106(25), 10081-10085. https://doi.org/10.1073/pnas.0812533106 - the source of the snake's-belly-scales example (§Intuition) and the phenomenon modeled: friction fixed to the body frame, lower along the body than across it for snakes. The paper's friction model is deterministic; translating it into an EKF process-noise ellipse is this doc's own extension, applying the world-frame-rotation argument from [`pointcloud_pose_tracking_empirical_note.md`](pointcloud_pose_tracking_empirical_note.md) (see §Intuition above) to process rather than measurement noise.
-2. Kong, N. J., Payne, J. J., Zhu, J., & Johnson, A. M. (2024). *Saltation Matrices: The Essential Tool for Linearizing Hybrid Dynamical Systems*. Proceedings of the IEEE, 112(6), 585-608. https://doi.org/10.1109/JPROC.2024.3440211 (preprint: arXiv:2306.06862) - §V-F derives the saltation matrix for the stick-slip friction transition under Coulomb friction with static and kinetic coefficients that have no direction dependence; this doc's direction-dependent process noise is the part that model leaves out. Also reference 1 of [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md#11-references).
+1. Hu, D. L., Nirody, J., Scott, T., & Shelley, M. J. (2009). *The Mechanics of Slithering Locomotion*. Proceedings of the National Academy of Sciences, 106(25), 10081-10085. https://doi.org/10.1073/pnas.0812533106 - the source of the snake's belly-scales example (§Intuition) and the phenomenon modeled: friction fixed to the body frame, lower along the body than across it for snakes. The paper's friction model is deterministic; translating it into an EKF process-noise ellipse is this doc's own extension, applying the world-frame-rotation argument from [`pointcloud_pose_tracking_empirical_note.md`](pointcloud_pose_tracking_empirical_note.md) (see §Intuition above) to process rather than measurement noise.
+2. Kong, N. J., Payne, J. J., Zhu, J., & Johnson, A. M. (2024). *Saltation Matrices: The Essential Tool for Linearizing Hybrid Dynamical Systems*. Proceedings of the IEEE, 112(6), 585-608. https://doi.org/10.1109/JPROC.2024.3440211 (preprint: arXiv:2306.06862) - §V-F derives the saltation matrix for the stick-slip friction transition under Coulomb friction with static and kinetic coefficients that have no direction dependence; this doc's direction-dependent process noise is the part that the model leaves out. Also reference 1 of [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md#11-references).
 3. Khalili, H. H., Cheah, W., Garcia-Nathan, T. B., Carrasco, J., Watson, S., & Lennox, B. (2020). *Tuning and Sensitivity Analysis of a Hexapod State Estimator*. Robotics and Autonomous Systems, 129, 103509. https://doi.org/10.1016/j.robot.2020.103509 - a real-hardware study (an IMU + leg-kinematics EKF on the Corin hexapod) of how an EKF's accuracy depends on its noise parameters, tuned there by particle-swarm optimization; this doc's fixed-vs-heading-aware $Q$ comparison is one instance of that broader question. Also reference 4 of [inchworm_zupt_ekf.md](inchworm_zupt_ekf.md#7-references).
