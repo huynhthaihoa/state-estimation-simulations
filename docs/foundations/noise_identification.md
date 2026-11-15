@@ -2,9 +2,9 @@
 
 ## Intuition
 
-Every IMU filter in this repo is given noise values, such as `--gyro-noise-std 0.01`. A datasheet or a calibration file gives them in other units, and they can be read off a recording of a motionless sensor.
+Every IMU filter in this repo is given noise values, such as `--gyro-noise-std 0.01`. A datasheet or calibration file gives them in other units, and you can read them off a recording of a motionless sensor.
 
-Leave a gyroscope still and average its readings over longer and longer windows. Two things happen:
+Leave a gyroscope still and average its readings over increasingly long windows. Two things happen:
 
 - **White noise** averages down: the longer the window, the smaller the leftover.
 - **Bias drift** does not: the bias wanders, so a longer window sees more of it.
@@ -16,7 +16,7 @@ Leave a gyroscope still and average its readings over longer and longer windows.
 | 1 s | $`1.7\times10^{-4}`$ rad/s | $`1.1\times10^{-5}`$ rad/s | white noise |
 | 100 s | $`1.7\times10^{-5}`$ rad/s | $`1.1\times10^{-4}`$ rad/s | drift |
 
-(white part $`N/\sqrt{\tau}`$, drift part $`K\sqrt{\tau/3}`$, with $`\tau`$ the window in seconds.) The **Allan deviation** plots this leftover spread against the window length on log-log axes. White noise appears as a line of slope −1/2, the drift as a line of slope +1/2, and the two values $`N`$ and $`K`$ are read off the lines. This doc does that on simulated data with known truth (§3-§5), then shows what a wrong density to per-sample conversion does to the [ESKF](../filtering/eskf.md) (§6). Implemented in [`imu_allan_variance.py`](../../use_numpy/imu_allan_variance.py).
+(white part $`N/\sqrt{\tau}`$, drift part $`K\sqrt{\tau/3}`$, with $`\tau`$ the window in seconds.) The **Allan deviation** plots this leftover spread against the window length on log-log axes. White noise appears as a line of slope −1/2, the drift as a line of slope +1/2, and the two values $`N`$ and $`K`$ are read off the lines. This doc does that on simulated data with known truth (§3-§5), then shows what a wrong density-to-per-sample conversion does to the [ESKF](../filtering/eskf.md) (§6). Implemented in [`imu_allan_variance.py`](../../use_numpy/imu_allan_variance.py).
 
 ## 1. The noise model
 
@@ -28,7 +28,7 @@ One axis of a gyroscope or accelerometer reads $`y = \text{truth} + b + n`$. All
 | **Noise density** | $`N`$ | strength of the white noise; its power spectral density is $`N^2`$ | rad/s/√Hz \| m/s²/√Hz |
 | Bias | $`b`$ | slowly varying offset added to every reading | rad/s \| m/s² |
 | **Bias random walk** density | $`K`$ | strength of the white noise whose integral is the bias, $`\dot b = K w`$ (called the rate random walk coefficient in references 6 and 7) | rad/s²/√Hz \| m/s³/√Hz |
-| **Angle / velocity random walk** | | the datasheet name for $`N`$ (gyroscope / accelerometer): integrating white noise on the rate or the acceleration gives a random walk in the angle or the velocity (reference 1) | |
+| **Angle/velocity random walk** | | the datasheet name for $`N`$ (gyroscope/accelerometer): integrating white noise on the rate or the acceleration gives a random walk in the angle or the velocity (reference 1) | |
 | **Bias instability** | | the flat bottom of the Allan curve, between the white-noise and random-walk regions: its Allan variance reaches a plateau (reference 6, eq. C.5; reference 4); datasheets usually quote it in place of $`K`$ (reference 1) | same as the readings |
 
 **Default values.** The script's preset is the EuRoC MAV dataset's IMU, an ADIS16448 (reference 2) sampled at 200 Hz (references 2, 3). The values come from a copy of the dataset's `imu0/sensor.yaml` in the EuRoC-rs crate's test data (reference 2), not from the original dataset archive:
@@ -77,7 +77,7 @@ with $`n_c`$ the number of clusters (at least 9 for a meaningful value, referenc
 
 ($`n+1`$ values of $`x`$ give $`n-2m+1`$ terms; eq. 11 of reference 5 writes the same count as $`N-2m`$ with $`N = n+1`$.) A test checks it against a slow version of eq. 10 on explicit cluster averages (they agree to $`10^{-10}`$).
 
-**Expected curve of the model.** For white noise of density $`N`$ the variance is $`N^2/\tau`$ (reference 6, eq. C.3; reference 7, eq. 17), a line of slope −1/2. For a bias random walk of density $`K`$ it is $`K^2\tau/3`$ (reference 6, eq. C.7; reference 7, eq. 21), a line of slope +1/2. The same two slopes are tabulated in reference 5 (Table 16). In discrete time the white term is exactly $`N^2/\tau`$, and the bias-walk term is $`K^2 \Delta t\,(2m^2+1)/(6m)`$, which tends to the quoted $`K^2\tau/3`$ for large $`m`$; this exact discrete form is derived here from the covariance of the estimator's term and checked by a test against a brute-force variance. Together:
+**Expected curve of the model.** For white noise of density $`N`$, the variance is $`N^2/\tau`$ (reference 6, eq. C.3; reference 7, eq. 17), a line of slope −1/2. For a biased random walk of density $`K`$ it is $`K^2\tau/3`$ (reference 6, eq. C.7; reference 7, eq. 21), a line of slope +1/2. The same two slopes are tabulated in reference 5 (Table 16). In discrete time, the white term is exactly $`N^2/\tau`$, and the bias-walk term is $`K^2 \Delta t\,(2m^2+1)/(6m)`$, which tends to the quoted $`K^2\tau/3`$ for large $`m`$; this exact discrete form is derived here from the covariance of the estimator's term and checked by a test against a brute-force variance. Together:
 
 ```math
 \mathrm{ADEV}(\tau) = \sqrt{\frac{N^2}{\tau} + \frac{K^2\tau}{3}}
@@ -119,13 +119,13 @@ Each record is simulated with the EuRoC values at 200 Hz, 10 seeds per sensor. T
 
 - **$`N`$ is read within 1% at every length**, spread under 1%. The small positive median is the read-off itself: the same fit applied to the noise-free expected curve (the exact discrete model) gives +0.34 to +0.46% (gyroscope) and +0.66 to +0.69% (accelerometer), because the bias walk adds a little to the curve at the long-$`\tau`$ end of the white-noise region.
 - **The accelerometer $`K`$ is read with a median error under 1.6% and a spread of about 6% from 0.25 h on**: its random walk dominates beyond $`\tau_c \approx 1.2`$ s, so even 0.25 h (clusters up to 100 s) holds the +1/2 line.
-- **The gyroscope $`K`$ needs the long record.** Its curve turns upward only beyond $`\tau_c \approx 15`$ s, and 0.25 h reaches $`\tau = 100`$ s: only 2 of 10 seeds found a +1/2 region at 0.25 h, so the median at 0.25 h is two numbers. At 4 h the median error is −0.8% with a 5.5% spread (9 of 10 resolved). Likely cause of the unresolved cases: too few points left between the minimum and the 9-cluster limit for a run of 4 (seed 0 at 0.25 h: "walk none").
+- **The gyroscope $`K`$ needs the long record.** Its curve turns upward only beyond $`\tau_c \approx 15`$ s, and 0.25 h reaches $`\tau = 100`$ s: only 2 of 10 seeds found a +1/2 region at 0.25 h, so the median at 0.25 h is two numbers. At 4 h, the median error is −0.8% with a 5.5% spread (9 of 10 resolved). Likely cause of the unresolved cases: too few points left between the minimum and the 9-cluster limit for a run of 4 (seed 0 at 0.25 h: "walk none").
 - Fit regions of seed 0 at 4 h: gyroscope white 0.005-3.75 s, walk 64-352 s; accelerometer white 0.005-0.32 s, walk 3.75-241 s.
 - Cost: the Allan deviation of one 4 h record (2,880,000 samples) takes 252 ns per sample and 92 MB peak memory.
 
 ![Animation: raw static readings, the Allan deviation of the first T seconds, and the read-off against the truth, for T growing from 1 min to 1 h](../../assets/imu_allan_variance.gif)
 
-*Animation: `uv run python generator/animate_imu_allan_variance.py --out assets/imu_allan_variance.gif` (one record per sensor, seed 0 of that script, 1 h, 45 record lengths). In this record the random-walk fit first finds a region at T = 66 s for the accelerometer and at T = 1,420 s for the gyroscope; at 1 h $`\hat N/N`$ is 1.002 and 1.005 and $`\hat K/K`$ is 0.904 and 0.892 (gyroscope, accelerometer). This is one draw, so it illustrates the table above and does not replace it.*
+*Animation: `uv run python generator/animate_imu_allan_variance.py --out assets/imu_allan_variance.gif` (one record per sensor, seed 0 of that script, 1 h, 45 record lengths). In this record, the random-walk fit first finds a region at T = 66 s for the accelerometer and at T = 1,420 s for the gyroscope; at 1 h $`\hat N/N`$ is 1.002 and 1.005 and $`\hat K/K`$ is 0.904 and 0.892 (gyroscope, accelerometer). This is one draw, so it illustrates the table above and does not replace it.*
 
 ## 6. What a wrong conversion does to an ESKF
 
@@ -138,12 +138,12 @@ Each record is simulated with the EuRoC values at 200 Hz, 10 seeds per sensor. T
 | `gyro_bias_std`, `accel_bias_std` | std of the true constant bias draw, and the filters' prior | initial covariance |
 
 - **Truth:** `generate_trial` with per-sample stds $`N/\sqrt{\Delta t}`$ at $`\Delta t = 0.01`$ s (EuRoC preset, 100 Hz), and the script's defaults for motion, 1 Hz position fix, bias draw and initial error. That truth has constant biases, so `add_bias_walk` adds the preset's walk (per-step std $`K\sqrt{\Delta t}`$) on top from a spawned random stream, and the bias error is scored against the drifting truth.
-- **Filters** (same trials, they differ only in the per-sample std put in $`Q`$; all use the same $`K`$):
+- **Filters** (same trials; they differ only in the per-sample std put in $`Q`$; all use the same $`K`$):
   - **correct**: $`N/\sqrt{\Delta t}`$;
   - **density_as_std**: $`N`$, the density used directly (10 times too small at 100 Hz);
   - **double_conversion**: $`N/\Delta t`$, an already converted per-sample std converted a second time (10 times too large).
 - **Score:** the [NEES](../glossary.md#consistency-and-nees) of the 15-state error, averaged over 50 [Monte Carlo](../glossary.md#monte-carlo-trials) trials (each redraws motion, biases, bias walk, IMU noise, position-fix noise and initial error) and over the second half of the 30 s run, with the 95% band $`[13.5, 16.6]`$ for 50 trials from `averaged_nees_bounds` (consistent = 15). **Overconfident** means NEES above the band (the filter's covariance is smaller than its actual error); **underconfident**, below it. The position and attitude RMSE of the same runs are reported too.
-- **Scenarios** (noise scale : bias-walk scale). `1:1` is the preset. `1:0` removes the bias walk from the truth and from every $`Q`$, which is the script's own constant-bias truth with nothing in $`Q`$ that is not in the truth. `10:1` and `100:1` multiply $`N`$ and $`K`$ by 10 and 100: Kalibr notes that static-data values of low-cost IMUs may need raising by 10x or more (reference 1), so these are what-ifs, not measured values.
+- **Scenarios** (noise scale: bias-walk scale). `1:1` is the preset. `1:0` removes the bias walk from the truth and from every $`Q`$, which is the script's own constant-bias truth with nothing in $`Q`$ that is not in the truth. `10:1` and `100:1` multiply $`N`$ and $`K`$ by 10 and 100: Kalibr notes that static-data values of low-cost IMUs may need raising by 10x or more (reference 1), so these are what-ifs, not measured values.
 
 `uv run python use_numpy/imu_allan_variance.py --part 2 --mc-trials 50` (default scenarios, seed 0). The table uses `--mc-trials 50`; the script's default is 20 trials (band $`[12.7, 17.5]`$), which is what the §4 figure shows:
 
@@ -164,16 +164,16 @@ Each record is simulated with the EuRoC values at 200 Hz, 10 seeds per sensor. T
 
 - **The density used as the per-sample std is overconfident** (NEES above the band) in all four scenarios. The size depends on the bias-walk term: 18.96 against 15.69 at the preset (a mild excess, 2.4 above the band's top of 16.6), 31.68 at $`100\times`$ the noise, and 196.68 against 18.59 when the bias walk is absent from $`Q`$. Likely, the bias walk in $`Q`$ keeps the bias uncertainty from shrinking and so limits the harm; this was not isolated by a separate ablation.
 - **Its RMSE is almost identical to the correct filter's** (position 0.1747 vs 0.1745 m, attitude 1.214 vs 1.212 deg at the preset). An RMSE comparison would not reveal the mistake; only the NEES does.
-- **Where the 197 lives.** `--part 2 --mc-trials 50 --scenarios 1:1 1:0 --block-check` re-runs the same trials and prints the NEES of each 3-state block next to the joint one (consistent: 3 per block, 15 joint). In scenario `1:0`, density_as_std has block NEES of 3.4 (position), 4.0 (velocity), 4.6 (attitude), 5.1 (accelerometer bias) and 5.8 (gyroscope bias), yet a joint NEES of 196.7; the correct filter has 3.3 to 4.5 per block and 18.6 joint. The overconfidence is therefore in the cross-covariances between blocks, not in any single block's variance. At the preset (`1:1`) the blocks are 2.7 to 4.2 and the joint 19.0.
+- **Where the 197 lives.** `--part 2 --mc-trials 50 --scenarios 1:1 1:0 --block-check` re-runs the same trials and prints the NEES of each 3-state block next to the joint one (consistent: 3 per block, 15 joint). In scenario `1:0`, density_as_std has block NEES of 3.4 (position), 4.0 (velocity), 4.6 (attitude), 5.1 (accelerometer bias) and 5.8 (gyroscope bias), yet a joint NEES of 196.7; the correct filter has 3.3 to 4.5 per block and 18.6 joint. The overconfidence is therefore in the cross-covariances between blocks, not in any single block's variance. At the preset (`1:1`), the blocks are 2.7 to 4.2, and the joint is 19.0.
 - **The opposite mistake (double conversion) is underconfident** (NEES 5.8 to 7.1, below the band) and costs accuracy as the noise grows: position RMSE 5% above the correct filter at the preset, 21% at $`10\times`$, 18% at $`100\times`$; attitude RMSE 12%, 75%, 37%.
-- **Truth vs model.** Scenario `1:0` is the case where the filters' $`Q`$ contains exactly what the truth contains; there the correct filter's NEES, 18.59, is above the band's top (16.6), so a small overconfidence remains even with the right noise. It comes from the ESKF's first-order linearization, not a model or code mismatch. With every uncertainty scaled by $`\lambda`$ on the same 50 trials (outside the script), the excess over the $`\lambda = 0.01`$ run (NEES 14.7) is +3.4, +0.9, +0.24 and +0.05 at $`\lambda`$ = 1, 0.5, 0.25 and 0.1: it falls as $`\lambda^2`$. It grows with the gap between position fixes: NEES 354 at 5 s (50 trials) and 11,279 at 10 s (20 trials). The dominant term is the second-order yaw × tilt attitude error in the rotated specific force ([eskf.md §4.3](../filtering/eskf.md#43-larger-initial-attitude-errors)).
+- **Truth vs model.** Scenario `1:0` is the case where the filters' $`Q`$ contains exactly what the truth contains; there, the correct filter's NEES, 18.59, is above the band's top (16.6), so a small overconfidence remains even with the right noise. It comes from the ESKF's first-order linearization, not a model or code mismatch. With every uncertainty scaled by $`\lambda`$ on the same 50 trials (outside the script), the excess over the $`\lambda = 0.01`$ run (NEES 14.7) is +3.4, +0.9, +0.24 and +0.05 at $`\lambda`$ = 1, 0.5, 0.25 and 0.1: it falls as $`\lambda^2`$. It grows with the gap between position fixes: NEES 354 at 5 s (50 trials) and 11,279 at 10 s (20 trials). The dominant term is the second-order yaw × tilt attitude error in the rotated specific force ([eskf.md §4.3](../filtering/eskf.md#43-larger-initial-attitude-errors)).
 
 ## 7. What this toy does not show
 
 - **Bias instability (flicker noise)** is not simulated, so the flat region between the two lines never appears, and the read-off here does not account for it.
 - **Temperature and scale-factor errors.** Static data at constant temperature ignores both, so the identified values are optimistic. Kalibr's advice for low-cost IMUs is to raise them by 10x or more (reference 1). §6's `10:1` and `100:1` rows show the filter side of that, not a measurement.
 - **Axis misalignment and cross-axis coupling**: each axis is simulated and fitted alone.
-- **Real recordings** have quantization, a sensor-internal filter and non-Gaussian tails; here the noise is exactly the model's, so the read-off errors are probably smaller than on a real sensor.
+- **Real recordings** have quantization, a sensor-internal filter, and non-Gaussian tails; here the noise is exactly the model's, so the read-off errors are probably smaller than on a real sensor.
 - **The EuRoC values** are the dataset file's values as copied in the EuRoC-rs crate (reference 2); they were not re-derived by an Allan analysis of the dataset's own static data.
 - **Part 2** is one 30 s trajectory family with 1 Hz position fixes and 50 trials per scenario in the table (95% band $`[13.5, 16.6]`$); the scenario `1:1` excess (18.96) is outside it by 2.4. It uses the EuRoC density at 100 Hz, not the sensor's native 200 Hz.
 
