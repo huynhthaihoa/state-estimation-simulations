@@ -5,7 +5,7 @@ An [IMU](../glossary.md#imu-inertial-measurement-unit) sampled at 100-1000 Hz pr
 It builds on two earlier ideas:
 
 - The **node/edge language** from [pose_graph_optimization.md](pose_graph_optimization.md#2-where-do-the-edges-come-from): an edge is a relative-motion constraint between two nodes.
-- The **right Jacobian** from [jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space): $`\text{Exp}(\varphi+\delta\varphi) \approx \text{Exp}(\varphi)\cdot\text{Exp}\big(J_r(\varphi)\,\delta\varphi\big)`$, where the extra rotation is composed on the right, i.e. in the object's own body frame. Here $`\text{Exp}`$ turns a rotation vector (an axis times an angle) into a rotation matrix ([glossary](../glossary.md#exp-and-log-maps)).
+- The **right Jacobian** from [jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space): $`\text{Exp}(\varphi+\delta\varphi) \approx \text{Exp}(\varphi)\cdot\text{Exp}\big(J_r(\varphi)\,\delta\varphi\big)`$, where the extra rotation is composed on the right, i.e., in the object's own body frame. Here $`\text{Exp}`$ turns a rotation vector (an axis times an angle) into a rotation matrix ([glossary](../glossary.md#exp-and-log-maps)).
 
 ---
 
@@ -85,7 +85,7 @@ J_{p,b_g} = \frac{\partial \Delta p}{\partial b_g} \qquad J_{p,b_a} = \frac{\par
 
 Each $J$ is a $3\times3$ matrix saying how much its quantity changes per unit bias. For $\Delta v$ and $\Delta p$ that is the ordinary derivative. $\Delta R$ is itself a $3\times3$ matrix, so $J_{R,b_g}$ instead gives the tangent vector of a right perturbation: $`\Delta R(b_g+\delta b_g) \approx \Delta R\cdot\text{Exp}(J_{R,b_g}\,\delta b_g)`$ (used in §5).
 
-These are the "sensitivity map" from [jacobian.md §3](../foundations/jacobian.md#3-think-of-it-as-a-sensitivity-map) ("if I nudge the input a little, how much does the output move?"), tracked incrementally one micro-step at a time. Each step uses the current micro-step's rotation $dR = \text{Exp}((\tilde\omega-b_g)dt)$ and right Jacobian $J_r = J_r\big((\tilde\omega-b_g)dt\big)$, in the same old-value order as §3 (`imu_preintegration.py:68-74`): $p$-Jacobians first, then $v$-Jacobians, then $J_{R,b_g}$ last.
+This is the "sensitivity map" from [jacobian.md §3](../foundations/jacobian.md#3-think-of-it-as-a-sensitivity-map) ("if I nudge the input a little, how much does the output move?"), tracked incrementally one micro-step at a time. Each step uses the current micro-step's rotation $dR = \text{Exp}((\tilde\omega-b_g)dt)$ and right Jacobian $J_r = J_r\big((\tilde\omega-b_g)dt\big)$, in the same old-value order as §3 (`imu_preintegration.py:68-74`): $p$-Jacobians first, then $v$-Jacobians, then $J_{R,b_g}$ last.
 
 ### Intuition (why bias moves $`\Delta v`$ and $`\Delta p`$)
 - An accelerometer bias is plain "bias × time" in velocity and "bias × time²/2" in position.
@@ -124,7 +124,7 @@ It is a direct use of $J_r$'s definition ([jacobian.md §11.2](../foundations/ja
 ### Implementation notes
 
 - Both `lie_utils.py` helpers switch to first-order forms when $\theta = \lVert(\tilde\omega-b_g)dt\rVert < 10^{-6}$ (the rotation vector $\phi = (\tilde\omega-b_g)dt$ of one micro-step has a tiny angle): `so3_exp` returns $`I + [\phi]_\times`$ and `so3_right_jacobian` returns $`I - \tfrac{1}{2}[\phi]_\times`$. Otherwise they use the closed forms (Rodrigues and the $J_r$ formula from [jacobian.md §11.4](../foundations/jacobian.md#114-closed-form-for-so3)).
-- The demo omits two things a real preintegrated factor needs. There is **no gravity term**: a real accelerometer measures specific force ([glossary](../glossary.md#imu-inertial-measurement-unit)), so gravity must be removed, usually in the residual. There is **no preintegrated noise covariance**: the script propagates the bias Jacobians but not Forster et al.'s $\Sigma$ recursion, so the bundle carries no uncertainty. Where the IMU noise values such a covariance needs come from, and how a continuous noise density becomes a per-sample std, is in [noise_identification.md](../foundations/noise_identification.md).
+- The demo omits two things a real preintegrated factor needs. There is **no gravity term**: a real accelerometer measures specific force ([glossary](../glossary.md#imu-inertial-measurement-unit)), so gravity must be removed, usually in the residual. There is **no preintegrated noise covariance**: the script propagates the bias Jacobians but not Forster et al.'s $\Sigma$ recursion, so the bundle carries no uncertainty. Where the IMU noise values such as covariance needs come from, and how a continuous noise density becomes a per-sample std, is in [noise_identification.md](../foundations/noise_identification.md).
 - The demo builds its raw readings as the commanded [twist](../glossary.md#twist) (a 6-vector of linear and angular velocity) plus the *estimated* bias, so $`\tilde v - b_a`$ and $`\tilde\omega - b_g`$ equal the commanded values exactly.
 
 ---
@@ -143,7 +143,7 @@ After the bundle has absorbed, say, 100 raw samples, the optimizer updates the b
 
 ![Two log-log panels from imu_preintegration.py: as the bias update grows from 0.1 to 300 times the script's default, the change it causes in Δp and ΔR grows in proportion, while the error of the first-order correction against full re-integration grows as its square](../../assets/imu_bias_sweep_concept.png)
 
-*Figure: the first-order correction against re-integrating the 100 samples, with the script's default bias update (gyro and accelerometer together) scaled by 0.1 to 300. At the default the Δp error is 2.3e-6 m, 0.09% of the 2.6 mm change it corrects; at 300× ($`|\delta b_g|`$ = 0.9 rad/s) it is 27%. Plotted by `uv run python generator/make_figures.py imu_bias_sweep_concept`.*
+*Figure: the first-order correction against re-integrating the 100 samples, with the script's default bias update (gyro and accelerometer together) scaled by 0.1 to 300. At the default, the Δp error is 2.3e-6 m, 0.09% of the 2.6 mm change it corrects; at 300× ($`|\delta b_g|`$ = 0.9 rad/s) it is 27%. Plotted by `uv run python generator/make_figures.py imu_bias_sweep_concept`.*
 
 ---
 
@@ -170,7 +170,7 @@ A full visual-inertial odometry (VIO) back-end ([GTSAM](../glossary.md#gtsam)'s 
 | `imu_integration_comparison.py` | noisy gyroscope rate + body velocity | naive Euler-angle vs $SO(3)$ Exp-map | none | none | about 70.8° (naive) vs about 0.47° (Exp-map) rotation error after 20 s |
 
 - **`imu_preintegration.py`** (both [`use_numpy/`](../../use_numpy/imu_preintegration.py) and [`use_manif/`](../../use_manif/imu_preintegration.py)) implements §3-§5: compress raw samples into a bundle, track the bias Jacobians, apply the $O(1)$ correction. The two versions are line-for-line equivalent (`use_manif`'s docstring spells out the correspondence: its `rplus()` returns the same `dR`/right-Jacobian pair the numpy version computes by hand). **Neither builds the graph residual of §6**; both stop at compression plus correction.
-- **`imu_propagation_position_fix.py`** is related but different: it [dead-reckons](factor_graph.md#2-why-do-we-need-it) noisy body-twist readings directly on $SE(3)$ (see [SO(3) and SE(3)](../glossary.md#so3-and-se3)) every micro-step, with no bundle and no bias Jacobians. Its "IMU" reports a 6-D velocity twist, so there is no accelerometer, no bias and no gravity. Every second it runs a small damped [Gauss-Newton](gauss_newton.md) correction against a separate GPS-like position fix. It is about *twist dead reckoning + periodic on-manifold correction*, not preintegration.
+- **`imu_propagation_position_fix.py`** is related but different: it [dead-reckons](factor_graph.md#2-why-do-we-need-it) noisy body-twist readings directly on $SE(3)$ (see [SO(3) and SE(3)](../glossary.md#so3-and-se3)) every micro-step, with no bundle and no bias Jacobians. Its "IMU" reports a 6-D velocity twist, so there is no accelerometer, no bias, and no gravity. Every second it runs a small damped [Gauss-Newton](gauss_newton.md) correction against a separate GPS-like position fix. It is about *twist dead reckoning + periodic on-manifold correction*, not preintegration.
 - **`imu_integration_comparison.py`** is also related but different. Like [pointcloud_pose_tracking_empirical_note.md](../filtering/pointcloud_pose_tracking_empirical_note.md), it is an empirical comparison note, not a concept explainer: it plots naive Euler-angle (vector-space) integration against proper $SO(3)$ Exp-map integration. The Exp-map estimate still drifts from gyroscope noise, just far less. In `use_numpy`, each method is scored against its own noise-free ground truth (§7.1); the `use_manif` twin scores both against one shared SE(3) truth and ends at 70.4°. No bias correction is involved.
 
 ![Two panels from imu_preintegration.py: the preintegrated position change built up sample by sample from keyframe i to keyframe j, and a log-scale bar chart comparing how much a bias update changes each preintegrated quantity with the error of the first-order Jacobian correction against a full re-integration](../../assets/imu_preintegration.png)
@@ -189,7 +189,7 @@ A full visual-inertial odometry (VIO) back-end ([GTSAM](../glossary.md#gtsam)'s 
 
 *Figure: `use_numpy/imu_integration_comparison.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py imu_integration_comparison`.*
 
-The animation replays that run (`use_numpy/imu_integration_comparison.py` at its defaults, seed 0, 20 s). The two 3D panels show the attitude of a body at the origin, naive on the left and Exp-map in the middle: a pale box with pale axes for the truth, a thin dashed box with dashed axes for the estimate (axes: x red, y green, z blue). Each estimate is drawn against **its own ground truth** (§7.1, "Ground truths"): the naive estimate against $`R^{gt}_{\text{naive}}`$ and the Exp-map estimate against $`R^{gt}_{\text{exp}}`$, so the two pale boxes are not the same attitude (they differ by 0.45° at the end, invisible at this scale). The right column draws the rotation error and position error of the static figure progressively. The rotation errors end at 70.78° (naive; it peaks near 180° within the first seconds) and 0.47° (Exp-map), and the position errors at 11.5 m and 0.029 m, all printed by the generator from the script's own histories (checked equal to `run_simulation`'s). Only the orientation is drawn; the box (1.0 × 0.6 × 0.3) and the axis length are chosen shapes, and the frames are subsampled to every 0.125 s.
+The animation replays that run (`use_numpy/imu_integration_comparison.py` at its defaults, seed 0, 20 s). The two 3D panels show the attitude of a body at the origin, naive on the left and Exp-map in the middle: a pale box with pale axes for the truth, a thin dashed box with dashed axes for the estimate (axes: x red, y green, z blue). Each estimate is drawn against **its own ground truth** (§7.1, "Ground truths"): the naive estimate against $`R^{gt}_{\text{naive}}`$ and the Exp-map estimate against $`R^{gt}_{\text{exp}}`$, so the two pale boxes are not the same attitude (they differ by 0.45° at the end, invisible at this scale). The right column shows the rotation error and position error of the static figure progressively. The rotation errors end at 70.78° (naive; it peaks near 180° within the first seconds) and 0.47° (Exp-map), and the position errors at 11.5 m and 0.029 m, all printed by the generator from the script's own histories (checked to be equal to `run_simulation`'s). Only the orientation is drawn; the box (1.0 × 0.6 × 0.3) and the axis length are chosen shapes, and the frames are subsampled to every 0.125 s.
 
 ![Animation of imu_integration_comparison.py over 20 s: two 3D panels with the true (pale) and estimated (dashed) body box and axes for naive Euler-angle integration and for the SO(3) Exp-map update, next to rotation error and position error curves growing to 70.78 deg versus 0.47 deg](../../assets/imu_integration_comparison.gif)
 
@@ -239,7 +239,7 @@ $$V = I + \frac{1-\cos\theta}{\theta^2}[\omega]_\times + \frac{\theta-\sin\theta
 
 falling back to $`I + [\omega]_\times`$ and $`V = I + \tfrac{1}{2}[\omega]_\times`$ below $\theta < 10^{-6}$.
 
-**Position fix.** Once per second: $z = t_{true} + n_z$ with $n_z \sim \mathcal N(0, \sigma_{pos}^2 I)$, $\sigma_{pos} = 0.05$ m by default. It measures translation only, never orientation.
+**Position fix.**** Once per second: $z = t_{true} + n_z$ with $n_z \sim \mathcal N(0, \sigma_{pos}^2 I)$, $\sigma_{pos} = 0.05$ m by default. It measures translation only, never orientation.
 
 **Residual and Jacobian** (`position_observation_jacobian`). For a [right perturbation](../glossary.md#left-and-right-perturbation) $T_{est} \text{Exp}(\delta\xi)$:
 
@@ -247,7 +247,7 @@ $$r = z - t_{est}, \qquad J = \frac{\partial t}{\partial \delta\xi} = \begin{bma
 
 $J$ is the $3\times6$ derivative of the predicted position $t_{est}$ with respect to that perturbation.
 
-**Solve and [retract](../glossary.md#retraction).** With the [information matrix](../glossary.md#information-matrix) $\Omega = I/\sigma_{pos}^2$ (built in `__main__` as `pos_info`):
+**Solve and [retract](../glossary.md#retraction).
 
 ```math
 \left(J^\top \Omega J + 10^{-4} I_6\right)\delta\xi = J^\top \Omega\, r, \qquad T_{est} \leftarrow T_{est}\,\text{Exp}(\delta\xi)
@@ -264,7 +264,7 @@ The $10^{-4} I$ damping is required, not cosmetic:
 
 ## 8. One-sentence summary
 
-> **Preintegration turns "re-run 100+ raw IMU samples every time the bias estimate changes" into "a few small matrix-vector multiplies," by tracking, while integrating, the first-order sensitivity of the compressed relative-motion bundle to the bias, using the same right-Jacobian machinery ([jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space)) that converts a tangent-space nudge into a body-frame rotation.**
+> **Preintegration turns "re-run 100+ raw IMU samples every time the bias estimate changes" into "a few small matrix-vector multiplies" by tracking, while integrating, the first-order sensitivity of the compressed relative-motion bundle to the bias, using the same right-Jacobian machinery ([jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space)) that converts a tangent-space nudge into a body-frame rotation.**
 
 ---
 
