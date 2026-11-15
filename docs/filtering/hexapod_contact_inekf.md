@@ -22,14 +22,14 @@ So a correct filter can only ever *lose* information about yaw. The experiments 
 - the **invariant EKF**, whose error dynamics do not depend on the estimate;
 - the ordinary **world-frame error-state EKF** ([glossary](../glossary.md#eskf-error-state-kalman-filter)), whose Jacobians ([glossary](../glossary.md#jacobian)) are evaluated at the estimate.
 
-Short answer: at a small initial rotation error both are about equally *accurate*, but the world-frame EKF gains spurious yaw information. With a larger initial rotation error it becomes badly overconfident: NEES ([glossary](../glossary.md#consistency-and-nees), the error scaled by the filter's own claimed uncertainty; 9 is the consistent value here) 18 instead of 9 at an initial rotation std (the std of the random rotation error each trial starts with, per axis) of 0.1 rad (5.7°), 481 at 0.3 rad (17.2°).
+Short answer: at a small initial rotation error both are about equally *accurate*, but the world-frame EKF gains spurious yaw information. With a larger initial rotation error, it becomes badly overconfident: NEES ([glossary](../glossary.md#consistency-and-nees), the error scaled by the filter's own claimed uncertainty; 9 is the consistent value here) is 18 instead of 9 at an initial rotation std (the std of the random rotation error each trial starts with, per axis) of 0.1 rad (5.7°), 481 at 0.3 rad (17.2°).
 
 ![Three panels from hexapod_contact_inekf.py: yaw error over 12 s with an initial rotation std of 0.1 rad, where the invariant EKF's actual RMSE (6.2 deg) and reported sigma (5.7 deg) stay flat while the world-frame EKF's reported sigma falls to 1.9 deg below its actual 6.8 deg; average NEES bars for initial rotation std 0.02, 0.1 and 0.3 rad, invariant EKF 9.3, 9.3, 9.4 and world-frame EKF 9.6, 18.2, 481, against the 95% band for 9 DoF; and velocity RMSE of the invariant EKF over time with leg L2 slipping between 4 and 8 s, for the tripod and wave gaits, trusting every foot versus the per-foot chi-squared gate](../../assets/hexapod_contact_inekf.png)
 
 *Figure: `use_numpy/hexapod_contact_inekf.py` at its defaults (seed 0, 50 trials), plotted by `uv run python generator/make_figures.py hexapod_contact_inekf` (about 2 minutes). The numbers match the script's printout.*
 
 ### Scope
-3D body walking at fixed height on flat ground, with a small roll, pitch and up-down bob at twice the gait frequency; tripod, ripple and wave gaits and their footholds from [`hexapod_gait_ekf.md`](hexapod_gait_ekf.md); the true stance schedule; isotropic noise added directly to the foot's body-frame position (the joint encoders and leg kinematics themselves are not modelled; [hexapod_joint_kinematics_inekf.md](hexapod_joint_kinematics_inekf.md) models them for HEBI's 18-DOF Daisy). No other sensor fixes position or yaw here; [hexapod_camera_fusion_inekf.md](hexapod_camera_fusion_inekf.md) adds a tracking camera. Each trial starts with a random error in the initial estimate, with std 0.02 rad (1.146°) per rotation axis, 0.05 m/s per velocity axis and 0.01 m per position axis; the filters' initial covariance is set to match. §3 varies the rotation std. Biases are off except in §5. Run with `uv run python use_numpy/hexapod_contact_inekf.py` (about 4 minutes).
+3D body walking at fixed height on flat ground, with a small roll, pitch and up-down bob at twice the gait frequency; tripod, ripple and wave gaits and their footholds from [`hexapod_gait_ekf.md`](hexapod_gait_ekf.md); the true stance schedule; isotropic noise added directly to the foot's body-frame position (the joint encoders and leg kinematics themselves are not modelled; [hexapod_joint_kinematics_inekf.md](hexapod_joint_kinematics_inekf.md) models them for HEBI's 18-DOF Daisy). No other sensor fixes position or yaw here; [hexapod_camera_fusion_inekf.md](hexapod_camera_fusion_inekf.md) adds a tracking camera. Each trial starts with a random error in the initial estimate, with std 0.02 rad (1.146°) per rotation axis, 0.05 m/s per velocity axis, and 0.01 m per position axis; the filters' initial covariance is set to match. §3 varies the rotation std. Biases are off except in §5. Run with `uv run python use_numpy/hexapod_contact_inekf.py` (about 4 minutes).
 
 ---
 
@@ -41,7 +41,7 @@ Short answer: at a small initial rotation error both are about equally *accurate
 X = \begin{bmatrix} R & v & p & d_1 & \cdots & d_K \\ 0 & & I_{K+2} & & \end{bmatrix} \in SE_{K+2}(3)
 ```
 
-This is the extended pose $`SE_2(3)`$ ([glossary](../glossary.md#extended-pose)) with one more column per foot. $`K`$ follows the gait: 3, 4 or 5 feet for **tripod**, **ripple** and **wave**. A foot joins the state at touchdown and leaves it at liftoff.
+This is the extended pose $`SE_2(3)`$ ([glossary](../glossary.md#extended-pose)) with one more column per foot. $`K`$ follows the gait: 3, 4, or 5 feet for **tripod**, **ripple**, and **wave**. A foot joins the state at touchdown and leaves it at liftoff.
 
 **Propagate** (`propagate_base`), with gyro $`\omega`$ and accelerometer $`a`$ over one step $`\Delta t`$, gravity $`g`$ (a world-frame vector, $`(0, 0, -9.81)`$ m/s²), and $`\mathrm{Exp}`$ turning a rotation vector (axis × angle, in rad) into a rotation ([glossary](../glossary.md#exp-and-log-maps)). The readings $`\omega`$ and $`a`$ are in the body frame:
 
@@ -89,7 +89,7 @@ In the invariant EKF, a global yaw rotation by an angle $`\theta`$ is the fixed 
 ## 3. No biases: equal accuracy, different honesty
 
 ### Default initial error (rotation std 0.02 rad, about 1.1°)
-50 trials, seed 0; NEES of $`(R, v, p)`$ should be 9 (95% band $`[7.86, 10.21]`$, see [linear_nonlinear.md §4.4](linear_nonlinear.md#44-after-the-fact-consistency-tests)) and yaw NEES 1 ($`[0.65, 1.43]`$). [RMSE](../glossary.md#rmse-root-mean-square-error) is the root-mean-square error over the trials, i.e. the actual error. The **reported σ** is the yaw std the filter claims: the square root of the yaw entry of $P$ (the rotation-error entry about the vertical axis; variance averaged over trials).
+50 trials, seed 0; NEES of $`(R, v, p)`$ should be 9 (95% band $`[7.86, 10.21]`$, see [linear_nonlinear.md §4.4](linear_nonlinear.md#44-after-the-fact-consistency-tests)) and yaw NEES 1 ($`[0.65, 1.43]`$). [RMSE](../glossary.md#rmse-root-mean-square-error) is the root-mean-square error over the trials, i.e., the actual error. The **reported σ** is the yaw std the filter claims: the square root of the yaw entry of $P$ (the rotation-error entry about the vertical axis; variance averaged over trials).
 
 | Gait | Filter | NEES | yaw NEES | final yaw RMSE / reported σ (°) | tilt RMSE (°) | velocity RMSE (m/s) | final position RMSE (m) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -100,7 +100,7 @@ In the invariant EKF, a global yaw rotation by an angle $`\theta`$ is the fixed 
 | wave | invariant | 8.91 | 1.13 | 1.220 / 1.154 | 0.250 | 0.0113 | 0.0282 |
 | wave | world | 9.15 | 1.35 | 1.298 / 1.034 | 0.252 | 0.0113 | 0.0292 |
 
-- **Both are consistent here, and equally accurate.** Every NEES is inside the band.
+- **Both are consistent here and equally accurate.** Every NEES is inside the band.
 - **But the world-frame EKF already "learns" yaw.** Its reported yaw σ ends at 1.03-1.06°, *below* the 1.146° it started with; the invariant EKF's grows to 1.154° (gyro noise only).
 - **The gait matters a little**, as in [`hexapod_gait_ekf.md` §2](hexapod_gait_ekf.md#2-no-slip-the-gait-matters-but-less-than-youd-think): velocity RMSE 0.0134 → 0.0113 m/s (16% lower) from tripod to wave.
 
@@ -151,7 +151,7 @@ Results (50 trials; "in window" = $`t \in [4, 8)`$ s):
 | wave | gated | 0.0091 | 10.2 | 0.030 | 29.7% | 99.0% |
 
 - **The gate halves the error and restores consistency** (NEES about 10 instead of 31-42).
-- **But it lets 30-52% of the slipping readings through, against about 2% in the gated velocity-reading filter of [`hexapod_gait_ekf.md` §3](hexapod_gait_ekf.md#3-one-slipping-leg-the-gait-barely-matters-gating-does).** The reason is the foot in the state. The residual is the distance the foot has slid since touchdown, not its velocity. At 2 mm per tick (one 0.02 s filter step) the slide starts below the 5 mm reading noise: in the first 5 ticks after the slip begins, 96-100% of the slipping readings pass; after about 23 ticks (4.6 cm) almost none do. The tripod, with 30-tick stances, uses the most.
+- **But it lets 30-52% of the slipping readings through, against about 2% in the gated velocity-reading filter of [`hexapod_gait_ekf.md` §3](hexapod_gait_ekf.md#3-one-slipping-leg-the-gait-barely-matters-gating-does).** The reason is the foot in the state. The residual is the distance the foot has slid since touchdown, not its velocity. At 2 mm per tick (one 0.02 s filter step), the slide starts below the 5 mm reading noise: in the first 5 ticks after the slip begins, 96-100% of the slipping readings pass; after about 23 ticks (4.6 cm), almost none do. The tripod, with 30-tick stances, uses the most.
 - **Those early readings cost little.** Gated velocity RMSE in the window (0.0091-0.0120 m/s) is close to the no-slip values of §3 (0.0113-0.0134 m/s, whole run).
 
 ---
@@ -180,7 +180,7 @@ Each trial draws a constant gyroscope **bias** ([glossary](../glossary.md#bias))
 ## 6. Takeaway
 
 - **Put the stance feet in the state and use an invariant error.** Then the measurement Jacobian and the touchdown step are constant, and the filter's unobservable directions (yaw and position) are the true ones. That is the main point of ref. 1.
-- **The standard EKF is as accurate at a small initial error, but not honest.** At a 0.02 rad (1.1°) initial rotation std the difference is small. At 0.1 rad (5.7°) its NEES doubles, and at 0.3 rad (17.2°) it is about 50× too high, with a reported yaw σ of 1.3°.
+- **The standard EKF is as accurate at a small initial error, but not honest.** At a 0.02 rad (1.1°) initial rotation std, the difference is small. At 0.1 rad (5.7°), its NEES doubles, and at 0.3 rad (17.2°) it is about 50× too high, with a reported yaw σ of 1.3°.
 - **Biases cost exact invariance, not consistency**, in this setting.
 - **Gating still works with feet in the state, but catches a slip later.** The residual measures how far a foot has slid, so the first centimetre passes.
 - **Yaw and position still drift.** IMU plus legs fixes roll, pitch and velocity; an **exteroceptive** sensor, one that measures the surroundings (camera, lidar, GPS), is needed for the rest.
