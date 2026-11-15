@@ -72,7 +72,7 @@ We want $`H=LL^\top`$, where $`H`$ is the Hessian of the linearized problem and 
     4
 ```
 
-- **Eliminate 1.** It has one neighbor, so 2 takes over its information and no fill-in appears: $\text{parent}(1)=2$.
+- **Eliminate 1.** It has one neighbor, so 2 takes over its information, and no fill-in appears: $\text{parent}(1)=2$.
 - **Eliminate 2.** It still has **two** neighbors, 3 and 4, which were never directly connected. Removing 2 forces them to pick up each other's dependency, so a new edge $3 \leftrightarrow 4$ appears ([fill-in](../glossary.md#fill-in)), and $\text{parent}(2)=3$.
 - **Eliminate 3.** Its only remaining neighbor is 4, via that fill-in edge: $\text{parent}(3)=4$.
 
@@ -222,7 +222,7 @@ x1 ─ x2 ─ x3 ─ x4 ─ x5
      l2        l3
 ```
 
-Suppose we use the elimination order $x_1$, $l_1$, $l_2$, $l_3$, $x_2$, $x_3$, $x_4$, $x_5$: $x_1$ and the landmarks first, then the remaining poses oldest first.
+Suppose we use the elimination order $x_1$, $l_1$, $l_2$, $l_3$, $x_2$, $x_3$, $x_4$, $x_5$: $x_1$ and the landmarks first, then the remaining poses, oldest first.
 
 The elimination tree is:
 
@@ -295,7 +295,7 @@ The resulting $L$ has far fewer nonzeros. It is always $n \times n$, so only its
 
 - **Toy assumption:** every camera sees every landmark.
 - **BA scene:** the seed-0 defaults of `bundle_adjustment.py`, 292 observations, so each camera sees only some of the landmarks.
-- **Interleaved:** each camera followed by the landmarks it is the first to see.
+- **Interleaved:** each camera is followed by the landmarks it is the first to see.
 - **Reading it:** poses first leaves $L$ nearly dense in both graphs, while landmarks first keeps fill-in to 6 and 28 entries.
 
 The sparsity plots of $H$ and $L$ for the BA scene (with 6 and 3 scalar unknowns per camera and landmark) are the figure in [sparse_cholesky_factorization.md §5](sparse_cholesky_factorization.md#5-ordering-becomes-extremely-important).
@@ -353,4 +353,4 @@ This is one corner of the repo-wide map in [slam_mental_map.md](../slam_mental_m
 
 ## 12. References
 
-1. Liu, J. W. H. (1990). *The Role of Elimination Trees in Sparse Factorization*. SIAM Journal on Matrix Analysis and Applications, 11(1), 134-172. https://doi.org/10.1137/0611010 - the original definition and analysis of the elimination tree this doc builds intuition for, including the parent/child dependency-structure framing used throughout.
+1. Liu, J. W. H. (1990). *The Role of Elimination Trees in Sparse Factorization*. SIAM Journal on Matrix Analysis and Applications, 11(1), 134-172. https://doi.org/10.1137/0611010 - the original definition and analysis of the elimination tree that this doc builds intuition for, including the parent/child dependency-structure framing used throughout.
