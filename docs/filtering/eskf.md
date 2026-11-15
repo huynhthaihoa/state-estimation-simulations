@@ -25,7 +25,7 @@ After each measurement update, the estimated error is **injected** into the nomi
 - Reset: $`\delta\theta = 0`$ again.
 
 Two things follow:
-- The error state has one number per independent quantity (here 15: three each for position, velocity, rotation and the two biases), so its covariance has no direction that does not exist physically.
+- The error state has one number per independent quantity (here 15: three each for position, velocity, rotation, and the two biases), so its covariance has no direction that does not exist physically.
 - The filter always linearizes around $`\delta x = 0`$, which is where the error actually is after each reset, so the first-order approximation stays accurate.
 
 [`eskf_imu_position_fix.py`](../../use_numpy/eskf_imu_position_fix.py) runs this filter on a 3D body and compares it with the two shortcuts it avoids: leaving the biases out, and putting a quaternion directly in an EKF state.
@@ -76,7 +76,7 @@ All right-hand sides use the values from the start of the step. The biases stay 
 
 ### 2.2 Predict, error state (`eskf_transition`)
 
-The error evolves as $`\delta x \leftarrow F\,\delta x + L\,n`$, where $`n`$ stacks the accelerometer noise, gyro noise and the two bias random walks. The covariance follows as $`P \leftarrow F P F^\top + L Q L^\top`$. Over one step, to first order:
+The error evolves as $`\delta x \leftarrow F\,\delta x + L\,n`$, where $`n`$ stacks the accelerometer noise, gyro noise, and the two bias random walks. The covariance follows as $`P \leftarrow F P F^\top + L Q L^\top`$. Over one step, to first order:
 
 | Error | Driven by | Term in $`F`$ | In words |
 | --- | --- | --- | --- |
@@ -111,7 +111,7 @@ K = P H^\top (H P H^\top + \sigma_p^2 I)^{-1} \qquad \widehat{\delta x} = K r \q
 \hat p \leftarrow \hat p + \widehat{\delta p} \qquad \hat v \leftarrow \hat v + \widehat{\delta v} \qquad \hat R \leftarrow \hat R\,\mathrm{Exp}(\widehat{\delta\theta}) \qquad \hat b \leftarrow \hat b + \widehat{\delta b}
 ```
 
-**Reset** $`\delta x`$ to zero. Strictly, moving the nominal rotation also changes the frame the remaining rotation error is expressed in, so $`P`$ is mapped through the **reset Jacobian** $`G = I - \tfrac12[\,\widehat{\delta\theta}\,]_\times`$ on the rotation block: $`P \leftarrow G P G^\top`$ (Solà 2017, §6.3); $`G`$ differs from $`I`$ only to first order in the injected error. Here it makes no measurable difference: with `--no-reset-jacobian` ($`G = I`$) on the same trials, the ESKF's NEES is 16.6 instead of 16.4 and its attitude RMSE 1.36° instead of 1.35°.
+**Reset** $`\delta x`$ to zero. Strictly, moving the nominal rotation also changes the frame the remaining rotation error is expressed in, so $`P`$ is mapped through the **reset Jacobian** $`G = I - \tfrac12[\,\widehat{\delta\theta}\,]_\times`$ on the rotation block: $`P \leftarrow G P G^\top`$ (Solà 2017, §6.3); $`G`$ differs from $`I`$ only to first order in the injected error. Here it makes no measurable difference: with `--no-reset-jacobian` ($`G = I`$) on the same trials, the ESKF's NEES is 16.6 instead of 16.4 and its attitude RMSE is 1.36° instead of 1.35°.
 
 | Step | Acts on | Linearized? |
 | --- | --- | --- |
@@ -138,7 +138,7 @@ For a fair comparison, the quaternion EKF's covariance is mapped to the same 15 
 
 ## 4. Results at the defaults
 
-50 Monte Carlo trials (motion, biases, noise and initial error redrawn each time), averaged over the second half of the run (15-30 s). With 50 trials, the 95% band for a consistent average NEES is [13.5, 16.6] for 15 states and [7.9, 10.2] for 9.
+50 Monte Carlo trials (motion, biases, noise, and initial error redrawn each time), averaged over the second half of the run (15-30 s). With 50 trials, the 95% band for a consistent average NEES is [13.5, 16.6] for 15 states and [7.9, 10.2] for 9.
 
 | Filter | Attitude RMSE | Position RMSE | NEES | States |
 | --- | --- | --- | --- | --- |
@@ -217,6 +217,6 @@ The ESKF's rotation error $`\delta\theta = \mathrm{Log}(\hat R^\top R)`$ is alre
 
 ## 8. References
 
-1. Solà, J. (2017). *Quaternion kinematics for the error-state Kalman filter*. arXiv:1711.02508. https://arxiv.org/abs/1711.02508 - the ESKF formulation, conventions and reset Jacobian used here.
+1. Solà, J. (2017). *Quaternion kinematics for the error-state Kalman filter*. arXiv:1711.02508. https://arxiv.org/abs/1711.02508 - the ESKF formulation, conventions, and reset Jacobian used here.
 2. Trawny, N., & Roumeliotis, S. I. (2005). *Indirect Kalman Filter for 3D Attitude Estimation*. Technical Report 2005-002, University of Minnesota. https://www.cse.sc.edu/~yiannisr/774/2023/indirect-kalman-filter-for-3d-attitude-estimation.pdf - the same filter for attitude, in the JPL quaternion convention.
 3. Lefferts, E. J., Markley, F. L., & Shuster, M. D. (1982). *Kalman Filtering for Spacecraft Attitude Estimation*. Journal of Guidance, Control, and Dynamics, 5(5), 417-429. https://doi.org/10.2514/3.56190 - the multiplicative EKF, the attitude-only ancestor of the ESKF.
