@@ -4,7 +4,7 @@
 
 When the anchor may slip, the filter has to decide whether "velocity = 0" is true right now. [`inchworm_zupt_ekf.md` §6](inchworm_zupt_ekf.md#6-side-extension-anchor-slip-and-a-measured-gate) decides with a hard rule: the schedule, a threshold gate on the pad reading, or no decision at all (use the reading as a velocity). An **interacting multiple model (IMM)** filter decides softly. It runs two Kalman filters side by side, one that assumes the body is **still** and one that assumes it is **moving**, and keeps a probability for each. Each tick, the mode that predicted the new measurements better gains probability, and the output is the probability-weighted blend of the two.
 
-Worked number. A pad reading of $`-0.05`$ m/s arrives on an anchored tick (a mid-slip speed). If the body were still, the filter expects 0 with a spread of $`\sqrt{0.01^2 + 0.01^2} = 0.014`$ m/s (the still mode's own velocity spread plus the reading noise, both 0.01 m/s). The reading is $`0.05 / 0.014 = 3.5`$ spreads away, which scales the still mode's likelihood by $`e^{-3.5^2/2} \approx 0.002`$ against its best case. The moving mode does not expect 0, so it is not surprised, and the probability moves to it. At the defaults this takes 0.08 s on average (table in [Slip detection](#slip-detection)).
+Worked number. A pad reading of $`-0.05`$ m/s arrives on an anchored tick (a mid-slip speed). If the body were still, the filter expects 0 with a spread of $`\sqrt{0.01^2 + 0.01^2} = 0.014`$ m/s (the still mode's own velocity spread plus the reading noise, both 0.01 m/s). The reading is $`0.05 / 0.014 = 3.5`$ spreads away, which scales the still mode's likelihood by $`e^{-3.5^2/2} \approx 0.002`$ against its best case. The moving mode does not expect 0, so it is not surprised, and the probability moves to it. At the defaults, this takes 0.08 s on average (table in [Slip detection](#slip-detection)).
 
 Question: does this beat the hard rules, and in which regime? Measured answer, in the order of the sections below:
 
@@ -75,8 +75,8 @@ P = \sum_j \mu_j\Big[P_j + (\hat x_j - \hat x)(\hat x_j - \hat x)^\top\Big]
 - **Convention:** the paper's matrix $`H_{ij}`$ is $`P(\text{mode}_t = i \mid \text{mode}_{t-1} = j)`$, so its columns sum to 1. The code uses its transpose $`\Pi`$ (row = previous mode), as the sums above are written. A test compares the mixing to the paper's equations (12)-(14) written literally with an asymmetric matrix.
 - **Likelihood factor:** the paper's (15) drops the $`(2\pi)^{-m/2}`$ factor. It is the same for both modes here (same $`y`$), so it cancels in step 4; the code keeps it and works with logs, so a very surprising measurement does not underflow.
 - **Pruning:** a mode with $`\bar\mu_j = 0`$ is pruned in the paper. The code keeps it with its probability at 0 (a mode that can never be entered, as in the "always moving" test).
-- **Which switching fits:** the paper reports that the IMM works well when the dynamics matrices or noise gains switch between modes (§IV), which is the case here ($`F`$ and $`Q`$ differ between S and M; $`H`$ does not). The paper's model, eq. (1)-(2), lets the dynamics, the noise gains and the measurement matrix switch with the mode.
-- **Checks:** with the transition matrix forced to "always moving" the IMM equals the parent's `sensor_fused` (pad) and `never` (position only) to $`10^{-9}`$ (test), and a plain-loop reference written from the paper's equations matches `run_imm` to $`10^{-10}`$.
+- **Which switching fits:** the paper reports that the IMM works well when the dynamics matrices or noise gains switch between modes (§IV), which is the case here ($`F`$ and $`Q`$ differ between S and M; $`H`$ does not). The paper's model, eq. (1)-(2), lets the dynamics, the noise gains, and the measurement matrix switch with the mode.
+- **Checks:** with the transition matrix forced to "always moving", the IMM equals the parent's `sensor_fused` (pad) and `never` (position only) to $`10^{-9}`$ (test), and a plain-loop reference written from the paper's equations matches `run_imm` to $`10^{-10}`$.
 
 ## Transition matrix: a design choice
 
@@ -97,7 +97,7 @@ The last row is part of the default. The first version of the schedule-aware rul
 
 ## Results
 
-All tables: seed 0, 500 trials, NEES by window against the 95% interval $`[1.83, 2.18]`$ for the average of a consistent 2-DoF filter (the expected value is 2). Single-run RMSE is one noise realization (RMSE vel in m/s). Command that prints every table of §A, §B, §C, the sensitivity table and the detection tables (about two minutes): `uv run python use_numpy/inchworm_slip_imm.py --out assets/inchworm_slip_imm.png`. The other tables name their command.
+All tables: seed 0, 500 trials, NEES by window against the 95% interval $`[1.83, 2.18]`$ for the average of a consistent 2-DoF filter (the expected value is 2). Single-run RMSE is one noise realization (RMSE vel in m/s). Command that prints every table of §A, §B, §C, the sensitivity table, and the detection tables (about two minutes): `uv run python use_numpy/inchworm_slip_imm.py --out assets/inchworm_slip_imm.png`. The other tables name their command.
 
 ### A: with the pad sensor
 
@@ -124,7 +124,7 @@ All tables: seed 0, 500 trials, NEES by window against the 95% interval $`[1.83,
 | `sensor_fused` | 0.0097 | 0.0091 | 0.0089 | 0.0093 |
 | `imm_schedule` | 0.0066 | 0.0098 | 0.0089 | 0.0081 |
 
-On clean anchors the still mode adds its "v = 0" belief to the pad reading, which `sensor_fused` lacks. It does not match the plain ZUPT of `schedule` there (0.0066 vs. 0.0040). In the slip window the IMM is slightly worse than `sensor_fused` (0.0098 vs. 0.0091) and in cruise they are equal.
+On clean anchors, the still mode adds its "v = 0" belief to the pad reading, which `sensor_fused` lacks. It does not match the plain ZUPT of `schedule` there (0.0066 vs. 0.0040). In the slip window, the IMM is slightly worse than `sensor_fused` (0.0098 vs. 0.0091), and in cruise they are equal.
 
 - **Clean anchor and cruise NEES:** 1.31 and 1.99 for `imm_schedule` against 1.69 and 1.77 for `sensor_fused`. The truth has no random disturbance (see [Model](#model)), so values below 2 mean a conservative covariance.
 - **Cost:** roughly 3-5 times a parent EKF per tick (105 µs per step for `imm_schedule` vs. 21-35 µs for the five policies in one run on a shared laptop; the IMM is run as a batch of one trial).
@@ -138,7 +138,7 @@ Seeds 0-3 (each seed draws different slip pulses: 2 in seed 0 with 24 slip ticks
 | 2 | 72 | 47.58 | 1.90 | 1.93 | 0.0088 | 0.0079 |
 | 3 | 72 | 47.65 | 1.90 | 1.93 | 0.0092 | 0.0084 |
 
-The slip-window NEES of `imm_schedule` is within 0.07 of `sensor_fused`'s in every seed, and its single-run velocity RMSE is lower in all four (9-13%). This is one noise realization per seed, so the RMSE gap is consistent in sign but is not a significance test.
+The slip-window NEES of `imm_schedule` is within 0.07 of `sensor_fused` in every seed, and its single-run velocity RMSE is lower in all four (9-13%). This is one noise realization per seed, so the RMSE gap is consistent in sign but is not a significance test.
 
 ### B: no pad sensor (position only)
 
@@ -149,8 +149,8 @@ The slip-window NEES of `imm_schedule` is within 0.07 of `sensor_fused`'s in eve
 | `imm_pos` | 0.0097 | 0.0457 | 1.03 | 2.92 | 2.83 | 1.86 |
 | `imm_schedule_pos` | 0.0087 | 0.0401 | 0.79 | 9.34 | 1.92 | 1.85 |
 
-- **`imm_schedule_pos`** keeps the schedule's accuracy (RMSE pos 0.0087 vs. 0.0089, vel 0.0401 vs. 0.0404; both better than `never`) and cuts the slip-window NEES from 47.27 to 9.34. It is still far above `never` (2.58) and the interval. Across seeds 1-3 its slip NEES is 6.40-6.96 (`schedule`: 47.58-48.29, `never`: 2.00-2.13).
-- **`imm_pos`** (no schedule) stays near `never` (RMSE vel 0.0457 vs. 0.0496, slip 2.92 vs. 2.58) with a worse cruise NEES (2.83 vs. 1.64). It cannot tell the modes apart: P(M) above 0.5 on 99.2% of clean-anchor ticks, and its mean P(M) is 0.60 on clean-anchor ticks and 0.63 on slip ticks ([Slip detection](#slip-detection)).
+- **`imm_schedule_pos`** keeps the schedule's accuracy (RMSE pos 0.0087 vs. 0.0089, vel 0.0401 vs. 0.0404; both better than `never`) and cuts the slip-window NEES from 47.27 to 9.34. It is still far above `never` (2.58) and the interval. Across seeds 1-3, its slip NEES is 6.40-6.96 (`schedule`: 47.58-48.29, `never`: 2.00-2.13).
+- **`imm_pos`** (no schedule) stays near `never` (RMSE vel 0.0457 vs. 0.0496, slip 2.92 vs. 2.58) with a worse cruise NEES (2.83 vs. 1.64). It cannot tell the modes apart: P(M) is above 0.5 on 99.2% of clean-anchor ticks, and its mean P(M) is 0.60 on clean-anchor ticks and 0.63 on slip ticks ([Slip detection](#slip-detection)).
 - **Why position alone does not work:** the largest slip displacement per tick is $`0.08 \times 0.05 = 4`$ mm against a position noise of 20 mm.
 
 ### C: pad noise sweep
@@ -170,12 +170,12 @@ Gate threshold stays $`3\sigma_d`$ as in the parent. Command: the same default c
 | | `imm_schedule` | 0.0302 | 0.91 | 8.26 | 1.92 |
 
 - **The IMM keeps the lower velocity error** (0.0195 vs. 0.0231 and 0.0302 vs. 0.0353) and a lower clean-anchor NEES (0.91-1.05 vs. 1.53-1.64; both are below 2, see [Model](#model)).
-- **`sensor_fused` keeps the slip window consistent** (2.02 and 2.27) and the IMM does not (4.27 and 8.26). The IMM's mean P(M) on slip ticks falls to 0.58 and 0.31 ([Slip detection](#slip-detection)), so on the undetected ticks the still mode, which holds $`v = 0 \pm 0.01`$ m/s while the body slides at up to 0.08 m/s, keeps a large weight. This is the likely cause; no run isolates it.
+- **`sensor_fused` keeps the slip window consistent** (2.02 and 2.27) and the IMM does not (4.27 and 8.26). The IMM's mean P(M) on slip ticks falls to 0.58 and 0.31 ([Slip detection](#slip-detection)), so on the undetected ticks, the still mode, which holds $`v = 0 \pm 0.01`$ m/s while the body slides at up to 0.08 m/s, keeps a large weight. This is the likely cause; no run isolates it.
 - **The gate collapses first:** at 2 mm the gate threshold ($`3\sigma_d = 6`$ mm per tick) is above the largest slip displacement (4 mm per tick), so `schedule_and_sensor` rarely vetoes the ZUPT (only when noise pushes a reading past the threshold) and nearly returns to `schedule`'s level (42.30 vs. 47.27).
 
 ### Switch-rate sensitivity
 
-All switch probabilities of the schedule-aware matrices (except the exact $`[1, 0]`$ row) are multiplied by a factor, and clipped to 1. The two bottom rows scale only one of the two matrices, to isolate where the failure at $`\times 10`$ comes from.
+All switch probabilities of the schedule-aware matrices (except the exact $`[1, 0]`$ row) are multiplied by a factor and clipped to 1. The two bottom rows scale only one of the two matrices, to isolate where the failure at $`\times 10`$ comes from.
 
 | Variant | Factor | Clean anchor | Slip | Cruise | Overall | RMSE vel |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -188,8 +188,8 @@ All switch probabilities of the schedule-aware matrices (except the exact $`[1, 
 | | 10, anchor matrix only | 0.90 | 18.32 | 2.11 | 2.96 | 0.0402 |
 | | 10, extend matrix only | 10.91 | 17.28 | 25.56 | 17.67 | 0.0606 |
 
-- **With the pad** the IMM changes little over two decades of switch rates (overall NEES 1.65-1.83), likely because the pad reading outweighs the prior.
-- **Position only** it depends on them, because the data cannot overrule the prior. Slowing the switches (0.1) pushes it toward `schedule` (slip 24.00); speeding them up 10 times collapses it. The cruise NEES shows which matrix: 25.56 when only the extend matrix is scaled (at $`\times 10`$ it puts probability 0.5 on "still" at every extend tick, instead of 0.05), 2.11 when only the anchor matrix is.
+- **With the pad**, the IMM changes little over two decades of switch rates (overall NEES 1.65-1.83), likely because the pad reading outweighs the prior.
+- **Position only** depends on them, because the data cannot overrule the prior. Slowing the switches (0.1) pushes it toward `schedule` (slip 24.00); speeding them up 10 times collapses it. The cruise NEES shows which matrix: 25.56 when only the extend matrix is scaled (at $`\times 10`$ it puts probability 0.5 on "still" at every extend tick, instead of 0.05), 2.11 when only the anchor matrix is.
 
 ### Ablations
 
@@ -261,11 +261,11 @@ Without the pad, `imm_schedule_next_pos` flags 40.7% of slip ticks and has a sli
 
 ## Takeaway
 
-- **With a pad reading,** the IMM matches `sensor_fused`'s slip-window NEES and lowers the velocity error on still ticks, with fewer false alarms and more slip detected than the gate. With a noisy pad it keeps the lower velocity error but loses slip-window consistency (4.27 and 8.26 at 2 and 5 mm, against 2.02 and 2.27 for `sensor_fused`).
+- **With a pad reading,** the IMM matches `sensor_fused`'s slip-window NEES and lowers the velocity error on still ticks, with fewer false alarms and more slip detected than the gate. With a noisy pad, it keeps the lower velocity error but loses slip-window consistency (4.27 and 8.26 at 2 and 5 mm, against 2.02 and 2.27 for `sensor_fused`).
 - **Without a pad reading,** position noise hides the slip. Weighing two hypotheses cannot add information the measurements lack, and the schedule-aware IMM only improves on `schedule`'s overconfidence (47.27 to 9.34), not on `never`.
 - **The transition matrix matters most where the data is weakest.** In this toy, pinning the first anchor tick to "still" is what exposes the missing detection, and a "detection" result should be checked against the share of pulses already flagged on their first tick.
 
 ## References
 
 1. Blom, H. A. P., & Bar-Shalom, Y. (1988). *The Interacting Multiple Model Algorithm for Systems with Markovian Switching Coefficients*. IEEE Transactions on Automatic Control, 33(8), 780-783. https://doi.org/10.1109/9.1299 - the IMM algorithm: model (1)-(2), the cycle in §III with mixing (12)-(14), mode probabilities (15)-(17) and combination (18)-(19); §IV for the comparison of which switching the IMM handles well. The transition-matrix convention differs by a transpose (see [the table above](#the-imm-in-one-table)).
-2. Kubík, J. & Faigl, J. (2026). *Adaptive Friction-based Inchworm-like Locomotion*. 2026 IEEE International Conference on Robotics and Automation (ICRA), 9951-9958. https://doi.org/10.1109/ICRA57385.2026.11696680 - an inchworm robot with a laser-mouse displacement sensor in each pad; the motivation for the parent doc's §6, whose toy this doc extends. This doc is a 1D toy, not a model of that robot.
+2. Kubík, J. & Faigl, J. (2026). *Adaptive Friction-based Inchworm-like Locomotion*. 2026 IEEE International Conference on Robotics and Automation (ICRA), 9951-9958. https://doi.org/10.1109/ICRA57385.2026.11696680 - an inchworm robot with a laser-mouse displacement sensor in each pad; the motivation for the parent doc's §6, which this doc extends. This doc is a 1D toy, not a model of that robot.
