@@ -13,9 +13,9 @@ A worked number from this toy (§1): at the dead-reckoning start, a false closur
 | `cauchy` | 0.0014 | 0.13 |
 | `dcs` | $`8.3 \times 10^{-6}`$ | 0.0008 |
 
-(Kernel scale $`\tau = 3.548`$, §2. These are the formulas of the existing [kernel section](pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures) evaluated at one residual.) Huber's weight is small, but its pull stays at the threshold $`\tau`$ however wrong the edge is; Cauchy and DCS let the pull fall to nearly zero.
+(Kernel scale $`\tau = 3.548`$, §2. These are the formulas of the existing [kernel section](pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures) evaluated at one residual.) Huber's weight is small, but its pull stays at the threshold $`\tau`$, however wrong the edge is; Cauchy and DCS let the pull fall to nearly zero.
 
-Result, at 20% false closures over 20 seeds (position RMSE over all nodes, §3): `l2` 1.38 m, `huber` 0.66 m, `cauchy` 0.106 m, `dcs` 0.102 m. The same graph without any false closure gives 0.102 m for `l2`.
+Result, at 20% false closures over 20 seeds (position RMSE over all nodes, §3): `l2` 1.38 m, `huber` 0.66 m, `cauchy` 0.106 m, `dcs` 0.102 m. The same graph without any false closures gives 0.102 m for `l2`.
 
 ![Animation of one run with 8 false of 48 loop closures: top views of the l2 and the cauchy estimate with every loop edge colored by its current weight and false closures dashed, and the position RMSE per iteration](../../assets/pose_graph_robust.gif)
 
@@ -61,9 +61,9 @@ The last row is this file's rule, not the source's: a pair at the same place (in
 | true | 800 | 19.9 | 5.4 | 41.1 | 0 |
 | false | 160 | 93.4 | 30.2 | 166.6 | 0 |
 
-From the dead-reckoning guess every closure, true or false, is beyond the threshold, because the drift (0.44 m position RMSE over 20 seeds) is large against the closures' noise (0.025 m). At the $`L_2`$ solution of the outlier-free graph the true closures have median $`e = 1.1`$ (max 2.3).
+From the dead-reckoning guess, every closure, true or false, is beyond the threshold, because the drift (0.44 m position RMSE over 20 seeds) is large compared to the closures' noise (0.025 m). At the $`L_2`$ solution of the outlier-free graph, the true closures have median $`e = 1.1`$ (max 2.3).
 
-Odometry edges are **never robustified**, as in the sources: Sünderhauf & Protzel state that the odometry constraints "remain unchanged" (ref 1, Eq. 1), and Agarwal et al. scale only the loop-closing terms (ref 2, Eq. 1 and the text after Eq. 15).
+Odometry edges are **never robustified**, as in the sources: Sünderhauf & Protzel state that the odometry constraints "remain unchanged" (ref. 1, Eq. 1), and Agarwal et al. scale only the loop-closing terms (ref. 2, Eq. 1 and the text after Eq. 15).
 
 ## 2. Methods
 
@@ -79,9 +79,9 @@ All four minimize $`\sum_{\text{odometry}} \tfrac{1}{2} e^2 + \sum_{\text{loops}
 - **Convex or not:** `l2` and `huber` are convex in the residual; `cauchy` and `dcs` are not (their cost flattens). None of them makes the pose problem convex: the residual itself is nonlinear in the poses. A non-convex kernel can end in a wrong solution when started far from the right one; §4 and §5 look for that.
 - **DCS formula:** $`s = \min(1, 2\Phi/(\Phi + \chi^2_l))`$ and the information matrix scaled by $`s^2`$, with $`\chi^2_l`$ the squared residual of the edge (ref 2, Eq. 15 and the sentence after it). In this file's notation $`\chi^2_l = e^2`$.
 - **DCS cost:** the paper gives the weight, not a cost. The cost in the table is the integral of the weight, $`\rho(e) = \int_0^e u\, w(u)\, du`$, which makes the weight exactly $`w = \tfrac{1}{e}\,\partial\rho/\partial e`$; it is a derivation of this file, checked by finite differences in the tests. g2o's DCS kernel instead returns the cost $`s^2 e^2`$ (ref 5), which decreases again for large $`e`$; that is not used here.
-- **DCS and switchable constraints:** a **switchable constraint** gives every loop edge a switch variable $`s_{ij} \in [0,1]`$ that scales its information matrix by $`s_{ij}^2`$, plus a prior that pulls the switch toward 1 (ref 1, Eq. 1). DCS derives its $`s`$ from that cost: setting the switch's derivative to zero gives $`s = \Phi/(\Phi + \chi^2_l)`$ (ref 2, Eq. 8), and the paper then takes the upper bound $`2\Phi/(\Phi + \chi^2_l)`$ capped at 1 (Eq. 14-15), which removes the switch variables from the optimization. So DCS is a closed-form relative of switchable constraints, not numerically the same method. Switchable constraints themselves are not implemented here.
-- **IRLS inside Levenberg-Marquardt:** at the start of each accepted-step iteration, each loop edge's information matrix is multiplied by its weight at the current poses; the step is then a damped Gauss-Newton step as in `pose_graph.py` (same Jacobians, node 0 anchored, adaptive damping, see [Levenberg-Marquardt](levenberg_marquardt.md)). A step is accepted only if the matching robust cost $`\sum \rho`$ goes down. With `l2` and identity information matrices it reproduces `pose_graph.py`'s solver to $`10^{-9}`$ (test).
-- **Kernel scale (a design choice, not from the sources):** $`\tau^2`$ is the 95% quantile of the chi-square distribution with 6 degrees of freedom, 12.59, so $`\tau = 3.548`$; Huber's $`\delta`$ and Cauchy's $`k`$ equal $`\tau`$ and DCS's $`\Phi`$ equals $`\tau^2`$. This follows the existing doc's guidance (§16.5). The DCS paper uses $`\Phi = 1`$ unless stated otherwise, from the switch-prior value of ref 1 (ref 2, §V-A); that value is tested separately in §4.
+- **DCS and switchable constraints:** a **switchable constraint** gives every loop edge a switch variable $`s_{ij} \in [0,1]`$ that scales its information matrix by $`s_{ij}^2`$, plus a prior that pulls the switch toward 1 (ref 1, Eq. 1). DCS derives its $`s`$ from that cost: setting the switch's derivative to zero gives $`s = \Phi/(\Phi + \chi^2_l)`$ (ref 2, Eq. 8), and the paper then takes the upper bound $`2\Phi/(\Phi + \chi^2_l)`$ capped at 1 (Eq. 14-15), which removes the switch variables from the optimization. So DCS is a closed-form relative of switchable constraints, not the same method numerically. Switchable constraints themselves are not implemented here.
+- **IRLS inside Levenberg-Marquardt:** at the start of each accepted-step iteration, each loop edge's information matrix is multiplied by its weight at the current poses; the step is then a damped Gauss-Newton step as in `pose_graph.py` (same Jacobians, node 0 anchored, adaptive damping, see [Levenberg-Marquardt](levenberg_marquardt.md)). A step is accepted only if the matching robust cost $`\sum \rho`$ goes down. With `l2` and identity information matrices, it reproduces `pose_graph.py`'s solver to $`10^{-9}`$ (test).
+- **Kernel scale (a design choice, not from the sources):** $`\tau^2`$ is the 95% quantile of the chi-square distribution with 6 degrees of freedom, 12.59, so $`\tau = 3.548`$; Huber's $`\delta`$ and Cauchy's $`k`$ equal $`\tau`$ and DCS's $`\Phi`$ equals $`\tau^2`$. This follows the existing doc's guidance (§16.5). The DCS paper uses $`\Phi = 1`$ unless stated otherwise, from the switch-prior value of ref. 1 (ref. 2, §V-A); that value is tested separately in §4.
 
 ## 3. Results
 
@@ -107,7 +107,7 @@ Seed 0, 20% false closures (8 of 48):
 
 ### 3.2 Over seeds and false-closure fractions
 
-20 seeds (0 to 19); for each seed the odometry, the true closures and the false closures are drawn from separate random streams of the seed, so only the number of false closures changes with the fraction, and the false closures at 10% are the first ones of those at 30%. Check printed by the run: dead-reckoning RMSE is identical across fractions (mean 0.4372 m). Command: `uv run python use_numpy/pose_graph_robust.py` (the Monte Carlo part of the default run; `--experiment montecarlo` runs it alone).
+20 seeds (0 to 19); for each seed, the odometry, the true closures, and the false closures are drawn from separate random streams of the seed, so only the number of false closures changes with the fraction, and the false closures at 10% are the first ones of those at 30%. Check printed by the run: dead-reckoning RMSE is identical across fractions (mean 0.4372 m). Command: `uv run python use_numpy/pose_graph_robust.py` (the Monte Carlo part of the default run; `--experiment montecarlo` runs it alone).
 
 Position RMSE in m, mean (median / worst of 20):
 
@@ -137,14 +137,14 @@ Classification at convergence (all seeds pooled):
 
 - **Four false closures among 40 true ones (10%) are enough to ruin `l2`:** 1.08 m against 0.10 m without false closures. It then grows slowly with the fraction (1.38 m at 0.2, 1.49 m at 0.3).
 - **`l2` without false closures is still 0.10 m**, and this floor is the same for every method. Per lap it is 0.103, 0.103 and 0.105 m (`--experiment diagnostics`), so no single lap carries it. This is the error left when only relative constraints are available; why it is the same in every lap was not isolated (likely: the closures tie the laps to each other, so they share the drift of the first).
-- **Cost of robustness when nothing is wrong:** at fraction 0 `huber` and `dcs` equal `l2` to four digits (0.1022 m), and `cauchy` is 0.1019 m. `cauchy` needs 16.7 iterations against 10.0 for `l2`, and one of its 800 true closures ends with weight below 0.5.
+- **Cost of robustness when nothing is wrong:** at fraction 0, `huber` and `dcs` equal `l2` to four digits (0.1022 m), and `cauchy` is 0.1019 m. `cauchy` needs 16.7 iterations against 10.0 for `l2`, and one of its 800 true closures ends with weight below 0.5.
 - **`dcs` is indistinguishable from the outlier-free solution:** 0.1022 m at every fraction (on seed 0 its largest false weight is $`4.6 \times 10^{-5}`$, §3.1). `cauchy` degrades slightly with the fraction (0.1019, 0.1030, 0.1055, 0.1083 m), likely because its false closures keep a small weight and a nonzero pull (largest false weight on seed 0: 0.0036).
 - **`huber` is the weakest robust method:** it improves on `l2` by 2.6 times at 10% false closures, 2.1 times at 20% and 1.8 times at 30%, but stays 4 to 8 times above the outlier-free level (0.42 m and 0.83 m against 0.10 m at 10% and 30%).
 - **Run time** of the default run is 2 min 42 s (numpy, one thread, laptop shared with other jobs); the manifpy version takes 44 s.
 
 ## 4. Kernel scale
 
-20 seeds, 20% false closures, `uv run python use_numpy/pose_graph_robust.py --experiment sweep --n-sweep-seeds 20`. The multiplier scales $`\tau`$ (so $`\Phi`$ scales with its square). The last row is DCS with $`\Phi = 1`$, the value of ref 2.
+20 seeds, 20% false closures, `uv run python use_numpy/pose_graph_robust.py --experiment sweep --n-sweep-seeds 20`. The multiplier scales $`\tau`$ (so $`\Phi`$ scales with its square). The last row is DCS with $`\Phi = 1`$, the value of ref. 2.
 
 | Method | Scale | $`\tau`$ | Position RMSE (m): mean (median / worst) | Iterations | False rejected | True kept |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -161,13 +161,13 @@ Classification at convergence (all seeds pooled):
 | `dcs` | $`\Phi = 1`$ | 1.00 | 0.4115 (0.3883 / 0.6758) | 19.4 | 160/160 | 9/800 |
 
 - **`huber` wants a small threshold:** the smaller $`\delta`$, the smaller its pull (Intuition table), 0.38 m at half the default against 1.02 m at twice. At $`2\tau`$ it rejects only 16 of 160 by the weight criterion.
-- **`dcs` gives the same RMSE at 1x and 2x** (0.1022 and 0.1020 m); **`cauchy` the same at 0.5x and 1x** (0.1045 and 0.1055 m) but 50% worse at 2x (0.1612 m).
+- **`dcs` gives the same RMSE at 1x and 2x** (0.1022 and 0.1020 m); **`cauchy` is the same at 0.5x and 1x** (0.1045 and 0.1055 m) but 50% worse at 2x (0.1612 m).
 - **Too tight a scale costs true closures:** with $`\tau`$ halved, `cauchy` keeps 536 of 800 true closures and `dcs` 408 of 800, and `dcs` gets a worst case of 0.52 m. DCS with $`\Phi = 1`$ keeps 9 of 800 and ends at 0.41 m, close to the dead-reckoning 0.44 m. This is consistent with §1: at the start no true closure has $`e \le 1`$, or even $`e \le 3.55`$, so a tight threshold leaves them down-weighted. No run isolates this cause. Whether $`\Phi = 1`$ suits information matrices other than this one is not tested.
 - **One such run (seed 0, `uv run python use_numpy/pose_graph_robust.py --experiment single --kernel-tau 1`, applied to every kernel):** `dcs` ends at 0.2028 m after 42 iterations with 1 of 40 true closures kept (0.0913 m at the default scale); `cauchy` 0.1152 m with 11 of 40; `huber` 0.1701 m with 25 of 40.
 
 ## 5. Variants and failure cases
 
-20 seeds, 30% false closures, default scale. Position RMSE in m, mean (worst). Each row is one command, `uv run python use_numpy/pose_graph_robust.py --experiment montecarlo --outlier-fracs 0.3` plus the flags in the first column (logs in the report folder).
+20 seeds, 30% false closures, default scale. Position RMSE in m, mean (worst). Each row is one command: `uv run python use_numpy/pose_graph_robust.py --experiment montecarlo --outlier-fracs 0.3` plus the flags in the first column (logs in the report folder).
 
 | Variant | `l2` | `huber` | `cauchy` | `dcs` |
 | --- | --- | --- | --- | --- |
@@ -191,14 +191,14 @@ A worse start, `--pos-noise-std 0.1 --rot-noise-std 0.02 --outlier-fracs 0.0 0.3
 | 0 | 0.2045 (0.2718) | 0.2045 (0.2718) | 0.2040 (0.2711) | 0.2045 (0.2718) |
 | 0.3 | 1.4867 (1.7520) | 1.1650 (1.4803) | 0.2600 (0.4070) | 0.2041 (0.2698) |
 
-- **The kernel matters more than the false-closure policy.** Grouping, a perfect-match measurement and local pairs move `huber` by up to 50% and `cauchy` by up to 15%, and `dcs` by less than 0.001 m. With the identity measurement `huber` is barely better than `l2` (1.26 m against 1.46 m) and rejects 2 of 240.
+- **The kernel matters more than the false-closure policy.** Grouping, a perfect-match measurement, and local pairs move `huber` by up to 50% and `cauchy` by up to 15%, and `dcs` by less than 0.001 m. With the identity measurement, `huber` is barely better than `l2` (1.26 m against 1.46 m) and rejects 2 of 240.
 - **No wrong solution from a non-convex kernel at the default scale.** In none of the 20 seeds of any row above did `cauchy` or `dcs` end above 0.41 m, and `dcs` stayed within 0.003 m of its outlier-free worst case in every row. The clearly worse solutions that were found came from a threshold that was too tight (§4).
 - **`cauchy` weakens with a worse start:** mean 0.260 m (worst 0.407 m) at 30% false closures with doubled odometry noise, against 0.204 m (worst 0.271 m) without false closures. All 240 false closures are still rejected and 799 of 800 true closures kept there, so the extra error is not a classification miss; its cause was not isolated (likely: the true closures keep weights well below 1).
 - **Every false closure here is far outside any threshold** (smallest $`e`$ at the start: 30.2, §1). That makes the test easy for the thresholded kernels; §6 says what it leaves out.
 
 ## 6. What this toy does not show
 
-- **No place-recognition front end.** False closures are drawn at random from the generator of ref 1 and carry a measurement unrelated to the geometry. A real aliasing error yields a measurement that is geometrically plausible; its $`e`$ could be small, and then no kernel can tell it from a true closure.
+- **No place-recognition front end.** False closures are drawn at random from the generator of ref. 1 and carry a measurement unrelated to the geometry. A real aliasing error yields a geometrically plausible measurement; its $`e`$ could be small, and then no kernel can tell it from a true closure.
 - **Their size is set by the source's numbers**, taken from other datasets (0.3, 10 deg), against closure noise of 0.025 m and 0.005 rad. At 12 to 35 standard deviations per axis, rejection is easy here.
 - **A planar path in SE(3):** the robot never turns (every pose has the identity rotation), as in `pose_graph.py`; one square, three laps.
 - **Only loop closures are robustified;** odometry is clean Gaussian, without outliers.
@@ -210,8 +210,8 @@ A worse start, `--pos-noise-std 0.1 --rot-noise-std 0.02 --outlier-fracs 0.0 0.3
 
 - Four false closures among 40 true ones (10%) multiply the position error by about 10 (0.10 m to 1.08 m); a kernel whose pull falls to nearly zero (`cauchy`, `dcs`) brings it back to the outlier-free level (0.103 m and 0.102 m), `huber` only to 0.42 m.
 - What decides the result is how fast the pull of a wrong edge falls with its residual: constant (`huber`), $`1/e`$ (`cauchy`), $`1/e^3`$ (`dcs`).
-- The scale has to suit the start: from dead reckoning even true closures lie beyond $`3.5`$ standard deviations, and a tighter threshold (half the default, or $`\Phi = 1`$) rejects true closures and costs accuracy.
-- Without false closures the robust kernels cost nothing in accuracy; `cauchy` takes about 7 more iterations.
+- The scale has to suit the start: from dead reckoning, even true closures lie beyond $`3.5`$ standard deviations, and a tighter threshold (half the default, or $`\Phi = 1`$) rejects true closures and costs accuracy.
+- Without false closures, the robust kernels cost nothing in accuracy; `cauchy` takes about 7 more iterations.
 
 ## 8. References
 
