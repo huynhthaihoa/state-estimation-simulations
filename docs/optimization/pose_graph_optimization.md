@@ -82,7 +82,7 @@ Small errors accumulate with motion. This is [**drift**](../glossary.md#drift).
 
 ## 4. The really important event: loop closure
 
-Suppose the robot recognizes "Hey! I've been here before", for example the same visual landmark/place as at $x_0$. That gives a [**loop-closure**](../glossary.md#loop-closure) constraint:
+Suppose the robot recognizes "Hey! I've been here before", for example, the same visual landmark/place as at $x_0$. That gives a [**loop-closure**](../glossary.md#loop-closure) constraint:
 
 ```text
 x₀ ───── x₁ ───── x₂ ───── x₃ ───── x₄
@@ -114,9 +114,9 @@ The scripts' four-pose square shows this: the optimizer spreads the loop error o
 
 ![Two panels from pose_graph.py: the four-pose square loop with ground truth, drifting odometry, the optimized estimate and the loop-closure edge, and each pose's position error before and after optimization](../../assets/pose_graph.png)
 
-*Figure: `use_numpy/pose_graph.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py pose_graph` (the same figure is used in §15.7). Error at the loop-closure node 0.1035 m to 0.0494 m; RMS position error 6.6 cm to 5.2 cm. X1 and X2 get slightly worse while X3 improves.*
+*Figure: `use_numpy/pose_graph.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py pose_graph` (the same figure is used in §15.7). Error at the loop-closure node: 0.1035 m to 0.0494 m; RMS position error 6.6 cm to 5.2 cm. X1 and X2 get slightly worse, while X3 improves.*
 
-The animation below replays the same run (seed 0) step by step. First the dead-reckoned poses X0 to X3 appear one by one next to the ground truth and the drift builds. Then the loop-closure edge X3-X0 appears: composing X3 with the edge's measurement predicts a position for X0 that is 8.1 cm away from where X0 is. Then the optimizer's steps 1, 2, 3, ... move all poses together. The top view is drawn to scale, so the centimeter-sized errors are hard to see there; the three panels on the right carry them: the error vector (estimate minus truth, split into x, y, z) of every pose, the position error per pose (3-D distance to the truth), and the **total chi-squared error** (the sum over all edges of the squared residual, here with an identity information matrix) after each iteration. Every pose and number comes from `pose_graph.py`'s own functions: iteration $k$ is the pose list returned by `run_pose_graph_optimization` with `gn_max_iters` $= k$, shown as a discrete state (nothing is interpolated or magnified). The chi-squared values are checked against the optimizer's own printout: 0.007156, 0.000838, 0.000828. After iteration 3 the poses no longer move at the precision shown, and the run stops at iteration 5 (step size below $10^{-6}$). X1 and X2 end slightly worse (3.33 to 3.95 cm and 7.61 to 8.25 cm), while X3 (10.35 to 4.94 cm) and the RMS position error (6.64 to 5.20 cm) improve.
+The animation below replays the same run (seed 0) step by step. First, the dead-reckoned poses X0 to X3 appear one by one next to the ground truth and the drift builds. Then the loop-closure edge X3-X0 appears: composing X3 with the edge's measurement predicts a position for X0 that is 8.1 cm away from where X0 is. Then the optimizer's steps 1, 2, 3, ... move all poses together. The top view is drawn to scale, so the centimeter-sized errors are hard to see there; the three panels on the right carry them: the error vector (estimate minus truth, split into x, y, z) of every pose, the position error per pose (3-D distance to the truth), and the **total chi-squared error** (the sum over all edges of the squared residual, here with an identity information matrix) after each iteration. Every pose and number comes from `pose_graph.py`'s own functions: iteration $k$ is the pose list returned by `run_pose_graph_optimization` with `gn_max_iters` $= k$, shown as a discrete state (nothing is interpolated or magnified). The chi-squared values are checked against the optimizer's own printout: 0.007156, 0.000838, 0.000828. After iteration 3, the poses no longer move at the precision shown, and the run stops at iteration 5 (step size below $10^{-6}$). X1 and X2 end slightly worse (3.33 to 3.95 cm and 7.61 to 8.25 cm), while X3 (10.35 to 4.94 cm) and the RMS position error (6.64 to 5.20 cm) improve.
 
 ![Animation of pose_graph.py at its defaults: dead-reckoned poses appear one by one next to the ground-truth square, the loop-closure edge X3-X0 appears, and the optimizer's iterations move the poses while the per-pose error vectors, the per-pose position errors and the chi-squared per iteration update](../../assets/pose_graph.gif)
 
@@ -142,7 +142,7 @@ That is what optimization does.
 
 ## 7. The mathematics is actually quite intuitive
 
-For every edge we have the **measured relative transformation** $\tilde T_{ij}$ between poses $i$ and $j$. Given our current estimates $T_i$ and $T_j$, the relative transformation they imply is $T_i^{-1}T_j$. We compare the two:
+For every edge, we have the **measured relative transformation** $\tilde T_{ij}$ between poses $i$ and $j$. Given our current estimates $T_i$ and $T_j$, the relative transformation they imply is $T_i^{-1}T_j$. We compare the two:
 
 $${E_{ij} = \tilde T_{ij}^{-1}(T_i^{-1}T_j)}$$
 
@@ -184,7 +184,7 @@ In plain English:
 
 > **Find the poses that make all the measured relative transformations agree as much as possible.**
 
-One subtlety this formula hides: since every constraint is *relative*, rigidly translating and rotating the entire graph together leaves every $e_{ij}$ unchanged. The cost therefore has flat directions with zero curvature: [**gauge freedom**](../glossary.md#gauge-freedom). In practice we anchor one pose (usually $T_0$), e.g. by giving it an enormous information weight. The linear system solved at each step then has a unique solution instead of infinitely many equally good ones.
+One subtlety this formula hides: since every constraint is *relative*, rigidly translating and rotating the entire graph together leaves every $e_{ij}$ unchanged. The cost therefore has flat directions with zero curvature: [**gauge freedom**](../glossary.md#gauge-freedom). In practice, we anchor one pose (usually $T_0$), e.g. by giving it an enormous information weight. The linear system solved at each step then has a unique solution instead of infinitely many equally good ones.
 
 ### Intuition
 Picture a square of poses drawn on the floor.
@@ -239,7 +239,7 @@ Home → A → B → C → D
 Accumulated error makes `D` appear 20 m away from Home, though the person is actually back at Home.
 
 - **Relative cue (loop closure):** we recognize Home again at `D`. That ties two nodes together: "D is about 0 m from Home".
-- **Absolute cue (GPS):** GPS would say "D is very close to this map position". That is an absolute (unary) constraint, i.e. a [prior factor](../glossary.md#prior-unary-factor) on one node, not a relative edge. Loop closure is its relative version.
+- **Absolute cue (GPS):** GPS would say "D is very close to this map position". That is an absolute (unary) constraint, i.e., a [prior factor](../glossary.md#prior-unary-factor) on one node, not a relative edge. Loop closure is its relative version.
 
 Either cue can be handled by distributing the correction instead of moving only `D`:
 
@@ -263,7 +263,7 @@ The trajectory becomes globally consistent. That is what PGO does.
 
 ## 10. Why loop closure is so powerful
 
-- **Without loop closure** the graph is a chain, so there is no opportunity to correct accumulated drift: the optimum is just [dead reckoning](../glossary.md#dead-reckoning) (checked in [marginalization.md §9](marginalization.md#9-empirical-verification-bounded-vs-unbounded)):
+- **Without loop closure**, the graph is a chain, so there is no opportunity to correct accumulated drift: the optimum is just [dead reckoning](../glossary.md#dead-reckoning) (checked in [marginalization.md §9](marginalization.md#9-empirical-verification-bounded-vs-unbounded)):
 
   ```text
   x₀ ─ x₁ ─ x₂ ─ x₃ ─ x₄ ─ x₅ ─ x₆
@@ -302,7 +302,7 @@ Suppose we have $x_0 - x_1 - x_2$ and noisy measurements. Optimization isn't dis
 
 > **the trajectory that best satisfies the available constraints according to the chosen error model and weights.**
 
-For example, if one measurement is highly reliable (weight $w_1 = 100$) and another is noisy ($w_2 = 1$), the optimizer cares much more about satisfying the first constraint. So the more complete objective is:
+For example, if one measurement is highly reliable (weight $w_1 = 100$) and another is noisy ($w_2 = 1$), the optimizer cares much more about satisfying the first constraint. So the complete objective is:
 
 $${\min_X \sum_{(i,j) \in \mathcal{E}} e_{ij}^\top \Omega_{ij} e_{ij}}$$
 
@@ -406,7 +406,7 @@ The global optimization minimizes the sum of squared Mahalanobis distances over 
 {F(X) = \sum_{(i,j) \in \mathcal{E}} r_{ij}(X)^\top \Omega_{ij} \, r_{ij}(X)}
 ```
 
-> **Note:** [Mahalanobis distance](../glossary.md#mahalanobis-distance) measures how far a point is from the center of a distribution, in units of its spread. Here the "point" is the residual ${r_{ij}(X)}$, the "distribution" is the measurement noise model (mean $\mathbf{0}$, covariance ${\Sigma_{ij} = \Omega_{ij}^{-1}}$), and ${\Omega_{ij}}$ is exactly the inverse-covariance weighting that turns a plain squared-error sum into a squared Mahalanobis-distance sum. See the tilestats.com video and amit's Medium explainer cited in [§17](#17-references), and [the isotropic special case](../glossary.md#isotropic-and-anisotropic), where this weighting collapses to a uniform scale factor.
+> **Note:** [Mahalanobis distance](../glossary.md#mahalanobis-distance) measures how far a point is from the center of a distribution, in units of its spread. Here the "point" is the residual ${r_{ij}(X)}$, the "distribution" is the measurement noise model (mean $\mathbf{0}$, covariance ${\Sigma_{ij} = \Omega_{ij}^{-1}}$), and ${\Omega_{ij}}$ is exactly the inverse-covariance weighting that turns a plain squared-error sum into a squared Mahalanobis-distance sum. See the tilestats.com video and Amit's Medium explainer cited in [§17](#17-references), and [the isotropic special case](../glossary.md#isotropic-and-anisotropic), where this weighting collapses to a uniform scale factor.
 
 ### 15.4 Manifold Optimization and Linearization
 
@@ -438,7 +438,7 @@ r_{ij}(T_i \oplus \boldsymbol{\xi}_i,\, T_j \oplus \boldsymbol{\xi}_j) \approx r
 Here the Jacobians are $`J_i = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_i}`$ and $`J_j = \frac{\partial r_{ij}}{\partial \boldsymbol{\xi}_j}`$. They are exact (no small-residual approximation), with $`J_j = J_r^{-1}(r_{ij})`$ (the inverse **right Jacobian**, [glossary](../glossary.md#right-and-left-jacobians)) and $`J_i`$ carrying an extra adjoint factor:
 
 - `use_numpy/` evaluates $J_r^{-1}$ from an 18-term series (see [§15.7](#157-the-solver-concretely)); its truncation error is $\lesssim 10^{-12}$ at about 1.6 rad.
-- `use_manif/` uses manif's closed-form Jacobians. For small residuals the two are expected to agree closely (not checked here).
+- `use_manif/` uses manif's closed-form Jacobians. For small residuals, the two are expected to agree closely (not checked here).
 
 ```math
 {J_i = - J_r^{-1}(r_{ij}) \, \mathrm{Ad}\left( T_j^{-1} T_i \right)}
@@ -463,7 +463,7 @@ and ${J_r^{-1}(\cdot)}$ is the inverse right Jacobian of ${\mathrm{SE}(3)}$.
 
 - Series: $`J_r^{-1}(e) = I + \tfrac{1}{2}\mathrm{ad}_e + \dots`$ (where $`\mathrm{ad}_e`$ is the little adjoint, the Lie-algebra bracket with $`e`$, 6x6 for $`\mathrm{se}(3)`$), so $`J_r^{-1}(0) = I`$.
 - Tiny example: an edge error with a $0.1$ rad rotation changes $J_r^{-1}$ by about $0.05$ (half the angle), so $I$ is a fair stand-in.
-- It matters only for large edge errors, e.g. a bad loop closure. Near convergence the errors are small and $J_r^{-1} \approx I$.
+- It matters only for large edge errors, e.g., a bad loop closure. Near convergence, the errors are small and $J_r^{-1} \approx I$.
 
 ### 15.5 Solving the Linear System (Gauss-Newton Step)
 
@@ -492,16 +492,16 @@ Each pass is just row-by-row substitution - no matrix inversion needed.
 **Why "sparse" matters:**
 
 - Most pose pairs never share a constraint, so most of $H$'s off-diagonal blocks are exactly zero. Sparse Cholesky exploits that known zero pattern instead of doing dense arithmetic on zeros.
-- Eliminating a variable can turn some zeros into nonzeros, called [**fill-in**](../glossary.md#fill-in). Example: eliminating $x_2$ out of a chain $x_1 - x_2 - x_3$ creates a new dependency between $x_1$ and $x_3$ even though they were never directly measured.
+- Eliminating a variable can turn some zeros into nonzeros, called [**fill-in**](../glossary.md#fill-in). Example: eliminating $x_2$ from a chain $x_1 - x_2 - x_3$ creates a new dependency between $x_1$ and $x_3$ even though they were never directly measured.
 - The elimination order controls how much fill-in accumulates. See [`elimination_tree.md`](elimination_tree.md) for a worked elimination example, and [`isam2_optimization.md` §12](isam2_optimization.md#12-variable-ordering-is-also-crucial) for why iSAM2 cares about this.
 
-In practice a pure Gauss-Newton step can overshoot or diverge far from the solution, so a **Levenberg-Marquardt** ([levenberg_marquardt.md](levenberg_marquardt.md)) damping term $\lambda$ is added to the Hessian's diagonal before solving. Both `pose_graph.py` implementations (`use_numpy/` and `use_manif/`) use the Marquardt-scaled form, which scales $\lambda$ by $H$'s own diagonal instead of adding $\lambda I$:
+In practice, a pure Gauss-Newton step can overshoot or diverge far from the solution, so a **Levenberg-Marquardt** ([levenberg_marquardt.md](levenberg_marquardt.md)) damping term $\lambda$ is added to the Hessian's diagonal before solving. Both `pose_graph.py` implementations (`use_numpy/` and `use_manif/`) use the Marquardt-scaled form, which scales $\lambda$ by $H$'s own diagonal instead of adding $\lambda I$:
 
 ```math
 {\big(H + \lambda \, \mathrm{diag}(H)\big) \, \boldsymbol{\delta}^* = -b}
 ```
 
-Larger $\lambda$ shrinks the step toward (diagonally scaled) gradient descent: safer, but slower. ${\lambda \to 0}$ recovers pure Gauss-Newton, which is faster near convergence. In both scripts $\lambda$ is **adaptive**, not fixed, and the two implementations are identical here:
+Larger $\lambda$ shrinks the step toward (diagonally scaled) gradient descent: safer, but slower. ${\lambda \to 0}$ recovers pure Gauss-Newton, which is faster near convergence. In both scripts, $\lambda$ is **adaptive**, not fixed, and the two implementations are identical here:
 
 1. Entries of $\mathrm{diag}(H)$ below $10^{-12}$ are clamped to $10^{-12}$.
 2. A trial step is accepted only if it lowers the total cost $F$. On acceptance, $\lambda \leftarrow \max(0.5\lambda,\ 10^{-7})$.
@@ -527,7 +527,7 @@ The whole solver is `run_pose_graph_optimization` in [`use_numpy/pose_graph.py`]
 
 ![Two panels from pose_graph.py: the four-pose square loop with ground truth, drifting odometry, the optimized estimate and the loop-closure edge, and each pose's position error before and after optimization](../../assets/pose_graph.png)
 
-*Figure: `use_numpy/pose_graph.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py pose_graph`. Error at the loop-closure node 0.1035 m to 0.0494 m; RMS position error 6.6 cm to 5.2 cm. The optimizer spreads the loop error over the chain, so X1 and X2 get slightly worse while X3 improves.*
+*Figure: `use_numpy/pose_graph.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py pose_graph`. Error at the loop-closure node: 0.1035 m to 0.0494 m; RMS position error: 6.6 cm to 5.2 cm. The optimizer spreads the loop error over the chain, so X1 and X2 get slightly worse while X3 improves.*
 
 **Measurements** (`simulate_noisy_edges`): each edge is the true relative pose with right-multiplied noise. The loop-closure edge scales both std-devs by `--loop-noise-scale` (default 0.5):
 
@@ -589,7 +589,7 @@ So $g = -b$ in §15.5's notation, and the code solves $`(H + \lambda \, \mathrm{
 Every node, node 0 included, is updated as $`X_k \leftarrow X_k \, \mathrm{Exp}(\boldsymbol{\delta}_k)`$ (`se3_exp`). `use_manif/` writes the same update as `T + manif.SE3Tangent(delta_k)`.
 
 #### Defaults
-`--damping 0.01` (initial $\lambda$), `--gn-tol 1e-6`, `--gn-max-iters 10`, `--side-length 2.0`, one node per square corner (4 nodes, 3 odometry edges and 1 loop closure). With `--seed 0` the default run converges in 5 iterations.
+`--damping 0.01` (initial $\lambda$), `--gn-tol 1e-6`, `--gn-max-iters 10`, `--side-length 2.0`, one node per square corner (4 nodes, 3 odometry edges and 1 loop closure). With `--seed 0`, the default run converges in 5 iterations.
 
 ---
 
@@ -659,9 +659,9 @@ s_{ij} = \min\left(1, \; \frac{2 \Phi}{\Phi + e_{ij}^2}\right)
 
 ![Left panel: weight on the information matrix against residual magnitude on a log axis for plain least squares, Huber, Cauchy, Geman-McClure and DCS, with the square root of the DCS threshold marked. Right panel: DCS scale and its square against squared error, with the threshold marked where the scale starts to drop](../../assets/robust_kernel_weights.png)
 
-*Figure: weight applied to an edge's information matrix for the kernels of §16 (left, log axis) and the DCS scale with its square (right), plotted by `uv run python generator/make_figures.py robust_kernel_weights`. Formulas from §16; only `pose_graph_robust.py` implements robust kernels, no other repo solver does.*
+*Figure: weight applied to an edge's information matrix for the kernels of §16 (left, log axis) and the DCS scale with its square (right), plotted by `uv run python generator/make_figures.py robust_kernel_weights`. Formulas from §16; only `pose_graph_robust.py` implements robust kernels; no other repo solver does.*
 
-At $\Phi = 12.59$, $s_{ij}$ is $1$ up to $e_{ij}^2 = \Phi$, then $0.7726$ at $e_{ij}^2 = 20$, $0.2236$ at $100$ and $0.002515$ at $10^4$. At residual magnitude $e = 10$ the plotted weights are Huber $0.1$, Cauchy $0.0099$, Geman-McClure $9.8 \times 10^{-5}$ and DCS $s^2 = 0.05$: DCS keeps full weight up to $e = \sqrt{\Phi} \approx 3.55$ and decays gently at first, so its "Very High" rating in §16.4 refers to the far tail.
+At $\Phi = 12.59$, $s_{ij}$ is $1$ up to $e_{ij}^2 = \Phi$, then $0.7726$ at $e_{ij}^2 = 20$, $0.2236$ at $100$ and $0.002515$ at $10^4$. At residual magnitude $e = 10$, the plotted weights are Huber $0.1$, Cauchy $0.0099$, Geman-McClure $9.8 \times 10^{-5}$, and DCS $s^2 = 0.05$: DCS keeps full weight up to $e = \sqrt{\Phi} \approx 3.55$ and decays gently at first, so its "Very High" rating in §16.4 refers to the far tail.
 
 #### How DCS Handles Outliers:
 
@@ -684,7 +684,7 @@ At $\Phi = 12.59$, $s_{ij}$ is $1$ up to $e_{ij}^2 = \Phi$, then $0.7726$ at $e_
 What is DCS's cost? Be careful, because the obvious reading is wrong:
 
 - DCS comes from Switchable Constraints' augmented cost $\Psi(s, e) = s^2e^2 + \Phi(s-1)^2$. The second term is a prior that keeps the switch $s$ near $1$ unless the data justifies turning the edge off.
-- Substituting DCS's closed-form $s=\frac{2\Phi}{\Phi+e^2}$ into $\Psi$ gives exactly $\Phi$, since $\frac{\Phi\left[4\Phi e^2 + (\Phi-e^2)^2\right]}{(\Phi+e^2)^2} = \Phi$. But this $s$ is **not** the minimizer of $\Psi$ over $s$, so $\Phi$ is not the effective robust cost. (A cost constant in $e$ would also have zero gradient, i.e. IRLS weight $0$, contradicting the $s^2 \propto \frac{1}{e^4}$ weight in the table.)
+- Substituting DCS's closed-form $s=\frac{2\Phi}{\Phi+e^2}$ into $\Psi$ gives exactly $\Phi$, since $\frac{\Phi\left[4\Phi e^2 + (\Phi-e^2)^2\right]}{(\Phi+e^2)^2} = \Phi$. But this $s$ is **not** the minimizer of $\Psi$ over $s$, so $\Phi$ is not the effective robust cost. (A cost constant in $e$ would also have zero gradient, i.e., IRLS weight $0$, contradicting the $s^2 \propto \frac{1}{e^4}$ weight in the table.)
 - The true minimizer is $s^* = \frac{\Phi}{\Phi+e^2}$, giving $\Psi^* = \frac{\Phi e^2}{\Phi+e^2}$. This is Geman-McClure-shaped: it grows like $e^2$ for small $e$ and approaches $\Phi$ only asymptotically. For $\Phi = 12.59$: $\Psi^* = 7.73,\ 11.18,\ 12.57$ at $e^2 = 20,\ 100,\ 10^4$.
 - In practice, DCS uses its closed-form $s$ as an IRLS-style weight $s^2 \propto \frac{1}{e^4}$. MacTavish & Barfoot (2015, §II-A and Table I) show that substituting the optimal switch into the Switchable Constraints cost gives exactly the Geman-McClure cost (times 2), and that DCS, whose weight is capped at 1, behaves like plain least squares for small errors and like Geman-McClure for large ones. Both therefore saturate rather than diverge, and both carry the "Graduated Non-Convexity" caveat below.
 
@@ -701,7 +701,7 @@ This section is theory only as far as `pose_graph.py` goes: neither `use_numpy/p
 
 1. Grisetti, G., Kümmerle, R., Stachniss, C., & Burgard, W. (2010). *A Tutorial on Graph-Based SLAM*. IEEE Intelligent Transportation Systems Magazine, 2(4), 31-43. https://doi.org/10.1109/MITS.2010.939925 - already cited in [frontend_backend.md §6](../frontend_backend.md#6-references); the general graph/error-formulation/optimization reference behind §1-§14 here.
 2. tilestats.com (2021, February 3). *Euclidean Distance and the Mahalanobis Distance (and the Error Ellipse)* [Video]. YouTube. https://www.youtube.com/watch?v=xXhLvheEF7o - the Mahalanobis-distance intuition in §15.3.
-3. amit (2024, October 30). *Understanding Mahalanobis Distance*. Medium. https://medium.com/@pamit2235/understanding-mahalanobis-distance-081bd765fcdb - the Mahalanobis-distance intuition in §15.3.
+3. Amit (2024, October 30). *Understanding Mahalanobis Distance*. Medium. https://medium.com/@pamit2235/understanding-mahalanobis-distance-081bd765fcdb - the Mahalanobis-distance intuition in §15.3.
 4. Huber, P. J. (1964). *Robust Estimation of a Location Parameter*. Annals of Mathematical Statistics, 35(1), 73-101. https://doi.org/10.1214/aoms/1177703732 - the Huber loss in §16.2.
 5. Geman, S., & McClure, D. E. (1985). *Bayesian Image Analysis: An Application to Single Photon Emission Tomography*. Proceedings of the American Statistical Association, Statistical Computing Section, 12-18. - the Geman-McClure loss named in §16.4's comparison table.
 6. Agarwal, P., Tipaldi, G. D., Spinello, L., Stachniss, C., & Burgard, W. (2013). *Robust Map Optimization Using Dynamic Covariance Scaling*. ICRA 2013, 62-69. https://doi.org/10.1109/ICRA.2013.6630557 - Dynamic Covariance Scaling in §16.3, already named inline there as "Agarwal et al., 2013".
