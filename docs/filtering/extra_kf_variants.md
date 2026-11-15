@@ -32,7 +32,7 @@ Standard KF  ┌───┴───────┐
 
 The chain is the lineage this doc follows: the IEKF is an error-state filter (§2). [slam_mental_map.md](../slam_mental_map.md) instead draws ESKF and IEKF as two sibling variants of the EKF.
 
-The remaining variants deal with **noise, time, robustness, and computational constraints**. This is one corner of the repo-wide map in [slam_mental_map.md](../slam_mental_map.md), which places every doc and script on one picture.
+The remaining variants deal with **noise, time, robustness, and computational constraints**. This is one corner of the repo-wide map in [slam_mental_map.md](../slam_mental_map.md), which places every doc and script in one picture.
 
 ---
 
@@ -86,7 +86,7 @@ Instead of approximating the nonlinear function with a tangent line like the EKF
 
 The cost: it evaluates the model $2n+1$ times per step instead of once, which adds up for high-dimensional states.
 
-See `run_ukf` in [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/pointcloud_pose_tracking.py)/[`use_manif/pointcloud_pose_tracking.py`](../../use_manif/pointcloud_pose_tracking.py) for a runnable manifold-UKF implementation of this idea. It forms each sigma point as $`T\,\mathrm{Exp}(\text{offset})`$ and measures the spread of the transformed points with $`\mathrm{Log}`$ relative to the central point. $`\mathrm{Exp}`$ turns a small tangent vector (a small motion) into a pose and $`\mathrm{Log}`$ is its inverse ([glossary](../glossary.md#exp-and-log-maps)).
+See `run_ukf` in [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/pointcloud_pose_tracking.py)/[`use_manif/pointcloud_pose_tracking.py`](../../use_manif/pointcloud_pose_tracking.py) for a runnable manifold-UKF implementation of this idea. It forms each sigma point as $`T\,\mathrm{Exp}(\text{offset})`$ and measures the spread of the transformed points with $`\mathrm{Log}`$ relative to the central point. $`\mathrm{Exp}`$ turns a small tangent vector (a small motion) into a pose, and $`\mathrm{Log}`$ is its inverse ([glossary](../glossary.md#exp-and-log-maps)).
 
 ### Unscented vs. Extended
 
@@ -98,15 +98,15 @@ See `run_ukf` in [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/point
 | Easy for complicated models | sometimes difficult | often easier |
 | Common in robotics | very common | less dominant than EKF/ESKF |
 
-For robotics we usually learn KF, EKF, ESKF and IEKF before spending much time on the UKF (see §11).
+For robotics, we usually learn KF, EKF, ESKF, and IEKF before spending much time on the UKF (see §11).
 
 ---
 
 ## 2. Error-State Kalman Filter (ESKF)
 
-Widely used in SLAM and VIO (visual-inertial [odometry](../glossary.md#odometry)). This section is the summary; [eskf.md](eskf.md) works through the filter step by step, with a simulation.
+Widely used in SLAM and VIO (visual-inertial [odometry](../glossary.md#odometry)). This section is a summary; [eskf.md](eskf.md) works through the filter step by step, with a simulation.
 
-An ESKF doesn't estimate the entire state directly. It separates a **nominal state** from a **small error state**. For example, the true rotation is the nominal one times a small correction ($`\delta\theta`$ is a small rotation vector, and $`^\wedge`$ turns a 3-vector into its skew-symmetric matrix, see [glossary](../glossary.md#hat-operator)):
+An ESKF doesn't estimate the entire state directly. It separates a **nominal state** from a **small error state**. For example, the true rotation is the nominal one times a small correction ($`\delta\theta`$ is a small rotation vector, and $`^\wedge`$ turns a 3-vector into its skew-symmetric matrix; see [glossary](../glossary.md#hat-operator)):
 
 $$R = \hat R \exp(\delta\theta^\wedge)$$
 
@@ -115,7 +115,7 @@ $$R = \hat R \exp(\delta\theta^\wedge)$$
 
 Each cycle has three steps:
 
-1. **Predict:** integrate the nominal state with the full nonlinear model (for example raw [IMU](../glossary.md#imu-inertial-measurement-unit) (inertial measurement unit) samples), and propagate the error covariance $P$ with the linearized error dynamics.
+1. **Predict:** integrate the nominal state with the full nonlinear model (for example, raw [IMU](../glossary.md#imu-inertial-measurement-unit) (inertial measurement unit) samples), and propagate the error covariance $P$ with the linearized error dynamics.
 2. **Update:** a measurement produces an estimate of $\delta x$ through a normal EKF update.
 3. **Inject and reset:** fold $\delta x$ into the nominal state (for rotation, $`\hat R \leftarrow \hat R\,\mathrm{Exp}(\delta\theta)`$, where $`\mathrm{Exp}`$ turns the rotation vector $`\delta\theta`$ (axis × angle, in rad) into the rotation matrix $`\exp(\delta\theta^\wedge)`$), then set $\delta x = 0$.
 
@@ -135,9 +135,9 @@ The **MSCKF** (Multi-State Constraint Kalman Filter; Mourikis & Roumeliotis 2007
 
 ### ESKF vs IEKF
 
-They aren't competing alternatives: the IEKF *is* an error-state filter. In fact the ESKF rotation error above, $`\delta\theta = \mathrm{Log}(\hat R^{-1}R)`$, already *is* the left-invariant error (for the rotation only; position, velocity and biases stay additive, and that is where the estimate-dependence enters). With $`X`$ and $`\hat X`$ the true and estimated states as group elements, the left-invariant error is $`\eta = \hat X^{-1}X`$ and the right-invariant one is $`X\hat X^{-1}`$ (each expresses the truth relative to the estimate; "invariant" means it is unchanged when the same group element is applied to both $`X`$ and $`\hat X`$, see [left_right_invariant.md §1](left_right_invariant.md#1-the-setup)). What the IEKF adds is:
+They aren't competing alternatives: the IEKF *is* an error-state filter. In fact, the ESKF rotation error above, $`\delta\theta = \mathrm{Log}(\hat R^{-1}R)`$, already *is* the left-invariant error (for the rotation only; position, velocity and biases stay additive, and that is where the estimate-dependence enters). With $`X`$ and $`\hat X`$ the true and estimated states as group elements, the left-invariant error is $`\eta = \hat X^{-1}X`$ and the right-invariant one is $`X\hat X^{-1}`$ (each expresses the truth relative to the estimate; "invariant" means it is unchanged when the same group element is applied to both $`X`$ and $`\hat X`$, see [left_right_invariant.md §1](left_right_invariant.md#1-the-setup)). What the IEKF adds is:
 
-- **Estimate-independent error dynamics.** For **group-affine** dynamics ([glossary](../glossary.md#group-affine-dynamics-trajectory-independence), [lie_algebra.md §11.1](../foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity)), the linearized error dynamics don't depend on the current estimate. With invariant-form measurements, the measurement Jacobian $`H`$ doesn't either. This can fail, for example with IMU biases in the state.
+- **Estimate-independent error dynamics.** For **group-affine** dynamics ([glossary](../glossary.md#group-affine-dynamics-trajectory-independence), [lie_algebra.md §11.1](../foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity)), the linearized error dynamics don't depend on the current estimate. With invariant-form measurements, the measurement Jacobian $`H`$ doesn't either. This can fail, for example, with IMU biases in the state.
 - **Left vs right choice.** We pick the invariant error that matches the measurement.
 
 ---
@@ -146,7 +146,7 @@ They aren't competing alternatives: the IEKF *is* an error-state filter. In fact
 
 [kf_ekf_iekf.md](kf_ekf_iekf.md) covers this one in depth; here we place it in the broader family.
 
-**Naming:** in this repo "IEKF" always means the *Invariant* EKF. The literature also uses IEKF for the *Iterated* EKF, which relinearizes the update at the new estimate and repeats. That is an unrelated idea, covered in [kf_ekf_iekf.md §9](kf_ekf_iekf.md#9-other-prominent-variants-worth-keeping-in-mind).
+**Naming:** in this repo, "IEKF" always means the *Invariant* EKF. The literature also uses IEKF for the *Iterated* EKF, which relinearizes the update at the new estimate and repeats. That is an unrelated idea, covered in [kf_ekf_iekf.md §9](kf_ekf_iekf.md#9-other-prominent-variants-worth-keeping-in-mind).
 
 The key idea:
 
@@ -154,7 +154,7 @@ The key idea:
 
 We treat $`R \in SO(3)`$ and $`T \in SE(3)`$ as group elements rather than as ordinary vectors. There are two formulations, using a left-invariant or a right-invariant error (the two $`\eta`$ of §2). For group-affine systems, both give error dynamics that are independent of the current state, which ordinary EKF linearizations don't. See [left_right_invariant.md](left_right_invariant.md) for what distinguishes the two and when to reach for each.
 
-Particularly relevant to IMU navigation, VIO, SLAM, robotics and pose estimation.
+Particularly relevant to IMU navigation, VIO, SLAM, robotics, and pose estimation.
 
 ---
 
@@ -251,7 +251,7 @@ The notable exception is the **Rao-Blackwellized particle filter**. Given the ro
 
 ## 7. Adaptive Kalman Filter
 
-Normally we assume the process noise covariance $Q$ and measurement noise covariance $R$ are known and fixed. In real life they change: an IMU, for example, behaves differently when the robot vibrates heavily.
+Normally, we assume the process noise covariance $Q$ and measurement noise covariance $R$ are known and fixed. In real life, they change: an IMU, for example, behaves differently when the robot vibrates heavily.
 
 An adaptive KF estimates or adjusts $Q$ and/or $R$ online. One family does this from the filter's own innovation sequence, the approach of Mehra (1970, reference 7). It is useful when the environment or sensor quality changes over time.
 
@@ -282,14 +282,14 @@ measurements:
 
 A conventional KF may be pulled toward that outlier. Robust filtering reduces the influence of bad measurements. The two common approaches are:
 
-- **Innovation gating**, widely used. Before an update, compute the normalized innovation squared $`\nu^\top S^{-1}\nu`$ (the NIS from [linear_nonlinear.md §4.4](linear_nonlinear.md#44-after-the-fact-consistency-tests), with $`\nu`$ the innovation, measurement minus prediction). If it exceeds a [chi-square](../glossary.md#chi-square-distribution) threshold (for example the 99% bound for the measurement's dimension), reject the measurement outright.
+- **Innovation gating**, widely used. Before an update, compute the normalized innovation squared $`\nu^\top S^{-1}\nu`$ (the NIS from [linear_nonlinear.md §4.4](linear_nonlinear.md#44-after-the-fact-consistency-tests), with $`\nu`$ the innovation, measurement minus prediction). If it exceeds a [chi-square](../glossary.md#chi-square-distribution) threshold (for example, the 99% bound for the measurement's dimension), reject the measurement outright.
 - **Down-weighting:** keep the measurement but inflate its $R$ in proportion to how surprising it is. This is the filter's version of the Huber-style robust losses in [pose_graph_optimization.md §16](../optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
 
 **Tiny example of gating** (1-D measurement, $S = 1$):
 - A 3σ surprise gives $`\nu^\top S^{-1}\nu = 9`$.
 - The 99% chi-square bound for 1 degree of freedom is 6.63, and $9 > 6.63$, so the measurement is rejected.
 
-Particularly relevant to visual SLAM, feature tracking, GNSS (satellite positioning, e.g. GPS), [LiDAR](../glossary.md#lidar) and multi-sensor fusion.
+Particularly relevant to visual SLAM, feature tracking, GNSS (satellite positioning, e.g., GPS), [LiDAR](../glossary.md#lidar) and multi-sensor fusion.
 
 In robotics, robust losses such as the **Huber loss** are also commonly used inside optimization-based estimators rather than relying exclusively on a robust KF.
 
