@@ -15,7 +15,7 @@ ANCHOR                    EXTEND                     ANCHOR
 
 *Illustrative: the toy itself is a point mass with a trapezoidal velocity.*
 
-- **Anchor:** one end is planted on the ground, so that segment is, ideally, stationary ($v = 0$). In this toy the whole point mass stands still, so it's known ground truth.
+- **Anchor:** one end is planted on the ground, so that segment is, ideally, stationary ($v = 0$). In this toy, the whole point mass stands still, so it's known ground truth.
 - **Extend:** the anchor releases, the body pushes forward at some commanded speed, then the new end plants and grips.
 
 The idea: during anchor, "velocity = 0" is a known, free measurement (a ZUPT, Zero-Velocity Update) that we can feed into the filter. It is valid only while we're still. Fed in during extend, it tells the filter something false with high confidence, which is the failure mode the `always` variant (defined in §1) demonstrates.
@@ -28,7 +28,7 @@ The same idea is well established for foot-mounted pedestrian navigation (Foxlin
 
 None of these holds during release and extend. Three caveats:
 
-- **It applies to the anchored segment, not the whole robot.** In a real inchworm gait the rest of the body moves while one end is planted. This toy's point mass stands in for a sensor on the anchored segment.
+- **It applies to the anchored segment, not the whole robot.** In a real inchworm gait, the rest of the body moves while one end is planted. This toy's point mass stands in for a sensor on the anchored segment.
 - **"Stationary" is approximate.** Micro-slip and vibration mean the zero is never exact, so the ZUPT update below carries a noise $\sigma_{\text{zupt}}$ rather than being treated as exact.
 - **Stillness isn't the only time the accelerometer sees just gravity.** Any unaccelerated motion does too. But only at rest do we know the velocity is zero without a motion model.
 
@@ -65,7 +65,7 @@ We compare three ways of using the ZUPT **pseudo-measurement** (a value the filt
 
 ### 1.1 The filter math, concretely
 
-All three variants run the same Kalman filter over $x = [p, v]^\top$. The script calls it an EKF ([glossary](../glossary.md#ekf-extended-kalman-filter)) to match the rest of this repo, but every model here is exactly linear, so there is no linearization error and it is really a plain KF. Each tick runs up to three steps, in this order: **predict**, **position update**, then (depending on the variant) a **ZUPT update** (`run_ekf`).
+All three variants run the same Kalman filter over $x = [p, v]^\top$. The script calls it an EKF ([glossary](../glossary.md#ekf-extended-kalman-filter)) to match the rest of this repo, but every model here is exactly linear, so there is no linearization error, and it is really a plain KF. Each tick runs up to three steps, in this order: **predict**, **position update**, then (depending on the variant) a **ZUPT update** (`run_ekf`).
 
 #### Predict (`predict`)
 A constant-velocity model, with **state-transition matrix** $`\Phi`$, is identical for all variants and both gait phases. The filter doesn't know the commanded velocity, only that it's roughly constant between ticks:
@@ -181,14 +181,14 @@ The same run, animated over five anchor/extend cycles. The top strip shows the p
 | `always` | ~299 | ~521 | ~0.060 m/s |
 | `phase_conditional` | ~6.1 | ~16.4 | ~0.043-0.045 m/s |
 
-A consistent 2-**DoF** ([degrees of freedom](../glossary.md#degrees-of-freedom-dof)) filter averages $\text{NEES} = 2$; for an average over 500 trials the 95% interval is about $[1.83, 2.18]$. None of the three is consistent: the four non-`always` windows (6.0-16.4) sit at ~3-8× that value.
+A consistent 2-**DoF** ([degrees of freedom](../glossary.md#degrees-of-freedom-dof)) filter averages $\text{NEES} = 2$; for an average over 500 trials, the 95% interval is about $[1.83, 2.18]$. None of the three is consistent: the four non-`always` windows (6.0-16.4) sit at ~3-8× that value.
 
 **Why `never` and `phase_conditional` are overconfident: the ramps.** The truth has no random disturbance at all. Its only departure from the filters' constant-velocity model is the ramp acceleration, $3.3\times$ the assumed $`\sigma_a`$ (§2). The truth changes speed faster than the filter expects. Per tick, at the defaults $`\Delta t = 0.05`$ s:
 
 - During a ramp the speed really changes by $`0.5 \times 0.05 = 0.025`$ m/s.
 - The filter's process noise allows only $`0.15 \times 0.05 = 0.0075`$ m/s (the $`\sigma_a\Delta t`$ in $Q$).
-- A confident ZUPT adds to the gap: after each update the filter claims $`\sigma_v \le 0.01`$ m/s, so the real change is about $2.5\times$ that claim.
-- Confident and under-sized: that is why the NEES is too high. This is a per-tick scale, not the exact NEES.
+- A confident ZUPT adds to the gap: after each update, the filter claims $`\sigma_v \le 0.01`$ m/s, so the real change is about $2.5\times$ that claim.
+- Confident and undersized: that is why the NEES is too high. This is a per-tick scale, not the exact NEES.
 
 Two checks at seed 0 confirm this is the whole story for these two (`always` stays at NEES 103/253 with $`\sigma_a = 0.5\,\text{m/s}^2`$, because its ZUPT is false during cruise):
 
@@ -204,7 +204,7 @@ Two checks at seed 0 confirm this is the whole story for these two (`always` sta
 **`always` is dramatically worse everywhere, not just during motion.** Misapplying ZUPT throughout every cruise phase drives the velocity variance artificially tight around a wrong belief. About 20 ticks of correct ZUPT evidence at the start of the next anchor phase can't undo that before the phase ends, so the corruption bleeds into the next cycle and compounds:
 
 - `always`'s NEES at the first tick of anchor phases 2-5 (seed 0; phase 1 precedes any cruise, so it's still ~2 there) is 230, 564, 732, then 798, and within phase 4 it decays only from 732 to 266.
-- `phase_conditional`'s starts near 20 and settles near 3.6 in each of those phases.
+- `phase_conditional` starts near 20 and settles near 3.6 in each of those phases.
 - `always` gets no accuracy benefit for the trouble. Its velocity RMSE (~0.060 m/s) matches `never`'s, and its position RMSE is far worse (0.060-0.062 m vs. `never`'s 0.011-0.015 m, single runs, seeds 0-3), while it is overconfident throughout.
 
 **A second finding, and what actually causes it.** At the defaults, `phase_conditional` has the best *velocity* accuracy of the three, but not the best position accuracy or calibration:
@@ -265,18 +265,18 @@ Checking each quantity on its own, as error² divided by its variance (1 = hones
 | --- | --- | --- | --- | --- |
 | 1.39 | 1.75 | 2.92 | 0.53 | 0.69 |
 
-The heading carries most of the excess, and position follows it, more across the track than along it: a wrong heading pushes the path sideways. Speed and turn rate are conservative. Changing one thing at a time (overall NEES; baseline 6.29 with these 300 trials, 6.38 with the table's 500). These ablations, including the ramp-length runs below, are one-off seed-0 diagnostics that no script reproduces; their Monte Carlo noise is about ±0.2:
+The heading carries most of the excess, and position follows it, more across the track than along it: a wrong heading pushes the path sideways. Speed and turn rate are conservative. Changing one thing at a time (overall NEES: baseline 6.29 with these 300 trials, 6.38 with the table's 500). These ablations, including the ramp-length runs below, are one-off seed-0 diagnostics that no script reproduces; their Monte Carlo noise is about ±0.2:
 
 - **No motion:** 2.50. **Moving but never turning:** 3.38. So the turning causes it.
 - **Initial error 10 times smaller:** 6.35, so it is not the EKF's linearization at a poor first guess.
 - **Assumed accelerations doubled:** 3.49, so "matched" noise is still too small for the turns.
 
-The likely reason is that the filter models the disturbance as independent kicks, one per tick, while the ramp pushes the same way on every ramp tick. Over the 4 ramp ticks the filter allows a turn-rate change of about $`1.5 \times 0.05 \times \sqrt{4} = 0.15`$ rad/s (one standard deviation), but each ramp changes $`\omega`$ by 0.3 rad/s, a 2σ event twice per cycle (ramp up and ramp down), and the heading integrates the difference. If that is the cause, longer and gentler ramps with the noise scaled to match should be worse, since the gap grows like $`\sqrt{n}`$ over $`n`$ ramp ticks. They are: ramp length 0.2 / 0.3 / 0.4 s gives NEES 6.29 / 9.69 / 11.86. This fits the explanation but does not prove it.
+The likely reason is that the filter models the disturbance as independent kicks, one per tick, while the ramp pushes the same way on every ramp tick. Over the 4 ramp ticks, the filter allows a turn-rate change of about $`1.5 \times 0.05 \times \sqrt{4} = 0.15`$ rad/s (one standard deviation), but each ramp changes $`\omega`$ by 0.3 rad/s, a 2σ event twice per cycle (ramp up and ramp down), and the heading integrates the difference. If that is the cause, longer and gentler ramps with the noise scaled to match should be worse, since the gap grows like $`\sqrt{n}`$ over $`n`$ ramp ticks. They are: ramp length 0.2 / 0.3 / 0.4 s gives NEES 6.29 / 9.69 / 11.86. This fits the explanation but does not prove it.
 
 #### `always` pins the heading where it started
 `always` applies ZUPT and ZARU on every tick, so the filter believes the body never moves or turns. Its $`\sigma_\theta`$ stays at the initial 0.10 rad (0.099-0.101) for the whole run, while the true heading turns through 1.2 rad. Its NEES grows cycle after cycle, and its average is about 1000 or more in both windows at both noise levels (seed 0: 1003.5-2023.9; the anchor window at the defaults is 992.9 and 994.8 in seeds 2 and 3).
 
-#### At the defaults, ZARU does not rescue an under-sized model
+#### At the defaults, ZARU does not rescue an undersized model
 The defaults repeat §3's finding. `never` has the lowest NEES in all 4 seeds (15.79-16.14 overall, against 33.68-33.98 for `phase_conditional`). Adding ZARU does not help there: `phase_conditional` is slightly worse than `phase_conditional_zupt_only` in 3 of 4 seeds (by at most 3.2). Both gated filters, made confident by their pseudo-measurements, are hit harder than `never` by ramps their process model doesn't allow for, the lesson of §3.
 
 #### What no policy does: estimate the turn rate
@@ -296,7 +296,7 @@ The same matched run, animated. The left panel shows the top view, with the true
 
 ### Model
 - **Slip:** each anchor phase contains, with probability 0.5, one backward slip pulse: a trapezoid with peak speed 0.08 m/s and duration 0.6 s, including 0.2 s ramps (a step would be an unmodeled acceleration, §2). The pulses are drawn once per seed and held fixed over the Monte Carlo trials, so a "slip tick" is the same tick in every trial. Seed 0 has pulses in 2 of the 10 anchor phases (24 slip ticks); seeds 1-3 have 6 each (72 ticks).
-- **Pad sensor:** each tick it reads $`d_k = \Delta t\, v_k + \epsilon_k`$, the current velocity times the tick length (the displacement over the tick if the velocity were constant), with $`\epsilon_k`$ independent noise of std $`\sigma_d = 0.5`$ mm. Divided by $`\Delta t`$ it is a velocity measurement with std $`0.5\,\text{mm} / 0.05\,\text{s} = 0.01`$ m/s, the same as the ZUPT noise. This is a simplification: a sensor mounted in a pad sees the pad's displacement, and only while that pad is on the ground. Here the sensor reads the body's displacement in every phase, as a ground-facing sensor on the body would.
+- **Pad sensor:** each tick it reads $`d_k = \Delta t\, v_k + \epsilon_k`$, the current velocity times the tick length (the displacement over the tick if the velocity were constant), with $`\epsilon_k`$ independent noise of std $`\sigma_d = 0.5`$ mm. Divided by $`\Delta t`$ it is a velocity measurement with std $`0.5\,\text{mm} / 0.05\,\text{s} = 0.01`$ m/s, the same as the ZUPT noise. This is a simplification: a sensor mounted in a pad sees the pad's displacement, and only while that pad is on the ground. Here, the sensor reads the body's displacement in every phase, as a ground-facing sensor on the body would.
 - **Gate:** the sensor is **quiet** on a tick when $`|d_k| \le d_{\text{thr}} = 3\sigma_d = 1.5`$ mm, a speed of $`d_{\text{thr}} / \Delta t = 0.03`$ m/s.
 - **Policies:** all five share §1.1's predict step and the position update, and differ only in the extra velocity information.
 
@@ -309,7 +309,7 @@ The same matched run, animated. The left panel shows the top view, with the true
 | `sensor_fused` | No ZUPT. The reading $`d_k / \Delta t`$ is applied on every tick as a velocity measurement. |
 
 - **Process noise:** the matched 0.5 m/s², as in §5, because at the 1D script's 0.15 m/s² every policy's NEES is dominated by the ramps (§3).
-- **Windows:** **clean anchor** is the anchor ticks of phases with no slip pulse, **slip** is the ticks inside a pulse, and **cruise** is as in §3. Ramp ticks, and the anchor ticks of slip phases outside the pulse, count only in the overall average.
+- **Windows:** **clean anchor** is the anchor ticks of phases with no slip pulse, **slip** is the ticks inside a pulse, and **cruise** is as in §3. Ramp ticks and the anchor ticks of slip phases outside the pulse count only in the overall average.
 
 ### Results
 Seed 0, 500 trials, NEES by window. A consistent 2-DoF filter averages NEES 2, with a 95% interval of $`[1.83, 2.18]`$.
@@ -327,7 +327,7 @@ Seed 0, 500 trials, NEES by window. A consistent 2-DoF filter averages NEES 2, w
 *Figure: `use_numpy/inchworm_slip_gate_ekf.py` at its defaults, seed 0, plotted by `uv run python generator/make_figures.py inchworm_slip_gate_ekf`. Shaded = slip pulses. The threshold-sweep panel uses 200 runs per point and its own Monte Carlo seed (the threshold table below uses 500 runs and seed 0).*
 
 #### The schedule is blind to slip
-During a pulse `schedule` keeps telling the filter the body is still, with std 0.01 m/s, while it slides back at up to 0.08 m/s. The slip pattern is one draw per seed, so the table below repeats the run for seeds 0-3 (NEES in the window named in each header, 500 trials each, matched process noise 0.5 m/s² as above; "slip ticks" is the number of ticks inside a pulse in that seed):
+During a pulse, `schedule` keeps telling the filter the body is still, with std 0.01 m/s, while it slides back at up to 0.08 m/s. The slip pattern is one draw per seed, so the table below repeats the run for seeds 0-3 (NEES in the window named in each header, 500 trials each, matched process noise 0.5 m/s² as above; "slip ticks" is the number of ticks inside a pulse in that seed):
 
 | Seed | Slip ticks | `schedule` slip | `schedule` overall | `schedule_and_sensor` slip | `schedule_and_sensor` overall | `never` slip | `schedule` cruise | `schedule_and_sensor` cruise | `sensor_gate` cruise |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -336,7 +336,7 @@ During a pulse `schedule` keeps telling the filter the body is still, with std 0
 | 2 | 72 | 47.58 | 11.16 | 3.56 | 1.98 | 2.13 | 2.35 | 1.80 | 2.51 |
 | 3 | 72 | 47.65 | 11.22 | 3.55 | 1.97 | 2.01 | 2.29 | 1.78 | 2.51 |
 
-`schedule`'s slip-window NEES is 47.3-48.3 in every seed, against 2.0-2.6 for `never`. The excess lingers: its cruise NEES is 1.85-2.46, against 1.70-1.83 for `schedule_and_sensor`. Its overall NEES rises from 4.60 (seed 0, 24 slip ticks) to 11.16-11.37 (seeds 1-3, 72 slip ticks), so how bad it looks depends on how often the anchor slips. On clean anchors (seeds 0-3) it matches `schedule_and_sensor` (0.93-0.97 vs 0.92-0.95) and beats `sensor_gate` (1.04-1.10). Slip also costs it its position advantage over `never` in seeds 1 and 3 (single-run RMSE 0.0102 vs 0.0096 m and 0.0125 vs 0.0120 m), though not in seeds 0 and 2.
+`schedule`'s slip-window NEES is 47.3-48.3 in every seed, against 2.0-2.6 for `never`. The excess lingers: its cruise NEES is 1.85-2.46, against 1.70-1.83 for `schedule_and_sensor`. Its overall NEES rises from 4.60 (seed 0, 24 slip ticks) to 11.16-11.37 (seeds 1-3, 72 slip ticks), so how bad it looks depends on how often the anchor slips. On clean anchors (seeds 0-3), it matches `schedule_and_sensor` (0.93-0.97 vs 0.92-0.95) and beats `sensor_gate` (1.04-1.10). Slip also costs it its position advantage over `never` in seeds 1 and 3 (single-run RMSE 0.0102 vs 0.0096 m and 0.0125 vs 0.0120 m), though not in seeds 0 and 2.
 
 #### Letting the sensor veto the schedule
 `schedule_and_sensor` applies the ZUPT only when the schedule and the sensor agree. Across seeds 0-3 it cuts the slip-window NEES to 3.55-3.56 and the overall NEES to 1.54-1.98 (table above), with clean-anchor NEES no worse than `schedule`'s. With `--p-slip 0` it matches `schedule` (both: overall 1.32, clean anchor 0.93, cruise 1.66), so at the default threshold the veto costs nothing when nothing slips.
@@ -344,7 +344,7 @@ During a pulse `schedule` keeps telling the filter the body is still, with std 0
 The slip window is still above the interval (3.56 vs 2.18 at seed 0). The gate admits the ZUPT on 6 of the 24 slip ticks, at the ends of each pulse, where the true speed (0.003-0.037 m/s) is near or below the 0.03 m/s threshold. Lowering the threshold reduces it (3.56 at 3σ to 2.36 at 1σ; see [Choosing the threshold](#choosing-the-threshold)), though at this noise level it never gets back inside the interval.
 
 #### A gate without the schedule leaks at both ends of the extend phase
-`sensor_gate` drops the schedule and applies the ZUPT whenever the sensor is quiet. Its cruise-window NEES is 2.51-2.67 across seeds 0-3, above `schedule_and_sensor`'s in every seed (table above). In every seed it admits the ZUPT on 23-29 of the 200 extend ticks, all within 0.1 s of either end of the extend phase. 10 of them are the first extend tick of each cycle, where the true speed is still exactly 0, so the ZUPT is correct. The other 13-19 are leaks: the ramp speed is 0.025 m/s (or, in two seeds, 0.05 m/s), below or near the 0.03 m/s threshold. The schedule says "extending" on those ticks, so `schedule_and_sensor` skips them.
+`sensor_gate` drops the schedule and applies the ZUPT whenever the sensor is quiet. Its cruise-window NEES is 2.51-2.67 across seeds 0-3, above `schedule_and_sensor`'s in every seed (table above). In every seed, it admits the ZUPT on 23-29 of the 200 extend ticks, all within 0.1 s of either end of the extend phase. 10 of them are the first extend tick of each cycle, where the true speed is still exactly 0, so the ZUPT is correct. The other 13-19 are leaks: the ramp speed is 0.025 m/s (or, in two seeds, 0.05 m/s), below or near the 0.03 m/s threshold. The schedule says "extending" on those ticks, so `schedule_and_sensor` skips them.
 
 #### Choosing the threshold
 Seed 0, 500 trials, varying only the threshold (in units of $`\sigma_d`$, and as the speed $`d_{\text{thr}} / \Delta t`$):
@@ -360,7 +360,7 @@ Seed 0, 500 trials, varying only the threshold (in units of $`\sigma_d`$, and as
 | 10σ | 0.10 m/s | 46.70 | 126.52 |
 
 - **High threshold:** a threshold at the cruise speed (10σ) lets the gate pass "$`v = 0`$" during cruise. `sensor_gate` then fails the way §3's `always` does, with a confidently wrong ZUPT during motion (cruise NEES 126.5; §3's numbers are at 0.15 m/s², so the comparison is qualitative). `schedule_and_sensor` becomes `schedule` (slip NEES 46.7 vs 47.3).
-- **Low threshold:** noise vetoes more anchor ticks, since only about 20% of readings on still ticks fall inside the band at 0.25σ. The tested range shows little cost: clean-anchor NEES rises from 0.94 to 1.08, likely because the position fixes still bound the error. A real cost from losing ZUPT ticks may need a lower threshold, a coarser position sensor or a longer anchor phase to show.
+- **Low threshold:** noise vetoes more anchor ticks, since only about 20% of readings on still ticks fall inside the band at 0.25σ. The tested range shows little cost: clean-anchor NEES rises from 0.94 to 1.08, likely because the position fixes still bound the error. A real cost from losing ZUPT ticks may need a lower threshold, a coarser position sensor, or a longer anchor phase to show.
 - **Noise-free sensor:** with $`\sigma_d \approx 0`$ (`--sensor-noise-std 1e-6`, threshold 3σ), the slip-window NEES of `schedule_and_sensor` is 2.13, so the excess above comes from the gate's finite resolution (threshold and noise together), mostly the threshold (3.56 to 2.36 at 1σ in the table).
 
 #### Slip slower than the gate
@@ -372,10 +372,10 @@ A slip whose peak speed is below the threshold is mostly invisible to the gate. 
 | 0.04 m/s | 1.79 | 12.22 | 4.66 | 1.78 |
 | 0.08 m/s (default) | 2.58 | 47.27 | 3.56 | 1.95 |
 
-At 0.02 m/s the gate gives almost nothing over the schedule (3.29 vs 3.60). The harm is also small, and in the slip window `never` beats every ZUPT policy. The gate's benefit appears once the peak slip exceeds the threshold (0.04 m/s: 12.22 → 4.66; 0.08 m/s: 47.27 → 3.56), though at 0.04 m/s it still trails `never` (4.66 vs 1.79).
+At 0.02 m/s, the gate gives almost nothing over the schedule (3.29 vs 3.60). The harm is also small, and in the slip window `never` beats every ZUPT policy. The gate's benefit appears once the peak slip exceeds the threshold (0.04 m/s: 12.22 → 4.66; 0.08 m/s: 47.27 → 3.56), though at 0.04 m/s it still trails `never` (4.66 vs 1.79).
 
 #### Fusing the reading instead of gating it
-`sensor_fused` uses $`d_k / \Delta t`$ as an ordinary velocity measurement and has no gate and no schedule. At seed 0 its NEES is 1.69, 1.95 and 1.77 in the clean-anchor, slip and cruise windows, and its single-run velocity RMSE is 0.009 m/s against 0.039-0.050 for the others. It is also the closest to consistent at the script's under-sized 0.15 m/s² (overall NEES 3.40, against 9.40-17.11 for the other four; slip window 5.33). The comparison is not like for like: the gated policies use the reading only as a yes/no flag, while this one uses its value on every tick, and the toy gives it a velocity sensor in every phase. How much of that a real pad sensor offers is the question the simplification above hides.
+`sensor_fused` uses $`d_k / \Delta t`$ as an ordinary velocity measurement and has no gate and no schedule. At seed 0, its NEES is 1.69, 1.95, and 1.77 in the clean-anchor, slip, and cruise windows, and its single-run velocity RMSE is 0.009 m/s against 0.039-0.050 for the others. It is also the closest to consistent at the script's under-sized 0.15 m/s² (overall NEES 3.40, against 9.40-17.11 for the other four; slip window 5.33). The comparison is not like-for-like: the gated policies use the reading only as a yes/no flag, while this one uses its value on every tick, and the toy gives it a velocity sensor in every phase. How much of what a real pad sensor offers is the question the simplification above hides.
 
 #### What this toy does not show
 - It does not model a pad sensor that reads only while its pad is on the ground. The reading would then mean something only on scheduled anchor ticks, which is how `schedule_and_sensor` uses it. This is an inference about how such a sensor would be used, not a statement about a specific robot. `sensor_gate` and `sensor_fused` need the body-mounted sensor of the model above.
@@ -401,7 +401,7 @@ A soft alternative to the gate, an interacting multiple model filter that keeps 
 
 References 2-4 are further reading, not cited in the text above.
 
-1. Foxlin, E. (2005). *Pedestrian Tracking with Shoe-Mounted Inertial Sensors*. IEEE Computer Graphics and Applications, 25(6), 38-46. https://doi.org/10.1109/MCG.2005.140 - foot-mounted inertial navigation with zero-velocity updates; the basis of this doc's `never`/`always`/`phase_conditional` split, there gated by a stance-phase detector rather than this toy's known anchor/extend schedule.
+1. Foxlin, E. (2005). *Pedestrian Tracking with Shoe-Mounted Inertial Sensors*. IEEE Computer Graphics and Applications, 25(6), 38-46. https://doi.org/10.1109/MCG.2005.140 - foot-mounted inertial navigation with zero-velocity updates; the basis of this doc's `never`/`always`/`phase_conditional` split, then gated by a stance-phase detector rather than this toy's known anchor/extend schedule.
 2. Lubbe, E., Withey, D., & Uren, K. R. (2015). *State Estimation for a Hexapod Robot*. 2015 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 6286-6291. https://doi.org/10.1109/IROS.2015.7354274 - state estimation for a physical hexapod robot, a larger-scale setting than this toy; its method is not reproduced here.
 3. Liu, Y., Gao, H., Ding, L., Liu, G., Deng, Z., & Li, N. (2018). *State Estimation of a Heavy-Duty Hexapod Robot with Passive Compliant Ankles Based on the Leg Kinematics and IMU Data Fusion*. Journal of Mechanical Science and Technology, 32(8), 3885-3897. https://doi.org/10.1007/s12206-018-0741-4 - leg-kinematics and IMU fusion on a heavy-duty hexapod with passive compliant ankles, a much less idealized contact setting than this toy's stationary anchor phase.
 4. Khalili, H. H., Cheah, W., Garcia-Nathan, T. B., Carrasco, J., Watson, S., & Lennox, B. (2020). *Tuning and Sensitivity Analysis of a Hexapod State Estimator*. Robotics and Autonomous Systems, 129, 103509. https://doi.org/10.1016/j.robot.2020.103509 - tuning and sensitivity analysis of a hexapod state estimator; related in spirit to §3's lesson that the process noise has to be sized honestly before the gating comparison means anything.
