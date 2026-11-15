@@ -33,11 +33,11 @@ Planar body, perfect kinematics (the filter knows where each stance foot is; onl
 ## 1. Model
 
 ### Why planar, not 1D
-In 1D every stance foot measures the same scalar velocity, so six legs only average noise: variance $`\sigma^2/n`$, with $n$ the count of stance feet and $\sigma$ the noise standard deviation (std) of one reading. In the plane, a foot at body-frame offset $`r_i`$ (its position relative to the body centre) sees the body's velocity *plus* the turn: when the body turns in place at $`\omega = 0.2`$ rad/s, a foot 0.15 m to the left moves at 0.03 m/s and its mirror foot at −0.03 m/s. Feet in different places therefore separate forward speed from turn rate.
+In 1D, every stance foot measures the same scalar velocity, so six legs only average noise: variance $`\sigma^2/n`$, with $n$ the count of stance feet and $\sigma$ the noise standard deviation (std) of one reading. In the plane, a foot at body-frame offset $`r_i`$ (its position relative to the body centre) sees the body's velocity *plus* the turn: when the body turns in place at $`\omega = 0.2`$ rad/s, a foot 0.15 m to the left moves at 0.03 m/s and its mirror foot at −0.03 m/s. Feet in different places therefore separate forward speed from turn rate.
 
 ### State
 $`x = [p_x, p_y, \theta, u, v, \omega]`$ includes world position $`p = [p_x, p_y]`$, heading $`\theta`$, body-frame velocity $`b = [u, v]`$ (forward, left), and turn rate $`\omega`$:
-- **Heading** $`\theta`$ (also called **yaw**) is the body's orientation in the plane: the angle from the world x-axis to the body's forward axis. It is not the direction of travel (the $`\mathrm{atan2}`$ of the world velocity); the two differ whenever the robot doesn't move straight forward, e.g. when it steps sideways ($`v \neq 0`$), which a hexapod can do.
+- **Heading** $`\theta`$ (also called **yaw**) is the body's orientation in the plane: the angle from the world x-axis to the body's forward axis. It is not the direction of travel (the $`\mathrm{atan2}`$ of the world velocity); the two differ whenever the robot doesn't move straight forward, e.g., when it steps sideways ($`v \neq 0`$), which a hexapod can do.
 - **Turn rate** $`\omega = \dot\theta`$ (yaw rate, rad/s, positive counter-clockwise, i.e. turning left) is how fast the body rotates, not how sharply its path curves: turning in place has $`\omega \neq 0`$ at zero speed.
 - **Velocity** and **turn rate** together are the body's **twist** ([glossary](../glossary.md#twist)). Here it is a planar twist, 3 numbers $`[u, v, \omega]`$ (the glossary's 6-vector without the out-of-plane parts); $u$ is forward speed.
 
@@ -82,7 +82,7 @@ In [`hybrid_saltation_ekf.md` §4](hybrid_saltation_ekf.md#4-deriving-xi---inclu
 
 The symbols follow [`hybrid_saltation_ekf.md` §1](hybrid_saltation_ekf.md#1-what-a-hybrid-dynamical-system-is-here) ([glossary](../glossary.md#hybrid-system-guard-and-reset-map)): the **guard** $`g(x) = 0`$ triggers the jump and $Dg$ is its gradient; $R$ is the **reset map** applied at the jump (not the rotation $`R(\theta)`$ above) and $DR$ its Jacobian; $`f^{-}`$ and $`f^{+}`$ are the dynamics just before and after the jump; $\otimes$ is the outer product.
 
-A touchdown here only changes *which feet are measured*. The legs have no mass and the schedule is set by the clock, so:
+A touchdown here only changes *which feet are measured*. The legs have no mass, and the schedule is set by the clock, so:
 
 - the body state does not jump: $`DR = I`$;
 - the body moves the same way before and after: $`f^{+} = f^{-}`$;
@@ -141,7 +141,7 @@ One tick's readings pin down the body velocity to about $`\sigma/\sqrt{n}`$; tur
 L2 slips outward at 0.1 m/s for $`t \in [4, 8)`$ s whenever it is down. Its reading is then biased by 0.1 m/s, and the filter's model says it is zero.
 
 ### Intuition
-In the joint update, one bad foot out of $n$ pulls the estimate by about $`1/n`$ of its bias: $`0.1/3 = 0.033`$ m/s with a tripod, $`0.1/5 = 0.020`$ m/s with a wave gait. The peaks of the sideways velocity RMSE match (seed 0, 100 trials): 0.0316 (tripod), 0.0254 (ripple), 0.0206 m/s (wave). But the slipping foot is down for 1/2 of the cycle in a tripod and 5/6 in a wave gait, so the wave gait's smaller error lasts longer. Over the window the two largely cancel.
+In the joint update, one bad foot out of $n$ pulls the estimate by about $`1/n`$ of its bias: $`0.1/3 = 0.033`$ m/s with a tripod, $`0.1/5 = 0.020`$ m/s with a wave gait. The peaks of the sideways velocity RMSE match (seed 0, 100 trials): 0.0316 (tripod), 0.0254 (ripple), 0.0206 m/s (wave). But the slipping foot is down for 1/2 of the cycle in a tripod and 5/6 in a wave gait, so the wave gait's smaller error lasts longer. Over the window, the two largely cancel.
 
 ### Per-foot gating (`gating=True`)
 Before the joint update, test each stance foot's **innovation** $`\nu_i = z_i - H_i \hat{x}^-`$ against the predicted state $`\hat{x}^-`$ and covariance $`P^-`$ ([glossary](../glossary.md#innovation-and-kalman-gain), [predict step](../glossary.md#predict-and-update-steps)):
@@ -163,11 +163,11 @@ Results (100 trials, seeds 0-2; **naive** = trusts every stance foot, **gated** 
 | wave | naive | 0.0170-0.0172 | 36.6-37.4 | 0.078-0.083 | 100% | 100% |
 | wave | gated | 0.0032-0.0033 | 3.17-3.19 | 0.022-0.024 | 2.0-2.3% | 99.0% |
 
-- **Naive: wrong and overconfident.** About 5× the no-slip velocity error and twist NEES near 34-37 instead of 3. Position error after 12 s triples (≈0.08 m vs ≈0.025 m). The gait changes little: wave is 9% better on velocity, and its NEES is slightly *worse*, probably because its extra feet make it more confident (not tested).
+- **Naive: wrong and overconfident.** About 5× the no-slip velocity error and twist NEES near 34-37 instead of 3. Position error after 12 s triples (≈0.08 m vs ≈0.025 m). The gait changes little: wave is 9% better in velocity, and its NEES is slightly *worse*, probably because its extra feet make it more confident (not tested).
 - **Gated: back to the no-slip numbers.** RMSE and NEES return to the §2 values for every gait. The gate drops about 98% of the slipping readings and 1.0% of the good ones, the false-alarm rate it was set for.
 - **Why 2% get through.** A 0.1 m/s bias against a per-axis std of 0.02 m/s contributes about $`(0.1/0.02)^2 = 25`$ to the test value; noise adds about 2 on average, and sometimes pulls the total under 9.21.
 - **What this needs.** Gating works because the *other* feet agree with the prediction. With a tripod, two good feet still carry 4 readings for 3 twist unknowns.
-- **Small slips get through.** At `--slip-speed 0.03` (1.5× the reading std; seed 0, 100 trials; ranges over the three gaits) the gate lets 93.3-93.8% of the slipping readings through. Gated and naive then look alike: in-window $`v`$ RMSE 0.0056-0.0063 vs 0.0060-0.0066 m/s, twist NEES 5.6-5.8 vs 6.0-6.3, all about twice the no-slip values. A per-tick test cannot separate a slip of that size from noise.
+- **Small slips get through.** At `--slip-speed 0.03` (1.5× the reading std; seed 0, 100 trials; ranges over the three gaits), the gate lets 93.3-93.8% of the slipping readings through. Gated and naive then look alike: in-window $`v`$ RMSE 0.0056-0.0063 vs 0.0060-0.0066 m/s, twist NEES 5.6-5.8 vs 6.0-6.3, all about twice the no-slip values. A per-tick test cannot separate a slip of that size from noise.
 
 The same experiment, one run (seed 0, tripod gait), animated. The top-down view shows each stance foot at its simulated foothold, red while L2 slides; trusting every foot drags the sideways velocity off whenever L2 is down, and its estimated path drifts away (final position error 0.083 m vs 0.020 m with the gate). Swing feet are drawn faded at their simulated positions (§5 describes the swing model).
 
@@ -220,7 +220,7 @@ Three filters, same draws: **trust** the detected flags; the **per-foot gate** o
 | 0.05 s | 6.8-7.5 / 0.051-0.054 | 3.28-3.46 / 0.024-0.026 | 2.98-3.10 / 0.025-0.027 | 108-123 / 0.20-0.22 | 3.06-3.11 / 0.020-0.023 | 7.6-9.4 / 0.028-0.042 |
 | 0.1 s | 38.6-43.8 / 0.146-0.155 | 3.47-3.65 / 0.027-0.028 | 3.19-4.14 / 0.034-0.037 | 476-545 / 0.45-0.49 | 3.06-3.11 / 0.020-0.023 | 186-222 / 0.21-0.26 |
 
-- **Trusting the flags is fine for the tripod at 1 tick, never for the wave gait.** At 0.05 s the wave gait's twist NEES is 108-123 and its position error about 10× the gated value.
+- **Trusting the flags is fine for the tripod at 1 tick, never for the wave gait.** At 0.05 s, the wave gait's twist NEES is 108-123, and its position error is about 10× the gated value.
 - **The gate handles both gaits at every level.** A wave foot read mid-swing is off by many reading stds, so the gate drops it: 0.1-0.4 such readings get through per run. Tripod swing readings near the ends are slow enough to pass (36-81 per run), and cost little; only at 0.1 s does the tripod reach the 3.50 bound (3.47-3.65).
 - **Trimming works for the tripod, not the wave gait.** It only covers timing errors up to $`2\sigma_{\text{detect}}`$; the remaining events (about 2-3%) still read a moving foot, because only an early touchdown or a late liftoff beyond $`2\sigma_{\text{detect}}`$ does so; harmless for the tripod's slow feet, costly for the wave's fast ones. At 0.1 s, a late liftoff and an early touchdown also add up to more than a 10-tick swing for about 10% of wave swings (9.7-10.5% over seeds 0-2): the swing vanishes from the detected flags, leaving no edge to trim around. Trimming also throws away good readings: at 0.1 s the trimmed tripod filter ends 0.034-0.037 m off, against 0.027-0.028 m with the gate.
 - **No $`\Xi`$ or timing-noise term would fix this:** both are trivial here (§1). The fix belongs on the measurement side.
@@ -229,7 +229,7 @@ Three filters, same draws: **trust** the detected flags; the **per-foot gate** o
 
 *Figure: `use_numpy/hexapod_gait_ekf.py` at its defaults (seed 0, 100 trials), plotted by `uv run python generator/make_figures.py hexapod_gait_ekf_extensions` (about 3 minutes). Panel (a) is §4's drift experiment.*
 
-Follow-up: [gait_phase_ekf.md](gait_phase_ekf.md) drops the known touchdown times (only liftoff is known) and compares stance flags from the commanded schedule, a contact detector, a learned offset in the style of a central pattern generator (CPG) and a phase EKF.
+Follow-up: [gait_phase_ekf.md](gait_phase_ekf.md) drops the known touchdown times (only liftoff is known) and compares stance flags from the commanded schedule, a contact detector, a learned offset in the style of a central pattern generator (CPG), and a phase EKF.
 
 ---
 
