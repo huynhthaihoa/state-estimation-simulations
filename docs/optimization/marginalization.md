@@ -1,6 +1,6 @@
 # Marginalization and sliding-window smoothing
 
-Marginalizing a variable permanently removes it from the optimization and keeps everything it taught us about its neighbors, packaged as one new **prior factor** (see [Prior](../glossary.md#prior-unary-factor); unary only in the pure-chain case of §8, in general it spans all of $x_a$'s neighbors). A real-time estimator can then bound its problem size without discarding what it used to know.
+Marginalizing a variable permanently removes it from the optimization and keeps everything it taught us about its neighbors, packaged as one new **prior factor** (see [Prior](../glossary.md#prior-unary-factor); unary only in the pure-chain case of §8; in general, it spans all of $x_a$'s neighbors). A real-time estimator can then bound its problem size without discarding what it used to know.
 
 This doc builds on two earlier ones:
 - **Variable elimination** from [`bayes_tree.md`](bayes_tree.md) §3 ("eliminate $x_1$ → its info gets summarized into a new constraint on $x_2$"). We reuse that mechanic for a different purpose.
@@ -34,7 +34,7 @@ Eliminate x1:
     from x1
 ```
 
-That is marginalization. `bayes_tree.md` uses it to build a **solve order**, where nothing is thrown away for good. We use the same step to drop $x_1$ **permanently**, on purpose: it is the oldest pose in the window and the estimator will never touch it again.
+That is marginalization. `bayes_tree.md` uses it to build a **solve order**, where nothing is thrown away for good. We use the same step to drop $x_1$ **permanently**, on purpose: it is the oldest pose in the window, and the estimator will never touch it again.
 
 ### Why not just delete $`x_1`$?
 Two naive shortcuts go wrong, in opposite directions. Marginalization is the third option:
@@ -80,7 +80,7 @@ Marginalizing out $x_a$ means integrating it out of the joint distribution. The 
 
 For the prior, $\Lambda_{bb}$ and $\eta_b$ must contain only the factors that touch $x_a$. Factors among the $x_b$ variables alone stay in the graph unchanged, so folding their contribution to $\Lambda_{bb}$ into the prior would count it twice. §8.1 shows how the script handles this.
 
-$(\Lambda_b', \eta_b')$ is a brand-new **prior factor** over exactly the variables $x_a$ used to connect to. It enters the graph like any other factor, as in the §2 diagram with $x_a = x_1$: $x_a$ disappears and the summarized information sits on its former neighbors.
+$(\Lambda_b', \eta_b')$ is a brand-new **prior factor** over exactly the variables $x_a$ used to connect to. It enters the graph like any other factor, as in the §2 diagram with $x_a = x_1$: $x_a$ disappears, and the summarized information sits on its former neighbors.
 
 The difference from BA's use of the same Schur complement (on the point block):
 - BA computes $\Lambda_b'$ *only to solve the reduced system faster*, then back-substitutes to recover $x_a$ from $x_b$.
@@ -114,7 +114,7 @@ $(\Lambda_b', \eta_b')$ is computed by linearizing at the *current* estimates of
 
 **Intuition (toy 2D range example):** a range factor between pose $`p`$ and landmark $`l`$ only measures their distance.
 - Move both by the same shift and the range does not change. So that shift is [unobservable](../glossary.md#observability).
-- Consistent linearization: the Jacobian is the unit vector $`u`$ from $`p`$ to $`l`$ on the $`l`$ side and $`-u`$ on the $`p`$ side. For a common shift they cancel, so the information along it is 0.
+- Consistent linearization: the Jacobian is the unit vector $`u`$ from $`p`$ to $`l`$ on the $`l`$ side and $`-u`$ on the $`p`$ side. For a common shift, they cancel, so the information along it is 0.
 - Mixed points: $`p = (0,0)`$, $`l = (3,4)`$ give $`u = (0.6, 0.8)`$. Now linearize the pose side at $`p' = (0,1)`$, which gives $`u' = (0.707, 0.707)`$.
 - A common shift of $`(1,0)`$ then predicts a range change of $`0.6 - 0.707 = -0.107`$ m. The true change is 0.
 - So the system "sees" information where there is none, and becomes overconfident (a [consistency](../glossary.md#consistency-and-nees) failure).
@@ -235,15 +235,15 @@ The solve therefore never exceeds `window_size` poses, so `max_dof` (the size, i
 | 128 | 768 | 4,718,592 | 60 | 28,800 |
 | 256 | 1536 | 18,874,368 | 60 | 28,800 |
 
-Two measurements, only one of them deterministic:
+Two measurements; only one of them is deterministic:
 - **Memory (`max_dof`):** full-batch's system size grows linearly with trajectory length (so its dense-matrix memory grows *quadratically* - visible directly in the table, roughly $4\times$ per doubling of length) and never stops. Sliding-window's caps at exactly $`6 \times \text{window\_size}`$ the moment the window first fills, and never moves again, confirmed identically across multiple seeds (`max_dof` depends only on trajectory length and `window_size`, not on the noise realization). `max_dof` (and the byte counts derived from it) is the deterministic part.
-- **Average per-step wall-clock time** tells the same story less starkly, and absolute values depend on the machine and its load (middle panel below). In the committed run the full batch grows from about 0.5 ms to about 86 ms per new pose, while the window stays at about 0.5-2 ms. The window's time flattens once trajectories exceed `window_size`, while the full batch's keeps growing; individual runs differ, so do not read the exact values.
+- **Average per-step wall-clock time** tells the same story less starkly, and absolute values depend on the machine and its load (middle panel below). In the committed run, the full batch grows from about 0.5 ms to about 86 ms per new pose, while the window stays at about 0.5-2 ms. The window's time flattens once trajectories exceed `window_size`, while the full batch keeps growing; individual runs differ, so do not read the exact values.
 
 ![Three panels from sliding_window_marginalization.py: largest information-matrix size, time per new pose and position RMSE against trajectory length from 8 to 256 poses, for a full batch re-solve and a 10-pose sliding window](../../assets/sliding_window_marginalization.png)
 
 *Figure: `use_numpy/sliding_window_marginalization.py` at its defaults (seed 0), plotted by `uv run python generator/make_figures.py sliding_window_marginalization`.*
 
-The same streaming, animated for a 64-pose run with a 10-pose window. The window's system size stops at 60 unknowns while a full batch re-solve keeps growing as 6 unknowns per pose, reaching 384 at the last pose. The path drifts and does not close the square because there are only odometry edges, so both solvers return the dead-reckoned path.
+The same streaming, animated for a 64-pose run with a 10-pose window. The window's system size stops at 60 unknowns, while a full batch re-solve keeps growing by 6 unknowns per pose, reaching 384 at the last pose. The path drifts and does not close the square because there are only odometry edges, so both solvers return the dead-reckoned path.
 
 ![Animation of a 64-pose odometry-only square path streaming in: top, the live 10-pose window in blue, marginalized poses frozen in gray and the pose being marginalized circled in red; bottom left, the system size of a full batch re-solve growing with the number of poses against the sliding window capped at 60 unknowns; bottom right, the window's block-tridiagonal information matrix with the prior block on its oldest pose](../../assets/sliding_window_marginalization.gif)
 
@@ -251,7 +251,7 @@ The same streaming, animated for a 64-pose run with a 10-pose window. The window
 
 **Accuracy is identical here, but that's guaranteed by the setup, not evidence that marginalization loses nothing.**
 - Final position [RMSE](../glossary.md#rmse-root-mean-square-error) is the same for full-batch and sliding-window at every trajectory length.
-- The reason is the one in §8.1 (all residuals are zero): the least-squares optimum *is* the dead-reckoned trajectory. Both solvers return exactly that. Checked at seed 0, both match dead reckoning with a maximum difference of 0.0 at 8, 16 and 32 poses.
+- The reason is the one in §8.1 (all residuals are zero): the least-squares optimum *is* the dead-reckoned trajectory. Both solvers return exactly that. Checked at seed 0, both match dead reckoning with a maximum difference of 0.0 at 8, 16, and 32 poses.
 - So any correct solver would tie. The accuracy comparison can't reveal whether marginalization throws information away, and the figure's accuracy panel is simply dead-reckoning error. The memory bound above is the real result.
 - The information claim is checked separately: `tests/use_numpy/test_sliding_window_marginalization.py` (`test_marginalized_window_covariance_matches_joint_batch_marginal`) compares the window covariance after two marginalizations against the matching marginal of the joint batch system, and it passes. The accuracy panel cannot show this.
 
