@@ -248,7 +248,7 @@ The uncertainty around it is usually approximated as a Gaussian. Its [informatio
 We reconstruct a person's route through a city.
 
 - **Filtering:** at each intersection we take the previous answer, add the new clue (a street sign, a step count), and update "I'm probably here". We carry that belief forward and never reopen old answers.
-- **Smoothing:** at the end of the day we collect all the GPS fixes, photos, timestamps and landmarks and ask, **"Given everything we know now, where were you at every point during the day?"** The person realizes the landmark seen at 2 PM is the one seen at 10 AM, so the 11 AM, 12 PM and 1 PM positions get revised too.
+- **Smoothing:** at the end of the day, we collect all the GPS fixes, photos, timestamps, and landmarks and ask, **"Given everything we know now, where were you at every point during the day?"** The person realizes the landmark seen at 2 PM is the one seen at 10 AM, so the 11 AM, 12 PM and 1 PM positions get revised too.
 
 ---
 
@@ -272,7 +272,7 @@ This gives us a useful trade-off:
 **A caveat on cost:** "filtering is cheaper" holds for small, fixed-size problems, but it inverts at scale.
 - **EKF-SLAM** keeps a *dense* joint covariance, so every update costs roughly $O(n^2)$ in the number of landmarks $n$ (Dissanayake et al., 2001).
 - **Sparse factor-graph smoothing** exploits the sparsity of the graph instead. With an [incremental](glossary.md#batch-vs-incremental) solver such as iSAM2 (Kaess et al., 2012), an odometry measurement only [re-eliminates](glossary.md#variable-elimination) a small part of the [Bayes tree](glossary.md#bayes-tree) near the newest pose.
-- **There is no small worst-case bound:** a loop closure can force re-elimination of most or all of the tree (in the worst case a full refactorization; Kaess et al. 2012, §4.3), and the cost depends on the [fill-in](glossary.md#fill-in) of the sparse factorization. This repo's [`bayes_tree_construction.py`](../use_numpy/bayes_tree_construction.py) shows both cases on a 16-node square loop. Under its fixed oldest-first [variable ordering](glossary.md#variable-ordering) (the order in which variables are eliminated; it controls fill-in), an odometry edge affects 2 of 16 variables and a loop-closure edge affects all 16; iSAM2 additionally reorders the affected part, so its real cost is lower (see [`bayes_tree.md` §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo)).
+- **There is no small worst-case bound:** a loop closure can force re-elimination of most or all of the tree (in the worst case, a full refactorization; Kaess et al. 2012, §4.3), and the cost depends on the [fill-in](glossary.md#fill-in) of the sparse factorization. This repo's [`bayes_tree_construction.py`](../use_numpy/bayes_tree_construction.py) shows both cases on a 16-node square loop. Under its fixed oldest-first [variable ordering](glossary.md#variable-ordering) (the order in which variables are eliminated; it controls fill-in), an odometry edge affects 2 of 16 variables and a loop-closure edge affects all 16; iSAM2 additionally reorders the affected part, so its real cost is lower (see [`bayes_tree.md` §15](optimization/bayes_tree.md#15-where-this-is-implemented-in-this-repo)).
 
 So most updates in a typical SLAM graph (mostly odometry, occasionally a loop closure) are cheap under iSAM2, while EKF-SLAM pays $O(n^2)$ on every update. This is a main reason large-scale SLAM moved from EKF-SLAM toward factor-graph smoothing.
 
@@ -313,7 +313,7 @@ Optimization then asks:
 
 > **"What configuration of $x_0$, $x_1$, $x_2$, $x_3$ best satisfies all these constraints?"**
 
-In this repo the gauge is fixed as follows:
+In this repo, the gauge is fixed as follows:
 
 | Script | How the gauge is fixed |
 | --- | --- |
@@ -352,7 +352,7 @@ flowchart TB
 
 #### Three estimates from the same data
 
-The toy is linear: the state is $`x = [p, v]`$ (position in m, velocity in m/s), a position measurement arrives every tick, and a [zero-velocity update (ZUPT)](glossary.md#zupt-and-zaru) ($`v = 0`$) is applied on the scheduled anchor ticks. All three estimates use the same model, the same measurements and the same noise values:
+The toy is linear: the state is $`x = [p, v]`$ (position in m, velocity in m/s), a position measurement arrives every tick, and a [zero-velocity update (ZUPT)](glossary.md#zupt-and-zaru) ($`v = 0`$) is applied on the scheduled anchor ticks. All three estimates use the same model, the same measurements, and the same noise values:
 
 | Estimate | Uses at tick $`k`$ | How it is computed |
 | --- | --- | --- |
@@ -374,7 +374,7 @@ Notation (all from the forward pass, except the smoothed quantities): $`F`$ is t
 
 The smoother was introduced by Rauch, Tung and Striebel (1965, reference 9); the equations above are Theorem 8.2, Eq. (8.6) of Särkkä (2013, reference 10).
 
-**Equality with batch least squares.** For a linear Gaussian model, the posterior over the whole trajectory is Gaussian, and its mean is the least-squares solution over all states (for linear systems the least-squares solution is the posterior mean, reference 10, §1.2). The smoother's output at tick $`k`$ is that posterior's marginal at $`k`$ (reference 10, Eq. 8.1 and Theorem 8.2). So the RTS means must equal the batch solution, and so must the covariances. The batch problem uses the same factors as the filter: a prior on $`x_0`$, one dynamics factor per tick (covariance $`Q`$), one position factor per tick, one ZUPT factor per anchor tick, each weighted by its own covariance. That is the argument; the script checks it numerically. On the run below the largest difference between the RTS and batch results is 9.6e-15 (means) and 5.5e-17 (covariances), and the tests require at most 1e-9.
+**Equality with batch least squares.** For a linear Gaussian model, the posterior over the whole trajectory is Gaussian, and its mean is the least-squares solution over all states (for linear systems, the least-squares solution is the posterior mean, reference 10, §1.2). The smoother's output at tick $`k`$ is that posterior's marginal at $`k`$ (reference 10, Eq. 8.1 and Theorem 8.2). So the RTS means must equal the batch solution, and so must the covariances. The batch problem uses the same factors as the filter: a prior on $`x_0`$, one dynamics factor per tick (covariance $`Q`$), one position factor per tick, one ZUPT factor per anchor tick, each weighted by its own covariance. That is the argument; the script checks it numerically. On the run below, the largest difference between the RTS and batch results is 9.6e-15 (means) and 5.5e-17 (covariances), and the tests require at most 1e-9.
 
 #### One run
 
@@ -385,8 +385,8 @@ Errors are the **RMSE** ([root-mean-square error](glossary.md#rmse-root-mean-squ
 | Position RMSE | 0.0084 m | 0.0036 m |
 | Velocity RMSE | 0.0381 m/s | 0.0115 m/s |
 
-- The smoother's velocity $`\sigma`$ divided by the filter's is at most 1.00 (equal at the last tick), 0.84 at the median tick and 0.37 at the smallest (1.95 s). The smallest eigenvalue of $`P_k - P^s_k`$ over all ticks is 0, so the smoother's covariance is nowhere larger than the filter's.
-- At 1.95 s the position error also drops: filter $`-0.0159`$ m ($`\sigma = 0.0109`$ m), smoother $`-0.0055`$ m ($`\sigma = 0.0040`$ m).
+- The smoother's velocity $`\sigma`$ divided by the filter's is at most 1.00 (equal at the last tick), 0.84 at the median tick, and 0.37 at the smallest (1.95 s). The smallest eigenvalue of $`P_k - P^s_k`$ over all ticks is 0, so the smoother's covariance is nowhere larger than the filter's.
+- At 1.95 s, the position error also drops: filter $`-0.0159`$ m ($`\sigma = 0.0109`$ m), smoother $`-0.0055`$ m ($`\sigma = 0.0040`$ m).
 - Tick 0 is the filter's prior (velocity error 0.080 m/s, $`\sigma = 0.050`$ m/s), which no measurement has touched. The smoother's tick-0 error is 0.017 m/s ($`\sigma = 0.024`$ m/s). The tables leave tick 0 out because that gain has nothing to do with the gait.
 
 #### Monte Carlo: accuracy and consistency
@@ -414,7 +414,7 @@ Three scenarios, ticks 1 to $`N`$:
 
 (Each cell: filter / smoother.)
 
-**Accuracy.** The smoother is more accurate in position in every window and in velocity in every window except the anchor phase. Over ticks 1 to $`N`$ its position RMSE is 0.48 times the filter's and its velocity RMSE 0.35 times.
+**Accuracy.** The smoother is more accurate in position in every window and in velocity in every window except the anchor phase. Over ticks 1 to $`N`$, its position RMSE is 0.48 times the filter's, and its velocity RMSE is 0.35 times.
 
 **Where the gain is largest.** Velocity RMSE per tick within the gait cycle, over the interior ticks (not the first or last cycle), in m/s, filter then smoother, with and without the ZUPTs in both estimators:
 
@@ -424,11 +424,11 @@ Three scenarios, ticks 1 to $`N`$:
 | 24 (1.20 s, end of the ramp-up) | 0.0913 to 0.0224 | 0.0904 to 0.0301 |
 | 25 (1.25 s) | 0.0818 to 0.0155 | 0.0806 to 0.0244 |
 
-These are the three largest reductions, and the largest is the tick right before the anchor phase. Removing the ZUPTs weakens the gain there (0.0073 becomes 0.0202) but does not erase it: the coming ZUPT supplies most of it, and the later position measurements the rest.
+These are the three largest reductions, and the largest is the tick right before the anchor phase. Removing the ZUPTs weakens the gain there (0.0073 becomes 0.0202) but does not erase it: the coming ZUPT supplies most of it, and the later position measurements supply the rest.
 
-**Where the smoother is not better.** In the anchor window the smoother's velocity RMSE (0.0012 m/s) is higher than the filter's (0.0006 m/s). On the deterministic truth its velocity RMSE exceeds the filter's at 22 of the 40 ticks of the cycle (the 20 anchor ticks, the first ramp-up tick and the first ramp-down tick); its position RMSE never does. On `matched` truth it exceeds the filter's at 0 of 40 ticks, in velocity and in position. The deterministic truth departs from the model in two ways: its velocity is exactly 0 on every anchor tick, where the filter's ZUPT pins it, and its slope changes abruptly at the ramp corners. `matched` truth contains neither, and there the smoother is nowhere worse, so the effect comes from that departure, not from the smoother.
+**Where the smoother is not better.** In the anchor window, the smoother's velocity RMSE (0.0012 m/s) is higher than the filter's (0.0006 m/s). On the deterministic truth, its velocity RMSE exceeds the filter's at 22 of the 40 ticks of the cycle (the 20 anchor ticks, the first ramp-up tick, and the first ramp-down tick); its position RMSE never does. On `matched` truth, it exceeds the filter's at 0 of 40 ticks, in velocity and in position. The deterministic truth departs from the model in two ways: its velocity is exactly 0 on every anchor tick, where the filter's ZUPT pins it, and its slope changes abruptly at the ramp corners. `matched` truth contains neither, and there the smoother is nowhere worse, so the effect comes from that departure, not from the smoother.
 
-**Consistency.** On the deterministic truth both estimators are conservative (NEES below 2), the smoother more so (0.99 vs. 1.31), because the model assumes a random disturbance the truth does not have. On `matched` truth both are consistent (1.97 and 2.01, inside $`[1.83, 2.18]`$), which checks the smoother's covariance, not only its mean. With the parent's under-sized process noise both are overconfident (10.45 and 4.17): the later data lower the NEES but do not bring it into the band. In that scenario, at the last tick the smoother has no later data, so its NEES (20.33) equals the filter's (in the default scenario both are 1.19 there, table above).
+**Consistency.** On the deterministic truth both estimators are conservative (NEES below 2), the smoother more so (0.99 vs. 1.31), because the model assumes a random disturbance the truth does not have. On `matched` truth, both are consistent (1.97 and 2.01, inside $`[1.83, 2.18]`$), which checks the smoother's covariance, not only its mean. With the parent's undersized process noise, both are overconfident (10.45 and 4.17): the latter data lower the NEES but do not bring it into the band. In that scenario, at the last tick the smoother has no later data, so its NEES (20.33) equals the filter's (in the default scenario both are 1.19 there, table above).
 
 ![Four panels from rts_smoother.py: one run's velocity with the filter and smoother estimates and their 2-sigma bands, the same run's position error with the bands, the Monte Carlo velocity RMSE per tick for both, and the Monte Carlo NEES of both against the consistent value 2 and its 95% band, with the matched-truth curves dotted](../assets/rts_smoother.png)
 
@@ -457,7 +457,7 @@ Half a second of delay (10 ticks) already removes 94% of the velocity RMSE gap b
 
 #### Cost
 
-One run, 200 ticks (median of 15 repeats; peak memory from `tracemalloc` for one call, which includes Python object overhead). The times come from the run logged for this doc on a shared laptop; another run of the same command gave 27, 30 and 15 µs, so read the ratios, not the absolute values:
+One run, 200 ticks (median of 15 repeats; peak memory from `tracemalloc` for one call, which includes Python object overhead). The times come from the run logged for this doc on a shared laptop; another run of the same command gave 27, 30, and 15 µs, so read the ratios, not the absolute values:
 
 | Pass | Time per tick | Peak memory | What it holds |
 | --- | --- | --- | --- |
@@ -474,7 +474,7 @@ One run, 200 ticks (median of 15 repeats; peak memory from `tracemalloc` for one
 - **The velocity gain depends on the ZUPT schedule.** The gain at the end of each extend phase comes largely from the known anchor phase that follows (the without-ZUPT column above); a gait without such a known stop would see less.
 - **One gait.** The Monte Carlo tables average 500 trials of this one gait; none varies the gait itself.
 
-**Takeaway.** On the same data, the RTS smoother halves the position error and cuts the velocity error to about a third, matches the batch least-squares solution to round-off, and gains most just before a stop. It costs a stored history, an offline backward pass, and, where the truth departs from the model (here, an exactly-zero anchor velocity), it can be slightly worse than the filter in velocity during the anchor phase.
+**Takeaway.** On the same data, the RTS smoother halves the position error and cuts the velocity error to about a third, matches the batch least-squares solution to round-off, and gains most just before a stop. It costs a stored history, an offline backward pass, and, where the truth departs from the model (here, an exactly zero anchor velocity), it can be slightly worse than the filter in velocity during the anchor phase.
 
 ---
 
@@ -525,7 +525,7 @@ A rough map is:
 Examples:
 
 - **EKF-SLAM** → filtering
-- **[MSCKF](glossary.md#msckf-multi-state-constraint-kalman-filter)** (Multi-State Constraint Kalman Filter) → an EKF-based filter for visual-inertial estimation, run over a sliding window of poses. Landmarks never enter the state; each is used once as a constraint between window poses, then dropped. Because of the window it fits the fixed-lag box only loosely.
+- **[MSCKF](glossary.md#msckf-multi-state-constraint-kalman-filter)** (Multi-State Constraint Kalman Filter) → an EKF-based filter for visual-inertial estimation, run over a sliding window of poses. Landmarks never enter the state; each is used once as a constraint between window poses, then dropped. Because of the window, it fits the fixed-lag box only loosely.
 - **[VINS-Mono](glossary.md#vins-mono)/VINS-Fusion** → nonlinear optimization + sliding window
 - **[ORB-SLAM](glossary.md#orb-slam)** → heavily optimization-based
 - **GTSAM-based systems** (GTSAM is a factor-graph optimization library) → factor-graph optimization
@@ -561,7 +561,7 @@ A filter asks this for both **smooth motion** and **hybrid motion**. The differe
 
 | | Smooth motion | Hybrid motion |
 |---|---|---|
-| Next step | Integrate the motion model | Also decide **when** the jump happens (e.g. touchdown), then apply it |
+| Next step | Integrate the motion model | Also decide **when** the jump happens (e.g., touchdown), then apply it |
 | Uncertainty | Ordinary Jacobian of the motion model carries the covariance forward | **[Saltation matrix](glossary.md#saltation-matrix)**: the reset map's Jacobian plus a correction for the jump happening slightly earlier or later ([hybrid_saltation_ekf.md §2](filtering/hybrid_saltation_ekf.md#2-why-the-reset-maps-own-jacobian-is-not-enough)) |
 | A wrong call | A small error; the next measurements pull it back | A wrong decision, e.g. contact detected late ([§8](filtering/hybrid_saltation_ekf.md#8-quantifying-contact-detection-timing-jitter)) or "velocity = 0" while still moving ([inchworm_zupt_ekf.md §3](filtering/inchworm_zupt_ekf.md#3-the-finding-not-just-always-is-wrong-while-moving)); the filter can't go back and redo it |
 
