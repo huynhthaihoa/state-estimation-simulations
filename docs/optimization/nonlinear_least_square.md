@@ -43,7 +43,7 @@ Take errors $`[1,-2,3]`$:
 - Plain sum: $`1-2+3=2`$, so positive and negative errors cancel.
 - Squares: $`1^2+(-2)^2+3^2=14`$, so every error contributes positively.
 
-Absolute values, $`\sum_i|e_i|`$, would also stop the cancelling, so why squares? Two reasons:
+Absolute values, $`\sum_i|e_i|`$, would also stop the cancellation, so why squares? Two reasons:
 
 - **Easy to solve.** Once we linearize $e$ (§7), each step is a linear least-squares problem with a closed-form solution (normal equations, §8). $`|e|`$ has a kink at zero and no such structure.
 - **Statistically right.** For [Gaussian](../glossary.md#gaussian-noise) measurement noise, minimizing squared error gives the **maximum-likelihood estimate**: the parameters under which the observed measurements are most probable. This is also why §12's weights are $`W_i=\Sigma_i^{-1}`$ ($`W_i`$ is the weight and $`\Sigma_i`$ the measurement covariance, both defined in §12).
@@ -180,7 +180,7 @@ $$e(x_k+\Delta x)\approx e(x_k)+J\Delta x,\qquad J=\frac{\partial e}{\partial x}
 
 Here $\Delta x$ is the step added to the unknowns ($k$ is the iteration index), and $J$ is the matrix of derivatives of the stacked residual $e$ with respect to the unknowns: one row per residual entry, one column per unknown.
 
-Visually, near the current point the curve is replaced by its tangent line, the local linear approximation (the same picture as [gauss_newton.md §9](gauss_newton.md#9-picture-following-the-tangent)):
+Visually, near the current point, the curve is replaced by its tangent line, the local linear approximation (the same picture as [gauss_newton.md §9](gauss_newton.md#9-picture-following-the-tangent)):
 
 ![Two panels for Gauss-Newton on the residual x squared minus 4 starting from x = 3: the curve with the tangent at x = 3, which crosses zero at 2.1667, and the next tangent at 2.1667, which crosses zero at 2.0064, next to the true root at 2; and the residual magnitude at iterations 0 to 3 on a log axis, falling from 5 to 4.1e-05](../../assets/gauss_newton_tangent.png)
 
@@ -319,7 +319,7 @@ Sensor B:  10.5 m
 Sensor C:   9.8 m
 ```
 
-We don't know the true position, and instead of choosing one reading we find the $x$ that minimizes:
+We don't know the true position, and instead of choosing one reading, we find the $x$ that minimizes:
 
 $$(x-10.0)^2+(x-10.5)^2+(x-9.8)^2$$
 
@@ -329,7 +329,7 @@ If Sensor B is much noisier, we down-weight it:
 
 $$(x-10.0)^2+0.1(x-10.5)^2+(x-9.8)^2$$
 
-B now has less influence and the solution moves toward A and C: $`x = (10.0 + 0.1\cdot 10.5 + 9.8)/2.1 \approx 9.93`$ m.
+B now has less influence, and the solution moves toward A and C: $`x = (10.0 + 0.1\cdot 10.5 + 9.8)/2.1 \approx 9.93`$ m.
 
 That's the intuition behind weighted least squares in SLAM.
 
