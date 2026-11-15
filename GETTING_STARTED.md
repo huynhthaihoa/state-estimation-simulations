@@ -1,6 +1,6 @@
 # Getting started suggestion
 
-A suggested reading-and-running order through this repo, for newcomers. Each phase names the [`docs/`](docs/) notes to read first, then the matching simulation(s) to run under [`use_numpy/`](use_numpy/) (or its [`use_manif/`](use_manif/) counterpart). Keep that order: each script exercises what its phase's reading just introduced.
+A suggested reading-and-running order through this repo for newcomers. Each phase names the [`docs/`](docs/) notes to read first, then the matching simulation(s) to run under [`use_numpy/`](use_numpy/) (or its [`use_manif/`](use_manif/) counterpart). Keep that order: each script exercises what its phase's reading just introduced.
 
 Before starting, follow [README.md § D. Installation](README.md#d-installation) to get `uv sync` working. Every script below runs as `uv run python use_numpy/<script>.py [flags]`. The full flag list for each lives in [README.md § E. Simulations](README.md#e-simulations); this guide links to the relevant numbered entry instead of repeating it.
 
@@ -38,7 +38,7 @@ After all nine phases (and, optionally, [Track L](#track-l---hybrid-and-bio-insp
 
 **Read, in order:** [`docs/filtering/kf_ekf_iekf.md`](docs/filtering/kf_ekf_iekf.md) (KF → EKF → IEKF), [`docs/filtering/linear_nonlinear.md`](docs/filtering/linear_nonlinear.md) (how to tell a linear system from a nonlinear one, and whether the nonlinearity matters at your uncertainty level), [`docs/filtering/extra_kf_variants.md`](docs/filtering/extra_kf_variants.md) (UKF/ESKF/MSCKF), [`docs/filtering/left_right_invariant.md`](docs/filtering/left_right_invariant.md).
 
-**Run:** [README.md §5](README.md#5-point-cloud-pose-tracking-ekf-vs-invariant-ekf-vs-batch-gauss-newton-vs-ukf-vs-vanilla-kf) - [`use_numpy/pointcloud_pose_tracking.py`](use_numpy/pointcloud_pose_tracking.py) - EKF vs. IEKF vs. batch-GN vs. UKF vs. vanilla KF, head to head, with timing/memory numbers.
+**Run:** [README.md §5](README.md#5-point-cloud-pose-tracking-ekf-vs-invariant-ekf-vs-batch-gauss-newton-vs-ukf-vs-vanilla-kf) - [`use_numpy/pointcloud_pose_tracking.py`](use_numpy/pointcloud_pose_tracking.py) - EKF vs. IEKF vs. batch-GN vs. UKF vs. vanilla KF, head-to-head, with timing/memory numbers.
 
 **Then read:** [`docs/filtering/pointcloud_pose_tracking_empirical_note.md`](docs/filtering/pointcloud_pose_tracking_empirical_note.md) - deliberately *after* running the script, since it explains that script's output after the fact: why EKF/IEKF agree to round-off, why UKF differs mainly during the initial correction, and why vanilla KF stays millimeters away.
 
@@ -97,7 +97,7 @@ After all nine phases (and, optionally, [Track L](#track-l---hybrid-and-bio-insp
 
 ## Track L - Hybrid and bio-inspired locomotion (optional)
 
-**Needs:** Phase 4. Every script in L1-L4 is a filter for motion that is *not* smooth between measurements: something switches (a bounce, an anchor, a foot touching down), and the question is what the filter may assume at that switch. The groups go from one contact event, to one anchor, to many legs; L5 adds wheels that slip. Within a group, go top to bottom.
+**Needs:** Phase 4. Every script in L1-L4 is a filter for motion that is *not* smooth between measurements: something switches (a bounce, an anchor, a foot touching down), and the question is what the filter may assume at that switch. The groups go from one contact event to one anchor, to many legs; L5 adds wheels that slip. Within a group, go top to bottom.
 
 ### L1 - Contact events: a reset in the motion
 
@@ -108,7 +108,7 @@ After all nine phases (and, optionally, [Track L](#track-l---hybrid-and-bio-insp
 
 How to work through L1.1:
 - **Read** the doc's derivation section first. It includes a formula that is correct for a different comparison than this filter needs; finite-difference checks show which one applies.
-- **Run** the script and check the Monte Carlo NEES plot. Contrary to the expectation that the naive update is overconfident, with exact contact detection both filters are *under*confident after a bounce (post-bounce NEES about 2.4 and 2.5 against a consistent 6), the two are close, and which one is nearer 6 depends on the tuning.
+- **Run** the script and check the Monte Carlo NEES plot. Contrary to the expectation that the naive update is overconfident, with exact contact detection, both filters are *under*confident after a bounce (post-bounce NEES about 2.4 and 2.5 against a consistent 6); the two are close, and which one is nearer 6 depends on the tuning.
 - **Then** the doc's §8 quantifies what happens once contact *detection* timing itself is uncertain (`--detect-time-bias`/`--detect-time-noise-std`): both filters become overconfident as jitter grows, and the saltation-corrected one more so (about 1.4-1.6× the naive filter's NEES), a modest gap rather than a blow-up.
 
 ### L2 - Anchors: crawling on a held contact
@@ -140,7 +140,7 @@ Not a discontinuous reset like L1, but an ordinary switched-linear system: the q
 
 | Step | Read + run | The question | Builds on |
 | --- | --- | --- | --- |
-| L4.1 | [`gait_phase_ekf.md`](docs/filtering/gait_phase_ekf.md) + [README.md §27](README.md#27-gait-phase-which-feet-are-on-the-ground-when-touchdowns-are-uncertain) - [`gait_phase_ekf.py`](use_numpy/gait_phase_ekf.py) | The hexapod's liftoffs are commanded but its touchdowns are not: which feet may the body filter read when a foot can land late and a detector can fire falsely? A schedule and a raw detector both read swinging feet; a learned touchdown offset or a small Kalman filter rejects triggers that come too early, if its acceptance window is the right width | L3.1 |
+| L4.1 | [`gait_phase_ekf.md`](docs/filtering/gait_phase_ekf.md) + [README.md §27](README.md#27-gait-phase-which-feet-are-on-the-ground-when-touchdowns-are-uncertain) - [`gait_phase_ekf.py`](use_numpy/gait_phase_ekf.py) | The hexapod's liftoffs are commanded but its touchdowns are not: which feet may the body filter read when a foot can land late, and a detector can fire falsely? A schedule and a raw detector both read swinging feet; a learned touchdown offset or a small Kalman filter rejects triggers that come too early, if its acceptance window is the right width | L3.1 |
 | L4.2 | [`gait_phase_torque_ekf.md`](docs/filtering/gait_phase_torque_ekf.md) + [README.md §29](README.md#29-torque-based-contact-detection-what-decides-it-and-when-the-gait-phase-helps) - [`gait_phase_torque_ekf.py`](use_numpy/gait_phase_torque_ekf.py) | The detector itself: on a robot that measures joint torque (HEBI Daisy), what decides when the contact detector fires, and does the gait-phase filter still help? | L4.1, L3.3 |
 
 ### L5 - Wheels: slip in turns
