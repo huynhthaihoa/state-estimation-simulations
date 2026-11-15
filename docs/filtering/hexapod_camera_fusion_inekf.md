@@ -19,10 +19,10 @@ It then adds the failures the T265's documentation warns about (ref. 2): a sudde
 
 **Short answer.**
 
-- **Treating the camera pose as the world pose is badly overconfident.** Position NEES ([glossary](../glossary.md#consistency-and-nees)) is about 8600, where 3 is consistent, and the position error is worse than with legs alone (12.2 cm against 8.3 cm). The filter trusts each reading to 5 mm while the camera has drifted centimeters.
-- **Estimating the drift fixes it.** With the camera frame's offset as states, position NEES is 3.18, and the position error drops to 3.2 cm, less than half of legs alone. Yaw becomes observable too (yaw error 0.25° against 0.74°).
-- **The camera velocity adds little and is slightly overconfident.** The velocity carries the camera's 1% scale error, which the filter does not model (position NEES 6.71). Without the scale error it is consistent (2.84).
-- **A late camera reading hurts, and the filter can learn the delay.** At 0.2 m/s a 30 ms delay shifts the reading's position by 6.5 mm, as much as its 5 mm noise, and a 100 ms delay by 21.5 mm. Ignoring a 100 ms delay raises position NEES from 1.86 to 7.11 (straight walk) and, on a turning walk, yaw NEES from 1.18 to 51. A filter that is told the delay is consistent through 200 ms, and one that estimates it as a state is within 5 ms of it in under 1 s and within 0.3 ms by the end of 20 s (§5; the delay values are a sweep, not a measured T265 latency).
+- **Treating the camera pose as the world pose is badly overconfident.** Position NEES ([glossary](../glossary.md#consistency-and-nees)) is about 8600, where 3 is consistent, and the position error is worse than with legs alone (12.2 cm against 8.3 cm). The filter trusts each reading to 5 mm, while the camera has drifted centimeters.
+- **Estimating the drift fixes it.** With the camera frame's offset as stated, position NEES is 3.18, and the position error drops to 3.2 cm, less than half of legs alone. Yaw becomes observable too (yaw error 0.25° against 0.74°).
+- **The camera velocity adds little and is slightly overconfident.** The velocity carries the camera's 1% scale error, which the filter does not model (position NEES 6.71). Without the scale error, it is consistent (2.84).
+- **A late camera reading hurts, and the filter can learn the delay.** At 0.2 m/s, a 30 ms delay shifts the reading's position by 6.5 mm, as much as its 5 mm noise, and a 100 ms delay by 21.5 mm. Ignoring a 100 ms delay raises position NEES from 1.86 to 7.11 (straight walk) and, on a turning walk, yaw NEES from 1.18 to 51. A filter that is told the delay is consistent through 200 ms, and one that estimates it as a state, is within 5 ms of it in under 1 s and within 0.3 ms by the end of 20 s (§5; the delay values are a sweep, not a measured T265 latency).
 - **A position jump does not hurt the drift-aware filter, and gating barely matters for it.** With one 10 cm pose jump and one 3 s dropout per run, `cam_pose_drift` stays consistent with or without a gate (position NEES 2.95 and 2.98) at 3.0 cm error. The gate rejects 17% of the readings after the jump but locks the camera out in none of the 30 runs. The filter that treats the camera pose as the world pose is the one in trouble: the gate locks its camera out in 23 of 30 runs, and it stays overconfident (NEES 1196).
 
 ![Four panels from hexapod_camera_fusion_inekf.py, 30 trials, 60 s of tripod walking: position RMSE and position NEES over time for legs only, camera velocity, camera pose as world pose and camera pose with drift states; then the same with one pose jump and one dropout per run, for the three camera filters with and without a gate](../../assets/hexapod_camera_fusion_inekf.png)
@@ -38,17 +38,17 @@ The experiment 2 setting, one run, animated: a top-down view of the walking hexa
 | `cam_pose`, gated | 423.76 | 3.08 | 2.97 |
 | `cam_pose_drift` | 1.55 | 1.80 | 1.69 |
 
-- The camera reading itself is 7.4 cm off at the end (scale error -0.92%, yaw drift and the jump); `cam_pose` follows it and steps up with the jump.
+- The camera reading itself is 7.4 cm off at the end (scale error: -0.92%, yaw drift, and the jump); `cam_pose` follows it and steps up with the jump.
 - The gate rejects 74% of the camera readings after the jump and uses none from the jump until 46.8 s, 2.1 s after the dropout ends. That is not a lockout as defined in section 4 (under 5% used; it used 26%), and the NEES stays at 424.
-- The error ordering of `cam_pose` against `legs` depends on the seed: in seeds 0, 2 and 3 its mean error is above that of `legs`, in seed 1 below (4.4 against 6.3 cm). The NEES result does not: `cam_pose` 1300-47000 and `cam_pose_drift` 1.1-3.5 in seeds 0-3.
-- In the NEES panel the grey band, 0.22-9.35, holds 95% of the NEES values of a consistent filter at one instant (the chi-square 2.5% and 97.5% points for 3 degrees of freedom); the 30-trial band above is for an average.
+- The error ordering of `cam_pose` against `legs` depends on the seed: in seeds 0, 2, and 3 its mean error is above that of `legs`, in seed 1 below (4.4 against 6.3 cm). The NEES result does not: `cam_pose` 1300-47000 and `cam_pose_drift` 1.1-3.5 in seeds 0-3.
+- In the NEES panel, the grey band, 0.22-9.35, holds 95% of the NEES values of a consistent filter at one instant (the chi-square 2.5% and 97.5% points for 3 degrees of freedom); the 30-trial band above is for an average.
 
 ![Animation of one 60 s tripod-gait run with a drifting tracking camera, one pose jump and one dropout: left, a top-down window following the hexapod, with its true stance feet, the camera's reported position and heading drifting away and stepping at the jump, and the estimated body outlines of the legs-only filter, the camera pose as world pose, the same with a gate, and the camera pose with drift states; right, each filter's position error, its position NEES on a log scale with the consistent value 3 marked, and a strip of when the camera reading was available and used, with the jump and the dropout marked](../../assets/hexapod_camera_fusion_inekf.gif)
 
 *Animation: `uv run python generator/animate_hexapod_camera_fusion_inekf.py --out assets/hexapod_camera_fusion_inekf.gif` (seed 2 by default). Swing legs are drawn at fixed default positions relative to the body; the script does not simulate swing feet.*
 
 ### Scope
-The contact doc's 3D walking body, IMU, stance feet and right-invariant EKF ([IEKF](../glossary.md#iekf-invariant-ekf)), unchanged: isotropic foot-position noise, no IMU biases, the true stance schedule, tripod gait. The body walks faster and straighter than in the contact doc (0.2 m/s, no mean turn, 60 s, about 12 m) so the camera's drift has room to grow. The camera's numbers are T265-style assumptions, not a specific robot's; no published geometry was found for the DARPA hexapod or SCARAB, and the question does not depend on it.
+The contact doc's 3D walking body, IMU, stance feet, and right-invariant EKF ([IEKF](../glossary.md#iekf-invariant-ekf)), unchanged: isotropic foot-position noise, no IMU biases, the true stance schedule, tripod gait. The body walks faster and straighter than in the contact doc (0.2 m/s, no mean turn, 60 s, about 12 m), so the camera's drift has room to grow. The camera's numbers are T265-style assumptions, not a specific robot's; no published geometry was found for the DARPA hexapod or SCARAB, and the question does not depend on it.
 
 ---
 
@@ -84,18 +84,18 @@ The vibration of walking would show up as larger noise; no published size was fo
 
 All four are the contact doc's right-invariant EKF on the same legs and IMU data. The camera filters add a camera update after each tick's leg update; `cam_pose_drift` also carries the offset states below through the prediction and the leg update.
 
-**Notation.** $`R`$, $`v`$, $`p`$ are the body's true rotation, world velocity and world position; a hat ($`\hat R`$, $`\hat v`$, $`\hat p`$) marks the filter's estimate. $`y_v`$, $`y_p`$, $`y_R`$ are the camera's velocity, position and rotation readings, and $`n_v`$, $`n_p`$, $`n_R`$ their white noises. $`\mathrm{Exp}`$ turns a rotation vector into a rotation matrix and $`\log`$ is its inverse ([glossary](../glossary.md#exp-and-log-maps)). The **residual** is the difference between the reading and its prediction, and $`H`$ is its Jacobian: how the residual changes with the filter's error ([glossary](../glossary.md#residual-error)).
+**Notation.** $`R`$, $`v`$, $`p`$ are the body's true rotation, world velocity, and world position; a hat ($`\hat R`$, $`\hat v`$, $`\hat p`$) marks the filter's estimate. $`y_v`$, $`y_p`$, $`y_R`$ are the camera's velocity, position and rotation readings, and $`n_v`$, $`n_p`$, $`n_R`$ their white noises. $`\mathrm{Exp}`$ turns a rotation vector into a rotation matrix and $`\log`$ is its inverse ([glossary](../glossary.md#exp-and-log-maps)). The **residual** is the difference between the reading and its prediction, and $`H`$ is its Jacobian: how the residual changes with the filter's error ([glossary](../glossary.md#residual-error)).
 
-- **`cam_vel`** uses $`y_v = R^\top v + n_v`$. For a right-invariant EKF this is an **invariant observation** ([glossary](../glossary.md#invariant-observation); the same kind as the leg readings): the residual $`\hat R y_v - \hat v`$ has the constant Jacobian $`[0, -I, 0]`$ on (rotation, velocity, position).
+- **`cam_vel`** uses $`y_v = R^\top v + n_v`$. For a right-invariant EKF, this is an **invariant observation** ([glossary](../glossary.md#invariant-observation); the same kind as the leg readings): the residual $`\hat R y_v - \hat v`$ has the constant Jacobian $`[0, -I, 0]`$ on (rotation, velocity, position).
 - **`cam_pose`** uses $`y_p = p + n_p`$ and $`y_R = \mathrm{Exp}(n_R) R`$. The rotation residual $`\log(\hat R y_R^\top)`$ has the Jacobian $`I`$ on the rotation error. The position residual $`\hat p - y_p`$ has $`-[\hat p]_\times`$ on rotation and $`I`$ on position, so it depends on the estimate. Here $`[\cdot]_\times`$ is the cross-product matrix.
 - **`cam_pose_drift`** adds two **offset states**, the camera frame's position offset $`b_p`$ (3 numbers) and yaw offset $`b_\psi`$, so that $`y_p = p + b_p + n_p`$ and $`y_R = R_z(b_\psi)\,\mathrm{Exp}(n_R) R`$, where $`R_z(b_\psi)`$ is a rotation by $`b_\psi`$ about the vertical. Both are random walks whose variance grows with the distance walked (estimated speed × time step):
   - for the yaw offset, by the truth's 0.005 rad per $`\sqrt{\text{m}}`$;
   - for the position offset, by $`1.2 \times 10^{-3}`$ m² per m. That is chosen so that its std after the run's 12 m equals 1% of 12 m. The truth's scale error grows in proportion to the distance, not as a random walk, so this matches it only at the end of the run.
 
-**The gate** (`gated`, [glossary](../glossary.md#gating-chi-square-gate)): a camera reading is used only if its **normalized innovation squared** (the residual weighed by its predicted covariance) is below the chi-squared 99% bound for its dimension: 11.34 for velocity (3), 16.81 for pose (6). Leg readings are never gated here.
+**The gate** (`gated`, [glossary](../glossary.md#gating-chi-square-gate)): a camera reading is used only if its **normalized innovation squared** (the residual weighted by its predicted covariance) is below the chi-squared 99% bound for its dimension: 11.34 for velocity (3), 16.81 for pose (6). Leg readings are never gated here.
 
 **Scores**:
-- **Position NEES:** physical position error against the position covariance mapped to world coordinates. Its consistent value is 3, and over 30 [Monte Carlo trials](../glossary.md#monte-carlo-trials) a consistent run average falls in [2.19, 3.94] 95% of the time.
+- **Position NEES:** physical position error against the position covariance mapped to world coordinates. Its consistent value is 3, and over 30 [Monte Carlo trials](../glossary.md#monte-carlo-trials), a consistent run average falls in [2.19, 3.94] 95% of the time.
 - **Yaw NEES:** consistent value 1, band [0.56, 1.57].
 - **Velocity NEES**, and position and yaw RMSE ([glossary](../glossary.md#rmse-root-mean-square-error)).
 
@@ -128,7 +128,7 @@ Without the camera, yaw is never corrected, so the initial yaw error stays and t
 Each reading claims 5 mm, so the filter's position uncertainty stays at a few millimeters while the camera's frame drifts by centimeters. NEES reaches thousands, and the position error ends worse than with legs alone (20.0 against 11.8 cm), because the filter follows the camera's drift.
 
 #### Drift as states: consistent and twice as accurate
-With the offsets as states, the camera's pose still fixes what the legs cannot, the yaw (0.25°) and the short-term position. The filter's uncertainty now grows as the camera's frame may have drifted. Position error ends at 5.1 cm against 11.8 cm for legs alone, and every NEES is in its band.
+With the offsets as states, the camera's pose still fixes what the legs cannot: the yaw (0.25°) and the short-term position. The filter's uncertainty now grows as the camera's frame may have drifted. Position error ends at 5.1 cm against 11.8 cm for legs alone, and every NEES is in its band.
 
 #### Camera velocity: no help, slightly overconfident
 The velocity cannot fix yaw or position, and it carries the 1% scale error. With 50 velocity readings a second, the filter believes it knows the velocity better than the scale error allows, and position NEES rises to 6.71. A rerun without the scale error (`--scale-std 0 --n-mc-trials 10`) gives a consistent 2.84 and a slightly smaller error than legs alone (6.5 against 6.8 cm).
@@ -152,7 +152,7 @@ The jump shifts the camera's position only, as the T265 doc says its pose jumps 
 "Readings used" counts only ticks outside the dropout. A run is **locked out** when it uses under 5% of the readings after the jump.
 
 - **`cam_vel`: the gate changes almost nothing.** A pose jump shifts the camera frame, not its velocity; the gate rejects about 1% of readings both before and after the jump, the rate expected of a 99% bound, and NEES moves from 6.61 to 6.45.
-- **`cam_pose` without a gate follows the jump** (its error curve steps up at the jumps in the figure; 24.6 cm at the end). With the gate it uses only 10% of the readings after the jump and is locked out in 23 of 30 runs. Its error is then lower (13.0 cm at the end), but it remains overconfident (NEES 1196), as it already was without any jump in experiment 1.
+- **`cam_pose` without a gate follows the jump** (its error curve steps up at the jumps in the figure; 24.6 cm at the end). With the gate, it uses only 10% of the readings after the jump and is locked out in 23 of 30 runs. Its error is then lower (13.0 cm at the end), but it remains overconfident (NEES 1196), as it already was without any jump in experiment 1.
 - **`cam_pose_drift` is consistent with or without the gate** (2.95, 2.98), with the same error (4.47 cm at the end, against 21.8 cm for legs alone on these draws). The gate rejects 17% of the readings after the jump but locks out no run.
 - **The dropout's cost is not measured separately**: every run in this experiment has one.
 
@@ -168,7 +168,7 @@ The jump shifts the camera's position only, as the T265 doc says its pose jumps 
 
 - **Delay $`d`$:** the time between the camera sampling the body and the filter receiving the reading. It is constant in a run. The reading at tick $`k`$ describes the body at time $`t_k - d`$ (position, rotation and velocity, all in the camera's drifting frame as before). Between two 20 ms ticks the body follows the IMU model with constant inputs per tick, which is how the truth is built. The first readings, from before the start, do not exist.
 - **The delay value is a sweep, not a T265 value.** No measured T265 pose latency was found. Intel states a design target for the T265 of "latency under 6ms" (ref. 8; a target, for head tracking, not a measurement). Qin and Shen write that a camera-IMU time offset "usually ranges from several milliseconds to hundreds of milliseconds" (ref. 7). Pronto reports 150-300 ms for its own visual odometry, not for a T265 (ref. 5). The sweep 0, 10, 30, 100, 200 ms covers these ranges; it is an assumption.
-- **Setup.** `cam_pose_drift` (§2) with no jump, dropout or gate; 30 trials; 20 s of tripod walking (not 60 s, to keep the run near 9 minutes). Two walks: a **straight walk** (0.2 m/s, as above) and a **turning walk** (initial turn rate 0.2 rad/s, the contact doc's default; the turn rate then random-walks as in the contact doc). With no delay, the straight 60 s walk reproduces experiment 1's `cam_pose_drift` line exactly (`--delay-experiment --delay-duration 60 --delays-ms 0`: position NEES 3.18, yaw NEES 1.09, position RMSE 3.21 cm, yaw RMSE 0.25°).
+- **Setup.** `cam_pose_drift` (§2) with no jump, dropout, or gate; 30 trials; 20 s of tripod walking (not 60 s, to keep the run near 9 minutes). Two walks: a **straight walk** (0.2 m/s, as above) and a **turning walk** (initial turn rate 0.2 rad/s, the contact doc's default; the turn rate then random-walks as in the contact doc). With no delay, the straight 60 s walk reproduces experiment 1's `cam_pose_drift` line exactly (`--delay-experiment --delay-duration 60 --delays-ms 0`: position NEES 3.18, yaw NEES 1.09, position RMSE 3.21 cm, yaw RMSE 0.25°).
 
 | Filter | How the reading is compared | Delay |
 | --- | --- | --- |
@@ -185,7 +185,7 @@ The jump shifts the camera's position only, as the T265 doc says its pose jumps 
 | 100 | 21.5 | 2.86 | 0.291 | 1.150 |
 | 200 | 42.3 | 4.96 | 0.561 | 2.358 |
 
-On the straight walk the yaw part is below the camera's noise up to 30 ms and equal to it at 100 ms; the roll and pitch part is above it from 30 ms on. The roll and pitch bob (0.05 rad amplitude) is an assumption of the contact doc's toy body, so the size of this part is too.
+On the straight walk, the yaw part is below the camera's noise up to 30 ms and equal to it at 100 ms; the roll and pitch part is above it from 30 ms on. The roll and pitch bob (0.05 rad amplitude) is an assumption of the contact doc's toy body, so the size of this part is too.
 
 ### 5.2 How `known` and `estimated` work
 
@@ -194,14 +194,14 @@ On the straight walk the yaw part is below the camera's noise up to 30 ms and eq
 - **Estimated delay.** The column of the Jacobian for $`\hat d`$ is minus the rate at which the predicted reading changes: for rotation, minus the rewound rotation times the gyro reading; for position, minus the rewound velocity. The estimate may go negative; the filter then runs the current estimate forward with the latest IMU reading. It is clipped to -0.2-1 s.
 - **Not modeled** in `known`: the process noise accumulated over $`d`$ (from the IMU noise, 0.37 mm and 0.018° over 200 ms, against the camera's 5 mm and 0.29°; a side check, not in the script) and the leg updates since the reading was taken, which a full replay (as in Pronto, ref. 5) would redo.
 - **Li and Mourikis (ref. 6).** Their delay $`t_d`$ is defined so that an image with timestamp $`t`$ was captured at $`t + t_d`$ (ref. 6, §3), so a late camera has $`t_d = -d`$. They compare the reading with the state estimated at $`t + \hat t_d`$ (ref. 6, eqs. 21-24) and put $`t_d`$ in the EKF state with Jacobian $`H_\theta \hat\omega + H_p \hat v`$ (eq. 26): the rotation and position Jacobians times the angular and linear velocity, which is the rate of change of the predicted reading. Ours is the same rate with the opposite sign ($`t_d = -d`$). Two differences: they propagate the filter to $`t + \hat t_d`$, so with a late camera their estimate lags (ref. 6, §4.4), while ours rewinds the current estimate only to predict the reading, so the estimate stays current; and their readings are image features with camera-IMU extrinsics, ours a pose with offsets. Their timestamp jitter term (eq. 32) is not modeled here.
-- **Against an exact replay.** A reference filter that runs 100 ms (5 ticks) behind, takes each reading at its own tick and is replayed to the present, has a position RMSE of 1.03 cm averaged over 8 runs of 10 s, `known` 0.89 cm and `ignore` 1.89 cm (a side check with the test file's replay helper, not in the script). Per run, `known` is lower than the replay in 6 of 8 runs and higher in 2 (by up to 0.3 cm): no sign that it is worse.
+- **Against an exact replay.** A reference filter that runs 100 ms (5 ticks) behind, takes each reading at its own tick, and is replayed to the present, has a position RMSE of 1.03 cm averaged over 8 runs of 10 s, `known` 0.89 cm and `ignore` 1.89 cm (a side check with the test file's replay helper, not in the script). Per run, `known` is lower than the replay in 6 of 8 runs and higher in 2 (by up to 0.3 cm): no sign that it is worse.
 
 **Checked** (the 15 new tests in `tests/use_numpy/test_hexapod_camera_fusion_inekf.py`):
 - a delayed camera reads the body at the earlier time, also for delays that are not a whole number of ticks;
 - a `known` filter at the truth, with the true IMU readings, has a zero residual (10, 30, 100, 200 ms);
 - the 9×9 map from the current error to the earlier error matches a propagation of a perturbed state;
 - the Jacobian column of $`\hat d`$ matches finite differences (also for a negative $`\hat d`$), and so does the whole Jacobian on the error of rotation, velocity, position, the offsets and $`\hat d`$;
-- with no delay, `known` and `estimated` (with a zero prior std on $`\hat d`$) equal `ignore`;
+- with no delay, `known` and `estimated` (with a zero prior std on $`\hat d`$) are equal to `ignore`;
 - `known` stays close to the replay on one run, and `estimated` recovers a 100 ms delay on a fixed seed.
 
 ### 5.3 Results (30 trials, 20 s)
@@ -232,9 +232,9 @@ On the straight walk the yaw part is below the camera's noise up to 30 ms and eq
 
 *Figure: `uv run python use_numpy/hexapod_camera_fusion_inekf.py --delay-experiment --out assets/hexapod_camera_fusion_inekf_delay.png` (about 9 minutes). Bottom row: mean estimate over the trials, with the filter's std shaded and the true delay dotted; then §5.5.*
 
-- **Ignoring a delay costs little up to 10 ms and then grows.** On the straight walk, 30 ms leaves position NEES in the consistent band (2.24) with 8% more position error (1.31 against 1.21 cm). At 100 ms NEES is 7.11 and the error 2.21 cm; at 200 ms, 16.77 and 3.44 cm, 2.8 times the no-delay error.
-- **The turning walk shows the yaw.** A yaw reading that lags by the turn rate times the delay: 0.114° at 10 ms to 2.358° at 200 ms (table above). Yaw NEES is 1.93 at 10 ms (band up to 1.57), 6.53 at 30 ms and 176.81 at 200 ms, with yaw error 2.07° against 0.17°. On the straight walk, yaw is hurt later: NEES 1.09 (inside the band) at 100 ms, 2.72 at 200 ms.
-- **`known` removes the effect.** Its position error moves from 1.21 to 1.27 cm over the sweep (straight), its yaw error not at all (0.12°), and its NEES stays in the no-delay range (1.65-1.78 straight, 2.50-2.88 turning).
+- **Ignoring a delay costs little up to 10 ms and then grows.** On the straight walk, 30 ms leaves position NEES in the consistent band (2.24) with 8% more position error (1.31 against 1.21 cm). At 100 ms, NEES is 7.11, and the error is 2.21 cm; at 200 ms, 16.77 and 3.44 cm, 2.8 times the no-delay error.
+- **The turning walk shows the yaw.** A yaw reading that lags by the turn rate times the delay: 0.114° at 10 ms to 2.358° at 200 ms (table above). Yaw NEES is 1.93 at 10 ms (band up to 1.57), 6.53 at 30 ms, and 176.81 at 200 ms, with yaw error 2.07° against 0.17°. On the straight walk, yaw is worse later: NEES 1.09 (inside the band) at 100 ms, 2.72 at 200 ms.
+- **`known` removes the effect.** Its position error moves from 1.21 to 1.27 cm over the sweep (straight), its yaw error is not at all (0.12°), and its NEES stays in the no-delay range (1.65-1.78 straight, 2.50-2.88 turning).
 - **`estimated` matches `known` up to 100 ms and is slightly worse at 200 ms** (position NEES 2.18 against 1.65 straight, 3.32 against 2.50 turning; after the first 5 s still 2.06 against 1.71 and 3.25 against 2.62), within the consistent band but above `known`. The cause is not isolated.
 - **Cost per tick** (straight walk, from the same run): `ignore` 0.55 ms; `known` 0.61 ms (10 ms) to 0.78 ms (200 ms), `estimated` 0.65 to 0.84 ms; the rewind goes back one tick per 20 ms of delay.
 
@@ -265,15 +265,15 @@ Li and Mourikis show that their time offset is locally identifiable "except in a
 | constant velocity, no rotation | 49.37 | 15.81 |
 | constant velocity and constant turn rate | 39.33 | 15.60 |
 
-- **The delay is only identified with enough variation in the motion.** Without the body bob the error is 25 ms; with a constant velocity or a constant turn rate it is 39-49 ms, the degenerate cases of ref. 6. The default walk is not degenerate here, mainly because of the bob (an assumption of the toy, above); the prior std of 100 ms falls to 0.3 ms with it and to 14-16 ms without it.
+- **The delay is only identified with enough variation in the motion.** Without the body bob, the error is 25 ms; with a constant velocity or a constant turn rate, it is 39-49 ms, the degenerate cases of ref. 6. The default walk is not degenerate here, mainly because of the bob (an assumption of the toy, above); the prior std of 100 ms falls to 0.3 ms with it and to 14-16 ms without it.
 - **A constant turn does not help.** A constant turn rate is "constant rotational velocity", which ref. 6 lists as degenerate, and the run agrees (39 ms). The turning walk of §5.3 is identifiable because of the bob and the random-walk turn rate, not because it turns.
-- **In the degenerate cases the filter is overconfident:** its std (14-16 ms) is below its RMS error (25-49 ms).
+- **In the degenerate cases, the filter is overconfident:** its std (14-16 ms) is below its RMS error (25-49 ms).
 - **Why the std still falls from 100 ms to about 15 ms is likely** the known start: the camera frame starts at the world pose, and the position offset's prior std is 1 mm, so a 100 ms delay at 0.2 m/s (2 cm) is visible before the offset's variance grows. This was not isolated.
 
 ### 5.6 What §5 does not show
 
 - **A real T265 delay.** The sweep is an assumption. The delay is constant, with no timestamp jitter (ref. 6 models it) and no camera-to-IMU clock drift.
-- **The other filters and failures with a delay.** `cam_vel` and `cam_pose` are not run with a delay (`cam_vel` adds little, `cam_pose` is already overconfident), nor are the jump, the dropout and the gate.
+- **The other filters and failures with a delay.** `cam_vel` and `cam_pose` are not run with a delay (`cam_vel` adds little, `cam_pose` is already overconfident), nor are the jump, the dropout, and the gate.
 - **A full replay for every delay.** The replay reference is one 100 ms comparison on 8 short runs.
 - **Longer runs.** The experiment is 20 s, not 60 s.
 
@@ -281,7 +281,7 @@ Li and Mourikis show that their time offset is locally identifiable "except in a
 
 ## 6. What this toy does not show
 
-- **Real T265 numbers.** The drift model (one zero-mean scale error plus a yaw random walk), the noise levels and the jump sizes are assumptions. Only the 0.7-2.0% drift range comes from a measurement (ref. 3), and that was not on a walking robot.
+- **Real T265 numbers.** The drift model (one zero-mean scale error plus a yaw random walk), the noise levels, and the jump sizes are assumptions. Only the 0.7-2.0% drift range comes from a measurement (ref. 3), and that was not on a walking robot.
 - **Correlated VIO errors.** A real VIO's errors are smooth over time, not white per reading. The camera is also read at the filter's 50 Hz, not at 200 Hz. White readings this fast make the filter more confident than real ones would justify.
 - **Vibration and delay.** Walking vibration (ref. 4) is not modeled. The camera's latency is modeled only in experiment 3 (§5): a constant delay, as a sweep, for `cam_pose_drift` alone. Pronto (ref. 5) reports its visual odometry arriving 150-300 ms late and replays the filter from the reading's time.
 - **The tracker confidence.** Readings with low confidence are not given less weight; dropouts are simply missing readings.
