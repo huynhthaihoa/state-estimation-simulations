@@ -1,6 +1,6 @@
 # Sparse Cholesky Factorization
 
-Sparse Cholesky factorization is **Cholesky factorization designed to avoid unnecessary work on zeros**.
+Sparse Cholesky factorization is a **Cholesky factorization designed to avoid unnecessary work on zeros**.
 
 For a symmetric positive-definite matrix $A$, ordinary Cholesky decomposes:
 
@@ -142,9 +142,9 @@ The intuitive way to see it is through variable elimination. Take this graph:
 1 ─ 2 ─ 3
 ```
 
-Initially 1 is connected to 2, 2 is connected to 3, and 1 is **not** connected to 3.
+Initially, 1 is connected to 2, 2 is connected to 3, and 1 is **not** connected to 3.
 
-Now eliminate variable 2. Because 2 connects both 1 and 3, after removing 2 we need to connect its neighbors:
+Now eliminate variable 2. Because 2 connects both 1 and 3, after removing 2, we need to connect its neighbors:
 
 ```text
 1 ───── 3
@@ -173,9 +173,9 @@ The figure below applies this to a real bundle-adjustment problem, with the same
 
 The animation below builds the same three factors $L$ column by column, one camera (6 columns) or one landmark (3 columns) per step, 56 steps in all, with black for entries of $L$ that are also nonzero in $H$ and red for fill-in. **Caveat:** eliminating a variable creates fill-in between its remaining neighbors, but each such nonzero of $L$ sits in the column of one of those neighbors, which is eliminated later, so it is drawn only when that column is built. The salmon entries and the dashed curve therefore count fill-in already created, and the red entries and the solid curve count fill-in drawn in the columns built so far.
 
-In this run, landmarks first creates all 1008 of its fill-in entries during the landmark steps yet draws no red before step 49 (the first camera column), and poses first draws its first red at step 9 (the first landmark column). The scene, the orders and the final counts (the table below; nnz of the lower triangle of $H$ = 5712) are those of the static figure, from `utils.symbolic_eliminate`, and the script asserts them. The fill-in created at each step is derived from that function's separators; one block per step and the holds at the start and end are display choices.
+In this run, landmarks first creates all 1008 of its fill-in entries during the landmark steps yet draws no red before step 49 (the first camera column), and poses first draws its first red at step 9 (the first landmark column). The scene, the orders, and the final counts (the table below; nnz of the lower triangle of $H$ = 5712) are those of the static figure, from `utils.symbolic_eliminate`, and the script asserts them. The fill-in created at each step is derived from that function's separators; one block per step and the holds at the start and end are display choices.
 
-![Animation of the Cholesky factor L being built column by column for the same bundle-adjustment problem under three elimination orders, poses first, landmarks first and interleaved. Black entries also appear in H, red entries are fill-in, salmon entries are fill-in already created whose column is not built yet. Under each panel, counters give the columns built, nnz of L so far and fill-in drawn and created; a curve below plots both fill-in counts against the step. Poses first draws a growing red triangle over the landmark columns after the cameras, landmarks first draws red only in the last camera columns, and interleaved draws red from the first columns on. The final fill-in is 10107, 1008 and 7740 entries.](../../assets/sparse_cholesky_fill_in.gif)
+![Animation of the Cholesky factor L being built column by column for the same bundle-adjustment problem under three elimination orders, poses first, landmarks first, and interleaved. Black entries also appear in H, red entries are fill-in, and salmon entries are fill-in already created whose column is not built yet. Under each panel, counters give the columns built, nnz of L so far, and fill-in drawn and created; a curve below plots both fill-in counts against the step. Poses first draws a growing red triangle over the landmark columns after the cameras; landmarks first draws red only in the last camera columns, and interleaved draws red from the first columns on. The final fill-in is 10107, 1008, and 7740 entries.](../../assets/sparse_cholesky_fill_in.gif)
 
 *Animation: `uv run python generator/animate_sparse_cholesky_fill_in.py --out assets/sparse_cholesky_fill_in.gif` (seed 0, the default; the counts are entries, not run time).*
 
@@ -198,7 +198,7 @@ Finding the truly optimal order is NP-hard (no known polynomial-time algorithm),
 
 - **AMD** (Approximate Minimum Degree): repeatedly eliminate the variable with the fewest remaining neighbors.
 - **COLAMD:** the same idea, computed from the columns of $J$ without forming $H$. It is a common choice for batch solvers.
-- **CCOLAMD:** constrained COLAMD, which can force chosen variables (for example the newest poses) to the end. iSAM2 (an incremental solver) uses it ([isam2_optimization.md §12](isam2_optimization.md#12-variable-ordering-is-also-crucial)).
+- **CCOLAMD:** constrained COLAMD, which can force chosen variables (for example, the newest poses) to the end. iSAM2 (an incremental solver) uses it ([isam2_optimization.md §12](isam2_optimization.md#12-variable-ordering-is-also-crucial)).
 - **Nested dissection:** split the graph with a small **separator** (a set of variables whose removal disconnects it), order each half recursively, and put the separator last.
 
 [elimination_tree.md §9](elimination_tree.md#9-why-ordering-matters-so-much) works through the effect of ordering on two bundle-adjustment examples.
