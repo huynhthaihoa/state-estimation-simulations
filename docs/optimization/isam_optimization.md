@@ -13,7 +13,7 @@ t0       t1       t2       t3
 x0 ───── x1 ───── x2 ───── x3
 ```
 
-At every timestep we receive new measurements. A traditional **batch** approach does:
+At every time step, we receive new measurements. A traditional **batch** approach does:
 
 ```text
 Measurement at t0
@@ -210,7 +210,7 @@ $x_0$ is the anchor, so it stays put. The small errors of every odometry step ad
 
 This is the expensive case (see §6).
 
-This is why **smoothing** matters: the system is not merely estimating $x_t$, it keeps refining $x_0, \ldots, x_t$ using all available information.
+This is why **smoothing** matters: the system is not merely estimating $x_t$; it keeps refining $x_0, \ldots, x_t$ using all available information.
 
 ---
 
@@ -220,7 +220,7 @@ Full comparison: **[filtering vs optimization/smoothing](../filtering_smoothing.
 
 ### EKF-style filtering
 
-Once $x_0$ is processed, its information is summarized and the filter moves forward. It tracks $`P(x_t \mid z_{1:t})`$, where $`z_{1:t}`$ denotes all measurements received from time 1 to $`t`$.
+Once $x_0$ is processed, its information is summarized, and the filter moves forward. It tracks $`P(x_t \mid z_{1:t})`$, where $`z_{1:t}`$ denotes all measurements received from time 1 to $`t`$.
 
 > **Filtering:** "What is my best estimate of the robot NOW?"
 
@@ -234,7 +234,7 @@ It maintains the entire trajectory $x_{0:t}$ and continuously refines it.
 
 ## 11. Where iSAM fits into the SLAM mental map
 
-The full map is in [slam_mental_map.md](../slam_mental_map.md), which places every doc and script on one picture. iSAM sits under **smoothing**, **factor graph**, **nonlinear optimization**, **incremental** (next to batch: Gauss-Newton and Levenberg-Marquardt). Underneath the pose optimization (see the [glossary](../glossary.md#1-geometry-and-lie-groups) for SE(3), Lie algebra and perturbation) the chain is SE(3) → Lie algebra → perturbation → Jacobian → linearization → Gauss-Newton → factorization → iSAM/iSAM2.
+The full map is in [slam_mental_map.md](../slam_mental_map.md), which places every doc and script on one picture. iSAM sits under **smoothing**, **factor graph**, **nonlinear optimization**, **incremental** (next to batch: Gauss-Newton and Levenberg-Marquardt). Underneath the pose optimization (see the [glossary](../glossary.md#1-geometry-and-lie-groups) for SE(3), Lie algebra and perturbation), the chain is SE(3) → Lie algebra → perturbation → Jacobian → linearization → Gauss-Newton → factorization → iSAM/iSAM2.
 
 ---
 
@@ -307,10 +307,10 @@ It stops when ${\lVert \boldsymbol{\delta} \rVert <}$ `--gn-tol` (default $10^{-
 
 **Intuition for a Givens rotation:** it turns two rows to push one entry to zero, like turning a ruler.
 - **Tiny example (one column):** $`R_{cc} = 3`$ and the new row has $`a_c = 4`$. Then $`\rho = 5`$, $`\gamma = 0.6`$, $`\sigma = 0.8`$ (the combined length, cosine and sine of the rotation, formulas below).
-- The rotated entries are $`(\gamma \cdot 3 + \sigma \cdot 4,\; -\sigma \cdot 3 + \gamma \cdot 4) = (5, 0)`$. The new row's entry is zeroed and $`R_{cc}`$ grows to 5.
+- The rotated entries are $`(\gamma \cdot 3 + \sigma \cdot 4,\; -\sigma \cdot 3 + \gamma \cdot 4) = (5, 0)`$. The new row's entry is zeroed, and $`R_{cc}`$ grows to 5.
 - Nothing is lost: $`3^2 + 4^2 = 5^2`$. A rotation only mixes rows, so the information is kept.
 
-**Givens row insertion** (`qr_insert_row` in `utils.py`): this absorbs one new whitened row ${(\mathbf{a}, \beta)}$ into ${(R, d)}$ without refactorizing. For each column $c$ where ${\lvert a_c \rvert \ge 10^{-14}}$, a plane rotation mixes row $c$ of the system with the new row so that $a_c$ becomes 0:
+**Givens row insertion** (`qr_insert_row` in `utils.py`): this absorbs one new whitened row ${(\mathbf{a}, \beta)}$ into ${(R, d)}$ without refactoring. For each column $c$ where ${\lvert a_c \rvert \ge 10^{-14}}$, a plane rotation mixes row $c$ of the system with the new row so that $a_c$ becomes 0:
 
 $$\rho = \sqrt{R_{cc}^2 + a_c^2}, \qquad \gamma = \frac{R_{cc}}{\rho}, \qquad \sigma = \frac{a_c}{\rho}$$
 
@@ -349,7 +349,7 @@ It starts from the read-out estimate $X$, not from ${\bar{X}}$. The script never
 - That makes 9 full relinearizations: the initial one, 7 periodic ones (${k = 8, 16, \ldots, 56}$) and the loop-closure one at ${k = 63}$.
 - The `run_batch_streaming` baseline instead runs `pose_graph.py`'s damped solver from scratch 63 times, starting at `--damping 0.01`.
 - With `--seed 0`, both solvers finish at the same final-node position error (0.0334 m) and rotation error (0.377 deg).
-- The `use_manif/` twin has the same flow, triggers and defaults. It retracts with `x_lin[k] + manif.SE3Tangent(delta_k)`.
+- The `use_manif/` twin has the same flow, triggers, and defaults. It retracts with `x_lin[k] + manif.SE3Tangent(delta_k)`.
 
 ---
 
