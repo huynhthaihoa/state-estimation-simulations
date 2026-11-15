@@ -6,7 +6,7 @@ We can tell by looking at the model equations, not the data. Write the two model
 x_{k+1} = f(x_k, u_k) + w_k \qquad z_k = h(x_k) + v_k
 ```
 
-The system is linear only if both $f$ and $h$ are linear in the state $x$, meaning they can be written as $f = F x + G u$ and $h = H x$, where $F$, $G$, $H$ don't depend on $x$. Here $`u_k`$ is the control input and $`v_k`$ the measurement noise ([glossary](../glossary.md#ekf-extended-kalman-filter)), $`w_k`$ is the process noise ([glossary](../glossary.md#predict-and-update-steps)), and $`G`$ maps the input into the state. If either $f$ or $h$ isn't linear, the system is nonlinear and the plain Kalman filter (KF) is no longer the exact answer.
+The system is linear only if both $f$ and $h$ are linear in the state $x$, meaning they can be written as $f = F x + G u$ and $h = H x$, where $F$, $G$, $H$ don't depend on $x$. Here $`u_k`$ is the control input and $`v_k`$ the measurement noise ([glossary](../glossary.md#ekf-extended-kalman-filter)), $`w_k`$ is the process noise ([glossary](../glossary.md#predict-and-update-steps)), and $`G`$ maps the input into the state. If either $f$ or $h$ isn't linear, the system is nonlinear, and the plain Kalman filter (KF) is no longer the exact answer.
 
 ## 1. Three ways to tell
 
@@ -18,7 +18,7 @@ The system is linear only if both $f$ and $h$ are linear in the state $x$, meani
    - **Rotations or poses in minimal coordinates** (as many numbers as degrees of freedom; [glossary](../glossary.md#minimal-vs-ambient-redundant-parameterization)): composing $T \cdot \mathrm{Exp}(\xi)$ (pose $`T`$, tangent-space error $`\xi`$, **exponential map** $`\mathrm{Exp}`$; [glossary](../glossary.md#exp-and-log-maps)), or a pose parameterized by angles. The point-cloud observation $`R\,p_i + t`$ is the counter-example: it is exactly linear in the state $[\mathrm{vec}(R), t]$ ($\mathrm{vec}(R)$ is the 9 entries of $R$ flattened row-major, as `R.flatten()`; [kf_ekf_iekf.md §1](kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear); see [pointcloud_pose_tracking_empirical_note.md §4.1](pointcloud_pose_tracking_empirical_note.md#41-what-vanilla-buys-and-costs)). The nonlinearity enters through the rotation constraint and the minimal error coordinates.
    - **Division by a state:** camera projection $u = f_x X/Z$ (here $`u`$ is the pixel coordinate, not the control input; $`f_x`$ is the focal length in pixels, not the motion model $`f`$; $`X`$ and $`Z`$ are the lateral and depth coordinates of the point in the camera frame).
    - **Norms and square roots:** range $\sqrt{(x-x_L)^2 + (y-y_L)^2}$ (robot position $`(x, y)`$, [landmark](../glossary.md#landmark) position $`(x_L, y_L)`$).
-   - **Switching or contact:** impacts, or stick/slip friction. These are non-smooth, which is what the saltation-matrix EKF in [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) handles.
+   - **Switching or contact:** impacts or stick/slip friction. These are non-smooth, which is what the saltation-matrix EKF in [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) handles.
 
 The first two tests are exact. The third is a heuristic for spotting what will fail them.
 
@@ -60,7 +60,7 @@ The same question comes up in optimization, where every [Gauss-Newton](../optimi
 
 ## 4. How do you know whether it's nonlinear over your uncertainty region?
 
-The test is always the same: compare the part the linearization leaves out with the noise the filter already expects. Small leftover means a good linear approximation over our uncertainty region. Four ways to check:
+The test is always the same: compare the part the linearization leaves out with the noise the filter already expects. A small leftover means a good linear approximation over our uncertainty region. Four ways to check:
 
 ### 4.1 Analytic: the second-order term
 
