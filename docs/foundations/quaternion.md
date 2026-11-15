@@ -12,7 +12,7 @@ Take a robot. It can point **left/right** (yaw), tilt **up/down** (pitch), and r
 
 But three angles cause two separate problems:
 
-- **Gimbal lock.** At certain orientations (for the common yaw-pitch-roll order, pitch $= \pm 90°$) two of the three rotation axes line up, and one degree of freedom disappears. Different angle combinations then give the same orientation, and small orientation changes can need large angle jumps. It is a singularity of the three-angle description, not of rotation itself.
+- **Gimbal lock.** At certain orientations (for the common yaw-pitch-roll order, pitch $= \pm 90°$) two of the three rotation axes line up, and one degree of freedom disappears. Different angle combinations then give the same orientation, and small orientation changes can require large angle jumps. It is a singularity of the three-angle description, not of rotation itself.
 - **Order conventions.** Rotating around X and then Y is not the same as around Y and then X, so every set of Euler angles only means something together with its convention (XYZ, ZYX, ...). Interpolating the three angles separately also gives awkward paths.
 
 Unit quaternions avoid gimbal lock because no orientation is singular. They do not make rotation order-independent (nothing can: composing rotations is inherently order-dependent, §13), but once a convention is fixed, composition is a single multiplication.
@@ -183,9 +183,9 @@ This matters for **optimization, SLAM, [EKF](../glossary.md#ekf-extended-kalman-
 - **Additive updates break the unit-norm constraint.** Adding a small correction to $q$ leaves the unit sphere (the set of quaternions with norm 1).
 - **The double cover makes averaging and differencing ambiguous.** The **double cover** means each rotation has two quaternions, $`q`$ and $`-q`$. Averaging $q$ and $-q$ (the same rotation) gives $(0,0,0,0)$, which is not a rotation. Their component-wise difference is as large as possible.
 
-The animation below turns a box about Z from 0° to 720°. The left panel shows the box, oriented by `quat_to_rotation(q)` (`utils.py`). The right panel shows $`q = (\cos\frac{\theta}{2}, 0, 0, \sin\frac{\theta}{2})`$ (the §2 formula with axis $`(0,0,1)`$) as a point on the unit circle in the $`(w, z)`$ plane, together with $`-q`$ (hollow), the opposite point. At every frame $`q`$ and $`-q`$ give the same box (asserted in the generator). Because of the half angle in §2, the box is back at its start after $`	heta = 360°`$ (a full turn), but $`q`$ has only reached $`(-1, 0, 0, 0) = -q_{\text{start}}`$; $`q`$ itself returns to $`(+1, 0, 0, 0)`$ only after $`\theta = 720°`$. The numbers are exact (no simulation, no randomness); the box shape, camera angle, 10° step per frame and the pauses at 360° and 720° are illustrative.
+The animation below turns a box about Z from 0° to 720°. The left panel shows the box, oriented by `quat_to_rotation(q)` (`utils.py`). The right panel shows $`q = (\cos\frac{\theta}{2}, 0, 0, \sin\frac{\theta}{2})`$ (the §2 formula with axis $`(0,0,1)`$) as a point on the unit circle in the $`(w, z)`$ plane, together with $`-q`$ (hollow), the opposite point. At every frame $`q`$ and $`-q`$ give the same box (asserted in the generator). Because of the half angle in §2, the box is back at its start after $`	heta = 360°`$ (a full turn), but $`q`$ has only reached $`(-1, 0, 0, 0) = -q_{\text{start}}`$; $`q`$ itself returns to $`(+1, 0, 0, 0)`$ only after $`\theta = 720°`$. The numbers are exact (no simulation, no randomness); the box shape, camera angle, 10° step per frame, and the pauses at 360° and 720° are illustrative.
 
-![A box turning about Z from 0 to 720 degrees next to its unit quaternion (w, z) moving once around the unit circle; at 360 degrees the box is back at its start but q equals -q of the start](../../assets/quaternion_double_cover.gif)
+![A box turning about Z from 0 to 720 degrees next to its unit quaternion (w, z) moving once around the unit circle; at 360 degrees the box is back at its start, but q equals -q of the start](../../assets/quaternion_double_cover.gif)
 
 *Animation: `uv run python generator/animate_quaternion_double_cover.py --out assets/quaternion_double_cover.gif` (exact math, no seed).*
 
@@ -405,5 +405,5 @@ In 3D, one quaternion multiplication leaks out of 3D whenever the vector has a c
 
 ## 14. References
 
-1. Diebel, J. (2006). *Representing Attitude: Euler Angles, Unit Quaternions, and Rotation Vectors*. Stanford University Technical Report. https://www.astro.rug.nl/software/kapteyn-beta/_downloads/attitude.pdf - a widely-cited technical reference covering the quaternion/Euler-angle/rotation-vector conversions and conventions this doc builds intuition for.
+1. Diebel, J. (2006). *Representing Attitude: Euler Angles, Unit Quaternions, and Rotation Vectors*. Stanford University Technical Report. https://www.astro.rug.nl/software/kapteyn-beta/_downloads/attitude.pdf - a widely cited technical reference covering the quaternion/Euler-angle/rotation-vector conversions and conventions this doc builds intuition for.
 2. Solà, J. (2017). *Quaternion kinematics for the error-state Kalman filter*. arXiv:1711.02508. https://arxiv.org/abs/1711.02508 - the Hamilton vs. JPL comparison in the §2 note, and the body-frame quaternion error of §11.
