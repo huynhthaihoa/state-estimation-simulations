@@ -116,7 +116,7 @@ Here $`f_x, f_y`$ are the camera's focal lengths (in pixels) and $`u, v`$ are pi
 The Jacobian answers that to first order. For example:
 
 - $\partial u/\partial X = f_x/Z$: if $X$ changes slightly, $u$ changes by about $f_x/Z$ times that amount.
-- $\partial u/\partial Z = -f_x X/Z^2$: moving the point in depth changes its image position, by an amount that depends on its current depth and horizontal position.
+- $\partial u/\partial Z = -f_x X/Z^2$: moving the point in depth changes its image position by an amount that depends on its current depth and horizontal position.
 
 Putting every partial derivative together gives the full Jacobian:
 
@@ -132,7 +132,7 @@ Notice the zeros: $\partial u/\partial Y = 0$ and $\partial v/\partial X = 0$, b
 
 ## 5. Why does EKF need it?
 
-Suppose the real system is nonlinear: $z = h(x)$. The [EKF (Extended Kalman Filter)](../glossary.md#ekf-extended-kalman-filter) still evaluates the exact $h$ at its estimate, to predict the measurement. What it can't do is push a whole probability distribution through $h$ exactly: the Kalman gain and covariance update need a linear model. So for those it asks:
+Suppose the real system is nonlinear: $z = h(x)$. The [EKF (Extended Kalman Filter)](../glossary.md#ekf-extended-kalman-filter) still evaluates the exact $h$ at its estimate to predict the measurement. What it can't do is push a whole probability distribution through $h$ exactly: the Kalman gain and covariance update need a linear model. So for those it asks:
 
 > "Around my current estimate $\hat{x}$, can I approximate this nonlinear function with a linear one?"
 
@@ -217,7 +217,7 @@ So instead of blindly asking "What is the derivative with respect to my state ve
 
 Here the **state manifold** is the curved (but locally flat) space the state lives in, so plain addition does not apply ([glossary](../glossary.md#manifold)). That's one reason Lie groups (the set of rotations or poses, which can be composed; [glossary](../glossary.md#lie-group)) and Jacobians become so tightly connected in modern SLAM.
 
-A manifold perturbation on its own isn't yet what makes a filter **invariant**: error-state filters such as the ESKF and [MEKF](../glossary.md#mekf-multiplicative-ekf) (multiplicative EKF, which perturbs attitude by composition) already perturb on the manifold. The IEKF goes one step further and picks a left- or right-[invariant](../glossary.md#invariant-and-equivariant) error. For **group-affine** dynamics ([glossary](../glossary.md#group-affine-dynamics-trajectory-independence)) this makes its error-propagation Jacobian independent of the current estimate (see [lie_algebra.md §11.1](lie_algebra.md#111-extended-poses-pose-plus-velocity)). See [kf_ekf_iekf.md §5](../filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error) and [left_right_invariant.md](../filtering/left_right_invariant.md).
+A manifold perturbation on its own isn't yet what makes a filter **invariant**: error-state filters such as the ESKF and [MEKF](../glossary.md#mekf-multiplicative-ekf) (multiplicative EKF, which perturbs attitude by composition) already perturb on the manifold. The IEKF goes one step further and picks a left- or right-[invariant](../glossary.md#invariant-and-equivariant) error. For **group-affine** dynamics ([glossary](../glossary.md#group-affine-dynamics-trajectory-independence)), this makes its error-propagation Jacobian independent of the current estimate (see [lie_algebra.md §11.1](lie_algebra.md#111-extended-poses-pose-plus-velocity)). See [kf_ekf_iekf.md §5](../filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error) and [left_right_invariant.md](../filtering/left_right_invariant.md).
 
 ---
 
@@ -239,13 +239,13 @@ In the EKF specifically:
 
 Everywhere above, perturbing an input meant simple addition: $x \to x + \delta x$. That works because $x$ lives in a vector space.
 
-A rotation $R \in SO(3)$ ([glossary](../glossary.md#so3-and-se3): the set of 3D rotation matrices) does not. There is no such thing as $R + \delta R$ - the result generally isn't even a valid rotation. Instead, a small perturbation is a **rotation vector** $\delta\varphi \in \mathbb{R}^3$: its direction is the rotation axis and its length the angle in radians. The exponential map $\mathrm{Exp}(\delta\varphi)$ ([lie_algebra.md §8](lie_algebra.md#8-the-exponential-map), [glossary](../glossary.md#exp-and-log-maps)) turns it into the rotation matrix that turns by that angle about that axis, and that matrix is then **composed** (matrix-multiplied) with $R$:
+A rotation $R \in SO(3)$ ([glossary](../glossary.md#so3-and-se3): the set of 3D rotation matrices) does not. There is no such thing as $R + \delta R$ - the result generally isn't even a valid rotation. Instead, a small perturbation is a **rotation vector** $\delta\varphi \in \mathbb{R}^3$: its direction is the rotation axis and its length is the angle in radians. The exponential map $\mathrm{Exp}(\delta\varphi)$ ([lie_algebra.md §8](lie_algebra.md#8-the-exponential-map), [glossary](../glossary.md#exp-and-log-maps)) turns it into the rotation matrix that rotates by that angle about that axis, and that matrix is then **composed** (matrix-multiplied) with $R$:
 
 ```math
 R' = \mathrm{Exp}(\delta\varphi)\,R \qquad \text{or} \qquad R' = R\,\mathrm{Exp}(\delta\varphi)
 ```
 
-Both are valid ways to perturb $R$ - but they are not the same $R'$ in general, because matrix multiplication doesn't commute. That non-commutativity, together with the nonlinearity of $\mathrm{Exp}$ (§11.2), is the reason the left and right versions differ. On a vector space the distinction never comes up, because addition commutes.
+Both are valid ways to perturb $R$ - but they are not the same $R'$ in general, because matrix multiplication doesn't commute. That non-commutativity, together with the nonlinearity of $\mathrm{Exp}$ (§11.2), is the reason the left and right versions differ. On a vector space, the distinction never comes up, because addition commutes.
 
 ### 11.2 The actual question being asked
 
@@ -273,7 +273,7 @@ So $J_l$ and $J_r$ are still Jacobians in the sense of §10, applied to the expo
 
 *Figure: the same extra rotation $`\mathrm{Exp}(\delta)`$ composed on the right and on the left (computed with `so3_exp`), plotted by `uv run python generator/make_figures.py jacobian_left_right_concept`.*
 
-Near the identity ($\varphi \to 0$) there's no rotation yet to disagree about "whose frame," so $J_l(0) = J_r(0) = I$. This is the flat-tangent-plane picture of [lie_algebra.md §6](lie_algebra.md#6-lie-algebra-zoom-in-locally): at the identity the manifold looks flat. The distinction only shows up when we linearize away from the identity, around some existing rotation.
+Near the identity ($\varphi \to 0$), there's no rotation yet to disagree about "whose frame," so $J_l(0) = J_r(0) = I$. This is the flat-tangent-plane picture of [lie_algebra.md §6](lie_algebra.md#6-lie-algebra-zoom-in-locally): at the identity the manifold looks flat. The distinction only shows up when we linearize away from the identity, around some existing rotation.
 
 ### 11.4 Closed form for $SO(3)$
 
