@@ -71,8 +71,8 @@ $$x_{\text{new}} = x_{\text{old}}+\Delta x$$
 
 > **Note:** solving it needs $J^\top J$ to be invertible, i.e. $J$ must have full column rank (no direction $\Delta x$ with $J\Delta x = 0$). In SLAM it isn't by default: some motions of the whole solution change no residual (a [gauge freedom](../glossary.md#gauge-freedom)), so $J^\top J$ stays singular until something pins the solution down.
 >
-> - **Pose graphs:** shifting or rotating the whole trajectory together (6 [degrees of freedom (DoF)](../glossary.md#degrees-of-freedom-dof) in 3D). Anchoring the first pose fixes it - `pose_graph.py` does this, "heavily anchoring node 0".
-> - **Monocular (single-camera) BA:** also uniformly rescaling the scene (7 DoF), which one pose can't pin. The BA scripts fix *two* cameras instead (a prior on cameras 0 and 1, or two hard-fixed keyframes); see [bundle_adjustment.md §14](bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment).
+> - **Pose graphs:** shifting or rotating the whole trajectory together (6 [degrees of freedom (DoF)](../glossary.md#degrees-of-freedom-dof) in 3D). Anchoring the first pose fixes it - `pose_graph.py` does this: "heavily anchoring node 0".
+> - **Monocular (single-camera) BA:** also uniformly rescales the scene (7 DoF), which one pose can't pin. The BA scripts fix *two* cameras instead (a prior on cameras 0 and 1, or two hard-fixed keyframes); see [bundle_adjustment.md §14](bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment).
 >
 > [Levenberg-Marquardt](levenberg_marquardt.md)'s damping (its §4-§5; [glossary](../glossary.md#levenberg-marquardt-lm-and-damping)) also keeps the system solvable.
 
