@@ -1,6 +1,6 @@
 # Docs index
 
-Conceptual notes on the state-estimation and SLAM ideas behind the code in [`use_numpy/`](../use_numpy/) and [`use_manif/`](../use_manif/). Docs are grouped by role and, within each group, listed in reading order (later ones lean on earlier ones).
+Conceptual notes on the state estimation and SLAM ideas behind the code in [`use_numpy/`](../use_numpy/) and [`use_manif/`](../use_manif/). Docs are grouped by role and, within each group, listed in reading order (later ones lean on earlier ones).
 
 ## Start here
 
@@ -60,7 +60,7 @@ Conceptual notes on the state-estimation and SLAM ideas behind the code in [`use
 - [bundle_adjustment.md](optimization/bundle_adjustment.md): factor graphs specialized to joint camera-pose and 3D-landmark refinement.
 - [sparse_cholesky_factorization.md](optimization/sparse_cholesky_factorization.md): why real solvers exploit the sparsity of the Hessian $`H`$ ([glossary](glossary.md#normal-equations-and-hessian)) in a [Cholesky factorization](glossary.md#cholesky-factorization) (this repo's solves are dense), and the fill-in that variable-elimination order controls.
 - [imu_preintegration.md](optimization/imu_preintegration.md): compressing raw high-rate IMU samples into one relative-motion edge, with bias-sensitivity Jacobians that correct it for bias changes without re-integrating.
-- [isam_optimization.md](optimization/isam_optimization.md): incrementally updating the solution to a growing factor graph (iSAM) instead of re-solving from scratch each step. Implemented in `pose_graph_incremental.py` (original-iSAM style: Givens-rotation QR updates for odometry edges, a full rebuild at loop closure, no reordering, no Bayes tree).
+- [isam_optimization.md](optimization/isam_optimization.md): incrementally updating the solution to a growing factor graph (iSAM) instead of re-solving from scratch each step. Implemented in `pose_graph_incremental.py` (original iSAM style: Givens-rotation QR updates for odometry edges, a full rebuild at loop closure, no reordering, no Bayes tree).
 - [elimination_tree.md](optimization/elimination_tree.md): the dependency structure ("what must be computed before what") that variable elimination produces, distinct from the factor graph itself ("who talks to whom"); the setup for the Bayes tree.
 - [bayes_tree.md](optimization/bayes_tree.md): the tree representation of variable-elimination order that iSAM2 uses to find which part of the solution a new factor affects. The underlying elimination tree (one node per variable, not merged into cliques) is built from this repo's pose graph in `bayes_tree_construction.py`.
 - [isam2_optimization.md](optimization/isam2_optimization.md): iSAM's successor, adding a Bayes-tree factorization, selective relinearization and dynamic variable reordering. Only the elimination tree underlying the Bayes tree is built in this repo (`bayes_tree_construction.py`); the rest is conceptual only.
@@ -68,4 +68,4 @@ Conceptual notes on the state-estimation and SLAM ideas behind the code in [`use
 
 ## [`images/`](images/)
 
-Diagrams referenced by the docs above. The four SVGs (`frontend_backend.svg`, `frontend_backend_loop_closure.svg`, `factor_graph.svg`, `factor_graph_vs_pose_graph.svg`) are drawn for this repo by [`generator/make_frontend_backend_svgs.py`](../generator/make_frontend_backend_svgs.py) and [`generator/make_factor_graph_svgs.py`](../generator/make_factor_graph_svgs.py) and have no external source. `frontend_backend_1.jpg` to `frontend_backend_4.jpg` and `factor_graph_1.jpg` to `factor_graph_5.jpg` are third-party sketches that no doc uses any more.
+Diagrams referenced by the docs above. The four SVGs (`frontend_backend.svg`, `frontend_backend_loop_closure.svg`, `factor_graph.svg`, `factor_graph_vs_pose_graph.svg`) are drawn for this repo by [`generator/make_frontend_backend_svgs.py`](../generator/make_frontend_backend_svgs.py) and [`generator/make_factor_graph_svgs.py`](../generator/make_factor_graph_svgs.py) and have no external source. `frontend_backend_1.jpg` to `frontend_backend_4.jpg` and `factor_graph_1.jpg` to `factor_graph_5.jpg` are third-party sketches that no doc uses anymore.
