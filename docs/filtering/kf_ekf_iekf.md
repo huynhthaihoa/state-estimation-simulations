@@ -71,7 +71,7 @@ The 15 m prediction vs. 14 m GPS from the start of this doc.
 
 *Figure: the tiny example above, plotted by `uv run python generator/make_figures.py kf_update_concept`.*
 
-The animation repeats the same 1D predict/update cycle 6 times. The left panel shows the Gaussian belief about the car's position: **predict** shifts the previous estimate by the car's motion and widens it by $`Q`$ (blue, variance $P^-$); the GPS reading appears (orange, variance $`R`$); **update** blends the two into a narrower estimate (green, variance $P$). The right panels show this cycle's $P^-$, $K$, $P$ and the variance per cycle. Cycle 1 is exactly the example above ($`x^- = 15`$ m, $`P^- = 3`$, $`z = 14`$ m, $`R = 7`$, $`K = 0.3`$, $`x = 14.7`$ m, $`P = 2.1`$, asserted in the script). The rest is **illustrative** and labelled on every frame: the car moves 5 m per cycle (the 5 m/s and 1 s from the start of this section), $`Q = 1`$ and a previous variance of 2 (chosen so that $P^- = 2 + 1 = 3$ in cycle 1), and the GPS readings of cycles 2-6 are drawn with seed 0 from $`N(\text{true position}, R)`$. With these values $P^-$ settles near $`(Q + \sqrt{Q^2 + 4QR})/2 = 3.19`$ and $P$ near $`2.19`$ (the predict step's growth and the update step's shrinkage balance); that steady state depends on $`Q`$ and $`R`$ only, not on the readings. The motion between beats is interpolated for readability.
+The animation repeats the same 1D predict/update cycle 6 times. The left panel shows the Gaussian belief about the car's position: **predict** shifts the previous estimate by the car's motion and widens it by $`Q`$ (blue, variance $P^-$); the GPS reading appears (orange, variance $`R`$); **update** blends the two into a narrower estimate (green, variance $P$). The right panels show this cycle's $P^-$, $K$, $P$, and the variance per cycle. Cycle 1 is exactly the example above ($`x^- = 15`$ m, $`P^- = 3`$, $`z = 14`$ m, $`R = 7`$, $`K = 0.3`$, $`x = 14.7`$ m, $`P = 2.1`$, asserted in the script). The rest is **illustrative** and labelled on every frame: the car moves 5 m per cycle (the 5 m/s and 1 s from the start of this section), $`Q = 1`$ and a previous variance of 2 (chosen so that $P^- = 2 + 1 = 3$ in cycle 1), and the GPS readings of cycles 2-6 are drawn with seed 0 from $`N(\text{true position}, R)`$. With these values, $P^-$ settles near $`(Q + \sqrt{Q^2 + 4QR})/2 = 3.19`$ and $P$ near $`2.19`$ (the predict step's growth and the update step's shrinkage balance); that steady state depends on $`Q`$ and $`R`$ only, not on the readings. The motion between beats is interpolated for readability.
 
 ![Animation of a 1D Kalman filter over 6 cycles: a Gaussian for the car's position shifts by 5 m and widens (prediction, blue), the GPS Gaussian (orange) appears, and the update (green) is narrower than both; cycle 1 shows the doc's numbers (variance 3, K = 0.3, 14.7 m, variance 2.1), and the variance per cycle settles near 3.19 before the update and 2.19 after it](../../assets/kf_predict_update.gif)
 
@@ -145,7 +145,7 @@ The real problem is more subtle: **the EKF's Jacobians are evaluated at the curr
 - Each time the filter linearizes at a slightly different point, it linearizes the system's symmetries slightly differently too.
 - **Picture:** some things no sensor can see, such as global yaw (the heading angle; every measurement is relative). Such a direction is **unobservable** ([observability](../glossary.md#observability)). An honest filter keeps its uncertainty wide there.
 - Each new linearization point acts like a slightly different ruler. Those small differences make the filter feel it measured yaw a little, so its covariance shrinks along a direction nobody observes. (Picture only here; [observability.md §5](../foundations/observability.md#5-simulation-results) measures it on a planar SLAM toy.)
-- **The result:** the EKF can inject spurious information into directions that should stay unobservable (for example, a global orientation offset no sensor can see). The filter is then overconfident in exactly those directions: its covariance claims less error than it really has, which makes it **inconsistent** ([consistency](../glossary.md#consistency-and-nees)). Huang, Mourikis, and Roumeliotis (2010) analyzed this consistency problem for EKF-SLAM. A planar EKF-SLAM simulation that measures it (the observability matrix's null space, the information gained along the rotation, first-estimate Jacobians and the invariant EKF as fixes) is in [observability.md](../foundations/observability.md).
+- **The result:** the EKF can inject spurious information into directions that should stay unobservable (for example, a global orientation offset no sensor can see). The filter is then overconfident in exactly those directions: its covariance claims less error than it really has, which makes it **inconsistent** ([consistency](../glossary.md#consistency-and-nees)). Huang, Mourikis, and Roumeliotis (2010) analyzed this consistency problem for EKF-SLAM. A planar EKF-SLAM simulation that measures it (the observability matrix's null space, the information gained along the rotation, first-estimate Jacobians, and the invariant EKF as fixes) is in [observability.md](../foundations/observability.md).
 - The Invariant EKF goes back to Bonnabel (2007), and Barrau and Bonnabel (2017) proved its stability. Barrau and Bonnabel (2015) showed that an invariant EKF-SLAM keeps the unobservable directions unobservable, which gives it better consistency properties than the standard EKF.
 
 ![Schematic with two panels of covariance ellipses over successive updates, global yaw on the horizontal axis and an observed direction on the vertical axis. A consistent filter's ellipse narrows only vertically and stays wide along yaw, so the true error stays inside it; the standard EKF's ellipse also shrinks along yaw, leaving the true error outside](../../assets/ekf_unobservable_concept.png)
@@ -211,7 +211,7 @@ For a rotation alone, the **multiplicative** (manifold) error $`R = \hat R \exp(
 | **Invariant** | $`\eta = \hat X^{-1}X`$ (left) or $`X\hat X^{-1}`$ (right) | IEKF | **no**, for group-affine dynamics |
 
 - Widely-used filters ([ESKF](../glossary.md#eskf-error-state-kalman-filter) (error-state KF), MEKF, the error-state formulations behind most VIO (visual-inertial odometry: camera + IMU) pipelines) already define their error this way without being IEKFs.
-- What earns the name **invariant** is a further choice: putting the whole state on one group (e.g. $`(R, v, p)`$ on $`SE_2(3)`$) and defining the error by group multiplication, left ($`\hat X^{-1}X`$) or right ($`X\hat X^{-1}`$). Velocity and position errors are then invariant too.
+- What earns the name **invariant** is a further choice: putting the whole state in one group (e.g. $`(R, v, p)`$ on $`SE_2(3)`$) and defining the error by group multiplication, left ($`\hat X^{-1}X`$) or right ($`X\hat X^{-1}`$). Velocity and position errors are then invariant too.
 - For [group-affine](../glossary.md#group-affine-dynamics-trajectory-independence) dynamics (roughly: motion that respects the group's composition rule; IMU kinematics are the standard example), this makes the **linearized error dynamics** independent of the current state estimate. With invariant-form measurements, the measurement Jacobian $H$ is independent of it too. These properties, not the exp/log notation, are what address the consistency problem from §2.
 
 ### EKF vs. IEKF, equations side by side
@@ -234,7 +234,7 @@ The mean is composed with the group operation (not addition), which is *exact* h
 - $J_\tau = J_r(u_{k-1}\Delta t)$ (`se3_right_jacobian`), the [right Jacobian](../glossary.md#right-and-left-jacobians) of $\mathrm{Exp}$, is the 6×6 derivative of the predicted pose with respect to the per-step increment $\tau = u_{k-1}\Delta t$: it carries the twist noise $Q$ into the pose. It is a first-order (in the twist noise) linearization.
 - $`Q = \Delta t^2\,\mathrm{diag}(\sigma_v^2 I_3, \sigma_\omega^2 I_3)`$ is the covariance of the twist increment $u\Delta t$, where $`\sigma_v`$ and $`\sigma_\omega`$ are the standard deviations of the linear and angular velocity noise.
 
-The Jacobians' Lie-group details (the motion-model table) and the full per-function math, including the UKF, vanilla KF and batch GN, are in [pointcloud_pose_tracking_empirical_note.md §1.1](pointcloud_pose_tracking_empirical_note.md#11-the-filter-math-concretely).
+The Jacobians' Lie-group details (the motion-model table) and the full per-function math, including the UKF, vanilla KF, and batch GN, are in [pointcloud_pose_tracking_empirical_note.md §1.1](pointcloud_pose_tracking_empirical_note.md#11-the-filter-math-concretely).
 
 #### Update - this is where they diverge
 Here $`R_{\text{pred}}`$ and $`t_{\text{pred}}`$ are the rotation and translation of the predicted pose $`\hat T_k^-`$.
@@ -292,7 +292,7 @@ An ordinary EKF has to repeatedly calculate Jacobians around the current estimat
 - provable convergence properties (Barrau & Bonnabel 2017).
 
 ### The catch is the biases
-With $b_g$ and $b_a$ in the state, the dynamics are not group-affine in the standard formulation, so those guarantees no longer hold exactly. Practical filters keep orientation, velocity and position on the group and treat the biases as ordinary vector states (an "imperfect" IEKF). Hartley et al. (2020), following Barrau, note that such a filter can still outperform a standard EKF. On their legged robot, with bias estimation on, it converged better than a quaternion EKF from poor initial estimates.
+With $b_g$ and $b_a$ in the state, the dynamics are not group-affine in the standard formulation, so those guarantees no longer hold exactly. Practical filters keep orientation, velocity, and position on the group and treat the biases as ordinary vector states (an "imperfect" IEKF). Hartley et al. (2020), following Barrau, note that such a filter can still outperform a standard EKF. On their legged robot, with bias estimation on, it converged better than a quaternion EKF from poor initial estimates.
 
 ---
 
@@ -306,7 +306,7 @@ An IEKF can sometimes have **better convergence and consistency properties** tha
 - **Accuracy: identical.** Under [isotropic](../glossary.md#isotropic-and-anisotropic) point-noise covariance, EKF and IEKF produce **exactly identical** corrections $K r$ and posterior $P$, so both converge to the same estimate.
   - Proof: the body-frame and world-frame residual/Jacobian pairs differ only by a per-point rotation, which cancels out of $K r$ and $P$ ($K$ itself differs by that rotation).
   - Numerical check: $`K r`$ and the poses agree to ~1e-14, and $`P`$ to round-off (typically ~1e-15 relative to its size, at most ~5e-13 on the default run).
-- **Speed: IEKF wins.** Its fixed Jacobian made it about 27-30% faster per step than EKF at nearly identical memory - [the empirical note's §2.4](pointcloud_pose_tracking_empirical_note.md#24-what-actually-differs-between-them-speed-not-accuracy) measured 260 vs. 369 µs/step. Timing is machine-dependent and noisy: in one re-run the order flipped.
+- **Speed: IEKF wins.** Its fixed Jacobian made it about 27-30% faster per step than EKF at nearly identical memory - [the empirical note's §2.4](pointcloud_pose_tracking_empirical_note.md#24-what-actually-differs-between-them-speed-not-accuracy) measured 260 vs. 369 µs/step. Timing is machine-dependent and noisy: in one re-run, the order flipped.
 - **Takeaway:** "geometry-aware" doesn't always mean "more accurate" - sometimes it means "cheaper to compute the same answer."
 - **Anisotropic noise does not open a gap.** The two stay identical as long as each filter gets the noise covariance in its own frame ([empirical note §5](pointcloud_pose_tracking_empirical_note.md#5-when-would-each-actually-diverge-more)); the IEKF only loses its fixed $H$.
 - **Where the IEKF can do better** is consistency, which needs a problem with unobservable directions (§5). This benchmark has none.
@@ -326,7 +326,7 @@ flowchart LR
     C -->|Yes| IEKF["IEKF<br/>linearize while respecting<br/>the geometry"]
 ```
 
-The last branch is a simplification. Rotations are also commonly handled by an EKF with a multiplicative error (ESKF, MEKF; §5). The IEKF's guarantees need group-affine dynamics (§5).
+The last branch is a simplification. Rotations are also commonly handled by an EKF with a multiplicative error (ESKF, MEKF; §5). The IEKF's guarantees require group-affine dynamics (§5).
 
 The last distinction is the one to internalize: **a robot pose is not just a vector; it has geometry.** That is one of the main reasons the IEKF is attractive for inertial navigation, visual-inertial estimation, and SLAM.
 
@@ -350,7 +350,7 @@ Instead of a Jacobian, the UKF pushes a small, deterministic set of "sigma point
 
 ### ESKF - "Keep a big slow-changing state and a tiny error state that's always near zero"
 
-Already touched on in §5: the ESKF splits the state into a "nominal" state, integrated directly with the raw nonlinear equations, and a small "error state" that stays close to zero and is safe to linearize. The error is additive for vector states and a small rotation for attitude ($`R = \hat R\exp(\delta\theta^\wedge)`$, as in §5). The filter estimates only the error; after each update that estimate is folded into the nominal state and reset to zero ([extra_kf_variants.md §2](extra_kf_variants.md#2-error-state-kalman-filter-eskf)). It's a common backbone of filter-based VIO (e.g. MSCKF-style systems).
+Already touched on in §5: the ESKF splits the state into a "nominal" state, integrated directly with the raw nonlinear equations, and a small "error state" that stays close to zero and is safe to linearize. The error is additive for vector states and a small rotation for attitude ($`R = \hat R\exp(\delta\theta^\wedge)`$, as in §5). The filter estimates only the error; after each update, that estimate is folded into the nominal state and reset to zero ([extra_kf_variants.md §2](extra_kf_variants.md#2-error-state-kalman-filter-eskf)). It's a common backbone of filter-based VIO (e.g. MSCKF-style systems).
 
 ### MSCKF - "Don't put landmarks in the state at all"
 
