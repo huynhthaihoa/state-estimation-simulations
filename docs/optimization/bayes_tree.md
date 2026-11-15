@@ -1,6 +1,6 @@
 # Bayes tree
 
-The name sounds probabilistic, but for SLAM a Bayes tree is mainly a **tree representation of the factorization of your optimization problem**.
+The name sounds probabilistic, but for SLAM, a Bayes tree is mainly a **tree representation of the factorization of your optimization problem**.
 
 ---
 
@@ -145,7 +145,7 @@ That is what the **Bayes tree** captures (strictly, this node-per-variable chain
 2. **[Fill-in](../glossary.md#fill-in).** Every pair of variables in $S(v)$ gets connected, then $v$ is removed from the graph. This is the "summarized information" arrow of §3: the new constraint links all of $v$'s remaining neighbors.
 3. **Parent.** $\text{parent}(v)$ is the member of $S(v)$ that comes earliest in `order`, i.e. the next of them to be eliminated. If $S(v)$ is empty, $v$ is the root.
 
-The node $`\{v\} \cup S(v)`$ is what the docstring calls a clique (a group of variables stored together in one tree node; see §13). The script keeps one node per variable and does not apply §13's merge rule (a node joins its parent's clique when its separator equals the parent clique's variables), so strictly it builds the [elimination tree](elimination_tree.md).
+The node $`\{v\} \cup S(v)`$ is what the docstring calls a clique (a group of variables stored together in one tree node; see §13). The script keeps one node per variable and does not apply §13's merge rule (a node joins its parent's clique when its separator equals the parent clique's variables), so strictly, it builds the [elimination tree](elimination_tree.md).
 
 **Worked example: a 5-node ring.** Take odometry edges 0–1, 1–2, 2–3, 3–4 plus a loop-closure edge 4–0, eliminated oldest-first (`order = [0, 1, 2, 3, 4]`, as the script does):
 
@@ -200,7 +200,7 @@ P(x_1,x_2,x_3) = P(x_1 \mid x_2)\,P(x_2 \mid x_3)\,P(x_3)
 Each variable ends up conditioned only on its separator, and the separator's next-eliminated member is its parent in the tree (§4.1). The tree represents exactly these conditional relationships.
 
 **What a node holds in numbers:** it is a row of $`R = L^\top`$, the upper-triangular square root of the Hessian $`H`$ ($`H = R^\top R`$; $`R`$ is not a rotation).
-- Each row reads $`x_j = (d_j - R_{j,\text{sep}}\, x_{\text{sep}}) / R_{jj}`$, where $`d_j`$ is the row's right-hand-side entry, $`R_{jj}`$ its diagonal entry, $`R_{j,\text{sep}}`$ its entries in the separator columns and $`x_{\text{sep}}`$ the separator variables (§4.1). Here $`x_j`$ is the update $`\Delta x_j`$ of variable $j$ (the system solved is $`H\Delta x = g`$ of §2), and $`d`$ solves the forward substitution $`R^\top d = g`$. For a 6-DoF pose each variable is a 6-number block, so each "row" is a block row and the division is a $`6 \times 6`$ triangular solve.
+- Each row reads $`x_j = (d_j - R_{j,\text{sep}}\, x_{\text{sep}}) / R_{jj}`$, where $`d_j`$ is the row's right-hand-side entry, $`R_{jj}`$ its diagonal entry, $`R_{j,\text{sep}}`$ its entries in the separator columns and $`x_{\text{sep}}`$ the separator variables (§4.1). Here $`x_j`$ is the update $`\Delta x_j`$ of variable $j$ (the system solved is $`H\Delta x = g`$ of §2), and $`d`$ solves the forward substitution $`R^\top d = g`$. For a 6-DoF pose, each variable is a 6-number block, so each "row" is a block row and the division is a $`6 \times 6`$ triangular solve.
 - Chain example: $`x_1 = (d_1 - r_{12}\, x_2) / r_{11}`$ (here $`r_{11}`$, $`r_{12}`$, $`d_1`$ are row 1's diagonal, off-diagonal and right-hand-side entries). This one line is "$`x_1`$ given $`x_2`$".
 - To solve, read the tree from the root down. The root has no parents (its separator is empty, §4.1, so it is a plain marginal), so it is solved first. Its value is then substituted into the children.
 
@@ -218,7 +218,7 @@ Suppose we have:
 x1 ─ x2 ─ x3 ─ x4 ─ x5
 ```
 
-The robot adds the odometry factor $(x_4, x_5)$. iSAM2 doesn't rebuild everything: with the Bayes tree it asks
+The robot adds the odometry factor $(x_4, x_5)$. iSAM2 doesn't rebuild everything; with the Bayes tree, it asks
 
 > "Which part of my factorization is affected by this new factor?"
 
@@ -309,7 +309,7 @@ Manager A
   CEO
 ```
 
-while leaving Manager B's branch alone. The CEO is always on the path, just as every update in a Bayes tree reaches the root. The Bayes tree gives iSAM2 the same ability to **localize the computational consequences of new information**.
+While leaving Manager B's branch alone. The CEO is always on the path, just as every update in a Bayes tree reaches the root. The Bayes tree gives iSAM2 the same ability to **localize the computational consequences of new information**.
 
 ---
 
@@ -387,13 +387,13 @@ Partially. [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_constructio
 - `symbolic_eliminate`/`bayes_tree_affected_path` in `utils.py` run the elimination-game construction from §3-§4 (spelled out in §4.1) and the root-ward affected-path query from §7-§9. Every "N/16 affected" count is a count of variables, not cliques.
 - The tree is built once from all edges, the loop-closure edge included, and then queried for each scenario's edge; for this topology, building it without the loop edge gives the same chain and the same affected sets.
 - The script's graph is the chain 0–1–…–15 plus the loop-closure edge (15, 0). Nodes are 0-based here, unlike $x_1, x_2, \dots$ in the prose above.
-- Defaults: `--nodes-per-side 4`, so 16 nodes; the newest odometry edge (14, 15) affects 2/16 variables and the loop-closure edge (15, 0) affects 16/16.
+- Defaults: `--nodes-per-side 4`, so 16 nodes; the newest odometry edge (14, 15) affects 2/16 variables, and the loop-closure edge (15, 0) affects 16/16.
 - The script plots the "small vs. large affected region" contrast this doc argues for in prose (§7 vs. §8) using a real, computed example instead of an ASCII sketch.
 
 ### What it doesn't
 - It fixes the elimination order (oldest node first) instead of choosing one dynamically. So **iSAM2's variable reordering (CCOLAMD, a fill-reducing [ordering](sparse_cholesky_factorization.md#5-ordering-becomes-extremely-important) heuristic) is not implemented**.
 - Under that fixed order, this repo's loop-closure edge invalidates the *entire* tree, not just a subtree. This is where a fixed ordering hurts most. iSAM2 additionally reorders the affected part to limit fill-in.
-- There is no numeric **fluid-relinearization** (relinearizing only variables whose estimate has moved enough) solve integrated with this tree. [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`) separately implements the older [iSAM v1](isam_optimization.md) algorithm (incremental QR row insertion, no Bayes tree at all); see [`isam_optimization.md` §14](isam_optimization.md#14-where-this-is-implemented-in-this-repo) and [`isam2_optimization.md` §19](isam2_optimization.md#19-where-this-is-implemented-in-this-repo) for exactly where that numeric-solve line is drawn.
+- There is no numeric **fluid-relinearization** (relinearizing only variables whose estimate has moved enough) solver integrated with this tree. [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) (both `use_numpy/` and `use_manif/`) separately implements the older [iSAM v1](isam_optimization.md) algorithm (incremental QR row insertion, no Bayes tree at all); see [`isam_optimization.md` §14](isam_optimization.md#14-where-this-is-implemented-in-this-repo) and [`isam2_optimization.md` §19](isam2_optimization.md#19-where-this-is-implemented-in-this-repo) for exactly where that numeric-solve line is drawn.
 
 ![Two rows from bayes_tree_construction.py: the 16-variable elimination chain, where a new odometry edge affects 2 variables and the loop-closure edge affects all 16](../../assets/bayes_tree_construction.png)
 
