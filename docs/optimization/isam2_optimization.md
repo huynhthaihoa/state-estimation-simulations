@@ -133,7 +133,7 @@ Bayes tree
 
 The **Bayes tree** ([glossary](../glossary.md#bayes-tree)) is a tree representation of that factorization. Given a new [factor](../glossary.md#factor), iSAM2 can walk straight to the affected part of the tree instead of recomputing everything.
 
-This doc needs only that. For how elimination produces the tree, the cliques, the probabilistic interpretation and a worked loop-closure example, see [`bayes_tree.md`](bayes_tree.md).
+This doc needs only that. For how elimination produces the tree, the cliques, the probabilistic interpretation, and a worked loop-closure example, see [`bayes_tree.md`](bayes_tree.md).
 
 ---
 
@@ -179,7 +179,7 @@ x6 ─ x5 ─ x4
 ┆ = new loop-closure factor (x6 ↔ x1)
 ```
 
-The new measurement can now affect **many old poses**. iSAM2 doesn't blindly update only $x_6$; it identifies the affected region of the Bayes tree and redoes that computation. A normal odometry edge gives a small affected region and a small update; a loop closure gives a large affected region and a larger update (measured example: the figure in §11). Ordinary updates are small and loop closures are the occasional large ones, which is a big part of why iSAM2 suits real-time SLAM.
+The new measurement can now affect **many old poses**. iSAM2 doesn't blindly update only $x_6$; it identifies the affected region of the Bayes tree and redoes that computation. A normal odometry edge gives a small affected region and a small update; a loop closure gives a large affected region and a larger update (measured example: the figure in §11). Ordinary updates are small, and loop closures are the occasional large ones, which is a big part of why iSAM2 suits real-time SLAM.
 
 ---
 
@@ -211,7 +211,7 @@ It isn't free for that one variable, though. Relinearizing $x_4$ changes every f
 
 ## 11. Why selective updates pay off
 
-Illustrative only (made-up numbers, not measured): in a SLAM graph with 10,000 poses, after a new measurement maybe only 50 variables have changed significantly. A batch optimizer might effectively reconsider all 10,000, while iSAM2 focuses on the affected portion. The exact behavior depends on the graph and ordering.
+Illustrative only (made-up numbers, not measured): in a SLAM graph with 10,000 poses, after a new measurement, maybe only 50 variables have changed significantly. A batch optimizer might effectively reconsider all 10,000, while iSAM2 focuses on the affected portion. The exact behavior depends on the graph and ordering.
 
 The measured counterpart from this repo (counts in §19):
 
@@ -228,7 +228,7 @@ The amount of computation in sparse Cholesky depends heavily on the [variable or
 - **Fill-in:** how dense the factorization gets ([sparse_cholesky_factorization.md](sparse_cholesky_factorization.md)).
 - **Where each variable sits in the Bayes tree.** The last variable eliminated becomes the root, and an update's affected region is the path from the touched cliques up to the root (§8-§9).
 
-A fixed order can be fine for one and terrible for the other. This repo's own example ([bayes_tree.md §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo)) eliminates a square loop of 16 poses oldest first. Fill-in stays small (no **separator**, the variables a clique shares with its parent, larger than 2). But the tree comes out as a single chain with the first pose at the bottom, so a loop closure touching the first pose invalidates all 16 variables.
+A fixed order can be fine for one and terrible for the other. This repo's own example ([bayes_tree.md §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo)) eliminates a square loop of 16 poses oldest first. Fill-in stays small (no **separator**; the variables a clique shares with its parent, larger than 2). But the tree comes out as a single chain with the first pose at the bottom, so a loop closure touching the first pose invalidates all 16 variables.
 
 iSAM2 therefore reorders as it goes. Each time it re-eliminates the affected part of the tree, it picks a new order for just those variables with **constrained COLAMD (CCOLAMD)**.
 
@@ -312,7 +312,7 @@ That is not correct. iSAM2 maintains a **global smoothing solution**: if a loop 
 Partially. The Bayes-tree construction is implemented; the rest is not:
 - [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) builds the [elimination tree](../glossary.md#elimination-tree) underlying this doc's §7 Bayes tree (symbolic elimination, which tracks only which variables end up connected and uses no numbers, over this repo's pose-graph topology, via `symbolic_eliminate`/`bayes_tree_affected_path` in `utils.py`).
 - It keeps one node per variable and never merges them into cliques, so its affected counts are counts of variables, not cliques. The tree is built once from all edges, the loop-closure edge included, and then queried per edge.
-- It quantifies §9's "small vs. large affected region" claim with a computed example instead of only prose (figure in §11): with the default 16 nodes (`--nodes-per-side 4`), the newest odometry edge affects 2/16 variables and the loop-closure edge affects 16/16. This is the worst case, because the elimination order is *fixed* (oldest node first; §12's variable reordering is not implemented), so the entire tree, not just a subtree, gets invalidated (details: [`bayes_tree.md` §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo)).
+- It quantifies §9's "small vs. large affected region" claim with a computed example instead of only prose (figure in §11): with the default 16 nodes (`--nodes-per-side 4`), the newest odometry edge affects 2/16 variables, and the loop-closure edge affects 16/16. This is the worst case, because the elimination order is *fixed* (oldest node first; §12's variable reordering is not implemented), so the entire tree, not just a subtree, gets invalidated (details: [`bayes_tree.md` §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo)).
 
 **§10 selective relinearization and §12 variable reordering (CCOLAMD) remain unimplemented.** No numeric solve is integrated with the tree above.
 
@@ -323,7 +323,7 @@ Partially. The Bayes-tree construction is implemented; the rest is not:
 
 Its module docstring explicitly calls out the Bayes tree and COLAMD as out of scope; see [`isam_optimization.md` §14](isam_optimization.md#14-where-this-is-implemented-in-this-repo) for exactly where that line is drawn.
 
-So this page's Bayes tree has a runnable counterpart. iSAM2 as a whole (the tree, selective relinearization and dynamic reordering working together against a numeric solve) is still not reached by any single script in `use_numpy/` or `use_manif/`.
+So this page's Bayes tree has a runnable counterpart. iSAM2 as a whole (the tree, selective relinearization, and dynamic reordering working together against a numeric solve) is still not reached by any single script in `use_numpy/` or `use_manif/`.
 
 ---
 
