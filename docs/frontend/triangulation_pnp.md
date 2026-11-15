@@ -4,7 +4,7 @@
 - **PnP:** given several known 3D points and their observed pixels, where is the camera?
 - **Why PnP needs several points:** one point/pixel pair (a **correspondence**) pins down a ray, not a unique pose.
   - **P3P** (PnP with exactly 3 correspondences) gives up to four candidate poses, so a fourth point picks the right one.
-  - Our own DLT (Direct Linear Transform, §3) implementation needs at least 6 (derived in §3).
+  - Our own DLT (Direct Linear Transform, §3) implementation needs at least 6 points (derived in §3).
 - **Same recipe for both:** both reduce to the same reprojection residual. We solve each with a **closed-form** (direct formula, no iteration) linear initial guess, then a few [Gauss-Newton](../glossary.md#gauss-newton) iterations.
 
 This builds directly on:
@@ -43,7 +43,7 @@ Only then can back-end optimization ([bundle_adjustment.md](../optimization/bund
 - The best point minimizes the sum of squared perpendicular distances to every ray.
 - For one ray (unit $d$, through camera center $o$), the projector $M = I - dd^\top$ measures that perpendicular distance.
 - Summing $M$ and $Mo$ over all observers and solving the resulting $3\times3$ linear system gives the point directly, with no iteration.
-- With noise the rays are skew (they do not meet), so the closed-form point is the least-squares compromise (figure (a) in §1 draws the geometry).
+- With noise, the rays are skew (they do not meet), so the closed-form point is the least-squares compromise (figure (a) in §1 draws the geometry).
 
 Then we polish and validate:
 
@@ -79,7 +79,7 @@ $$
 
 *Figure: the tiny example simulated with `triangulate_landmark`: two rectified cameras, $`f`$ = 800 px, $`Z`$ = 10 m, 1 px disparity noise, 2000 solves per baseline (seed 0). The measured depth std is 0.12 m at $`B`$ = 1 m and 1.25 m at $`B`$ = 0.1 m, as the formula predicts. The narrow baseline's spread is also lopsided (5-95%: 8.2-12.2 m), which the first-order formula does not show. Plotted by `uv run python generator/make_figures.py triangulation_baseline_concept`.*
 
-The animation runs the same experiment while the baseline $`B`$ shrinks from 1 m to 0.1 m (40 log-spaced values, then the last frame holds). Left: the top view with the two cameras, their rays to the true point and the 2000 noisy `triangulate_landmark` solutions. Right: the measured depth std of those solutions, added one baseline at a time, on top of the formula $`Z^2\sigma/(fB)`$ (log-log axes, so the formula is a straight line of slope $`-1`$; the $`B`$ axis is reversed, so the line rises as $`B`$ shrinks). The same 2000 pixel-noise draws are reused at every $`B`$ (**common random numbers**), so the cloud stretches smoothly instead of re-rolling. The cloud and the std are `triangulate_landmark` outputs (seed 0, so the $`B`$ = 1 m cloud is the static figure's); the formula is the doc's expression; the choice of 40 baselines and the hold are illustrative. Measured vs formula: 0.124 vs 0.125 m at $`B`$ = 1 m, 1.28 vs 1.25 m at $`B`$ = 0.1 m (5-95%: 8.2-12.3 m, so the far side reaches farther than the near side). The $`B`$ = 0.1 m draws differ from the static figure's, so its std (1.28 m) differs slightly from 1.25 m. The readout also counts the points outside the drawn window (4 of 2000 at $`B`$ = 0.1 m).
+The animation runs the same experiment while the baseline $`B`$ shrinks from 1 m to 0.1 m (40 log-spaced values, then the last frame holds). Left: the top view with the two cameras, their rays to the true point, and the 2000 noisy `triangulate_landmark` solutions. Right: the measured depth std of those solutions, added one baseline at a time, on top of the formula $`Z^2\sigma/(fB)`$ (log-log axes, so the formula is a straight line of slope $`-1`$; the $`B`$ axis is reversed, so the line rises as $`B`$ shrinks). The same 2000 pixel-noise draws are reused at every $`B`$ (**common random numbers**), so the cloud stretches smoothly instead of re-rolling. The cloud and the std are `triangulate_landmark` outputs (seed 0, so the $`B`$ = 1 m cloud is the static figure's); the formula is the doc's expression; the choice of 40 baselines and the hold are illustrative. Measured vs formula: 0.124 vs 0.125 m at $`B`$ = 1 m, 1.28 vs 1.25 m at $`B`$ = 0.1 m (5-95%: 8.2-12.3 m, so the far side reaches farther than the near side). The $`B`$ = 0.1 m draws differ from the static figures, so its std (1.28 m) differs slightly from 1.25 m. The readout also counts the points outside the drawn window (4 of 2000 at $`B`$ = 0.1 m).
 
 ![Animation: two cameras triangulating a point 10 m away while the baseline shrinks from 1 m to 0.1 m. The cloud of 2000 noisy solutions stretches along the viewing direction, and the measured depth std rises along the Z squared sigma over f B line from 0.12 m to 1.28 m](../../assets/triangulation_baseline.gif)
 
@@ -122,7 +122,7 @@ This is **linear and homogeneous** (right-hand side zero) in the 12 flattened en
 **Intuition:** the smallest singular vector is the direction that $A$ squashes the most. Toy case: $`A = \mathrm{diag}(3, 0.1)`$ stretches $`(1,0)`$ to length 3 but shrinks $`(0,1)`$ to 0.1, so $`(0,1)`$ is the best answer to $`Ax \approx 0`$.
 
 > **Note:** SVD (Singular Value Decomposition) factors any matrix as $A=U\Sigma V^\top$, with $U, V$ orthogonal and $\Sigma$ diagonal (the singular values, ranking how much each orthogonal direction contributes to $A$).
-> - The smallest right-singular vector of $A$ (the column of $V$ paired with the smallest singular value) is the least-squares null-space solution (the unit $`x`$ that makes $`\|Ax\|`$ smallest) `linear_pnp_dlt` uses above.
+> - The smallest right-singular vector of $A$ (the column of $V$ paired with the smallest singular value) is the least-squares null-space solution (the unit $`x`$ that makes $`\|Ax\|`$ smallest) that `linear_pnp_dlt` uses above.
 > - Taking $UV^\top$ from a matrix's own SVD gives the nearest orthogonal matrix (a rotation once $\det > 0$, handled below). The orthogonalization step below uses this.
 
 Concretely, each correspondence adds two rows to $A$: the first two rows of the cross-product matrix $`[d_i]_\times`$, times a $`3\times12`$ matrix that maps $x$ to $R_{cw}P_i + t_{cw}$. Here $r_1, r_2, r_3$ are the rows of $R_{cw}$:
@@ -133,7 +133,7 @@ A_i = \left([d_i]_\times\right)_{\text{rows }1,2}
 x = \begin{bmatrix} r_1 & r_2 & r_3 & t_{cw}^\top \end{bmatrix}^\top
 ```
 
-The third row is dropped because it is a combination of the first two (the third entry of $d_i$ is always 1). $A$ is $2n\times12$ and needs rank 11 for a one-dimensional null space. This sets the minimum point count derived above.
+The third row is dropped because it is a combination of the first two (the third entry of $d_i$ is always 1). $A$ is $2n\times12$, and needs rank 11 for a one-dimensional null space. This sets the minimum point count derived above.
 
 The recovered $3\times3$ block is only a *scaled, possibly reflected* rotation - not yet a valid element of $SO(3)$ ([glossary](../glossary.md#so3-and-se3): the group of 3D rotations). `linear_pnp_dlt` turns $x$ into a pose in this order:
 
@@ -160,7 +160,7 @@ The residual and right-hand side use the same sign convention as §2. It stops w
 
 A pinhole projection is invariant to certain sign flips, and a linear solve sees only the projection's algebraic structure, not "in front of the camera". So both problems can return a geometrically nonsensical but numerically consistent answer. The remedy is the same positive-depth reasoning in both:
 
-- **Triangulation:** `passes_cheirality` (§2) rejects a point unless its depth is positive in *every* observer. It guards the reflection that Gauss-Newton can produce.
+- **Triangulation:** `passes_cheirality` (§2) rejects a point unless its depth is positive in *every* observer. It guards against the reflection that Gauss-Newton can produce.
 - **PnP:** the sign fix in step 2 of §3 (`np.median(depths_raw) < 0.0`) is *analogous*, not identical. It guards a global $x$ versus $-x$ ambiguity of the DLT null vector, and it uses the *median* of the raw depths to choose a sign, where `passes_cheirality` demands all depths positive.
 
 With noise, neither linear step is accurate enough alone; the Gauss-Newton refinement and the depth checks both matter.
@@ -172,8 +172,8 @@ With noise, neither linear step is accurate enough alone; the Gauss-Newton refin
 `linear_pnp_dlt` is the simplest *correct* version of linear PnP, not a production algorithm. It needs the minimum number of correspondences from §3 for $A$ to reach rank 11. Its limits are about accuracy, not cost:
 
 - **Cost is not the issue.** A version linear in $n$ would take the SVD of the fixed $12\times12$ matrix $A^\top A$ (or use `full_matrices=False`). Our code calls `np.linalg.svd(A)` on the full $2n\times12$ matrix $A$ with NumPy's default `full_matrices=True`, which also builds a $2n\times2n$ factor $U$: fine at these sizes, but quadratic in $n$ in time and memory.
-- **Accuracy is.** It solves for 12 unconstrained numbers and minimizes an **algebraic error** (the size of $`Ax`$, which is easy to minimize, rather than the pixel error), ignoring that 9 of them must form a rotation until the orthogonalization step afterwards. More points help, but with few points, noticeable noise, or points close to a plane it is less accurate than purpose-built solvers.
-- **Exactly coplanar points break it.** $A$ then loses rank and the null space is no longer one-dimensional; planar scenes need a **homography**-based method (a homography is the projective map between a plane and its image) instead.
+- **Accuracy is.** It solves for 12 unconstrained numbers and minimizes an **algebraic error** (the size of $`Ax`$, which is easy to minimize, rather than the pixel error), ignoring that 9 of them must form a rotation until the orthogonalization step afterwards. More points help, but with few points, noticeable noise, or points close to a plane, it is less accurate than purpose-built solvers.
+- **Exactly coplanar points break it.** $A$ then loses rank, and the null space is no longer one-dimensional; planar scenes need a **homography**-based method (a homography is the projective map between a plane and its image) instead.
 
 **EPnP** (Lepetit, Moreno-Noguer & Fua, 2009 - see References) expresses every 3D point as a weighted combination of four virtual control points, so the problem becomes recovering just those four points' camera-frame coordinates. The $`O(n)`$ in its title is relative to earlier non-iterative PnP methods (the paper cites $`O(n^5)`$ and $`O(n^8)`$), not to the DLT. Its advantage over the DLT is accuracy.
 
@@ -198,6 +198,6 @@ In practice, PnP commonly runs inside **RANSAC** (random sample consensus: fit t
 
 ## 7. References
 
-1. Hartley, R., & Zisserman, A. (2004). *Multiple View Geometry in Computer Vision* (2nd ed.). Cambridge University Press. - the standard reference for DLT camera resectioning behind §3's derivation.
+1. Hartley, R., & Zisserman, A. (2004). *Multiple View Geometry in Computer Vision* (2nd ed.). Cambridge University Press. - The standard reference for DLT camera resectioning behind §3's derivation.
 2. Lepetit, V., Moreno-Noguer, F., & Fua, P. (2009). *EPnP: An Accurate O(n) Solution to the PnP Problem*. International Journal of Computer Vision, 81(2), 155-166. https://doi.org/10.1007/s11263-008-0152-6 - the more accurate linear-time PnP algorithm contrasted with the DLT in §5.
 3. Triggs, B., McLauchlan, P. F., Hartley, R. I., & Fitzgibbon, A. W. (2000). *Bundle Adjustment - A Modern Synthesis*. In Vision Algorithms: Theory and Practice (pp. 298-372). Springer. - already cited in [bundle_adjustment.md](../optimization/bundle_adjustment.md), covering the triangulation-within-BA context behind §2.
