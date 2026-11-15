@@ -45,7 +45,7 @@ x0  →  x1  →  x2  →  x3
   1.02   0.97    1.05 m
 ```
 
-so the real position is about $`3.04`$ m. Zero-mean per-step errors partly cancel, but nothing corrects them, so on average the drift keeps growing (like $`\sqrt n`$ for $n$ independent steps). Here the estimate (3.00 m) and the real position (3.04 m) diverge.
+So the real position is about $`3.04`$ m. Zero-mean per-step errors partly cancel, but nothing corrects them, so on average the drift keeps growing (like $`\sqrt n`$ for $n$ independent steps). Here the estimate (3.00 m) and the real position (3.04 m) diverge.
 
 > **Note:** each per-step measurement ($x_1$ is 1m ahead of $x_0$, etc.) is **odometry**: an estimate of the *incremental* pose change from onboard motion sensors (wheel encoders, IMU, visual odometry, ...).
 > - **Dead reckoning** chains ("integrates") these increments to track pose from a starting point, as the `3.00 m` estimate above was computed. With no correction, drift grows the longer we integrate; the loop closure below fixes exactly that.
@@ -108,7 +108,7 @@ Conceptually:
 Xi ─────────── Factor ─────────── Xj
                   ↓
              "How wrong
-              are Xi,Xj?"
+              are Xi, Xj?"
 ```
 
 The factor answers:
@@ -180,7 +180,7 @@ graph LR
     c21 --- l1
 ```
 
-Here landmark $l_0$ is seen from $x_0$ and $x_1$, and $l_1$ from $x_1$ and $x_2$. IMU factors link consecutive poses, like odometry factors do.
+Here landmark $l_0$ is seen from $x_0$ and $x_1$, and $l_1$ from $x_1$ and $x_2$. IMU factors link consecutive poses, as odometry factors do.
 
 Every measurement becomes a **factor connecting the variables it depends on**, so the graph shows the **structure of the estimation problem**.
 
@@ -222,7 +222,7 @@ For example:
        robot pose   landmark
 ```
 
-The camera measurement doesn't directly "set" $x_1$ or $l_0$. Instead it says:
+The camera measurement doesn't directly "set" $x_1$ or $l_0$. Instead, it says:
 
 > "$`x_1`$ and $l_0$ should satisfy this observation."
 
@@ -259,7 +259,7 @@ IMU factors link consecutive poses, and each camera factor links a pose to the l
 
 ![Top: the factor graph of §1 with the parts a pose graph leaves out faded (landmark l0, camera and GPS factors). Bottom: the pose graph, with poses x0 to x3 and the factors between them drawn as edges: three odometry edges, an IMU edge between x1 and x2 and a loop-closure edge, with x0 anchored by its prior.](../images/factor_graph_vs_pose_graph.svg)
 
-*Figure: the graph of §1 as a factor graph (top) and as a pose graph (bottom). A pose graph keeps the poses and the factors between them (here odometry, IMU and loop closure) and draws them as edges; the landmark and the camera and GPS factors are left out. The prior stays as an anchor on x0, which removes the [gauge freedom](../glossary.md#gauge-freedom). Regenerate with `uv run python generator/make_factor_graph_svgs.py`.*
+*Figure: the graph of §1 as a factor graph (top) and as a pose graph (bottom). A pose graph keeps the poses and the factors between them (here, odometry, IMU, and loop closure) and draws them as edges; the landmark and the camera and GPS factors are left out. The prior stays as an anchor on x0, which removes the [gauge freedom](../glossary.md#gauge-freedom). Regenerate with `uv run python generator/make_factor_graph_svgs.py`.*
 
 It can represent:
 
