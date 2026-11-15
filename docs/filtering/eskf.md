@@ -45,7 +45,7 @@ Two things follow:
 | **Measurement**: position fix | $`z = p + n_p`$, the world-frame position plus noise | 1 Hz, 0.1 m per axis |
 | Initial guess | truth perturbed in position, velocity and attitude; biases start at 0 | 0.1 m, 0.1 m/s, 2° per axis |
 
-The IMU drives the prediction: its noise is **process noise**, not measurement noise. The true trajectory is integrated with the same discretization the filters use, so any model error comes from a filter's own assumptions (for example, `eskf_no_bias` ignoring the biases).
+The IMU drives the prediction: its noise is **process noise**, not measurement noise. The true trajectory is integrated with the same discretization the filters use, so any model error comes from a filter's own assumptions (for example, `eskf_no_bias` ignoring the biases). Where noise values like these come from, and what a wrong conversion from a datasheet's noise density does to this filter, is in [noise_identification.md](../foundations/noise_identification.md).
 
 **State** (15 numbers in the error state):
 
@@ -188,7 +188,7 @@ Second-half NEES, 10 trials per value (the 2° row is the 50-trial run):
 | 10° | 27.7 | 8927 | 727 | 28.4 |
 
 - The naive quaternion EKF's overconfidence grows quickly with the initial error (NEES 20.6 at 0.5°, 727 at 10°).
-- The ESKF is not immune to large errors either: at 10° its NEES is 27.7 against 15. The likely cause (not checked separately) is that its linearization is first order, which is less accurate while the error is large.
+- The ESKF is not immune to large errors either: at 10° its NEES is 27.7 against 15. The cause is its first-order linearization, not a model or code error. With every uncertainty (IMU noise, bias priors, position-fix noise, initial errors) scaled by $`\lambda`$ on the same 20 trials (outside the script), the excess over the $`\lambda = 0.01`$ run (NEES 13.6) is +11.6 at $`\lambda = 1`$, +2.5 at 0.5 and +0.6 at 0.25: it falls as $`\lambda^2`$. A smaller initial error shrinks the excess but does not remove it, because the attitude uncertainty regrows from the gyro bias. The excess builds up during the prediction between fixes; the update and reset are exact to first order. In a sampled test outside the script, the dominant term is the second-order attitude error in the rotated specific force, mostly its yaw × tilt part: a horizontal acceleration error of about $`\tfrac12 g\,\psi\,\varphi`$ for yaw error $`\psi`$ and tilt error $`\varphi`$ (rad). Adding that term's covariance to the process noise of a copy of the filter brought the NEES at 5 s fixes from 380 to 17 (20 trials).
 
 ---
 

@@ -659,7 +659,7 @@ s_{ij} = \min\left(1, \; \frac{2 \Phi}{\Phi + e_{ij}^2}\right)
 
 ![Left panel: weight on the information matrix against residual magnitude on a log axis for plain least squares, Huber, Cauchy, Geman-McClure and DCS, with the square root of the DCS threshold marked. Right panel: DCS scale and its square against squared error, with the threshold marked where the scale starts to drop](../../assets/robust_kernel_weights.png)
 
-*Figure: weight applied to an edge's information matrix for the kernels of §16 (left, log axis) and the DCS scale with its square (right), plotted by `uv run python generator/make_figures.py robust_kernel_weights`. Formulas from §16, no repo solver implements robust kernels.*
+*Figure: weight applied to an edge's information matrix for the kernels of §16 (left, log axis) and the DCS scale with its square (right), plotted by `uv run python generator/make_figures.py robust_kernel_weights`. Formulas from §16; only `pose_graph_robust.py` implements robust kernels, no other repo solver does.*
 
 At $\Phi = 12.59$, $s_{ij}$ is $1$ up to $e_{ij}^2 = \Phi$, then $0.7726$ at $e_{ij}^2 = 20$, $0.2236$ at $100$ and $0.002515$ at $10^4$. At residual magnitude $e = 10$ the plotted weights are Huber $0.1$, Cauchy $0.0099$, Geman-McClure $9.8 \times 10^{-5}$ and DCS $s^2 = 0.05$: DCS keeps full weight up to $e = \sqrt{\Phi} \approx 3.55$ and decays gently at first, so its "Very High" rating in §16.4 refers to the far tail.
 
@@ -686,14 +686,14 @@ What is DCS's cost? Be careful, because the obvious reading is wrong:
 - DCS comes from Switchable Constraints' augmented cost $\Psi(s, e) = s^2e^2 + \Phi(s-1)^2$. The second term is a prior that keeps the switch $s$ near $1$ unless the data justifies turning the edge off.
 - Substituting DCS's closed-form $s=\frac{2\Phi}{\Phi+e^2}$ into $\Psi$ gives exactly $\Phi$, since $\frac{\Phi\left[4\Phi e^2 + (\Phi-e^2)^2\right]}{(\Phi+e^2)^2} = \Phi$. But this $s$ is **not** the minimizer of $\Psi$ over $s$, so $\Phi$ is not the effective robust cost. (A cost constant in $e$ would also have zero gradient, i.e. IRLS weight $0$, contradicting the $s^2 \propto \frac{1}{e^4}$ weight in the table.)
 - The true minimizer is $s^* = \frac{\Phi}{\Phi+e^2}$, giving $\Psi^* = \frac{\Phi e^2}{\Phi+e^2}$. This is Geman-McClure-shaped: it grows like $e^2$ for small $e$ and approaches $\Phi$ only asymptotically. For $\Phi = 12.59$: $\Psi^* = 7.73,\ 11.18,\ 12.57$ at $e^2 = 20,\ 100,\ 10^4$.
-- In practice, DCS uses its closed-form $s$ as an IRLS-style weight $s^2 \propto \frac{1}{e^4}$. MacTavish & Barfoot (2015) show this weighting is equivalent to a Geman-McClure-type kernel. Both therefore saturate rather than diverge, and both carry the "Graduated Non-Convexity" caveat below.
+- In practice, DCS uses its closed-form $s$ as an IRLS-style weight $s^2 \propto \frac{1}{e^4}$. MacTavish & Barfoot (2015, §II-A and Table I) show that substituting the optimal switch into the Switchable Constraints cost gives exactly the Geman-McClure cost (times 2), and that DCS, whose weight is capped at 1, behaves like plain least squares for small errors and like Geman-McClure for large ones. Both therefore saturate rather than diverge, and both carry the "Graduated Non-Convexity" caveat below.
 
 ### 16.5 Practical Considerations in Implementation
 
 1. **Threshold Tuning ($\delta, k, \Phi$):** The parameters set the boundary between inliers and outliers. In $\mathrm{SE}(3)$ PGO, error $e^2$ approximately follows a [Chi-Square distribution](../glossary.md#chi-square-distribution) ($\chi^2$) with 6 degrees of freedom, for inliers with well-modeled Gaussian noise. Setting $\Phi$ or $k^2$ corresponding to the 95% or 99% quantile of $\chi^2(6)$ (e.g., $\Phi \approx 12.59$) provides a sound baseline.
 2. **Graduated Non-Convexity (GNC):** Highly non-convex robust functions (like DCS or Geman-McClure) can introduce local minima if applied from a poor initial guess. Modern solvers use GNC to start with a convex $L_2$ loss and gradually harden the robust kernel as iterations progress.
 
-This section is theory only: neither `use_numpy/pose_graph.py` nor `use_manif/pose_graph.py` implements Huber, Cauchy, or DCS reweighting. Both still use the single unweighted `info_matrix = np.eye(6)` noted in §12. Robust reweighting is a natural extension, not something the accompanying scripts exercise.
+This section is theory only as far as `pose_graph.py` goes: neither `use_numpy/pose_graph.py` nor `use_manif/pose_graph.py` implements Huber, Cauchy, or DCS reweighting. Both still use the single unweighted `info_matrix = np.eye(6)` noted in §12. Robust reweighting is a natural extension, not something those two scripts exercise. `use_numpy/pose_graph_robust.py` (and its `use_manif/` twin) implements all three, as reweighting inside Levenberg-Marquardt, and compares them on a multi-lap graph with false loop closures: see [robust_pose_graph.md](robust_pose_graph.md).
 
 ---
 

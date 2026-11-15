@@ -106,7 +106,13 @@ Reusing the same random draws in every case that is being compared (here, every 
 The square root of the mean squared error, $`\sqrt{\tfrac{1}{N}\sum_k \|e_k\|^2}`$, in the error's own units; it weights large errors more than the mean absolute error does. Each doc states what the mean runs over (ticks, Monte Carlo trials, poses or keyframes). **RMS** (root mean square) is the same average applied to any quantity, e.g. a timing lag. For a trajectory RMSE taken after aligning to ground truth, see Umeyama alignment and trajectory RMSE (§5).
 
 ### Observability
-A direction of the state is observable if some measurement can determine it, and unobservable if none can. A solver that wrongly gains information in an unobservable direction becomes overconfident, the problem FEJ (§4) addresses. See [marginalization.md §6](optimization/marginalization.md#6-the-consistency-gotcha-why-fej-exists).
+A direction of the state is observable if some measurement can determine it, and unobservable if none can. A solver that wrongly gains information in an unobservable direction becomes overconfident, the problem FEJ (§4) addresses. See [marginalization.md §6](optimization/marginalization.md#6-the-consistency-gotcha-why-fej-exists), and [observability.md](foundations/observability.md) for a worked EKF-SLAM example.
+
+### Observability matrix
+The matrix of a filter's measurement Jacobians multiplied by its transition matrices over a window of steps. The directions it maps to zero (its null space) are the unobservable ones. For an EKF it depends on where the Jacobians were evaluated, which is how an EKF can lose an unobservable direction. See [observability.md §1](foundations/observability.md#1-observable-and-unobservable-directions) and [§3](foundations/observability.md#3-why-the-standard-ekf-loses-the-rotation-direction).
+
+### Spurious information
+Information (inverse covariance) that a filter adds along a direction its measurements cannot determine, so its covariance shrinks where nothing was measured and it turns overconfident. A world-frame EKF gains it along yaw ([hexapod_contact_inekf.md](filtering/hexapod_contact_inekf.md#why-only-one-filter-can-learn-yaw)), a standard EKF-SLAM along the global rotation ([observability.md §3](foundations/observability.md#3-why-the-standard-ekf-loses-the-rotation-direction), measured in [§5.1](foundations/observability.md#51-observability-and-information)).
 
 ### Bias
 **Symbols:** $b_g$, $b_a$. The slowly varying offset in an IMU's gyroscope and accelerometer readings, usually estimated as part of the state. See [vi_initialization.md §1](frontend/vi_initialization.md#1-the-bootstrapping-problem) and [imu_preintegration.md §4](optimization/imu_preintegration.md#4-the-bias-sensitivity-jacobians).
@@ -115,7 +121,22 @@ A direction of the state is observable if some measurement can determine it, and
 The error from rounding a reading to a fixed step $`\Delta`$, such as an encoder's resolution. If the true value falls anywhere within a step with equal chance, the error is spread evenly over one step, with std $`\Delta/\sqrt{12}`$. It is often modeled as white noise of that std. For the AX-12A servo's 0.29° step that is 0.084°. When each reading is the difference of two rounded counts, such as wheel-encoder ticks per interval, the errors cancel when the readings are summed, so white noise of that size overstates how the error grows ([skid_steer_odometry_ekf.md §3](filtering/skid_steer_odometry_ekf.md#3-experiment-1-slip-coefficient-1875-30-trials)). See [hexapod_redundant_leg_inekf.md §1.2](filtering/hexapod_redundant_leg_inekf.md#12-encoder-readings).
 
 ### Noise density
-How strong a sensor's white noise is per square root of bandwidth, e.g. a gyro's °/s/√Hz. Read every $`\Delta t`$ seconds, each sample's noise std is the density divided by $`\sqrt{\Delta t}`$: 0.03 °/s/√Hz read at 50 Hz gives 0.21 °/s. See [skid_steer_odometry_ekf.md §2](filtering/skid_steer_odometry_ekf.md#2-filters).
+How strong a sensor's white noise is per square root of bandwidth, e.g. a gyro's °/s/√Hz. Read every $`\Delta t`$ seconds, each sample's noise std is the density divided by $`\sqrt{\Delta t}`$: 0.03 °/s/√Hz read at 50 Hz gives 0.21 °/s. See [skid_steer_odometry_ekf.md §2](filtering/skid_steer_odometry_ekf.md#2-filters), and [noise_identification.md §2](foundations/noise_identification.md#2-continuous-density-vs-per-sample-std) for the conversion and how to read the density off an Allan curve.
+
+### Angle random walk and velocity random walk
+The datasheet names for a gyroscope's and an accelerometer's white-noise density: integrating white noise on the rate or on the acceleration gives a random walk in the angle or in the velocity. See [noise_identification.md §1](foundations/noise_identification.md#1-the-noise-model).
+
+### Bias random walk
+**Symbol:** $`K`$. A bias that drifts because white noise is integrated into it; $`K`$ is the strength of that white noise (rad/s²/√Hz for a gyroscope, m/s³/√Hz for an accelerometer). Per step $`\Delta t`$ the bias moves by a std of $`K\sqrt{\Delta t}`$. See [noise_identification.md §1](foundations/noise_identification.md#1-the-noise-model).
+
+### Bias instability
+The flat bottom of the Allan curve, between the white-noise and bias-random-walk regions; datasheets usually quote it in place of the bias random walk. This repo does not simulate it. See [noise_identification.md §1](foundations/noise_identification.md#1-the-noise-model).
+
+### Allan variance and Allan deviation
+**Symbols:** $`\mathrm{AVAR}(\tau)`$, $`\mathrm{ADEV}(\tau)`$. Half the mean squared difference between neighboring window averages of a signal, as a function of the window length $`\tau`$; the deviation is its square root. On log-log axes white noise is a line of slope -1/2 and a bias random walk a line of slope +1/2, which is how a recording of a motionless IMU gives its noise values. See [noise_identification.md §3](foundations/noise_identification.md#3-allan-deviation).
+
+### Cluster time
+**Symbol:** $`\tau`$. The length of the windows (clusters) whose averages the Allan variance compares: $`\tau = m\,\Delta t`$ for windows of $`m`$ samples. See [noise_identification.md §3](foundations/noise_identification.md#3-allan-deviation).
 
 ### Half-normal distribution
 The size of a normal draw with its sign removed: $`|z|\,\sigma`$, with $`z`$ standard normal. Its mean is $`\sigma\sqrt{2/\pi} \approx 0.80\,\sigma`$, so a sum of such draws grows in proportion to their number, while a sum of zero-mean noise grows only with its square root. See [magnetic_inchworm_odometry_ekf.md §1.2](filtering/magnetic_inchworm_odometry_ekf.md#12-the-simulated-robot).
@@ -167,7 +188,13 @@ An iteration that linearizes the residuals, solves the normal equations, updates
 Directions in which the whole solution can move without changing any residual, e.g. shifting and rotating the entire trajectory and map (plus scale, for monocular, i.e. single-camera, BA). It is removed by anchoring (a prior on, or fixing, the first pose, or the first two cameras in monocular BA) or handled at evaluation time by alignment. See [gauss_newton.md §4](optimization/gauss_newton.md#4-the-optimization-problem) and [bundle_adjustment.md §14](optimization/bundle_adjustment.md#14-evaluating-the-result-gauge-freedom-and-umeyama-alignment).
 
 ### Outlier and robust kernel
-An outlier is a grossly wrong measurement, such as a false loop closure. Robust kernels (Huber, Cauchy, DCS (Dynamic Covariance Scaling), ...) down-weight large residuals so outliers can't dominate the solution. See [pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).
+An outlier is a grossly wrong measurement, such as a false loop closure. Robust kernels (Huber, Cauchy, DCS (Dynamic Covariance Scaling), ...) down-weight large residuals so outliers can't dominate the solution. See [pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures); a runnable comparison of plain least squares, Huber, Cauchy and DCS on a graph with false loop closures is in [robust_pose_graph.md](optimization/robust_pose_graph.md).
+
+### IRLS (iteratively reweighted least squares)
+Solving a robust-kernel problem as a sequence of weighted least-squares problems: at each iteration every robustified edge's information matrix (in this repo, every loop edge's) is multiplied by its kernel weight $`w(e)`$ at the current estimate, and a Gauss-Newton or Levenberg-Marquardt step is taken. See [pose_graph_optimization.md §16.1](optimization/pose_graph_optimization.md#161-the-m-estimator-framework-iteratively-reweighted-least-squares) and [robust_pose_graph.md §2](optimization/robust_pose_graph.md#2-methods).
+
+### DCS (dynamic covariance scaling)
+**Symbols:** $`\Phi`$, $`s`$. A closed-form robust weight for loop edges: once an edge's squared residual $`e^2`$ (in standard deviations) exceeds the scale $`\Phi`$, its information matrix is multiplied by $`s^2`$ with $`s = \min(1, 2\Phi/(\Phi + e^2))`$, so large residuals are almost switched off and small ones keep full weight. It is derived from switchable constraints, without their extra switch variables. See [pose_graph_optimization.md §16.3](optimization/pose_graph_optimization.md#163-dynamic-covariance-scaling-dcs) and [robust_pose_graph.md §2](optimization/robust_pose_graph.md#2-methods).
 
 ### RANSAC (random sample consensus)
 Robust model fitting: fit a model to a small random subset of the data, count how many points agree with it (the inliers), repeat, and keep the model with the most inliers. It rejects outliers before least squares refines the fit. This repo uses it to extract LiDAR planes and cylinders; PnP commonly runs inside it. See [lidar_primitives.md §1](frontend/lidar_primitives.md#1-extraction) and [triangulation_pnp.md §5](frontend/triangulation_pnp.md#5-what-the-accompanying-scripts-do-and-dont-do).
@@ -231,10 +258,10 @@ The closed form for eliminating a block of variables from a linear system or an 
 Permanently removing a variable while keeping what it told about its neighbors, as a (generally dense) prior on them, computed with the Schur complement. See [marginalization.md §2](optimization/marginalization.md#2-marginalization-keep-the-information-drop-the-variable).
 
 ### Sliding window and fixed-lag smoothing
-Optimizing only the most recent states and marginalizing older ones, so per-step cost stays bounded. Unlike a filter, it can still revise every state in the window. See [marginalization.md §7](optimization/marginalization.md#7-sliding-window-and-fixed-lag-smoothing-the-payoff) and [filtering_smoothing.md §10](filtering_smoothing.md#10-where-the-modern-systems-fit).
+Optimizing only the most recent states and marginalizing older ones, so per-step cost stays bounded. Unlike a filter, it can still revise every state in the window. See [marginalization.md §7](optimization/marginalization.md#7-sliding-window-and-fixed-lag-smoothing-the-payoff) and [filtering_smoothing.md §10](filtering_smoothing.md#10-where-the-modern-systems-fit). A Kalman fixed-lag smoother, run on the 1D inchworm, is in [filtering_smoothing.md §8](filtering_smoothing.md#fixed-lag-most-of-the-gain-with-a-short-delay).
 
 ### FEJ (First-Estimate Jacobians)
-Once a variable has contributed to a marginalization prior, later Jacobians involving it are evaluated at that same first linearization point, so the frozen prior and new factors cannot add spurious information in unobservable directions. This repo's sliding-window script does not use it. See [marginalization.md §6](optimization/marginalization.md#6-the-consistency-gotcha-why-fej-exists) and [§8](optimization/marginalization.md#8-what-this-repo-implements).
+Once a variable has contributed to a marginalization prior, later Jacobians involving it are evaluated at that same first linearization point, so the frozen prior and new factors cannot add spurious information in unobservable directions. This repo's sliding-window script does not use it. See [marginalization.md §6](optimization/marginalization.md#6-the-consistency-gotcha-why-fej-exists) and [§8](optimization/marginalization.md#8-what-this-repo-implements). `observability_fej.py` simulates the EKF-SLAM form (the Jacobians at the first estimates) next to the standard and the invariant EKF: [observability.md §4](foundations/observability.md#4-two-fixes), [§5](foundations/observability.md#5-simulation-results).
 
 ### Filtering vs. smoothing
 Filtering estimates only the current state and folds the past away; smoothing keeps past states and can revise them. See [filtering_smoothing.md §1](filtering_smoothing.md#1-the-core-idea).
@@ -297,6 +324,9 @@ A gyroscope plus an accelerometer, measuring the body's angular rate and specifi
 ### Tracking camera
 A camera module that runs VIO on board and reports its own pose and velocity, e.g. the Intel RealSense T265 (200 Hz). The pose is given in the module's own odometry frame, fixed where it started, which drifts away from the world as the robot travels. With pose jumping enabled, it may **jump** its position suddenly when it finds its pose inconsistent with an earlier one. See [hexapod_camera_fusion_inekf.md §1](filtering/hexapod_camera_fusion_inekf.md#1-the-camera).
 
+### Camera delay (time offset)
+**Symbol:** $`d`$. The time in seconds between a sensor sampling the world and the filter receiving the reading, so a reading that arrives at time $`t`$ describes the state at $`t - d`$. Ignored, a 100 ms delay at 0.2 m/s puts the reading 2 cm off. A filter can compare each reading with its estimate $`d`$ ago (the current estimate run backwards through the stored IMU readings), or estimate $`d`$ as one more state (**online temporal calibration**), which works only while the motion varies. See [hexapod_camera_fusion_inekf.md §5](filtering/hexapod_camera_fusion_inekf.md#5-experiment-3-the-cameras-readings-arrive-late).
+
 ### IMU preintegration
 Summarizing all IMU samples between two keyframes into one relative-motion measurement ($\Delta R$, $\Delta v$, $\Delta p$: the change in rotation, velocity and position), with bias Jacobians so a bias change can be corrected without re-integrating. See [imu_preintegration.md §3](optimization/imu_preintegration.md#3-what-gets-compressed) and [§5](optimization/imu_preintegration.md#5-the-payoff-correcting-for-a-bias-change-without-re-integrating).
 
@@ -347,7 +377,13 @@ Pushes $2n+1$ deterministically chosen **sigma points** (for an $n$-dimensional 
 A Bayes filter whose belief is a set of weighted samples (**particles**), each a full state hypothesis. Each particle is pushed through the motion model and reweighted by how well it explains the measurement, and the set is periodically resampled. It needs no Gaussian assumption, at a cost that grows with the number of particles. See [extra_kf_variants.md §6](filtering/extra_kf_variants.md#6-particle-filter-pf).
 
 ### RTS (Rauch-Tung-Striebel) smoother
-A Kalman smoother: a forward Kalman-filter pass followed by a backward pass that revises each state using the later measurements too. See [extra_kf_variants.md §9](filtering/extra_kf_variants.md#9-kalman-smoother).
+A Kalman smoother: a forward Kalman-filter pass followed by a backward pass that revises each state using the later measurements too. See [extra_kf_variants.md §9](filtering/extra_kf_variants.md#9-kalman-smoother), and [filtering_smoothing.md §8](filtering_smoothing.md#the-same-picture-with-numbers-a-kalman-filter-and-its-rts-smoother-on-one-data-set) for it run next to the filter and batch least squares.
+
+### IMM (interacting multiple model)
+A filter for a system that switches between motion modes (here "still" and "moving"). It runs one Kalman filter per mode on the same measurements, mixes the previous estimates before each step, re-weights the modes by how well each predicted the new measurement, and outputs the probability-weighted estimate. See [inchworm_slip_imm.md](filtering/inchworm_slip_imm.md#the-imm-in-one-table).
+
+### Mode probability
+**Symbol:** $`\mu_j`$. The IMM's probability (0 to 1; the modes' probabilities sum to 1) that mode $`j`$ is the active one. Each tick it is the mode's predicted probability times its measurement likelihood, normalized. See [inchworm_slip_imm.md](filtering/inchworm_slip_imm.md#the-imm-in-one-table).
 
 ---
 

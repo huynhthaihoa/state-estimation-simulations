@@ -393,6 +393,8 @@ When the anchor can slip, "the schedule says anchor" is no longer enough to just
 
 Follow-up: [inchworm_two_pad_ekf.md](inchworm_two_pad_ekf.md) drops this toy's simplifications (two pads, a sensor read only on the anchored pad, turning, no position measurement). Without position measurements, a veto no longer recovers from slip, and only fusing the reading does.
 
+A soft alternative to the gate, an interacting multiple model filter that keeps a probability that the body is still or moving, is in [inchworm_slip_imm.md](inchworm_slip_imm.md).
+
 ---
 
 ## 7. References

@@ -323,7 +323,7 @@ t0 → t1 → t2 → t3 → t4
      both past AND future
 ```
 
-The classic example is the **Rauch–Tung–Striebel (RTS) smoother**, very useful for **offline SLAM and trajectory estimation**. [filtering_smoothing.md](../filtering_smoothing.md) covers the filtering-vs-smoothing distinction in depth.
+The classic example is the **Rauch–Tung–Striebel (RTS) smoother**, very useful for **offline SLAM and trajectory estimation**. [filtering_smoothing.md](../filtering_smoothing.md) covers the filtering-vs-smoothing distinction in depth. A run of the RTS smoother next to the filter and batch least squares is in [filtering_smoothing.md §8](../filtering_smoothing.md#the-same-picture-with-numbers-a-kalman-filter-and-its-rts-smoother-on-one-data-set).
 
 ---
 
