@@ -83,7 +83,7 @@ $$\boxed{\Delta x = -\alpha J^\top e}$$
 
 where $\alpha$ is the **step size**. It uses only the **slope**, with no $J^\top J$ term (the Gauss-Newton approximation of the [Hessian](../glossary.md#normal-equations-and-hessian), i.e. the curvature).
 
-**Safer:** to first order a step changes the cost by $`-\alpha\|\nabla f\|^2 < 0`$, so a small enough $\alpha$ always lowers it, and there's no matrix to invert.
+**Safer:** to first order, a step changes the cost by $`-\alpha\|\nabla f\|^2 < 0`$, so a small enough $\alpha$ always lowers it, and there's no matrix to invert.
 
 **Slow:** $\alpha$ must stay small enough not to overshoot in the steepest direction, so in a long, narrow valley the steps zigzag across it and crawl along it.
 
@@ -95,7 +95,7 @@ For example, $f = \tfrac12(x^2 + 100y^2)$ is 100× steeper in $y$, so $\alpha$ m
 
 ![Two panels for gradient descent on f = one half of x squared plus 100 y squared from (10, 1): contours with the zigzag path of step size 0.019, which converges in 361 steps, the growing zigzag of step size 0.021, which diverges, and the single straight Gauss-Newton step to the minimum; and the distance to the minimum per step on a log axis, shrinking for 0.019 and exceeding 1e8 after 194 steps for 0.021](../../assets/lm_gradient_descent.png)
 
-*Figure: the valley example above, plotted by `uv run python generator/make_figures.py lm_gradient_descent`. Left: contours with the three paths (for step size 0.021 only the first 9 steps are drawn). Right: the distance to the minimum per step on a log axis, 361 steps to reach the 0.01 tolerance for 0.019 and growing past 1e8 after 194 steps for 0.021.*
+*Figure: the valley example above, plotted by `uv run python generator/make_figures.py lm_gradient_descent`. Left: contours with the three paths (for step size 0.021, only the first 9 steps are drawn). Right: the distance to the minimum per step on a log axis, 361 steps to reach the 0.01 tolerance for 0.019 and growing past 1e8 after 194 steps for 0.021.*
 
 §5 shows that LM with a large $\lambda$ takes this gradient-descent step with $\alpha = 1/\lambda$, and §10 shows how Marquardt's scaling removes this valley problem when the valley runs along the parameter axes, as it does here.
 
@@ -156,11 +156,11 @@ flowchart TD
     B -->|no| D["Reject: x unchanged<br/>lambda increases, more cautious<br/>re-solve from the same x (up to 10 tries)"]
 ```
 
-In practice $\lambda$ tends to grow while the linear model predicts poorly (often far from the solution) and shrink near the solution, where the model becomes accurate - but that's a consequence of the rule, not the rule itself.
+In practice, $\lambda$ tends to grow while the linear model predicts poorly (often far from the solution) and shrink near the solution, where the model becomes accurate - but that's a consequence of the rule, not the rule itself.
 
 > **Note:** "did the cost drop?" is the simplest acceptance test, and the one this repo uses (§13). Many solvers instead use the **gain ratio**: the actual cost reduction divided by the reduction the linear model predicted. A ratio near 1 means the model is trustworthy ($\lambda \downarrow$); a small or negative ratio means it isn't ($\lambda \uparrow$).
 
-> **Note:** damping makes each step *safe*, not *global*. LM still only goes downhill from where it starts, so if a poor initial estimate sits in the basin of a wrong local minimum, LM converges to that minimum. In SLAM a reasonable initialization (odometry, a good [front end](../glossary.md#front-end-and-back-end)) is still needed.
+> **Note:** damping makes each step *safe*, not *global*. LM still only goes downhill from where it starts, so if a poor initial estimate sits in the basin of a wrong local minimum, LM converges to that minimum. In SLAM, a reasonable initialization (odometry, a good [front end](../glossary.md#front-end-and-back-end)) is still needed.
 
 ---
 
