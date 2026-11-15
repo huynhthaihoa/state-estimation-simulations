@@ -70,7 +70,7 @@ Tiny example, $`\sigma_p = 0.03`$ m default; $`H`$ is the measurement Jacobian (
 - Compare 1 cm with the 3 cm point noise: far points feel a small rotation more than near points do.
 
 ### Putting the two steps together
-EKF and IEKF share the predict step and differ only in the frame the update is linearized in - two algebraically related linearizations of the same model, which is why they can be proven identical (§2). UKF avoids linearizing in either step, so it can only be shown to be *close* (§3). Vanilla KF changes the state representation itself, which touches both steps (§4).
+EKF and IEKF share the predict step and differ only in the frame in which the update is linearized in - two algebraically related linearizations of the same model, which is why they can be proven identical (§2). UKF avoids linearizing in either step, so it can only be shown to be *close* (§3). Vanilla KF changes the state representation itself, which touches both steps (§4).
 
 ![Three panels from pointcloud_pose_tracking.py's defaults: the same 20-point body cloud carried rigidly along the true trajectory, the world-frame EKF residual between the measured points and the twist-only prediction T_pred·p at t = 1 s, and the same residuals pulled into the body frame as T_pred⁻¹·z − p for the IEKF, with identical lengths](../../assets/pose_tracking_concept.png)
 
@@ -138,7 +138,7 @@ Every method starts from the same guess, $`T_0^{\text{est}} = T_0\,\mathrm{Exp}(
 
 #### Motion model (`motion_model`)
 
-This is used by dead reckoning, EKF, IEKF, UKF and GN. With $w = u\Delta t$:
+This is used by dead reckoning, EKF, IEKF, UKF, and GN. With $w = u\Delta t$:
 
 ```math
 T^- = T\,\mathrm{Exp}(w), \qquad
@@ -159,25 +159,25 @@ $\mathrm{Ad}$ is `se3_adjoint`. $J_r$ is `se3_right_jacobian`, which sums the se
 | $`J_{\text{self}} = \mathrm{Ad}_{\mathrm{Exp}(-w)}`$ | the previous pose $T$ (right perturbation) | $F$, state transition | relabels the old uncertainty's axes in the new body frame (toy case below) |
 | $`J_\tau = J_r(w)`$ | the per-step increment $`w = u\Delta t`$ (the $\tau$ in $J_\tau$; `dtau` in code) | $G$, noise input | maps twist noise onto the pose; $`\approx I`$ for small $w$, so $Q$ passes through almost unchanged |
 
-**Intuition for $J_{\text{self}} = \mathrm{Ad}_{\mathrm{Exp}(-w)}$ in the covariance predict:** it only re-expresses the old uncertainty in the new body frame.
+**Intuition for $J_{\text{self}} = \mathrm{Ad}_{\mathrm{Exp}(-w)}$ in the covariance prediction:** it only re-expresses the old uncertainty in the new body frame.
 - Toy case: "30 cm of uncertainty ahead" becomes "30 cm to my left" after I turn 90° right.
-- The uncertainty is the same size. Only its axes are relabelled.
+- The uncertainty is the same size. Only its axes are relabeled.
 - So $`\mathrm{Ad}`$ rotates the covariance. It does not resize it. The noise term $Q$ is what adds new uncertainty.
 
 #### Observation model (`observation_model`)
 
-This is used by the data generator, EKF, UKF and GN. IEKF and vanilla KF build their own forms of it (below). For each body point $p_i$ it returns the predicted world point and, for a right perturbation $`T\,\mathrm{Exp}(\delta)`$, its Jacobian:
+This is used by the data generator, EKF, UKF, and GN. IEKF and vanilla KF build their own forms of it (below). For each body point $p_i$, it returns the predicted world point and, for a right perturbation $`T\,\mathrm{Exp}(\delta)`$, its Jacobian:
 
 ```math
 h_i(T) = R\,p_i + t, \qquad
 H_i = \begin{bmatrix} R & -R\,p_i^\wedge \end{bmatrix}
 ```
 
-The first three columns of $H_i$ are the translation part of $\delta$ and the last three the rotation part (see the intuition for $`H`$ in §1). Stacking all $M$ points gives $h(T) \in \mathbb R^{3M}$ and a $3M \times 6$ Jacobian $H$.
+The first three columns of $H_i$ are the translation part of $\delta$ and the last three are the rotation part (see the intuition for $`H`$ in §1). Stacking all $M$ points gives $h(T) \in \mathbb R^{3M}$ and a $3M \times 6$ Jacobian $H$.
 
 #### Dead reckoning (`run_dead_reckoning`)
 
-[Dead reckoning](../glossary.md#dead-reckoning) chains the noisy twists with no measurement correction: it applies $`T_{k+1} = T_k\,\mathrm{Exp}(u_k\Delta t)`$ only, so its error keeps growing. Its trajectory is also batch GN's initial guess.
+[Dead reckoning](../glossary.md#dead-reckoning) chains the noisy twists with no measurement correction: it applies $`T_{k+1} = T_k\,\mathrm{Exp}(u_k\Delta t)`$ only, so its error keeps growing. Its trajectory is also the batch GN's initial guess.
 
 #### EKF (`run_ekf`)
 
@@ -199,7 +199,7 @@ T^+ = T^-\,\mathrm{Exp}(K r), \qquad P^+ = (I - K H)\,P^-
 
 Here $r$ is the stacked residual (the [innovation](../glossary.md#innovation-and-kalman-gain)) and $S$ its covariance: the pose uncertainty mapped onto the points, $`H P^- H^\top`$, plus the sensor noise $`R_{\text{diag}}`$. It is $3M \times 3M$ ($60 \times 60$ at the default $M = 20$). The Kalman gain $K$ ($6 \times 3M$) turns the residual into a pose correction. It moves the pose a lot when $`H P^- H^\top`$ dominates $S$ (the pose is uncertain) and little when $`R_{\text{diag}}`$ does (the points are just noisy).
 
-The **covariance update** uses the simple $(I-KH)P^-$ form, not the **Joseph form** (a longer, numerically safer rewrite that keeps $`P`$ symmetric), and $S$ is inverted explicitly. $P^+$ is also not moved to the new estimate: it still describes the error around $T^-$, while the estimate is now $`T^+ = T^-\,\mathrm{Exp}(Kr)`$. Re-centering it on $T^+$ gives, to first order, $`J_r(Kr)\,P^+\,J_r(Kr)^\top`$ (from $`\mathrm{Exp}(Kr + \varepsilon) \approx \mathrm{Exp}(Kr)\,\mathrm{Exp}(J_r(Kr)\,\varepsilon)`$). Skipping this is a common simplification, because $J_r(Kr) \approx I$ for small corrections. At the defaults (20 seeds) it changes $P^+$ by 4-20% at the first update (the large initial correction) and by under 2% afterwards, and changes the RMSE pooled over the 20 seeds by about 0.01%; per seed, by at most 0.07% in position and 1.7% in rotation.
+The **covariance update** uses the simple $(I-KH)P^-$ form, not the **Joseph form** (a longer, numerically safer rewrite that keeps $`P`$ symmetric), and $S$ is inverted explicitly. $P^+$ is also not moved to the new estimate: it still describes the error around $T^-$, while the estimate is now $`T^+ = T^-\,\mathrm{Exp}(Kr)`$. Re-centering it on $T^+$ gives, to first order, $`J_r(Kr)\,P^+\,J_r(Kr)^\top`$ (from $`\mathrm{Exp}(Kr + \varepsilon) \approx \mathrm{Exp}(Kr)\,\mathrm{Exp}(J_r(Kr)\,\varepsilon)`$). Skipping this is a common simplification, because $J_r(Kr) \approx I$ for small corrections. At the defaults (20 seeds), it changes $P^+$ by 4-20% at the first update (the large initial correction) and by under 2% afterwards, and changes the RMSE pooled over the 20 seeds by about 0.01%; per seed, by at most 0.07% in position and 1.7% in rotation.
 
 #### IEKF (`run_iekf`)
 
@@ -226,7 +226,7 @@ $$
 
 The defaults give $\lambda = -3$, $n + \lambda = 3$, $W^m_0 = -1$, $W^c_0 = 1$ and $W_i = 1/6$. The negative central mean weight is intentional. The sigma offsets are $\chi_0 = 0$ and $\chi_i, \chi_{n+i} = \pm$ the $i$-th column of $L$. Here $L$ is a matrix square root of the scaled covariance, computed as its [Cholesky factor](../glossary.md#cholesky-factorization): $L L^\top = (n+\lambda)(P_{\text{sym}} + 10^{-9} I)$, and $P_{\text{sym}}$ is the symmetrized $P$.
 
-**Intuition:** the UKF replaces the Gaussian by a few stand-in points that have the same mean and covariance.
+**Intuition:** the UKF replaces the Gaussian with a few stand-in points that have the same mean and covariance.
 - Here $`n = 6`$, so there are $`2n + 1 = 13`$ points: the centre and $`\pm`$ one point per axis.
 - The weights add up to 1: $`-1 + 12/6 = 1`$.
 - Check the spread: each $`\pm`$ pair contributes $`2\cdot(1/6)\,L_jL_j^\top`$. Summed over the 6 columns this is $`(1/3)\,LL^\top = (1/3)(3P) = P`$ exactly.
@@ -263,7 +263,7 @@ $P_{zz}$ is the covariance of the predicted points plus the point noise (the UKF
 
 #### Vanilla KF (`run_vanilla_kf`)
 
-The state is $x = [\mathrm{vec}(R), t] \in \mathbb R^{12}$. Here $\mathrm{vec}$ is **row-major**, as `R.flatten()` computes it: $\mathrm{vec}(R) = [R_{11}, R_{12}, R_{13}, R_{21}, \dots, R_{33}]$. This is not the column-stacking $\mathrm{vec}$ common in textbooks. With this layout the observation model $z_i = R p_i + t$ is exactly linear. $H$ is built once:
+The state is $x = [\mathrm{vec}(R), t] \in \mathbb R^{12}$. Here $\mathrm{vec}$ is **row-major**, as `R.flatten()` computes it: $\mathrm{vec}(R) = [R_{11}, R_{12}, R_{13}, R_{21}, \dots, R_{33}]$. This is not the column-stacking $\mathrm{vec}$ common in textbooks. With this layout, the observation model $z_i = R p_i + t$ is exactly linear. $H$ is built once:
 
 ```math
 H_i = \begin{bmatrix} I_3 \otimes p_i^\top & I_3 \end{bmatrix}
@@ -331,7 +331,7 @@ Each iteration solves the damped normal equations below. The sums run over all f
 \Big( \sum J^\top \Omega J + 10^{-6} I \Big)\, \delta = -\sum J^\top \Omega\, e
 ```
 
-There is no line search or Levenberg-Marquardt schedule. It starts from the dead-reckoning trajectory, and with the defaults it converged in 5 iterations. The motion factor uses $Q$ directly as the covariance of $e_k$. It does not use the EKF predict's $J_\tau Q J_\tau^\top$.
+There is no line search or Levenberg-Marquardt schedule. It starts from the dead-reckoning trajectory, and with the defaults, it converged in 5 iterations. The motion factor uses $Q$ directly as the covariance of $e_k$. It does not use the EKF's prediction $J_\tau Q J_\tau^\top$.
 
 **Intuition:** batch GN and the EKF use the same models and the same measurements. They differ in **which measurements each pose gets to use**.
 - The EKF settles pose $`T_k`$ from the measurements up to time $`k`$ and never revisits it. Batch GN is a **smoother**: it solves for every pose at once, so each pose also uses the measurements that came **after** it ([filtering vs. smoothing](../filtering_smoothing.md#8-filtering-vs-smoothing-in-one-picture)).
@@ -354,7 +354,7 @@ There is no line search or Levenberg-Marquardt schedule. It starts from the dead
 - The **rotation error** is the angle $\theta$ of the relative rotation $`W = R^\top \hat R`$ between the true rotation $R$ and the estimated one $\hat R$, in degrees. It is computed as $`\mathrm{atan2}(s, c)`$, where $`c = (\mathrm{tr}\,W - 1)/2 = \cos\theta`$ is read off the symmetric part of $W$ and $`s = \tfrac12 \lVert (W - W^\top)^\vee \rVert = \sin\theta`$ off its skew part ($`^\vee`$ is the inverse of the hat map, [glossary](../glossary.md#hat-operator)). Unlike $\arccos(c)$, this stays accurate for tiny angles, down to round-off. The `use_manif` version computes the same angle as $`\lVert \hat R\ \text{rminus}\ R \rVert`$, and manif's $SO(3)$ $\mathrm{Log}$ also uses `atan2`, so the same accuracy holds there.
 - The **position error** is $\lVert t - \hat t \rVert$, with $t$ the true and $\hat t$ the estimated translation.
 
-"Final" is the error in the last pose, whereas "RMSE" ([root-mean-square error](../glossary.md#rmse-root-mean-square-error)) is calculated over all $N+1$ poses, including $k = 0$. At $k = 0$ the five recursive methods (dead reckoning, EKF, IEKF, UKF, vanilla KF) all still sit at the initial guess, so they share the same initial error in their RMSE, while batch GN already re-optimizes $T_0$. Small RMSE gaps between GN and the recursive filters therefore partly reflect this difference at $k = 0$.
+"Final" is the error in the last pose, whereas "RMSE" ([root-mean-square error](../glossary.md#rmse-root-mean-square-error)) is calculated over all $N+1$ poses, including $k = 0$. At $k = 0$, the five recursive methods (dead reckoning, EKF, IEKF, UKF, vanilla KF) all still sit at the initial guess, so they share the same initial error in their RMSE, while batch GN already re-optimizes $T_0$. Small RMSE gaps between GN and the recursive filters therefore partly reflect this difference at $k = 0$.
 
 
 ---
@@ -407,13 +407,13 @@ The step $`R_{\text{big}}\,R_{\text{diag}}\,R_{\text{big}}^\top = R_{\text{diag}
 
 ### 2.3 Empirical verification
 
-- Printed final-error and RMSE rotation+position rows are identical between EKF and IEKF across seed 0 (default args) and stress tests (`--init-pose-noise-std 0.5`/`0.8`, `--duration 8`).
+- Printed final error and RMSE rotation+position rows are identical between EKF and IEKF across seed 0 (default args) and stress tests (`--init-pose-noise-std 0.5`/`0.8`, `--duration 8`).
 - Direct numerical diff of the full trajectory (duration 5.0, seed 0, 51 poses): max position diff ~2e-14 m, and max rotation diff ~6e-13 deg (~1e-14 rad) from the script's own `rotation_geodesic_error`. Both are floating-point round-off. Don't measure this with $`\lVert\mathrm{Log}(R_{\text{EKF}}^\top R_{\text{IEKF}})\rVert`$: `se3_log`'s small-angle branch returns exactly 0 for any angle below $10^{-6}$ rad, so it can't show differences this small.
 - Saved trajectory/error plots show the IEKF line drawn exactly on top of the EKF line everywhere (invisible because identical).
 
 ### 2.4 What actually differs between them: speed, not accuracy
 
-$H_{\text{body}}$ depends only on the object's known geometry, so it is computed once outside the step loop; $H_{\text{world}}$ depends on the current $R_{\text{pred}}$, so the EKF rebuilds it every step. Result: IEKF is ~30% faster per step (e.g. 260 vs 369 microseconds/step in one run) at nearly identical memory - the entire practical benefit on this benchmark.
+$H_{\text{body}}$ depends only on the object's known geometry, so it is computed once outside the step loop; $H_{\text{world}}$ depends on the current $R_{\text{pred}}$, so the EKF rebuilds it every step. Result: IEKF is ~30% faster per step (e.g., 260 vs 369 microseconds/step in one run) at nearly identical memory - the entire practical benefit on this benchmark.
 
 ---
 
@@ -449,7 +449,7 @@ EKF vs UKF : max pos diff = 1.445e-03 m (at k = 1)  final pos diff = 3.8e-06 m  
 The UKF gap is real and structural, not floating-point noise, but *where* it happens matters:
 
 - **The maximum sits at $k = 1$**, the first update, when every filter corrects the initial pose error ($\sigma_0 = 0.1$, so a correction of order 0.1 m/0.1 rad). That is the largest correction in the run, and §3.2's second-order term scales with its size. Seeds 1 and 2 show the same (maximum at $k = 1$).
-- **Once the filters have converged, they agree far more closely:** at the final pose the difference is 3.8e-6 m, about 0.1% of the final position error (0.0031 m, the same for both).
+- **Once the filters have converged, they agree far more closely:** at the final pose, the difference is 3.8e-6 m, about 0.1% of the final position error (0.0031 m, the same for both).
 - The "Final/RMS errors" table the script prints only shows 3-4 decimal places, which is why EKF, IEKF and UKF look identical there.
 
 ### 3.4 How the gap moves as the step size changes
@@ -519,7 +519,7 @@ Unlike EKF vs. IEKF (§2.4, speed only, zero accuracy difference), UKF's disagre
 2. **Ambient (12-dim, redundant) vs. minimal (6-dim tangent) covariance.** $P$ is lifted from the initial $6\times6$ tangent covariance into the 12-dim ambient space via `se3_tangent_to_ambient_jacobian`, and the whole recursion - predict, update, gain - runs in that redundant linear space. This $P$ isn't directly comparable to the other four methods' $6\times6$ tangent covariance (see [minimal vs. ambient parameterization](../glossary.md#minimal-vs-ambient-redundant-parameterization) in the glossary).
 3. **Post-hoc SVD re-projection.** Nothing in a linear KF keeps a 9-vector an orthonormal rotation matrix. After every update, $\text{vec}(R)$ is re-projected onto $SO(3)$ via SVD ($`U\,\text{diag}\big(1, 1, \mathrm{sign}(\det(UV^\top))\big)\,V^\top`$) and fed back into the recursion. This is bolted on from outside, not part of the KF math; EKF/IEKF/UKF never need it because they stay on the manifold: every correction is applied as a [retraction](../glossary.md#retraction) $`T\,\mathrm{Exp}(\delta)`$, which always yields a valid pose.
 
-**Measured (§4.4):** after the initial transient the gap shrinks roughly in proportion to $\Delta t$ (mechanism 1 dominates the steady state), while the first-second gap is large and irregular at every $\Delta t$ (mechanisms 2 and 3).
+**Measured (§4.4):** after the initial transient, the gap shrinks roughly in proportion to $\Delta t$ (mechanism 1 dominates the steady state), while the first-second gap is large and irregular at every $\Delta t$ (mechanisms 2 and 3).
 
 **None of these three mechanisms involves noise shape, a residual frame, or a Jacobian-linearization choice**, so this divergence axis is orthogonal to the isotropy argument of §2 and §5. It is fully present under the default isotropic point noise, and anisotropic noise would neither create nor fix it.
 
@@ -533,10 +533,10 @@ EKF vs VKF: max pos diff = 1.349e-02 m (at k = 1)   final pos diff = 1.4e-03 m  
 ```
 
 - Vanilla KF (VKF in the output) has its maximum at the first update too, about 9x UKF's.
-- The bigger difference is at the end: after convergence UKF agrees with EKF to micrometers, while vanilla KF is still 1.4 mm away, about 45% of the final error.
+- The bigger difference is at the end: after convergence, UKF agrees with EKF to micrometers, while vanilla KF is still 1.4 mm away, about 45% of the final error.
 - The script's printed "Final/RMS errors" table makes this easy to miss: at default args, EKF's final rot/pos reads `0.289 deg/0.0031 m` against vanilla KF's `0.314 deg/0.0026 m`, which looks like noise at 3-4 decimal places. Vanilla KF happens to land slightly closer to the truth in position at this final pose, but it follows a different trajectory, not the same one with rounding.
 
-![Two log-scale panels over the 50 poses of one run: the position and rotation gap of IEKF, UKF and vanilla KF to the EKF trajectory. IEKF stays at floating-point rounding; UKF peaks at the first update and falls to micrometers; vanilla KF stays about a millimeter away, close to the EKF's own error](../../assets/pose_tracking_gap_concept.png)
+![Two log-scale panels over the 50 poses of one run: the position and rotation gap of IEKF, UKF, and vanilla KF to the EKF trajectory. IEKF stays at floating-point rounding; UKF peaks at the first update and falls to micrometers; vanilla KF stays about a millimeter away, close to the EKF's own error](../../assets/pose_tracking_gap_concept.png)
 
 *Figure: the per-pose gap behind §3.3's and §4.3's maxima (seed 0, 5 s, $`\Delta t = 0.1`$). IEKF stays at floating-point rounding (exactly 0 at 9 of 50 poses); UKF peaks at the first update (1.4 mm) and ends 3.8 µm away; vanilla KF peaks at 13 mm and ends 1.4 mm away, against the EKF's own final error of 3.1 mm. Plotted by `uv run python generator/make_figures.py pose_tracking_gap_concept`.*
 
@@ -563,7 +563,7 @@ dt      first 1 s (m)   after 1 s (m)   after 1 s, rot (deg)
 
 Unlike UKF, vanilla KF's steady-state gap is not limited by a numerical-safety constant; it keeps shrinking down to the smallest step tested.
 
-The figure plots this table and §3.4's together. Vanilla KF's steady-state line (solid orange) runs almost parallel to the grey $\propto \Delta t$ line, slightly shallower. UKF's (solid purple) is U-shaped, with its minimum at $\Delta t = 0.02$. The first-second lines (dashed) stay high and irregular for both.
+The figure plots this table and § 3.4 together. Vanilla KF's steady-state line (solid orange) runs almost parallel to the grey $\propto \Delta t$ line, slightly shallower. UKF's (solid purple) is U-shaped, with its minimum at $\Delta t = 0.02$. The first-second lines (dashed) stay high and irregular for both.
 
 ![Two log-log panels against the time step dt from 0.001 to 0.4 s: the maximum position gap to the EKF trajectory and the maximum rotation gap after the first second, for UKF and vanilla KF. Vanilla KF's steady-state gap rises roughly in proportion to dt; UKF's is U-shaped with its minimum at dt = 0.02; the first-second gaps stay high and irregular](../../assets/pose_tracking_dt_sweep.png)
 
@@ -603,7 +603,7 @@ The EKF/IEKF equivalence (§2) rests on **isotropic noise**, not on rigidity per
 | 3. Non-rigid motion | no single rigid $T$ explains the point cloud | **Ill-posed question**: the core assumption $z_i = T\cdot p_i + \text{noise}$ for one shared rigid $T$ has failed | a richer state (pose plus deformation or shape parameters), not a filter swap |
 
 - A *diagonal* covariance isn't enough for the shortcut in row 1: only a scalar one, $\sigma^2 I$, is unchanged by every rotation. This script's $R_{\text{diag}}$ is in fact scalar, despite its name.
-- In row 2b the practical difference is the modeling burden, and IEKF is arguably the more natural model, not just the faster one.
+- In row 2b, the practical difference is the modeling burden, and IEKF is arguably the more natural model, not just the faster one.
 
 **Rules of thumb**
 
@@ -611,15 +611,15 @@ The EKF/IEKF equivalence (§2) rests on **isotropic noise**, not on rigidity per
 | --- | --- | --- | --- |
 | EKF vs. IEKF | not rigid vs. non-rigid, but **whether the uncertainty is isotropic or anisotropic-and-tied-to-the-object's-frame** (and whether each filter's covariance is expressed in its own frame); non-rigid objects are a common source of the latter | yes | identical to round-off when it holds (§2) |
 | UKF vs. EKF/IEKF | the size of the correction and of the per-step motion | no; it never matches to round-off the way EKF/IEKF do | largest during the initial convergence; in steady state grows with $\Delta t$ (§3.4). At very small $\Delta t$ in this code, the fixed $10^{-9} I$ safety term in the sigma-point construction, not the filters, sets the gap |
-| Vanilla KF vs. the other three | the swapped state representation (ambient vs. minimal, §4.2 and the [glossary](../glossary.md#minimal-vs-ambient-redundant-parameterization)), not a linearization or sampling gap | no; fully present under the default isotropic noise (§4) | steady state shrinks roughly in proportion to $\Delta t$ (truncated motion step, §4.4); during large corrections the ambient representation and SVD re-projection add a larger, irregular error at any step size. At the default step it stays millimeters from the other three after convergence, where UKF is within micrometers |
+| Vanilla KF vs. the other three | the swapped state representation (ambient vs. minimal, §4.2 and the [glossary](../glossary.md#minimal-vs-ambient-redundant-parameterization)), not a linearization or sampling gap | no; fully present under the default isotropic noise (§4) | steady state shrinks roughly in proportion to $\Delta t$ (truncated motion step, §4.4); during large corrections the ambient representation and SVD re-projection add a larger, irregular error at any step size. At the default step, it stays millimeters from the other three after convergence, where UKF is within micrometers |
 
 ---
 
 ## 6. References
 
-1. Julier, S. J., & Uhlmann, J. K. (1997). *New Extension of the Kalman Filter to Nonlinear Systems*. Proceedings of SPIE, 3068 (Signal Processing, Sensor Fusion, and Target Recognition VI), 182-193. - the original unscented transform/UKF this doc's §3 empirically compares against EKF/IEKF.
+1. Julier, S. J., & Uhlmann, J. K. (1997). *New Extension of the Kalman Filter to Nonlinear Systems*. Proceedings of SPIE, 3068 (Signal Processing, Sensor Fusion, and Target Recognition VI), 182-193. - The original unscented transform/UKF in this doc's §3 is empirically compared against EKF/IEKF.
 2. Barrau, A., & Bonnabel, S. (2017). *The Invariant Extended Kalman Filter as a Stable Observer*. IEEE Transactions on Automatic Control, 62(4), 1797-1812. https://doi.org/10.1109/TAC.2016.2594085 - the invariant EKF and the group-affine class cited in §1.
 
 ### Further reading
 
-- Lee, D., Jung, M., Yang, W., & Kim, A. (2024). *LiDAR Odometry Survey: Recent Advancements and Remaining Challenges*. Intelligent Service Robotics, 17(2), 95-118. https://doi.org/10.1007/s11370-024-00515-8 - a survey of the problem this benchmark deliberately skips. Here every measured point $z_i$ arrives already paired with its body point $p_i$; a real LiDAR odometry pipeline has to find those correspondences (scan matching) before any filter or optimizer sees a residual. [`lidar_primitives.md`](../frontend/lidar_primitives.md) does that step in this repo, with ICP and with fitted planes and cylinders.
+- Lee, D., Jung, M., Yang, W., & Kim, A. (2024). *LiDAR Odometry Survey: Recent Advancements and Remaining Challenges*. Intelligent Service Robotics, 17(2), 95-118. https://doi.org/10.1007/s11370-024-00515-8 - a survey of the problem this benchmark deliberately skips. Here, every measured point $z_i$ arrives already paired with its body point $p_i$; a real LiDAR odometry pipeline has to find those correspondences (scan matching) before any filter or optimizer sees a residual. [`lidar_primitives.md`](../frontend/lidar_primitives.md) does that step in this repo, with ICP and with fitted planes and cylinders.
