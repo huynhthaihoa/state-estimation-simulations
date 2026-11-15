@@ -32,9 +32,9 @@ Stack what a window of steps $`k_0 \dots k_1`$ measures about the error at its s
 M = \begin{bmatrix} H_{k_0} \\ H_{k_0+1}\Phi_{k_0+1} \\ H_{k_0+2}\Phi_{k_0+2}\Phi_{k_0+1} \\ \vdots \end{bmatrix}
 ```
 
-A direction $`v`$ (a vector of the state's size) is **unobservable** over the window if $`M v = 0`$: moving the state along $`v`$ changes no residual, to first order. The directions with $`Mv = 0`$ form the **null space** of $`M`$ ([glossary](../glossary.md#null-space)); the number of unobservable directions is its dimension. The matrix is "local" because it depends on the points where each $`\Phi_k`$ and $`H_k`$ were evaluated. For a time-invariant system that point does not matter. For an EKF it does, and that is §3.
+A direction $`v`$ (a vector of the state's size) is **unobservable** over the window if $`M v = 0`$: moving the state along $`v`$ changes no residual, to first order. The directions with $`Mv = 0`$ form the **null space** of $`M`$ ([glossary](../glossary.md#null-space)); the number of unobservable directions is its dimension. The matrix is "local" because it depends on the points where each $`\Phi_k`$ and $`H_k`$ were evaluated. For a time-invariant system, that point does not matter. For an EKF it does, and that is §3.
 
-**Worked case.** A 1D robot at $`x`$ measures its distance to a landmark at $`p`$: $`z = p - x`$. The state is $`(x, p)`$, $`H = [-1,\ 1]`$ and $`\Phi = I`$ (the robot moves by a known odometry step, the landmark does not move). Every row of $`M`$ is $`[-1,\ 1]`$, so $`M`$ has rank 1 and its null space is spanned by $`v = (1, 1)`$: shift both. Of the 2 state directions, 1 is unobservable.
+**Worked case.** A 1D robot at $`x`$ measures its distance to a landmark at $`p`$: $`z = p - x`$. The state is $`(x, p)`$, $`H = [-1,\ 1]`$ and $`\Phi = I`$ (the robot moves by a known odometry step; the landmark does not move). Every row of $`M`$ is $`[-1,\ 1]`$, so $`M`$ has rank 1 and its null space is spanned by $`v = (1, 1)`$: shift both. Of the 2 state directions, 1 is unobservable.
 
 **Why a filter cares.** The Kalman update adds $`H^\top R^{-1} H`$ to the **information matrix** $`P^{-1}`$ (the inverse of the covariance $`P`$; $`R`$ is the measurement noise covariance; [glossary](../glossary.md#information-matrix)). The information added along $`v`$ is $`v^\top H^\top R^{-1} H\, v`$, which is 0 exactly when $`Hv = 0`$. If the filter's $`H`$ (or the $`v`$ it carries through its own $`\Phi`$) does not satisfy that, the covariance shrinks along a direction nobody measures.
 
@@ -85,7 +85,7 @@ The paper calls the loop "15 m in diameter", but 1 m/s at 9°/s is a circle of 1
 
 ## 3. Why the standard EKF loses the rotation direction
 
-Only the heading column of $`\Phi_k`$ depends on the estimate. For the model above it is the effect of the heading on the position:
+Only the heading column of $`\Phi_k`$ depends on the estimate. For the model above, it is the effect of the heading on the position:
 
 ```math
 \Phi_k = \begin{bmatrix} I_2 & J\,(\hat x_{k\mid k-1} - \hat x_{k-1\mid k-1}) & 0 \\ 0 & 1 & 0 \\ 0 & 0 & I \end{bmatrix}
@@ -93,13 +93,7 @@ Only the heading column of $`\Phi_k`$ depends on the estimate. For the model abo
 
 (the Jacobian of $`R(\theta)[d,0]^\top`$ with respect to $`\theta`$ is $`JR(\theta)[d,0]^\top`$, the estimated displacement turned by 90°).
 
-Carry the rotation direction $`n_3`$ through a run of these matrices. Its position part starts as $`Jx_0`$ and gains $`J(\hat x_{j\mid j-1} - \hat x_{j-1\mid j-1})`$ per step. Each term starts from the *updated* previous estimate, so it leaves out the correction $`c_{j-1} = \hat x_{j-1\mid j-1} - \hat x_{j-1\mid j-2}`$ that the update moved the position by. The terms would add up to $`J\hat x_{k\mid k-1}`$ without the corrections, so after $`k`$ steps the carried direction is
-
-```math
-\Big(J\big(\hat x_{k\mid k-1} - \textstyle\sum_{j<k} c_j\big),\ 1,\ \dots\Big)
-```
-
-and not $`(J\hat x_{k\mid k-1}, 1, \dots)`$, the rotation direction at the current estimate, which $`H_k`$ does annihilate (§2). The difference is made of update corrections (ref. 1 eq. 27 shows the same in closed form, including the changes of the landmark estimates). Any nonzero correction makes $`H_k n_3 \neq 0`$, so the rotation looks observable. Ref. 1 proves that this lowers the unobservable subspace of the standard EKF from 3 to 2 dimensions, and that the missing direction is the global rotation (eq. 28; ref. 2 states the dimension as its eq. 8).
+Carry the rotation direction $`n_3`$ through a run of these matrices. Its position part starts as $`Jx_0`$ and gains $`J(\hat x_{j\mid j-1} - \hat x_{j-1\mid j-1})`$ per step. Each term starts from the *updated* previous estimate, so it leaves out the correction $`c_{j-1} = \hat x_{j-1\mid j-1} - \hat x_{j-1\mid j-2}`$ that the update moved the position by. The terms would add up to $`J\hat x_{k\mid k-1}`$ without the corrections, so after $`k`$ steps the carried direction is $`\Big(J\big(\hat x_{k\mid k-1} - \textstyle\sum_{j<k} c_j\big),\ 1,\ \dots\Big)`$ and not $`(J\hat x_{k\mid k-1}, 1, \dots)`$, the rotation direction at the current estimate, which $`H_k`$ does annihilate (§2). The difference is made of update corrections (ref. 1 eq. 27 shows the same in closed form, including the changes of the landmark estimates). Any nonzero correction makes $`H_k n_3 \neq 0`$, so the rotation looks observable. Ref. 1 proves that this lowers the unobservable subspace of the standard EKF from 3 to 2 dimensions, and that the missing direction is the global rotation (eq. 28; ref. 2 states the dimension as its eq. 8).
 
 What the code measures on a small scene (3 landmarks always visible, 10 steps, one noisy trial; `observability_demo`):
 
@@ -120,12 +114,12 @@ The null-space dimension counts singular values below $`10^{-9}`$ of the largest
 
 Two changes to the Jacobians (ref. 1 eqs. 29 and 30), both needed:
 
-1. **Propagation:** compute $`\Phi_k`$ with $`\hat x_{k\mid k-1} - \hat x_{k-1\mid k-2}`$, the earlier predicted position, instead of the earlier updated one. The corrections then cancel out of the carried direction.
+1. **Propagation:** compute $`\Phi_k`$ with $`\hat x_{k\mid k-1} - \hat x_{k-1\mid k-2}`$, the earlier predicted position, instead of the earlier updated one. The corrections then cancel out in the carried direction.
 2. **Measurement:** in $`H_j`$'s term $`J(p_j - x)`$, use the landmark estimate from the first time it was seen, $`\hat p_j^{\text{first}}`$. The robot position there is the predicted one, as in the standard EKF.
 
 With these, the carried direction is $`(J\hat x_{k\mid k-1}, 1, J\hat p^{\text{first}}_j)`$ at every step and $`H_k`$ annihilates it. The Jacobians are less accurate than the standard ones, which use the latest estimates (ref. 1 says so too).
 
-The code also runs each rule alone: with only the propagation rule or only the measurement rule the null space is 2-dimensional again (§3 table), and the information along the rotation stays large (§5.1).
+The code also runs each rule alone: with only the propagation rule or only the measurement rule, the null space is 2-dimensional again (§3 table), and the information along the rotation stays large (§5.1).
 
 ### 4.2 Invariant EKF
 
@@ -140,7 +134,7 @@ Barrau & Bonnabel (ref. 3) change the error variable instead of the evaluation p
 - the transition matrix is the identity, so a direction carried through the propagation does not change;
 - $`H_j = \nabla\tilde h\,R(\hat\theta)^\top[\,-I,\ 0,\ I \text{ at } p_j\,]`$ has no heading column, so $`H_j`$ annihilates the rotation $`(1, 0, 0, \dots)`$ and both shifts $`(0, u, u, \dots)`$ **at any estimate** (ref. 3 Thm. 1, Prop. 3);
 - the information along these directions cannot increase (ref. 3 Thm. 2);
-- the update is applied on the group: the heading adds $`\delta\theta`$ and every position $`q`$ becomes $`R(\delta\theta)q + B(\delta\theta)\delta q`$ (ref. 3 eq. 22).
+- the update is applied to the group: the heading adds $`\delta\theta`$ and every position $`q`$ becomes $`R(\delta\theta)q + B(\delta\theta)\delta q`$ (ref. 3 eq. 22).
 
 Their $`G_n`$ (the Jacobian of the error with respect to the odometry noise; eqs. 17 and 21) corresponds to the noise entering before the input (their eq. 26). This repo uses $`\hat x_{n\mid n-1}`$ in it, the exact first-order $`G`$ for the process model (9) with the error (16), so that all four filters model the same odometry noise (finite-difference check in `tests/use_numpy/test_observability_fej.py`).
 
@@ -157,7 +151,7 @@ Times are from the default run on a laptop shared with other jobs, so only the r
 
 ## 5. Simulation results
 
-Everything below is one run of `uv run python use_numpy/observability_fej.py` (seed 0, 50 trials, 6 filters, about 80 s) unless another command is given. NEES is the **normalized estimation error squared** ([glossary](../glossary.md#consistency-and-nees)); for the robot pose (3 DoF) a consistent filter averages 3, and the 95% band of an average over 50 trials is [2.36, 3.72].
+Everything below is one run of `uv run python use_numpy/observability_fej.py` (seed 0, 50 trials, 6 filters, about 80 s) unless another command is given. NEES is the **normalized estimation error squared** ([glossary](../glossary.md#consistency-and-nees)); for the robot pose (3 DoF), a consistent filter averages 3, and the 95% band of an average over 50 trials is [2.36, 3.72].
 
 ### 5.1 Observability and information
 
@@ -194,7 +188,7 @@ Paired difference of the per-trial time-averaged robot NEES, standard minus the 
 | invariant EKF | 0.113 | 1.19 | 1.15 | 0.085 |
 | ideal EKF | 0.113 | 1.19 | 1.15 | 0.085 |
 
-- **The mean NEES of the standard EKF is raised by a few bad trials.** Its median trial (2.78) is as good as the others', its worst trial is 17.45 against 9.00 for FEJ. FEJ, the invariant EKF and the ideal EKF also have bad trials (max 8.9 to 9.1), so the evidence is the mean over trials and the landmark NEES, not one trial.
+- **The mean NEES of the standard EKF is raised by a few bad trials.** Its median trial (2.78) is as good as the others, its worst trial is 17.45, compared with 9.00 for FEJ. FEJ, the invariant EKF, and the ideal EKF also have bad trials (max 8.9 to 9.1), so the evidence is the mean over trials and the landmark NEES, not one trial.
 - **It is the combination that matters.** Each FEJ rule alone leaves most of the excess (NEES 3.81 and 3.40, against 3.95 for the standard and 3.05 for the ideal EKF) and the information along the rotation large; both together match the ideal EKF.
 - **Reported against actual heading error.** The standard EKF reports 1.13° but is off by 1.34° RMS (1.19 times its claim); the others report 1.15° against 1.19–1.21°.
 
@@ -231,9 +225,9 @@ Sweep of the odometry rotation noise (`--sweep-heading-noise 0.5 1 2 4`, multipl
 
 The odometry noise draws are the same in every row (they are scaled afterwards), and the landmarks first seen at step 0 are initialized identically at every scale (maximum difference 0 m, printed by the sweep). The 1× row is the default setting with 30 trials instead of 50; its standard-EKF NEES (3.07 against 3.95 in the default run) shows how much that mean depends on a few bad trials (§5.2).
 
-- **The NEES gap depends on the map and the noise.** With the paper's noise it is 0.1 to 0.9 on the three seeds (the paired difference of seed 1 is 0.11 ± 0.07 for FEJ and 0.16 ± 0.07 for the invariant EKF), 2.4 with 12 landmarks, and it grows with the rotation noise.
-- **More information along the rotation does not by itself mean a worse NEES.** With range-bearing measurements the standard EKF adds the most information (2.7e5) and its NEES (2.95) is inside the band. The reason is not tested.
-- **The invariant EKF is within 0.2 of the ideal EKF in every row.** At 4× noise both are above the band (8.6 and 8.3): the linearization error of large heading errors is then a second source of inconsistency that neither fix removes.
+- **The NEES gap depends on the map and the noise.** With the paper's noise, it is 0.1 to 0.9 on the three seeds (the paired difference of seed 1 is 0.11 ± 0.07 for FEJ and 0.16 ± 0.07 for the invariant EKF), 2.4 with 12 landmarks, and it grows with the rotation noise.
+- **More information along the rotation does not by itself mean a worse NEES.** With range-bearing measurements, the standard EKF adds the most information (2.7e5) and its NEES (2.95) is inside the band. The reason is not tested.
+- **The invariant EKF is within 0.2 of the ideal EKF in every row.** At 4× noise, both are above the band (8.6 and 8.3): the linearization error of large heading errors is then a second source of inconsistency that neither fix removes.
 - **FEJ breaks down before the others at large noise.** At 4× its mean NEES is 4942 (median trial 25.4): a few trials diverge. Its Jacobians use first estimates, taken before later measurements improved them (ref. 1 notes they are less accurate); whether that is the cause is not tested.
 
 ## 6. Every observability finding in the repo
@@ -272,7 +266,7 @@ These are 15 docs; the other files that mention observability (`README.md`, `GET
 ## 8. Takeaway
 
 - **Unobservable directions are a property of the model, and the filter must keep them wide.** Check with the null space of the observability matrix of the system the filter actually uses.
-- **A standard EKF's linear model has one unobservable direction too few (2 instead of 3), the global rotation**, because its Jacobians use estimates that moved between steps. Here that adds $`9\times10^4`$ of information along the rotation per run.
+- **A standard EKF's linear model has one unobservable direction too few (2 instead of 3), the global rotation**, because its Jacobians use estimates that moved between steps. Here, that adds $`9\times10^4`$ of information along the rotation per run.
 - **FEJ and the invariant EKF keep all 3.** FEJ needs both of its rules; the invariant EKF does it by construction, at the cost of the group-valued update.
 - **The NEES effect is small at this noise level and map-dependent** (§5.2, §5.4). The information measure and the null-space dimension show the mechanism more clearly than NEES does.
 
