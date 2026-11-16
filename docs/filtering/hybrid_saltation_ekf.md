@@ -89,7 +89,7 @@ p' = p + v\,h + \tfrac12 a\,h^2, \qquad v' = v + a\,h, \qquad
 \Phi(h) = \frac{\partial x'}{\partial x} = \begin{bmatrix} I_3 & h\,I_3 \\ 0 & I_3 \end{bmatrix}
 ```
 
-This is exact, not a linearization, because the flow is affine in $x$: between bounces the mean and covariance propagate with no approximation at all.
+This is exact, not a linearization, because the flow is affine in $x$: between bounces, the mean and covariance propagate with no approximation at all.
 
 **Process noise** (`process_noise_covariance`). For an interval $h$ and acceleration-disturbance std-dev $\sigma_a$:
 
@@ -219,7 +219,7 @@ Ball A is nominal; ball B starts 5 cm higher.
 - The naive $DR$ has no such term. It acts as if both balls bounced at the same instant.
 
 ### A formula that looks right and is right for a different question
-Before deriving the formula this script uses, we record what *doesn't* work here: a natural first guess that is the correct answer to a different, easily-conflated question. Following the same implicit-differentiation idea (the crossing-time sensitivity derived in the next subsection), but stopping short of the flow that continues *after* the reset, gives
+Before deriving the formula this script uses, we record what *doesn't* work here: a natural first guess that is the correct answer to a different, easily conflated question. Following the same implicit-differentiation idea (the crossing-time sensitivity derived in the next subsection), but stopping short of the flow that continues *after* the reset, gives
 
 $$\Xi_{\text{own-time}}(x^{-}) = DR(x^{-})\left[I - \frac{f(x^{-}) \otimes Dg(x^{-})}{Dg(x^{-}) \cdot f(x^{-})}\right]$$
 
@@ -361,7 +361,7 @@ The same run, animated. The two estimates stay close; what differs is the uncert
 
 ## 8. Quantifying contact-detection timing jitter
 
-§6 showed that with exact contact detection, both filters are conservative after a bounce, with the saltation-corrected one marginally closer to consistent. That leaves open how much a *real* contact sensor's detection latency/jitter degrades each of them. `step_hybrid`'s `detect_time_bias`/`detect_time_noise_std` parameters model this directly (both default to $0$, reproducing every result above): a bounce's reset is applied at a *detected* crossing time
+§6 showed that with exact contact detection, both filters are conservative after a bounce, with the saltation-corrected one marginally closer to consistent. That leaves open how much a *real* contact sensor's detection latency/jitter degrades each of them. `step_hybrid`'s `detect_time_bias`/`detect_time_noise_std` parameters model this directly (both default to $0$, reproducing every result above): a bounce's reset is applied at a *detected* crossing time.
 
 ```math
 \tau_{\text{detect}} = \text{clip}\big(\tau + b_{\text{detect}} + \mathcal{N}(0,\,\sigma_{\text{detect}}^2)\,,\ 0,\ \tau_{\text{remain}}\big)
@@ -478,4 +478,3 @@ Reference 2 is further reading: it is the direct precedent for this doc's exerci
 1. Kong, N. J., Payne, J. J., Zhu, J., & Johnson, A. M. (2024). *Saltation Matrices: The Essential Tool for Linearizing Hybrid Dynamical Systems*. Proceedings of the IEEE, 112(6), 585–608. https://doi.org/10.1109/JPROC.2024.3440211 (preprint: arXiv:2306.06862) - a modern tutorial/survey on saltation matrices - its Definition 2 (Eq. 9) is exactly the boxed $\Xi(x^-)$ derived in §4, $f^{+}$ term included, and its Eq. 33 is the fixed-$`\Delta`$ one-tick sandwich $`\Phi_{\text{after}}\,\Xi\,\Phi_{\text{before}}`$ used in §3-§4 (see also its §III-D), and its Eq. 34 composes it with flow Jacobians into the monodromy matrix discussed in §9.
 2. Kong, N. J., Payne, J. J., Council, G., & Johnson, A. M. (2021). *The Salted Kalman Filter: Kalman Filtering on Hybrid Dynamical Systems*. Automatica, 131, 109752. https://doi.org/10.1016/j.automatica.2021.109752 - the direct precedent for this doc's exercise: propagating a Kalman filter's covariance through a hybrid guard-crossing event via the saltation matrix. `saltation_matrix_ekf.py` uses the same idea, for up to 20 bounces per tick and with an ordinary EKF measurement update (no guard check after it, unlike the Salted KF's §4.2).
 3. Čížek, P., Kubík, J., & Faigl, J. (2018). *Online Foot-Strike Detection Using Inertial Measurements for Multi-Legged Walking Robots*. 2018 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS), 7622–7627. https://doi.org/10.1109/IROS.2018.8594010 - an example of the real contact detector §8 has in mind: foot-strikes detected online from accelerometer data on a hexapod walking robot, whose detection timing error is what §8's $\sigma_{\text{detect}}$ models (the paper reports precision and recall, not timing error).
-
