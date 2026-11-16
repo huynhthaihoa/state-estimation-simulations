@@ -2,10 +2,6 @@
 
 A suggested reading-and-running order through this repo for newcomers. Each phase names the [`docs/`](docs/) notes to read first, then the matching simulation(s) to run under [`use_numpy/`](use_numpy/) (or its [`use_manif/`](use_manif/) counterpart). Keep that order: each script exercises what its phase's reading just introduced.
 
-Before starting, follow [README.md § D. Installation](README.md#d-installa# Getting started suggestion
-
-A suggested reading-and-running order through this repo for newcomers. Each phase names the [`docs/`](docs/) notes to read first, then the matching simulation(s) to run under [`use_numpy/`](use_numpy/) (or its [`use_manif/`](use_manif/) counterpart). Keep that order: each script exercises what its phase's reading just introduced.
-
 Before starting, follow [README.md § D. Installation](README.md#d-installation) to get `uv sync` working. Every script below runs as `uv run python use_numpy/<script>.py [flags]`. The full flag list for each lives in [README.md § E. Simulations](README.md#e-simulations); this guide links to the relevant numbered entry instead of repeating it.
 
 After all nine phases (and, optionally, [Track L](#track-l---hybrid-and-bio-inspired-locomotion-optional) for hybrid and legged motion), [`docs/README.md`](docs/README.md) is the fuller index for non-sequential reference, and [`docs/slam_mental_map.md`](docs/slam_mental_map.md) shows where each phase sits in the overall picture.
