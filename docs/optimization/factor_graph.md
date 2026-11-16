@@ -257,7 +257,7 @@ x0 ●──IMU──●──IMU──● x2
 
 IMU factors link consecutive poses, and each camera factor links a pose to the landmark it observes. A pose graph would keep only the poses and the relative-pose factors between them.
 
-![Top: the factor graph of §1 with the parts a pose graph leaves out faded (landmark l0, camera and GPS factors). Bottom: the pose graph, with poses x0 to x3 and the factors between them drawn as edges: three odometry edges, an IMU edge between x1 and x2 and a loop-closure edge, with x0 anchored by its prior.](../images/factor_graph_vs_pose_graph.svg)
+![Top: the factor graph of §1 with the parts a pose graph leaves out faded (landmark l0, camera and GPS factors). Bottom: the pose graph, with poses x0 to x3 and the factors between them drawn as edges: three odometry edges, an IMU edge between x1 and x2, and a loop-closure edge, with x0 anchored by its prior.](../images/factor_graph_vs_pose_graph.svg)
 
 *Figure: the graph of §1 as a factor graph (top) and as a pose graph (bottom). A pose graph keeps the poses and the factors between them (here, odometry, IMU, and loop closure) and draws them as edges; the landmark and the camera and GPS factors are left out. The prior stays as an anchor on x0, which removes the [gauge freedom](../glossary.md#gauge-freedom). Regenerate with `uv run python generator/make_factor_graph_svgs.py`.*
 
