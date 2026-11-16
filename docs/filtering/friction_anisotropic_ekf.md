@@ -124,7 +124,7 @@ a c^2 + b s^2 & (a - b)\,c s \\
 ```
 
 #### Intuition (off-diagonal term)
-The off-diagonal is what tilts the ellipse. At 45° it says "slip in $x$ and slip in $y$ move together".
+The off-diagonal is what tilts the ellipse. At 45°, it says "slip in $x$ and slip in $y$ move together".
 - At 45°, $`cs = 1/2`$, so both diagonal entries are $`(a+b)/2`$ and the off-diagonal is $`(a-b)/2`$.
 - The correlation is $`(a-b)/(a+b)`$.
 - At the script defaults, $`a = 4\times10^{-4}\,\Delta t^2`$ and $`b = 10^{-2}\,\Delta t^2`$, so the correlation is $`-0.0096/0.0104 \approx -0.92`$.
