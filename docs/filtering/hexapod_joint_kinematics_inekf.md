@@ -19,7 +19,7 @@ This doc uses the real geometry of the **HEBI Daisy**, a hexapod with 18 degrees
 *Figure: Daisy's legs at the nominal stance, plotted by `uv run python generator/make_figures.py hexapod_joint_kinematics_concept`.*
 
 ### Scope
-The contact doc's 3D walking body, IMU, and filter, unchanged, at Daisy's size: body 0.21 m above the ground, feet landing around a nominal point on a 0.55 m radius. As in the contact doc's terms: the tripod gait (three feet down at a time), the true stance schedule, no IMU biases, and no gating (every reading is used). The stance feet's readings come from Daisy's leg kinematics and simulated encoders. Only the right-invariant extended Kalman filter (EKF) is run (the contact doc's `InvariantContactEKF`); the filters below differ only in how they model the foot reading's error. Run with `uv run python use_numpy/hexapod_joint_kinematics_inekf.py` (about 10 minutes).
+The contact doc's 3D walking body, IMU, and filter, unchanged, at Daisy's size: body 0.21 m above the ground, feet landing around a nominal point on a 0.55 m radius. As in the contact doc's terms: the tripod gait (three feet down at a time), the true stance schedule, no IMU biases, and no gating (every reading is used). The stance feet's readings come from Daisy's leg kinematics and simulated encoders. Only the right-invariant extended Kalman filter (EKF) is run (the contact doc's `InvariantContactEKF`); the filters below differ only in how they model the foot readings' error. Run with `uv run python use_numpy/hexapod_joint_kinematics_inekf.py` (about 10 minutes).
 
 ---
 
