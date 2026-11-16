@@ -55,7 +55,7 @@ Frame 1                  Frame 2
           ●                    ●
 ```
 
-The front-end tracks the same points and estimates the relative camera pose
+The front-end tracks the same points and estimates the relative camera pose.
 
 $$\tilde T_{12} \in \mathrm{SE}(3)$$
 
