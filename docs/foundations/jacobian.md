@@ -81,7 +81,7 @@ y \\
 \theta \end{bmatrix}
 ```
 
-and our camera produces some measurement:
+and our camera produces some measurements:
 
 ```math
 {z = \begin{bmatrix} u \\ 
@@ -126,7 +126,7 @@ Putting every partial derivative together gives the full Jacobian:
 0 & f_y/Z & -f_y Y/Z^2 \end{bmatrix}}
 ```
 
-Notice the zeros: $\partial u/\partial Y = 0$ and $\partial v/\partial X = 0$, because horizontal image position ($u$) doesn't depend on vertical 3D position ($Y$) at all, and vice versa for $v$ and $X$. This is the projection Jacobian a visual-SLAM or bundle-adjustment system computes at every reprojected point, with $(X, Y, Z)$ the point in *camera* coordinates. It is then chained with the Jacobians of the world-to-camera transform to get derivatives with respect to the pose and the world-frame point.
+Notice the zeros: $\partial u/\partial Y = 0$ and $\partial v/\partial X = 0$, because horizontal image position ($u$) doesn't depend on vertical 3D position ($Y$) at all, and vice versa for $v$ and $X$. This is the projection Jacobian that a visual-SLAM or bundle-adjustment system computes at every reprojected point, with $(X, Y, Z)$ the point in *camera* coordinates. It is then chained with the Jacobians of the world-to-camera transform to get derivatives with respect to the pose and the world-frame point.
 
 ---
 
@@ -171,7 +171,7 @@ The EKF does exactly this around its current estimate.
 
 ## 7. Jacobian $\approx$ "local translator"
 
-The mountain idea of §6, written as an equation. Let $\delta x$ be a slight change of the robot state ("I slightly changed my robot state"). The Jacobian converts it into $\delta z$, the approximate change in the sensor measurement:
+The mountain idea of §6, written as an equation. Let $\delta x$ be a slight change in the robot state ("I slightly changed my robot state"). The Jacobian converts it into $\delta z$, the approximate change in the sensor measurement:
 
 $$\boxed{\delta z \approx H\delta x}$$
 
