@@ -2,7 +2,7 @@
 
 ## Intuition
 
-Take a robot and the landmarks it measures, and move everything by 1 m. The robot is still at the same place relative to every landmark, so no measurement changes. Rotate everything by 90° about the origin and the same holds:
+Take a robot and the landmarks it measures, and move everything by 1 m. The robot is still in the same place relative to every landmark, so no measurement changes. Rotate everything by 90° about the origin and the same holds:
 
 | | robot position | robot heading | landmark | measured (landmark in the robot's frame) |
 | --- | --- | --- | --- | --- |
@@ -32,7 +32,7 @@ Stack what a window of steps $`k_0 \dots k_1`$ measures about the error at its s
 M = \begin{bmatrix} H_{k_0} \\ H_{k_0+1}\Phi_{k_0+1} \\ H_{k_0+2}\Phi_{k_0+2}\Phi_{k_0+1} \\ \vdots \end{bmatrix}
 ```
 
-A direction $`v`$ (a vector of the state's size) is **unobservable** over the window if $`M v = 0`$: moving the state along $`v`$ changes no residual, to first order. The directions with $`Mv = 0`$ form the **null space** of $`M`$ ([glossary](../glossary.md#null-space)); the number of unobservable directions is its dimension. The matrix is "local" because it depends on the points where each $`\Phi_k`$ and $`H_k`$ were evaluated. For a time-invariant system, that point does not matter. For an EKF it does, and that is §3.
+A direction $`v`$ (a vector of the state's size) is **unobservable** over the window if $`M v = 0`$: moving the state along $`v`$ changes no residual, to first order. The directions with $`Mv = 0`$ form the **null space** of $`M`$ ([glossary](../glossary.md#null-space)); the number of unobservable directions is its dimension. The matrix is "local" because it depends on the points where each $`\Phi_k`$ and $`H_k`$ were evaluated. For a time-invariant system, that point does not matter. For an EKF, it does, and that is §3.
 
 **Worked case.** A 1D robot at $`x`$ measures its distance to a landmark at $`p`$: $`z = p - x`$. The state is $`(x, p)`$, $`H = [-1,\ 1]`$ and $`\Phi = I`$ (the robot moves by a known odometry step; the landmark does not move). Every row of $`M`$ is $`[-1,\ 1]`$, so $`M`$ has rank 1 and its null space is spanned by $`v = (1, 1)`$: shift both. Of the 2 state directions, 1 is unobservable.
 
@@ -40,7 +40,7 @@ A direction $`v`$ (a vector of the state's size) is **unobservable** over the wi
 
 ## 2. The planar SLAM toy
 
-The model is the unicycle EKF-SLAM of Barrau & Bonnabel (ref. 3, eqs. 9 and 11) with the scenario of their Sec. 7.1, which they chose to resemble the one of Huang et al.'s journal paper (not read here); ref. 2 describes a similar one (10 laps of a circle, 20 landmarks, 5 m sensing range).
+The model is the unicycle EKF-SLAM of Barrau & Bonnabel (ref. 3, eqs. 9 and 11) with the scenario of their Sec. 7.1, which they chose to resemble the one in Huang et al.'s journal paper (not read here); ref. 2 describes a similar one (10 laps of a circle, 20 landmarks, 5 m sensing range).
 
 | Symbol | Meaning | Units |
 | --- | --- | --- |
@@ -106,7 +106,7 @@ What the code measures on a small scene (3 landmarks always visible, 10 steps, o
 | FEJ, propagation rule only | 2 | 6.2e-2 | 0 | 1.3e-3 |
 | FEJ, measurement rule only | 2 | 6.5e-3 | 0 | 2.4e-4 |
 
-The null-space dimension counts singular values below $`10^{-9}`$ of the largest; the translations stay unobservable in every filter and only the rotation is lost. The third singular value of the standard EKF is small but not zero: the rotation is weakly "seen". Run: `uv run python use_numpy/observability_fej.py` (printed first).
+The null-space dimension counts singular values below $`10^{-9}`$ of the largest; the translations stay unobservable in every filter, and only the rotation is lost. The third singular value of the standard EKF is small but not zero: the rotation is weakly "seen". Run: `uv run python use_numpy/observability_fej.py` (printed first).
 
 ## 4. Two fixes
 
@@ -188,7 +188,7 @@ Paired difference of the per-trial time-averaged robot NEES, standard minus the 
 | invariant EKF | 0.113 | 1.19 | 1.15 | 0.085 |
 | ideal EKF | 0.113 | 1.19 | 1.15 | 0.085 |
 
-- **The mean NEES of the standard EKF is raised by a few bad trials.** Its median trial (2.78) is as good as the others, its worst trial is 17.45, compared with 9.00 for FEJ. FEJ, the invariant EKF, and the ideal EKF also have bad trials (max 8.9 to 9.1), so the evidence is the mean over trials and the landmark NEES, not one trial.
+- **The mean NEES of the standard EKF is raised by a few bad trials.** Its median trial (2.78) is as good as the others; its worst trial is 17.45, compared with 9.00 for FEJ. FEJ, the invariant EKF, and the ideal EKF also have bad trials (max 8.9 to 9.1), so the evidence is the mean over trials and the landmark NEES, not one trial.
 - **It is the combination that matters.** Each FEJ rule alone leaves most of the excess (NEES 3.81 and 3.40, against 3.95 for the standard and 3.05 for the ideal EKF) and the information along the rotation large; both together match the ideal EKF.
 - **Reported against actual heading error.** The standard EKF reports 1.13° but is off by 1.34° RMS (1.19 times its claim); the others report 1.15° against 1.19–1.21°.
 
@@ -256,9 +256,9 @@ These are 15 docs; the other files that mention observability (`README.md`, `GET
 
 ## 7. What this toy does not show
 
-- **One robot, flat ground, point landmarks with known identity.** No data association, no 3D rotation, no IMU. Ref. 3's appendix A.4 derives a 3D invariant EKF-SLAM; the 3D case is not simulated here.
+- **One robot, flat ground, point landmarks with known identity.** No data association, no 3D rotation, no IMU. Ref. 3's Appendix A.4 derives a 3D invariant EKF-SLAM; the 3D case is not simulated here.
 - **No observability-constrained EKF and no robot-centric filter.** Refs. 1 and 3 compare against both.
-- **Large heading errors leave the linear regime.** At 4× the rotation noise even the ideal EKF is outside the band, and FEJ has diverging trials (§5.4); the cause is not tested.
+- **Large heading errors leave the linear regime.** At 4× the rotation noise, even the ideal EKF is outside the band, and FEJ has diverging trials (§5.4); the cause is not tested.
 - **One map per seed.** The consistency check is conditional on that map; §5.4 repeats it on two more.
 - **The NEES gap is modest at the paper's noise level.** The published gap is larger (ref. 2 Table 1: standard 12.79 against FEJ 3.68, with 15% distance-proportional measurement noise, 1°/s rotation noise and 0.25 m/s); the two setups differ in more than the noise level, and no run here reproduces that scenario.
 - **The information measure is a diagnostic of this repo, not a quantity from the references.** It combines ref. 3's Theorem 2 with the filter's own carried direction.
@@ -272,6 +272,6 @@ These are 15 docs; the other files that mention observability (`README.md`, `GET
 
 ## 9. References
 
-1. Huang, G. P., Mourikis, A. I., & Roumeliotis, S. I. (2008). *Analysis and Improvement of the Consistency of Extended Kalman Filter Based SLAM*. 2008 IEEE International Conference on Robotics and Automation (ICRA), 473-479. https://doi.org/10.1109/ROBOT.2008.4543252 - the observability matrix (eq. 20), the 3-dimensional null space of the true system (eq. 18) and of the ideal EKF, the 2-dimensional one of the standard EKF (eqs. 25-28), the FEJ rules (eqs. 29, 30). Their journal version (IJRR 2010, https://doi.org/10.1177/0278364909353640) could not be reached and was not used.
-2. Huang, G. P., Mourikis, A. I., & Roumeliotis, S. I. (2009). *A First-Estimates Jacobian EKF for Improving SLAM Consistency*. Experimental Robotics: The Eleventh International Symposium, Springer Tracts in Advanced Robotics 54, 373-382. https://doi.org/10.1007/978-3-642-00196-3_43 - the same rank result (eq. 8) and FEJ rules in the conference version, and the NEES numbers of its Table 1 quoted in §7.
-3. Barrau, A., & Bonnabel, S. (2016). *An EKF-SLAM algorithm with consistency properties*. arXiv:1510.06263v3. https://arxiv.org/abs/1510.06263 - the SLAM model (eqs. 9, 11), the unobservable shifts (Prop. 1, 2), the invariant EKF-SLAM (Algorithm 3; eqs. 16, 21, 22; Thm. 1, 2) and the simulation scenario (Sec. 7.1). Their stability paper (IEEE Trans. Automatic Control 2017) is about observer convergence and has no SLAM consistency result.
+1. Huang, G. P., Mourikis, A. I., & Roumeliotis, S. I. (2008). *Analysis and Improvement of the Consistency of Extended Kalman Filter-Based SLAM*. 2008 IEEE International Conference on Robotics and Automation (ICRA), 473-479. https://doi.org/10.1109/ROBOT.2008.4543252 - the observability matrix (eq. 20), the 3-dimensional null space of the true system (eq. 18) and of the ideal EKF, the 2-dimensional one of the standard EKF (eqs. 25-28), the FEJ rules (eqs. 29, 30). Their journal version (IJRR 2010, https://doi.org/10.1177/0278364909353640) could not be reached and was not used.
+2. Huang, G. P., Mourikis, A. I., & Roumeliotis, S. I. (2009). *A First-Estimates Jacobian EKF for Improving SLAM Consistency*. Experimental Robotics: The Eleventh International Symposium, Springer Tracts in Advanced Robotics 54, 373-382. https://doi.org/10.1007/978-3-642-00196-3_43 - the same rank result (eq. 8) and FEJ rules in the conference version, and the NEES numbers in Table 1 quoted in §7.
+3. Barrau, A., & Bonnabel, S. (2016). *An EKF-SLAM algorithm with consistency properties*. arXiv:1510.06263v3. https://arxiv.org/abs/1510.06263 - the SLAM model (eqs. 9, 11), the unobservable shifts (Prop. 1, 2), the invariant EKF-SLAM (Algorithm 3; eqs. 16, 21, 22; Thm. 1, 2), and the simulation scenario (Sec. 7.1). Their stability paper (IEEE Trans. Automatic Control 2017) is about observer convergence and has no SLAM consistency result.
