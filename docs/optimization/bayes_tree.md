@@ -227,7 +227,7 @@ The tree has the shape of §4's chain, with $x_5$ as the root (new information a
 ### Why the path goes up, not down
 - Each node's numbers are computed only from the factors in its own subtree (itself and everything below it). It never reads anything above.
 - A new factor on one variable changes that node, and every ancestor, because they absorb its summary.
-- Descendants and siblings never used that variable's numbers, so their rows stay valid and are reused as is.
+- Descendants and siblings never use that variable's numbers, so their rows stay valid and are reused as is.
 
 ---
 
