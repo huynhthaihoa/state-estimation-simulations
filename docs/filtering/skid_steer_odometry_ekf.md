@@ -6,7 +6,7 @@ A **skid-steer** robot ([glossary](../glossary.md#skid-steering-and-the-icr-coef
 
 The Computational Robotics Laboratory of the Czech Technical University in Prague (CTU) runs a Clearpath **Husky A200**, a four-wheeled skid-steer robot, with a 128-line LiDAR and an Xsens MTi-30 IMU (refs. 1, 2). This doc asks how much the skid matters for its wheel odometry, and whether a gyro, or estimating the skid online, fixes it.
 
-One established way to model the skid scales the track by an **ICR coefficient** $`\chi \ge 1`$ (refs. 6, 7): the robot turns as if its wheels were $`\chi`$ times farther apart than they are. Husky's own ROS driver multiplies its track by 1.875 (ref. 4), but the file does not say why. This doc compares four ways on the same data:
+One established way to model the skid is to scale the track by an **ICR coefficient** $`\chi \ge 1`$ (refs. 6, 7): the robot turns as if its wheels were $`\chi`$ times farther apart than they are. Husky's own ROS driver multiplies its track by 1.875 (ref. 4), but the file does not say why. This doc compares four ways on the same data:
 
 | Row | Wheels | Gyro | $`\chi`$ used |
 | --- | --- | --- | --- |
@@ -120,7 +120,7 @@ Also **assumed**: no sideways slip (the symmetric case of ref. 6's model), an ex
 With $`\hat\chi = 1`$ the odometry turns 1.875 times too fast. Each 360° loop becomes 675°, so the estimated path draws circles of about half the true radius and leaves each loop pointing the wrong way (figure, top left).
 
 #### `ekf_chi`: one turn to learn $`\chi`$
-For the first 8 s the path is straight, so $`\chi`$ stays at its prior (figure, bottom left). Once the first turn starts, it converges within about 2 s. The heading error made in those seconds stays, and driving on with it causes the 3 cm position error. A check over 10 trials confirms this: started with the true $`\chi`$ (`--chi-prior 1.875 --chi-prior-std 1e-4 --n-mc-trials 10`), `ekf_chi`'s position RMSE drops from 4.23 cm (the same 10 trials with the default prior) to 0.05 cm.
+For the first 8 s, the path is straight, so $`\chi`$ stays at its prior (figure, bottom left). Once the first turn starts, it converges within about 2 s. The heading error made in those seconds stays, and driving on with it causes the 3 cm position error. A check over 10 trials confirms this: started with the true $`\chi`$ (`--chi-prior 1.875 --chi-prior-std 1e-4 --n-mc-trials 10`), `ekf_chi`'s position RMSE drops from 4.23 cm (the same 10 trials with the default prior) to 0.05 cm.
 
 #### Both EKFs report too much uncertainty here
 NEES is 0.02 for `ekf_fixed` and 1.12 for `ekf_chi`, below the band. The filters treat the encoder rounding as white noise, which would add up over time. Real rounding does not add up. Each reading is the difference of two whole tick counts, so the rounding errors cancel when the readings are summed: the distance is never off by more than one tick.
