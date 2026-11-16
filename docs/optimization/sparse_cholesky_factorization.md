@@ -167,7 +167,7 @@ Both examples follow one rule: eliminating a variable connects all of its remain
 
 The figure below applies this to a real bundle-adjustment problem, with the same $H$ under three orders.
 
-![Two rows of three sparsity plots for one bundle-adjustment problem. Top row: the lower triangle of H with poses first, landmarks first and interleaved, each with 5712 nonzeros. Bottom row: the Cholesky factor L for the same three orders, with fill-in drawn in red. Poses first gives a large red triangle over the landmark block, landmarks first gives a small red block at the end, interleaved gives red regions spread under the first columns.](../../assets/sparse_fill_in_orderings.png)
+![Two rows of three sparsity plots for one bundle-adjustment problem. Top row: the lower triangle of H with poses first, landmarks first, and interleaved, each with 5712 nonzeros. Bottom row: the Cholesky factor L for the same three orders, with fill-in drawn in red. Poses first gives a large red triangle over the landmark block, landmarks first gives a small red block at the end, interleaved gives red regions spread under the first columns.](../../assets/sparse_fill_in_orderings.png)
 
 *Sparsity of the Hessian (top row, lower triangle) and of its Cholesky factor (bottom row, red = fill-in) for one bundle-adjustment problem under three elimination orders. Produced by `uv run python generator/make_figures.py sparse_fill_in_orderings`.*
 
@@ -224,7 +224,7 @@ with robot poses $x_1, \dots, x_N$ followed by landmarks $l_1, l_2, \dots$ (pose
 
 Because each measurement only involves a small number of variables, $J$ and $H$ are sparse.
 
-The pattern also stays fixed for a fixed graph. Every Gauss-Newton or LM iteration [relinearizes](../glossary.md#relinearization) at a new estimate, which changes the *values* in $H$, but the same factors connect the same variables, so the **nonzero pattern** doesn't change. Solvers exploit this by splitting the factorization in two: a **symbolic** step (choose the ordering, predict where $L$'s nonzeros go, allocate memory) done once for a fixed graph, and a **numeric** step (compute the values) repeated every iteration. CHOLMOD's `analyze`/`factorize` calls (CHOLMOD is a sparse Cholesky library) are this split. That's why an expensive ordering heuristic is affordable: its cost is paid once, not per iteration. (Incremental solvers add factors, so their pattern changes and they redo part of this step.)
+The pattern also stays fixed for a fixed graph. Every Gauss-Newton or LM iteration [relinearizes](../glossary.md#relinearization) at a new estimate, which changes the *values* in $H$, but the same factors connect the same variables, so the **nonzero pattern** doesn't change. Solvers exploit this by splitting the factorization into two: a **symbolic** step (choose the ordering, predict where $L$'s nonzeros go, allocate memory) done once for a fixed graph, and a **numeric** step (compute the values) repeated every iteration. CHOLMOD's `analyze`/`factorize` calls (CHOLMOD is a sparse Cholesky library) are this split. That's why an expensive ordering heuristic is affordable: its cost is paid once, not per iteration. (Incremental solvers add factors, so their pattern changes and they redo part of this step.)
 
 ---
 
