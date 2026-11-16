@@ -228,7 +228,7 @@ The amount of computation in sparse Cholesky depends heavily on the [variable or
 - **Fill-in:** how dense the factorization gets ([sparse_cholesky_factorization.md](sparse_cholesky_factorization.md)).
 - **Where each variable sits in the Bayes tree.** The last variable eliminated becomes the root, and an update's affected region is the path from the touched cliques up to the root (§8-§9).
 
-A fixed order can be fine for one and terrible for the other. This repo's own example ([bayes_tree.md §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo)) eliminates a square loop of 16 poses oldest first. Fill-in stays small (no **separator**; the variables a clique shares with its parent, larger than 2). But the tree comes out as a single chain with the first pose at the bottom, so a loop closure touching the first pose invalidates all 16 variables.
+A fixed order can be fine for one and terrible for the other. This repo's own example ([bayes_tree.md §15](bayes_tree.md#15-where-this-is-implemented-in-this-repo)) eliminates a square loop of 16 poses, oldest first. Fill-in stays small (no **separator**; the variables a clique shares with its parent, larger than 2). But the tree comes out as a single chain with the first pose at the bottom, so a loop closure touching the first pose invalidates all 16 variables.
 
 iSAM2 therefore reorders as it goes. Each time it re-eliminates the affected part of the tree, it picks a new order for just those variables with **constrained COLAMD (CCOLAMD)**.
 
@@ -329,7 +329,7 @@ So this page's Bayes tree has a runnable counterpart. iSAM2 as a whole (the tree
 
 ## 20. References
 
-1. Kaess, M., Johannsson, H., Roberts, R., Ila, V., Leonard, J. J., & Dellaert, F. (2012). *iSAM2: Incremental Smoothing and Mapping Using the Bayes Tree*. International Journal of Robotics Research, 31(2), 216–235. https://doi.org/10.1177/0278364911430419 - the Bayes tree, selective (fluid) relinearization, and dynamic variable reordering this whole doc walks through.
+1. Kaess, M., Johannsson, H., Roberts, R., Ila, V., Leonard, J. J., & Dellaert, F. (2012). *iSAM2: Incremental Smoothing and Mapping Using the Bayes Tree*. International Journal of Robotics Research, 31(2), 216–235. https://doi.org/10.1177/0278364911430419 - the Bayes tree, selective (fluid) relinearization, and dynamic variable reordering that this whole doc walks through.
 2. Kaess, M., Ranganathan, A., & Dellaert, F. (2008). *iSAM: Incremental Smoothing and Mapping*. IEEE Transactions on Robotics, 24(6), 1365–1378. https://doi.org/10.1109/TRO.2008.2006706 - the predecessor algorithm (incremental QR updates, no Bayes tree) that [`isam_optimization.md`](isam_optimization.md) covers and that `pose_graph_incremental.py` actually implements.
 
 See also [`bayes_tree.md`](bayes_tree.md) for the full elimination-to-tree mechanism behind §7, and [`isam_optimization.md`](isam_optimization.md) for the non-Bayes-tree predecessor algorithm this doc builds on.
