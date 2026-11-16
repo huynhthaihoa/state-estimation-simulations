@@ -612,7 +612,7 @@ Script defaults: 50 keyframes on a 90° arc of radius 15 m, 8 landmarks per keyf
 
 ## 14. Evaluating the result: gauge freedom and Umeyama alignment
 
-Monocular BA recovers the scene only up to an unknown similarity transform (rigid + scale). Shifting, rotating or uniformly rescaling the whole scene and every camera pose together leaves reprojection error unchanged.
+Monocular BA recovers the scene only up to an unknown similarity transform (rigid + scale). Shifting, rotating, or uniformly rescaling the whole scene and every camera pose together leaves reprojection error unchanged.
 
 ### Tiny example (scale)
 Use $`f_x = 800`$ and $`c_x = 320`$.
