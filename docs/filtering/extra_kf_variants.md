@@ -212,7 +212,7 @@ The update is still a **Kalman update**. The gain comes from the ensemble's samp
 
 What it gets rid of is the $n \times n$ matrix $P$. When the state has $n \sim 10^6$ to $10^8$ entries (a gridded atmosphere or ocean), $P$ can't even be stored, but an ensemble of tens to ~100 members gives a usable low-rank approximation of it.
 
-Especially popular in weather prediction, geophysical systems, ocean modeling and other very high-dimensional systems. It's generally **less central to robotics/SLAM** than EKF/ESKF/IEKF.
+Especially popular in weather prediction, geophysical systems, ocean modeling, and other very high-dimensional systems. It's generally **less central to robotics/SLAM** than EKF/ESKF/IEKF.
 
 ---
 
