@@ -12,7 +12,7 @@ Take a robot. It can point **left/right** (yaw), tilt **up/down** (pitch), and r
 
 But three angles cause two separate problems:
 
-- **Gimbal lock.** At certain orientations (for the common yaw-pitch-roll order, pitch $= \pm 90°$) two of the three rotation axes line up, and one degree of freedom disappears. Different angle combinations then give the same orientation, and small orientation changes can require large angle jumps. It is a singularity of the three-angle description, not of rotation itself.
+- **Gimbal lock.** At certain orientations (for the common yaw-pitch-roll order, pitch $= \pm 90°$), two of the three rotation axes line up, and one degree of freedom disappears. Different angle combinations then give the same orientation, and small orientation changes can require large angle jumps. It is a singularity of the three-angle description, not of rotation itself.
 - **Order conventions.** Rotating around X and then Y is not the same as around Y and then X, so every set of Euler angles only means something together with its convention (XYZ, ZYX, ...). Interpolating the three angles separately also gives awkward paths.
 
 Unit quaternions avoid gimbal lock because no orientation is singular. They do not make rotation order-independent (nothing can: composing rotations is inherently order-dependent, §13), but once a convention is fixed, composition is a single multiplication.
