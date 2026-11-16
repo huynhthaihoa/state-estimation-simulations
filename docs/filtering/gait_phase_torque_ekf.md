@@ -19,7 +19,7 @@ Robots built from **series-elastic actuators** ([glossary](../glossary.md#series
   The model error sets the false triggers, and the load ramp sets the delay.
 - **A raw torque threshold is not enough.** Model error near the threshold makes it fire early, and the body filter becomes overconfident.
 - **The gait-phase filter fixes it.** Fed with the torque triggers, the gait-phase doc's touchdown filter (`phase_ekf`) rejects almost every early trigger at every model-error size tried, and the body filter stays consistent.
-- **Fusion helps only with slow load ramps.** Adding the gait phase as a before the force reading, after Bledt et al. (ref. 5), roughly halves the missed stance at a slow 200 ms ramp. On a leg that lands very late, its prior outvotes "no force" and reads the swinging foot as planted.
+- **Fusion helps only with slow load ramps.** Adding the gait phase before the force reading, after Bledt et al. (ref. 5), roughly halves the missed stance at a slow 200 ms ramp. On a leg that lands very late, its prior outvotes "no force" and reads the swinging foot as planted.
 
 ![Four panels from gait_phase_torque_ekf.py at its defaults: the estimated vertical foot force of one step against the threshold, with a false trigger from a model-error pulse early in the swing-down and the true trigger 20 ms after touchdown; and three sweeps of wrong stance ticks per trial (swinging foot read as planted plus true stance missed) against the model-error size, the load-ramp time and the torque noise, for the three torque rows, with the gait-phase doc's position-error detector and phase EKF as dashed lines](../../assets/gait_phase_torque_ekf.png)
 
@@ -74,7 +74,7 @@ Per step, the script samples the estimated vertical force at 1 kHz, from the sta
 - **Prior from the gait phase:** the probability that the foot has landed by time $`t`$, a normal distribution around the touchdown that `torque_phase_ekf` predicts. Its std is the predicted lag's std combined with the terrain scatter.
 - **Evidence from the force:** a **logistic** ([glossary](../glossary.md#logistic-function-and-logistic-regression)) in the force, $`P(\text{contact} \mid f) = 1 / (1 + e^{-(\beta_1 f / F_\text{share} + \beta_0)})`$, as in Camurri et al. (ref. 4). Here $`F_\text{share}`$ is the foot's load share (101.4 N), and the weights $`\beta_1`$ (slope) and $`\beta_0`$ (offset) are fitted on one separate training trial, labelled by the true contact, and refitted for every sweep setting. The training data has its own **base rate** ([glossary](../glossary.md#base-rate)): the fraction of its samples at or after the true touchdown (0.65 at the defaults). The logistic has that rate built in, so its log-odds are subtracted before adding, to avoid counting a prior twice.
 
-This is a simplified version of the idea of Bledt et al. (ref. 5), who fuse a force estimate with contact priors in a Kalman filter. The details here are in this script.
+This is a simplified version of the idea of Bledt et al. (ref. 5), who fuse a force estimate with contact priors in a Kalman filter. The details are in this script.
 
 **Checked** (`tests/use_numpy/test_gait_phase_torque_ekf.py`, 7 tests):
 - the 4.27 N/Nm factor from Daisy's stance;
@@ -184,4 +184,4 @@ On a Daisy-sized hexapod, at the torque-noise levels assumed here (up to 1 Nm), 
 3. HEBI Robotics. *hebi_description* (Apache-2.0), https://github.com/HebiRobotics/hebi_description - Daisy's `.hrdf` files and `config/daisy/gains/hex_config.xml` (body mass 31.00). The CTU Computational Robotics Laboratory's Daisy page, https://comrob.fel.cvut.cz/robots/daisy.html - 18 DOF, X8-9 and X8-16 actuators.
 4. Camurri, M., Fallon, M., Bazeille, S., Radulescu, A., Barasuol, V., Caldwell, D. G., & Semini, C. (2017). *Probabilistic Contact Estimation and Impact Detection for State Estimation of Quadruped Robots*. IEEE Robotics and Automation Letters, 2(2), 1023-1030. https://doi.org/10.1109/LRA.2017.2652491 - foot force from joint torques, $`f = -(J^\top)^{-1}(\tau - h)`$; a logistic in the normal force for the contact probability; on the hydraulic HyQ.
 5. Bledt, G., Wensing, P. M., Ingersoll, S., & Kim, S. (2018). *Contact Model Fusion for Event-Based Locomotion in Unstructured Terrains*. IEEE ICRA, 4399-4406. https://doi.org/10.1109/ICRA.2018.8460904 - a momentum-observer force estimate fused with contact priors in a Kalman filter, 99.3% accuracy and a 4-5 ms delay on MIT Cheetah 3 (from the abstract; the full text was not read for this doc).
-6. RobotsGuide (IEEE Spectrum). *Daisy*. https://robotsguide.com/robots/daisy - weight 18 kg.
+6. RobotsGuide (IEEE Spectrum). *Daisy*. https://robotsguide.com/robots/daisy - weight: 18 kg.
