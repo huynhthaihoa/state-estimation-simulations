@@ -179,7 +179,7 @@ The same experiment, one run (seed 0, tripod gait), animated. The top-down view 
 
 ## 4. Every foot drifts a little: model it as reading noise
 
-So far a planted foot is perfectly still. Real feet creep: soil gives, rubber rolls. `--foot-drift-std` makes every stance foot slide at a small random velocity, white (independent from tick to tick) and independent per foot and per axis (std $`\sigma_{\text{drift}} = 0.02`$ m/s, as large as the reading noise).
+So far, a planted foot is perfectly still. Real feet creep: soil gives, rubber rolls. `--foot-drift-std` makes every stance foot slide at a small random velocity, white (independent from tick to tick) and independent per foot and per axis (std $`\sigma_{\text{drift}} = 0.02`$ m/s, as large as the reading noise).
 
 **Intuition.** The filter only sees the foot's velocity relative to the body, so a random slide looks exactly like extra reading noise. A filter that models the drift just uses a larger reading variance, $`\sigma^2 + \sigma_{\text{drift}}^2`$. (With foot positions in the state, as in refs. 1-2, the same drift would be process noise on each foot: the contact noise of [`hexapod_contact_inekf.md` §1](hexapod_contact_inekf.md#1-model).)
 
