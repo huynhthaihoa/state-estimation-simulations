@@ -104,7 +104,7 @@ That's a **[loop closure](glossary.md#loop-closure)**.
 
 The previous trajectory must have been wrong: the new information says the robot ended up back near its starting position, not at a separate point `E`.
 
-Therefore, **all those previous poses may need to move**: before the closure `E` sits apart from `A`, and after it `E` coincides with `A` while `B`, `C` and `D` shift to fit (the figure in [§3](#3-optimization-keep-the-history) shows this on a real run).
+Therefore, **all those previous poses may need to move**: before the closure, `E` sits apart from `A`, and after it `E` coincides with `A` while `B`, `C` and `D` shift to fit (the figure in [§3](#3-optimization-keep-the-history) shows this on a real run).
 
 A pure filter cannot do this: it has already compressed the past, so the old poses are no longer in its state and it cannot move them.
 
@@ -248,7 +248,7 @@ The uncertainty around it is usually approximated as a Gaussian. Its [informatio
 We reconstruct a person's route through a city.
 
 - **Filtering:** at each intersection we take the previous answer, add the new clue (a street sign, a step count), and update "I'm probably here". We carry that belief forward and never reopen old answers.
-- **Smoothing:** at the end of the day, we collect all the GPS fixes, photos, timestamps, and landmarks and ask, **"Given everything we know now, where were you at every point during the day?"** The person realizes the landmark seen at 2 PM is the one seen at 10 AM, so the 11 AM, 12 PM and 1 PM positions get revised too.
+- **Smoothing:** at the end of the day, we collect all the GPS fixes, photos, timestamps, and landmarks and ask, **"Given everything we know now, where were you at every point during the day?"** The person realizes the landmark seen at 2 PM is the one seen at 10 AM, so the 11 AM, 12 PM, and 1 PM positions get revised too.
 
 ---
 
@@ -372,7 +372,7 @@ Notation (all from the forward pass, except the smoothed quantities): $`F`$ is t
 | Smoothed mean | $`\hat x^s_k = \hat x_k + G_k (\hat x^s_{k+1} - \hat x^-_{k+1})`$ | all the data moved tick $`k+1`$ by $`\hat x^s_{k+1} - \hat x^-_{k+1}`$ relative to the filter's prediction; the gain passes that shift back to tick $`k`$ |
 | Smoothed covariance | $`P^s_k = P_k + G_k (P^s_{k+1} - P^-_{k+1}) G_k^\top`$ | the same pass-back for the uncertainty; it is never larger than $`P_k`$ |
 
-The smoother was introduced by Rauch, Tung and Striebel (1965, reference 9); the equations above are Theorem 8.2, Eq. (8.6) of Särkkä (2013, reference 10).
+The smoother was introduced by Rauch, Tung, and Striebel (1965, reference 9); the equations above are Theorem 8.2, Eq. (8.6) of Särkkä (2013, reference 10).
 
 **Equality with batch least squares.** For a linear Gaussian model, the posterior over the whole trajectory is Gaussian, and its mean is the least-squares solution over all states (for linear systems, the least-squares solution is the posterior mean, reference 10, §1.2). The smoother's output at tick $`k`$ is that posterior's marginal at $`k`$ (reference 10, Eq. 8.1 and Theorem 8.2). So the RTS means must equal the batch solution, and so must the covariances. The batch problem uses the same factors as the filter: a prior on $`x_0`$, one dynamics factor per tick (covariance $`Q`$), one position factor per tick, one ZUPT factor per anchor tick, each weighted by its own covariance. That is the argument; the script checks it numerically. On the run below, the largest difference between the RTS and batch results is 9.6e-15 (means) and 5.5e-17 (covariances), and the tests require at most 1e-9.
 
@@ -432,7 +432,7 @@ These are the three largest reductions, and the largest is the tick right before
 
 ![Four panels from rts_smoother.py: one run's velocity with the filter and smoother estimates and their 2-sigma bands, the same run's position error with the bands, the Monte Carlo velocity RMSE per tick for both, and the Monte Carlo NEES of both against the consistent value 2 and its 95% band, with the matched-truth curves dotted](../assets/rts_smoother.png)
 
-*Figure: `use_numpy/rts_smoother.py` at its defaults (seed 0, 500 trials), saved by `uv run python use_numpy/rts_smoother.py --out assets/rts_smoother.png`. Gold = anchor ticks. The filter's velocity band balloons during each extend phase and collapses at each ZUPT; the smoother's stays narrow.*
+*Figure: `use_numpy/rts_smoother.py` at its defaults (seed 0, 500 trials), saved by `uv run python use_numpy/rts_smoother.py --out assets/rts_smoother.png`. Gold = anchor ticks. The filter's velocity band balloons during each extend phase and collapses at each ZUPT; the smoother stays narrow.*
 
 The same run as an animation: the forward pass first (the filter at each tick, with the data not yet measured greyed out), then the backward pass (the smoother, now using all the data), with the 1D track on top and the Monte Carlo velocity RMSE below.
 
