@@ -84,7 +84,7 @@ EKF and IEKF share the predict step and differ only in the frame in which the up
 
 This section maps each piece of math to the function in [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/pointcloud_pose_tracking.py) that computes it. Lie-group helpers live in [`use_numpy/lie_utils.py`](../../use_numpy/lie_utils.py), and the UKF helpers live in [`utils.py`](../../utils.py). The `use_manif` version implements the same math with the `manif` library.
 
-Each recursive filter's `run_*` loop calls one predict and one update function per step; code that receives one measurement at a time (e.g. a ROS node) calls them directly:
+Each recursive filter's `run_*` loop calls one predict and one update function per step; code that receives one measurement at a time (e.g., a ROS node) calls them directly:
 
 | Filter | Built once | Predict | Update |
 | --- | --- | --- | --- |
@@ -513,7 +513,7 @@ Unlike EKF vs. IEKF (§2.4, speed only, zero accuracy difference), UKF's disagre
 | 3. SVD re-projection | after each update, the rotation is pushed back onto $SO(3)$ from outside the KF math | no | large corrections (the first second), as for 2 |
 
 1. **First-order truncation of the mean itself.**
-   - Every other method composes the mean exactly: $`T_{\text{pred}} = T_{\text{prev}}\,\mathrm{Exp}(u\,\Delta t)`$. `vanilla_kf_transition_matrix` builds a matrix that is exact only for the truncation $\mathrm{Exp}(\omega) \approx I + \omega^\wedge$ (here $\omega$ and $v$ are the per-step increments, as in §1.1).
+   - Every other method computes the mean exactly: $`T_{\text{pred}} = T_{\text{prev}}\,\mathrm{Exp}(u\,\Delta t)`$. `vanilla_kf_transition_matrix` builds a matrix that is exact only for the truncation $\mathrm{Exp}(\omega) \approx I + \omega^\wedge$ (here $\omega$ and $v$ are the per-step increments, as in §1.1).
    - The translation step is truncated too: it uses $`t + R\,v`$, while the exact $SE(3)$ increment is $`t + R\,V(\omega)\,v`$ with $V(\omega) = I + \tfrac{1}{2}\omega^\wedge + O(\lVert\omega\rVert^2)$, i.e. it assumes $V(\omega) \approx I$ (§1.1).
    - Unlike §3.2's point 1 (UKF's additive noise, which only affects *covariance* propagation), this is a real, growing error in the point estimate itself, with no counterpart in EKF, IEKF, UKF, or batch GN.
 2. **Ambient (12-dim, redundant) vs. minimal (6-dim tangent) covariance.** $P$ is lifted from the initial $6\times6$ tangent covariance into the 12-dim ambient space via `se3_tangent_to_ambient_jacobian`, and the whole recursion - predict, update, gain - runs in that redundant linear space. This $P$ isn't directly comparable to the other four methods' $6\times6$ tangent covariance (see [minimal vs. ambient parameterization](../glossary.md#minimal-vs-ambient-redundant-parameterization) in the glossary).
