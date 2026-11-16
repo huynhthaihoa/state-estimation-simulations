@@ -133,7 +133,7 @@ The datasheet names for a gyroscope's and an accelerometer's white-noise density
 The flat bottom of the Allan curve, between the white-noise and bias-random-walk regions; datasheets usually quote it in place of the bias random walk. This repo does not simulate it. See [noise_identification.md §1](foundations/noise_identification.md#1-the-noise-model).
 
 ### Allan variance and Allan deviation
-**Symbols:** $`\mathrm{AVAR}(\tau)`$, $`\mathrm{ADEV}(\tau)`$. Half the mean squared difference between neighboring window averages of a signal, as a function of the window length $`\tau`$; the deviation is its square root. On log-log axes, white noise is a line of slope -1/2 and a bias random walk a line of slope +1/2, which is how a recording of a motionless IMU gives its noise values. See [noise_identification.md §3](foundations/noise_identification.md#3-allan-deviation).
+**Symbols:** $`\mathrm{AVAR}(\tau)`$, $`\mathrm{ADEV}(\tau)`$. Half the mean squared difference between neighboring window averages of a signal, as a function of the window length $`\tau`$; the deviation is its square root. On log-log axes, white noise is a line of slope -1/2 and a biased random walk a line of slope +1/2, which is how a recording of a motionless IMU gives its noise values. See [noise_identification.md §3](foundations/noise_identification.md#3-allan-deviation).
 
 ### Cluster time
 **Symbol:** $`\tau`$. The length of the windows (clusters) whose averages the Allan variance compares: $`\tau = m\,\Delta t`$ for windows of $`m`$ samples. See [noise_identification.md §3](foundations/noise_identification.md#3-allan-deviation).
