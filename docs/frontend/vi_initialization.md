@@ -80,7 +80,7 @@ The other estimators in this doc set (§1's list) linearize *around* an existing
 
 It isn't the only design real systems use:
 - VINS-Mono's gravity refinement (Step 2) is itself a short iterative loop over a tangent-plane reparameterization. The 2 parameters move along the plane that touches, at the current estimate, the sphere of gravity vectors with the known magnitude.
-- [ORB-SLAM3](../glossary.md#orb-slam) (a visual-inertial SLAM system) instead estimates scale, gravity direction, velocities and IMU biases with an inertial-only [MAP](../glossary.md#map-maximum-a-posteriori-estimate) (maximum a posteriori: the most probable state given data and priors) optimization over keyframes from a vision-only initialization (introduced by Campos et al., 2020, in ORB-SLAM Visual-Inertial; see References), then refined jointly.
+- [ORB-SLAM3](../glossary.md#orb-slam) (a visual-inertial SLAM system) instead estimates scale, gravity direction, velocities, and IMU biases with an inertial-only [MAP](../glossary.md#map-maximum-a-posteriori-estimate) (maximum a posteriori: the most probable state given data and priors) optimization over keyframes from a vision-only initialization (introduced by Campos et al., 2020, in ORB-SLAM Visual-Inertial; see References), then refined jointly.
 
 ---
 
