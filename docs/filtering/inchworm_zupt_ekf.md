@@ -214,7 +214,7 @@ Two checks at seed 0 confirm this is the whole story for these two (`always` sta
 
 The per-tick NEES shows the mechanism. By the end of an anchor phase, ZUPT has made `phase_conditional` very confident in its velocity (NEES about 3.5). Then the ramp-up arrives with an acceleration its process model doesn't allow for, and the more confident filter is hit harder: at the end of the ramp its NEES jumps to about 30, against about 25 for `never`, and it stays higher through the cruise. The lag in velocity also drags its position.
 
-So this is a property of the under-sized process model, not of ZUPT. With $`\sigma_a = 0.5\,\text{m/s}^2`$, the finding reverses: `phase_conditional` is close to consistent (slightly conservative) and also the most accurate in position (0.0087 m vs. `never`'s 0.0123 m at seed 0). The general lesson is narrower than "trusting a pseudo-measurement is fragile": **an accurate pseudo-measurement makes an unmodeled disturbance hurt more**, because it removes the slack that would otherwise absorb it.
+So this is a property of the undersized process model, not of ZUPT. With $`\sigma_a = 0.5\,\text{m/s}^2`$, the finding reverses: `phase_conditional` is close to consistent (slightly conservative) and also the most accurate in position (0.0087 m vs. `never`'s 0.0123 m at seed 0). The general lesson is narrower than "trusting a pseudo-measurement is fragile": **an accurate pseudo-measurement makes an unmodeled disturbance hurt more**, because it removes the slack that would otherwise absorb it.
 
 ---
 
@@ -339,7 +339,7 @@ During a pulse, `schedule` keeps telling the filter the body is still, with std 
 `schedule`'s slip-window NEES is 47.3-48.3 in every seed, against 2.0-2.6 for `never`. The excess lingers: its cruise NEES is 1.85-2.46, against 1.70-1.83 for `schedule_and_sensor`. Its overall NEES rises from 4.60 (seed 0, 24 slip ticks) to 11.16-11.37 (seeds 1-3, 72 slip ticks), so how bad it looks depends on how often the anchor slips. On clean anchors (seeds 0-3), it matches `schedule_and_sensor` (0.93-0.97 vs 0.92-0.95) and beats `sensor_gate` (1.04-1.10). Slip also costs it its position advantage over `never` in seeds 1 and 3 (single-run RMSE 0.0102 vs 0.0096 m and 0.0125 vs 0.0120 m), though not in seeds 0 and 2.
 
 #### Letting the sensor veto the schedule
-`schedule_and_sensor` applies the ZUPT only when the schedule and the sensor agree. Across seeds 0-3 it cuts the slip-window NEES to 3.55-3.56 and the overall NEES to 1.54-1.98 (table above), with clean-anchor NEES no worse than `schedule`'s. With `--p-slip 0` it matches `schedule` (both: overall 1.32, clean anchor 0.93, cruise 1.66), so at the default threshold the veto costs nothing when nothing slips.
+`schedule_and_sensor` applies the ZUPT only when the schedule and the sensor agree. Across seeds 0-3, it cuts the slip-window NEES to 3.55-3.56 and the overall NEES to 1.54-1.98 (table above), with clean-anchor NEES no worse than `schedule`'s. With `--p-slip 0` it matches `schedule` (both: overall 1.32, clean anchor 0.93, cruise 1.66), so at the default threshold the veto costs nothing when nothing slips.
 
 The slip window is still above the interval (3.56 vs 2.18 at seed 0). The gate admits the ZUPT on 6 of the 24 slip ticks, at the ends of each pulse, where the true speed (0.003-0.037 m/s) is near or below the 0.03 m/s threshold. Lowering the threshold reduces it (3.56 at 3σ to 2.36 at 1σ; see [Choosing the threshold](#choosing-the-threshold)), though at this noise level it never gets back inside the interval.
 
@@ -372,7 +372,7 @@ A slip whose peak speed is below the threshold is mostly invisible to the gate. 
 | 0.04 m/s | 1.79 | 12.22 | 4.66 | 1.78 |
 | 0.08 m/s (default) | 2.58 | 47.27 | 3.56 | 1.95 |
 
-At 0.02 m/s, the gate gives almost nothing over the schedule (3.29 vs 3.60). The harm is also small, and in the slip window `never` beats every ZUPT policy. The gate's benefit appears once the peak slip exceeds the threshold (0.04 m/s: 12.22 → 4.66; 0.08 m/s: 47.27 → 3.56), though at 0.04 m/s it still trails `never` (4.66 vs 1.79).
+At 0.02 m/s, the gate gives almost nothing over the schedule (3.29 vs 3.60). The harm is also small, and in the slip window, `never` beats every ZUPT policy. The gate's benefit appears once the peak slip exceeds the threshold (0.04 m/s: 12.22 → 4.66; 0.08 m/s: 47.27 → 3.56), though at 0.04 m/s it still trails `never` (4.66 vs 1.79).
 
 #### Fusing the reading instead of gating it
 `sensor_fused` uses $`d_k / \Delta t`$ as an ordinary velocity measurement and has no gate and no schedule. At seed 0, its NEES is 1.69, 1.95, and 1.77 in the clean-anchor, slip, and cruise windows, and its single-run velocity RMSE is 0.009 m/s against 0.039-0.050 for the others. It is also the closest to consistent at the script's under-sized 0.15 m/s² (overall NEES 3.40, against 9.40-17.11 for the other four; slip window 5.33). The comparison is not like-for-like: the gated policies use the reading only as a yes/no flag, while this one uses its value on every tick, and the toy gives it a velocity sensor in every phase. How much of what a real pad sensor offers is the question the simplification above hides.
