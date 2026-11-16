@@ -85,7 +85,7 @@ Here $`R(\theta)`$ is the 2×2 rotation from the body frame to the world frame, 
 
 The veto threshold is 3 standard deviations of a still pad's reading (sensor noise plus micro-slip): 2.12 mm per tick, a speed of 0.042 m/s.
 
-The last two rows differ in the way inchworm §6's gate and fusion do: a veto uses the reading as a yes/no flag, fusion uses its value.
+The last two rows differ in the way inchworm §6's gate and fusion do: a veto uses the reading as a yes/no flag; fusion uses its value.
 
 ---
 
@@ -120,7 +120,7 @@ Defaults (`p_slip` 0.5), 500 trials per seed. "Final error" is the single run's 
 The heading [RMSE](../glossary.md#rmse-root-mean-square-error) is the same for all four policies in every seed (0.008-0.037 rad): the heading comes only from the gyro, and no policy changes it.
 
 #### One slip, in numbers
-Before the four mechanisms below, one pulse: seed 0's first slip (1.0-1.6 s, a 3.2 cm backward slide), averaged over 300 trials. "Error" is the body midpoint's mean error along the body axis just after the pulse; "reported σ" is the filter's own standard deviation in that direction. Before the pulse every policy is within about 5-7 mm. (Computed with the script's functions; not part of its printout.)
+Before the four mechanisms below, one pulse: seed 0's first slip (1.0-1.6 s, a 3.2 cm backward slide), averaged over 300 trials. "Error" is the body midpoint's mean error along the body axis just after the pulse; "reported σ" is the filter's own standard deviation in that direction. Before the pulse, every policy is within about 5-7 mm. (Computed with the script's functions; not part of its printout.)
 
 | Policy | Error after the pulse | Reported σ | Error / σ | Reading |
 | --- | --- | --- | --- | --- |
@@ -140,7 +140,7 @@ This is also why the "clean" and "slip" NEES windows used in inchworm §6 no lon
 The veto also misses the start and end of each pulse. At the threshold speed (0.042 m/s) and the ramp's acceleration (0.08 m/s over 0.2 s), each ramp spends about 0.1 s below the threshold. That leaves about 2 mm of unflagged slide per ramp, about 4.5 mm per pulse, against the 0.5 mm per tick the filter allows (a computed estimate, ignoring sensor noise).
 
 #### Fusing the reading keeps the position
-`pad_fused` moves the anchored pad by what its sensor measured, so a slide is followed, not just flagged. Its NEES stays at 4.84-5.01 in every seed and its final error at 1.3-4.1% of the distance, whatever the number of pulses. This is the step the paper lists as future work: Kalman fusion of the pad sensor with motor and inertial data.
+`pad_fused` moves the anchored pad by what its sensor measured, so a slide is followed, not just flagged. Its NEES stays at 4.84-5.01 in every seed, and its final error is 1.3-4.1% of the distance, whatever the number of pulses. This is the step the paper lists as future work: Kalman fusion of the pad sensor with motor and inertial data.
 
 #### `never` is not safe either
 `never`'s loose anchor (0.1 m/s) covers a slip pulse's speed, but not its direction: every pulse slides backward, while the filter models independent random steps. With more pulses, the bias adds up and `never` turns overconfident (NEES 3.19 → 8.09 from 5 to 13 pulses), with errors of 9-39%.
@@ -172,7 +172,7 @@ The veto has two knobs: **how loose it makes the pad** (`--free-noise-std`) and 
 
 ## 5. Experiments left out, and why
 
-- **Kinematic closure on/off.** With the moving pad's sensor unused and no position fix, closure is the only measurement of the moving pad. Switched off, the moving pad's estimate wanders freely (2 cm per tick), and at the next phase it becomes the anchored pad. The filter would lose track of the body within a phase (expected, not run), which says nothing about slip. Closure is therefore always on.
+- **Kinematic closure on/off.** With the moving pad's sensor unused and no position fix, closure is the only measurement of the moving pad. Switched off, the moving pad's estimate wanders freely (2 cm per tick), and in the next phase it becomes the anchored pad. The filter would lose track of the body within a phase (expected, not run), which says nothing about slip. Closure is therefore always on.
 - **Gyro noise or gyro on/off.** The heading comes only from the gyro and is the same for all four policies (§3), so a gyro study would not separate them. It is left for a later version.
 
 ---
