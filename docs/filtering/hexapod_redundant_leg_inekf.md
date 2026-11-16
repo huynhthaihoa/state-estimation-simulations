@@ -66,7 +66,7 @@ with $`q`$ the true angle, $`\tilde q`$ the reading, $`n_q`$ white noise drawn e
 
 ## 2. Filters
 
-The filters are the 3-joint doc's ([§2](hexapod_joint_kinematics_inekf.md#2-filters)), unchanged except that each leg has four joints:
+The filters are the 3-joint docs ([§2](hexapod_joint_kinematics_inekf.md#2-filters)), unchanged except that each leg has four joints:
 
 | Filter | Foot-reading error it assumes | Used in |
 | --- | --- | --- |
@@ -168,7 +168,7 @@ The 2° case, one run, animated: HAntR walks (left, each leg drawn from the DH t
 
 ## 6. Takeaway
 
-A fourth joint per leg gives the foot reading a blind direction at every pose, yet the offset along that direction is mostly learned while walking, likely because walking keeps turning it. The offsets that stay poorly learned are the femur's and tibia's, along a combination that moves the foot less than any single joint. For the body's velocity, estimating all 24 offsets is still the right choice. The offsets it reports should not be trusted as a calibration.
+A fourth joint per leg gives the foot reading a blind direction at every pose, yet the offset along that direction is mostly learned while walking, likely because walking keeps turning it. The offsets that stay poorly learned are the femur's and tibia's, along with a combination that moves the foot less than any single joint. For the body's velocity, estimating all 24 offsets is still the right choice. The offsets it reports should not be trusted as a calibration.
 
 ---
 
