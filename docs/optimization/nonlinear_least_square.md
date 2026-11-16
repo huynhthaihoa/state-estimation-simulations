@@ -301,7 +301,7 @@ We weight the residuals:
 
 $$\boxed{\min_x \sum_i e_i(x)^\top W_i e_i(x)}$$
 
-where $W_i$ says how much we trust measurement $i$. For Gaussian noise $`W_i=\Sigma_i^{-1}`$, with $\Sigma_i$ the [covariance](../glossary.md#covariance).
+where $W_i$ indicates how much we trust measurement $i$. For Gaussian noise $`W_i=\Sigma_i^{-1}`$, with $\Sigma_i$ the [covariance](../glossary.md#covariance).
 
 ($W_i$ is the same quantity as the [**information matrix**](../glossary.md#information-matrix) $\Omega_k$ used from [factor_graph.md §4](factor_graph.md#4-optimization-means-minimizing-all-those-errors) onward, including in [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md); this doc uses $W_i$, those use $\Omega$.)
 
