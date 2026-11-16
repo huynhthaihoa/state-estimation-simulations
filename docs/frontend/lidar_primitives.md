@@ -82,7 +82,7 @@ The **range fit** (`refine_cylinder_range`) instead compares each point's measur
 | 0.5 m | −2.0 / −8.7 mm | +0.1 / +1.1 mm |
 | 1.0 m | −1.2 / −5.9 mm | −0.1 / +0.3 mm |
 
-In 3D on the true pillar points (one-off run, not scripted), the range fit gives −0.3 mm at 2 cm (orthogonal −4.4) and −4.1 mm at 4 cm (orthogonal −16.9), with a larger spread at 4 cm (7.6 against 5.0 mm). A first-order fix, weighting each orthogonal residual by how much range noise can move that point off the surface, only reached −11.8 mm: a second-order bias needs the exact residual.
+In 3D on the true pillar points (one-off run, not scripted), the range fit gives −0.3 mm at 2 cm (orthogonal −4.4) and −4.1 mm at 4 cm (orthogonal −16.9), with a larger spread at 4 cm (7.6 against 5.0 mm). A first-order fix, weighting each orthogonal residual by how much range noise can move that point off the surface, only reached −11.8 mm; a second-order bias needs the exact residual.
 
 Inside the full pipeline (same RANSAC inliers for both fits), the range fit's bias changes sign:
 
