@@ -263,6 +263,7 @@ The bottom row is the solve strategy. GN/LM is the step rule, a separate axis; i
 | Bayes tree | Cliques; a new factor only touches its path to the root | [bayes_tree.md §7-§8](optimization/bayes_tree.md#7-heres-where-it-becomes-powerful-for-isam2), [§13](optimization/bayes_tree.md#13-one-more-important-concept-cliques) | `bayes_tree_construction.py` (elimination tree only) |
 | iSAM2 | Bayes tree + selective relinearization + reordering | [isam2_optimization.md §6-§10](optimization/isam2_optimization.md#6-but-what-makes-isam2-special), [§13](optimization/isam2_optimization.md#13-the-complete-isam2-picture) | - (conceptual only) |
 | Marginalization | Drop old states, keep their information as a prior | [marginalization.md §2](optimization/marginalization.md#2-marginalization-keep-the-information-drop-the-variable), [§4](optimization/marginalization.md#4-the-math-turning-an-eliminated-pose-into-a-prior), [§6](optimization/marginalization.md#6-the-consistency-gotcha-why-fej-exists) | `sliding_window_marginalization.py` |
+| RTS smoother | A backward pass after the filter uses all the data; for a linear Gaussian model it equals the batch solution, and a fixed-lag version bounds the delay | [filtering_smoothing.md §8](filtering_smoothing.md#the-same-picture-with-numbers-a-kalman-filter-and-its-rts-smoother-on-one-data-set), [fixed lag](filtering_smoothing.md#fixed-lag-most-of-the-gain-with-a-short-delay) | `rts_smoother.py` |
 
 ---
 

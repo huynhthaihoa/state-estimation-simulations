@@ -125,7 +125,7 @@ The standard fix is **[First-Estimate Jacobians (FEJ)](../glossary.md#fej-first-
 - The original MSCKF (Mourikis & Roumeliotis, 2007) predates FEJ. It was added in the later MSCKF 2.0 (Li & Mourikis, 2012/2013).
 - VINS-Mono does not apply FEJ systematically: its marginalization prior keeps the linearization point it was built at (FEJ-like for that factor), while the other factors are relinearized. Its §VI-D notes that marginalization fixes linearization points early, which may give suboptimal estimates, and argues that since small drift is acceptable for VIO, the negative impact is not critical.
 
-See Huang, Mourikis & Roumeliotis (2009) in the references below for the FEJ derivation itself - we don't reproduce it here.
+See Huang, Mourikis & Roumeliotis (2009) in the references below for the FEJ derivation itself - we don't reproduce it here. The same mechanism is measured on a small EKF-SLAM, with standard, FEJ, and invariant EKFs, in [observability.md §3-§5](../foundations/observability.md#3-why-the-standard-ekf-loses-the-rotation-direction).
 
 ---
 
