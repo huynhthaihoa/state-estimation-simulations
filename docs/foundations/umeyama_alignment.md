@@ -98,7 +98,7 @@ I & \text{if } \det(U)\det(V^\top) > 0 \\
 \end{cases}
 ```
 
-Plain $UV^\top$ is the best-fit *orthogonal* matrix, which can be a reflection ($\det = -1$) as well as a rotation ($\det = +1$). Since $\det(U)\det(V^\top) = \pm1$, a negative value means the plain fit is a reflection. In that case $S$ flips the axis paired with $\Sigma$'s smallest singular value (the last, since `np.linalg.svd` sorts in descending order). §4 shows why this matters and what it costs.
+Plain $UV^\top$ is the best-fit *orthogonal* matrix, which can be a reflection ($\det = -1$) as well as a rotation ($\det = +1$). Since $\det(U)\det(V^\top) = \pm1$, a negative value means the plain fit is a reflection. In that case, $S$ flips the axis paired with $\Sigma$'s smallest singular value (the last, since `np.linalg.svd` sorts in descending order). §4 shows why this matters and what it costs.
 
 **Step 4. Scale and translation:**
 
@@ -128,7 +128,7 @@ Without step 3's correction, the fit can return a **mirror image** instead of a 
 - **Uncorrected** ($R = UV^\top$): fits **perfectly** (residual $\approx 0$), but $\det(R) \approx -1$, which is not a valid rotation and not a valid camera/robot pose.
 - **Corrected** ($R = USV^\top$): $\det(R) = +1$, but it can only *approximate* the mirrored points. Here the best fit has a max per-point residual of about $0.77$ (at the origin point; the other three are off by about $0.31$), and scale drops from $1.0$ to $s = 7/9 \approx 0.78$ to partially compensate.
 
-So the guard trades a perfect fit on mirror-related point sets for a valid rotation. For the point sets this repo's scripts generate (cameras spread around a 3D landmark cluster), the reflection case is not expected to trigger (not measured separately). It is more likely for noisy or nearly degenerate configurations. For exactly coplanar points (all in one plane) the flip costs nothing.
+So the guard trades a perfect fit on mirror-related point sets for a valid rotation. For the point sets this repo's scripts generate (cameras spread around a 3D landmark cluster), the reflection case is not expected to trigger (not measured separately). It is more likely for noisy or nearly degenerate configurations. For exactly coplanar points (all in one plane), the flip costs nothing.
 
 ---
 
