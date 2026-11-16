@@ -9,7 +9,8 @@ The boxes, texts and arrows are laid out here, so editing a label or moving a bo
 curve and star positions), kept as numbers below. The banner is also what the README's image alt text and the SVG's
 own <desc> describe: when the content changes, change DESC and the alt text in README.md together.
 
-This script was written to reproduce the banner that had been edited by hand; its output matches it byte for byte.
+This script was first written to reproduce the banner that had been edited by hand (byte for byte); the banner is now
+regenerated from it.
 """
 import math
 import os
@@ -25,7 +26,7 @@ YEL, BLUE, PURP, GREEN, SLATE = "#facc15", "#38bdf8", "#a78bfa", "#34d399", "#64
 
 TITLE = "State Estimation Simulations"
 SUBTITLE = "From-scratch pose estimation, mostly on manifolds (SO(3), SE(3), SE\u2082(3)) \u00b7 NumPy and manif side by side"
-DESC = 'Pipeline overview: sensors (including contact signals) feed a front-end (PnP, triangulation, visual-inertial initialization, LiDAR primitives), whose constraints go to two back-end families - Kalman filtering (including crawling and legged robots) and factor-graph optimization - producing a trajectory and map estimate, all built on Lie-group and Jacobian foundations.'
+DESC = 'Pipeline overview: sensors (including contact signals) feed a front-end (PnP, triangulation, visual-inertial initialization, LiDAR primitives), whose constraints go to two back-end families - Kalman filtering and smoothing (including crawling and legged robots) and factor-graph optimization (including robust kernels) - producing a trajectory and map estimate, all built on Lie-group, Jacobian, IMU-noise and observability foundations.'
 DEFS = '<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#16213b"/><stop offset="1" stop-color="#0b1222"/></linearGradient><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#94a3b8"/></marker></defs>'
 
 out = []
@@ -81,10 +82,10 @@ panel(48, 170, 190, 132, YEL, "SENSORS", ["IMU \u00b7 camera", "odometry \u00b7 
 panel(278, 170, 214, 132, BLUE, "FRONT-END", ["PnP \u00b7 triangulation", "VI initialization", "LiDAR primitives"],
       (228, 252, 276), 200)
 panel(532, 126, 336, 118, PURP, "FILTERING",
-      ["KF \u00b7 EKF \u00b7 IEKF \u00b7 UKF", "saltation \u00b7 ZUPT \u00b7 slip \u00b7 friction", "legged \u00b7 gait phase"],
+      ["KF \u00b7 EKF \u00b7 ESKF \u00b7 IEKF \u00b7 UKF", "saltation \u00b7 ZUPT \u00b7 slip \u00b7 friction", "legged \u00b7 gait phase \u00b7 IMM \u00b7 RTS"],
       (180, 202, 224), 154)
 panel(532, 256, 336, 96, GREEN, "OPTIMIZATION",
-      ["GN \u00b7 LM \u00b7 factor graphs \u00b7 BA", "iSAM \u00b7 marginalization"], (310, 332), 284)
+      ["GN \u00b7 LM \u00b7 factor graphs \u00b7 BA", "iSAM \u00b7 marginalization \u00b7 robust kernels"], (310, 332), 284)
 box(908, 126, 244, 226, INK)
 text(926, 156, 14, 700, INK, "ESTIMATE", ls=1.5)
 
@@ -120,7 +121,7 @@ text(1030, 344, 14, 400, MUTED, "trajectory + map", anchor="middle")
 # ---------------------------------------------------------------- foundations bar
 box(48, 372, 1104, 42, SLATE, rx=12, fill_op=".14", stroke_op=".6")
 text(66, 399, 14, 700, MUTED, "FOUNDATIONS", ls=1.5)
-text(210, 399, 16, 400, INK, "Jacobians \u00b7 Lie groups (Exp / Log) \u00b7 quaternions \u00b7 Umeyama alignment")
+text(210, 399, 16, 400, INK, "Jacobians \u00b7 Lie groups (Exp / Log) \u00b7 quaternions \u00b7 Umeyama alignment \u00b7 Allan variance \u00b7 observability")
 out.append("</svg>")
 
 if __name__ == "__main__":
