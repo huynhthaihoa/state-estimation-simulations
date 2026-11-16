@@ -14,7 +14,7 @@ A plain EKF corrects its state by **adding** $`K r`$ (gain times residual). Adde
 
 The **error-state Kalman filter** (**ESKF**) sidesteps this by splitting the job in two:
 
-- The **nominal state** $`\hat x`$ carries the large motion: the rotation as a proper rotation matrix (or unit quaternion), plus velocity, position and the sensor [biases](../glossary.md#bias). It is integrated with the full nonlinear equations. It has no covariance of its own; the filter linearizes around it.
+- The **nominal state** $`\hat x`$ carries the large motion: the rotation as a proper rotation matrix (or unit quaternion), plus velocity, position, and the sensor [biases](../glossary.md#bias). It is integrated with the full nonlinear equations. It has no covariance of its own; the filter linearizes around it.
 - The **error state** $`\delta x`$ is the small gap between the truth and the nominal state. It holds the rotation error as a **3-vector** $`\delta\theta`$ (axis × angle, rad), with no constraint and no singularity near zero. The Kalman filter estimates only $`\delta x`$.
 
 After each measurement update, the estimated error is **injected** into the nominal state and **reset** to zero.
@@ -111,7 +111,7 @@ K = P H^\top (H P H^\top + \sigma_p^2 I)^{-1} \qquad \widehat{\delta x} = K r \q
 \hat p \leftarrow \hat p + \widehat{\delta p} \qquad \hat v \leftarrow \hat v + \widehat{\delta v} \qquad \hat R \leftarrow \hat R\,\mathrm{Exp}(\widehat{\delta\theta}) \qquad \hat b \leftarrow \hat b + \widehat{\delta b}
 ```
 
-**Reset** $`\delta x`$ to zero. Strictly, moving the nominal rotation also changes the frame the remaining rotation error is expressed in, so $`P`$ is mapped through the **reset Jacobian** $`G = I - \tfrac12[\,\widehat{\delta\theta}\,]_\times`$ on the rotation block: $`P \leftarrow G P G^\top`$ (Solà 2017, §6.3); $`G`$ differs from $`I`$ only to first order in the injected error. Here it makes no measurable difference: with `--no-reset-jacobian` ($`G = I`$) on the same trials, the ESKF's NEES is 16.6 instead of 16.4 and its attitude RMSE is 1.36° instead of 1.35°.
+**Reset** $`\delta x`$ to zero. Strictly, moving the nominal rotation also changes the frame the remaining rotation error is expressed in, so $`P`$ is mapped through the **reset Jacobian** $`G = I - \tfrac12[\,\widehat{\delta\theta}\,]_\times`$ on the rotation block: $`P \leftarrow G P G^\top`$ (Solà 2017, §6.3); $`G`$ differs from $`I`$ only to first order in the injected error. Here it makes no measurable difference: with `--no-reset-jacobian` ($`G = I`$) on the same trials, the ESKF's NEES is 16.6 instead of 16.4, and its attitude RMSE is 1.36° instead of 1.35°.
 
 | Step | Acts on | Linearized? |
 | --- | --- | --- |
@@ -153,7 +153,7 @@ For a fair comparison, the quaternion EKF's covariance is mapped to the same 15 
 
 ### 4.1 Without bias states, the filter believes a drifting model
 
-The biases are only 0.01 rad/s and 0.05 m/s² (1σ), yet `eskf_no_bias` averages 12.9° attitude error and 1.5 m position error over the second half, against 1.35° and 0.19 m with bias states. Its NEES is 1736 against a consistent 9, about 190 times too large: its covariance claims errors far smaller than the ones it makes, because its model has no term for the drift the biases cause. With bias states in the filter, the position fixes and the motion make the biases observable, and the filter estimates them instead.
+The biases are only 0.01 rad/s and 0.05 m/s² (1σ), yet `eskf_no_bias` averages 12.9° attitude error and 1.5 m position error over the second half, against 1.35° and 0.19 m with bias states. Its NEES is 1736 against a consistent 9, about 190 times too large: its covariance claims errors far smaller than the ones it makes, because its model has no term for the drift the biases cause. With bias states in the filter, the position fixes, and the motion make the biases observable, and the filter estimates them instead.
 
 ### 4.2 The quaternion EKF: the problem is the renormalization, not the quaternion
 
