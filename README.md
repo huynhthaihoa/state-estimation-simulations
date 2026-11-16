@@ -220,12 +220,12 @@ for f in $(find tests -name 'test_*.py' | sort); do uv run pytest -q "$f"; done
 |  | 24 | [Friction-anisotropic process noise](#24-friction-anisotropic-process-noise-fixed-vs-heading-aware-q) | Fixed vs. heading-aware process noise for a pad that slips more sideways than forward |  | [friction_anisotropic_ekf.md](docs/filtering/friction_anisotropic_ekf.md) |
 |  | 25 | [Hexapod leg odometry](#25-hexapod-leg-odometry-what-the-gait-changes) | Stance feet as velocity sensors: what the gait changes, and a per-foot slip test |  | [hexapod_gait_ekf.md](docs/filtering/hexapod_gait_ekf.md) |
 |  | 26 | [Contact-aided invariant EKF](#26-contact-aided-invariant-ekf-on-a-hexapod-which-filter-knows-yaw-is-unobservable) | Stance feet in the state; only the invariant EKF keeps yaw unobservable |  | [hexapod_contact_inekf.md](docs/filtering/hexapod_contact_inekf.md) |
-|  | 27 | [Gait phase](#27-gait-phase-which-feet-are-on-the-ground-when-touchdowns-are-uncertain) | Which feet to read when touchdowns are late or detectors fire falsely |  | [gait_phase_ekf.md](docs/filtering/gait_phase_ekf.md) |
+|  | 27 | [Gait phase](#27-gait-phase-which-feet-are-on-the-ground-when-touchdowns-are-uncertain) | Which feet to read when touchdowns are late, or detectors fire falsely |  | [gait_phase_ekf.md](docs/filtering/gait_phase_ekf.md) |
 |  | 28 | [Joint-encoder kinematics](#28-joint-encoders-on-an-18-dof-hexapod-when-the-leg-kinematics-noise-model-matters) | HEBI Daisy's 18-DOF legs: the noise model's shape barely matters, fixed joint offsets do |  | [hexapod_joint_kinematics_inekf.md](docs/filtering/hexapod_joint_kinematics_inekf.md) |
 |  | 29 | [Torque contact detection](#29-torque-based-contact-detection-what-decides-it-and-when-the-gait-phase-helps) | A joint-torque detector as a signal: model error and load ramp decide it, the gait-phase filter fixes its false triggers |  | [gait_phase_torque_ekf.md](docs/filtering/gait_phase_torque_ekf.md) |
 |  | 30 | [Four joints per leg](#30-four-joints-per-leg-which-joint-offsets-a-walking-hexapod-can-learn) | HAntR's redundant legs: the null-direction offset is mostly learned while walking, the femur and tibia offsets are not |  | [hexapod_redundant_leg_inekf.md](docs/filtering/hexapod_redundant_leg_inekf.md) |
 |  | 31 | [Legs + tracking camera](#31-legs-plus-a-tracking-camera-how-to-use-a-pose-that-drifts) | A drifting camera pose as world pose is badly overconfident; its drift as states halves the position error and stays consistent through a position jump; a late reading needs its delay told to the filter or estimated |  | [hexapod_camera_fusion_inekf.md](docs/filtering/hexapod_camera_fusion_inekf.md) |
-|  | 32 | [Skid-steer wheel odometry](#32-skid-steer-wheel-odometry-slip-as-a-filter-state) | A wrong slip coefficient throws wheel odometry off by meters and a wheels + gyro EKF keeps the error; with the coefficient as a state it is learned in one turn |  | [skid_steer_odometry_ekf.md](docs/filtering/skid_steer_odometry_ekf.md) |
+|  | 32 | [Skid-steer wheel odometry](#32-skid-steer-wheel-odometry-slip-as-a-filter-state) | A wrong slip coefficient throws wheel odometry off by meters, and a wheels + gyro EKF keeps the error; with the coefficient as a state, it is learned in one turn |  | [skid_steer_odometry_ekf.md](docs/filtering/skid_steer_odometry_ekf.md) |
 |  | 33 | [Magnetic climbing inchworm](#33-magnetic-climbing-inchworm-odometry-that-cannot-see-the-slide) | Servo odometry cannot see a holding pad slide on a wall; one-sided slides are not noise, and only an outside fix bounds the error, and a slide-bias state keeps the filter from becoming overconfident |  | [magnetic_inchworm_odometry_ekf.md](docs/filtering/magnetic_inchworm_odometry_ekf.md) |
 
 ### IMU and manifolds
@@ -625,7 +625,7 @@ uv run python use_numpy/lidar_primitives.py --experiment all --n-trials 10 --n-p
 
 ### Factor graphs and smoothing
 
-#### 10. RTS smoother: a Kalman filter, its smoother and batch least squares on one data set
+#### 10. RTS smoother: a Kalman filter, its smoother, and batch least squares on one data set
 
 **Purpose:** Runs the Kalman filter of the 1D inchworm and its Rauch-Tung-Striebel (RTS) smoother, a backward pass that also uses the measurements after each tick, on the same data, and checks that the smoother equals batch least squares over the whole trajectory.
 
@@ -1382,7 +1382,7 @@ uv run python use_numpy/friction_anisotropic_ekf.py --duration 20.0 --dt 0.05 --
 
 #### 25. Hexapod leg odometry: what the gait changes
 
-**Purpose:** Shows how the gait (tripod, ripple or wave) changes what a planar hexapod can estimate from its legs alone. It also tests slipping feet, foot drift and uncertain contact timing.
+**Purpose:** Shows how the gait (tripod, ripple, or wave) changes what a planar hexapod can estimate from its legs alone. It also tests slipping feet, foot drift, and uncertain contact timing.
 
 | Input | Output |
 |---|---|
