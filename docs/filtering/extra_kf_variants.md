@@ -235,7 +235,7 @@ Each particle is propagated through the (possibly highly nonlinear) motion model
      •    •                    •   •                       •
 ```
 
-This lets a PF represent **multimodal** beliefs - "the robot is either in room A or room B, I genuinely don't know which" - something a single Gaussian, which every KF-family filter assumes, cannot express.
+This lets a PF represent **multimodal** beliefs - "the robot is either in room A or room B; I genuinely don't know which" - something a single Gaussian, which every KF-family filter assumes, cannot express. A worked simulation, a PF against an EKF and a UKF at an unknown start in a corridor of identical doors, is in [particle_filter.md](particle_filter.md).
 
 **Why care?**
 

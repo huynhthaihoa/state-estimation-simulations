@@ -8,6 +8,8 @@ Think of them as:
 
 > **Back-end: "Given all observations, what is the most consistent trajectory and map?"**
 
+SLAM outputs two things: the **trajectory** (the robot's pose at each time) and the **map** (where the landmarks or surfaces are; a pose graph estimates the trajectory only). The map can also inform path planning (Cadena et al., 2016, §I; [§6](#6-references)). Neither output can be read off the sensors. Odometry gives relative steps whose errors add up ([drift](optimization/factor_graph.md#2-why-do-we-need-it)). The map is only as good as the poses it is built from, and the poses need the map to correct their drift (triangulation needs known poses, PnP needs known landmarks; [triangulation_pnp.md §1](frontend/triangulation_pnp.md#1-the-two-problems-stated-symmetrically)), so both are estimated together. SLAM does not have to run in real time: it can also be solved offline, after all the data is collected (§5).
+
 ![Pipeline: sensors feed the front-end (feature detection, matching and tracking, motion estimation, measurements and constraints; also data association, triangulation, PnP, keyframe selection and loop-closure detection), which hands constraints (relative poses, pixel observations, IMU bundles, priors) to the back-end (nonlinear least squares: bundle adjustment, pose graph, factor graph; Gauss-Newton, Levenberg-Marquardt and iSAM solvers; robust costs), which outputs the optimized trajectory and map. Loop closure spans both stages: the front-end detects a candidate, the back-end verifies and applies it. Both stages can run online.](images/frontend_backend.svg)
 
 *Figure: the two stages and what passes between them, drawn from §1-§5 (regenerate with `uv run python generator/make_frontend_backend_svgs.py`). The back-end is drawn through its optimization form (§2); filtering is the other back-end strategy ([filtering_smoothing.md](filtering_smoothing.md)). **IMU bundles** are preintegrated IMU measurements between keyframes ([glossary](glossary.md#imu-preintegration)), front-end work whose output is a back-end factor; **priors** are single-variable constraints such as one that pins the first pose ([glossary](glossary.md#prior-unary-factor)). **PnP** is Perspective-n-Point, **iSAM** incremental smoothing and mapping, **DCS** dynamic covariance scaling (a robust cost).*
@@ -162,7 +164,7 @@ The **back-end then optimizes the entire trajectory** so that all constraints ar
 
 *Figure: the toy case above, to scale in the drift and the corrections (the 2 m square and the drift direction are arbitrary); same generator as the figure in the introduction.*
 
-In practice, "loop closure" spans both stages. The front-end place-recognition module (which matches the current view against stored ones) detects the candidate match. The back-end checks it against the other constraints (robust costs down-weight a closure that disagrees strongly with them; see [§4](#4-front-end-vs-back-end)) and folds it into the global optimization.
+In practice, "loop closure" spans both stages. The front-end place-recognition module (which matches the current view against stored ones) detects the candidate match. The back-end checks it against the other constraints (robust costs down-weight a closure that disagrees strongly with them; see [§4](#4-front-end-vs-back-end)) and folds it into the global optimization. A false closure can look geometrically plausible (two different places that look alike); then its residual is small, and no robust cost can tell it from a true closure ([robust_pose_graph.md §6](optimization/robust_pose_graph.md#6-what-this-toy-does-not-show)).
 
 So loop closure belongs fully to neither stage, and a diagram can draw it in either one.
 
@@ -177,6 +179,8 @@ So loop closure belongs fully to neither stage, and a diagram can draw it in eit
 | Output             | Features, matches, relative poses, loop-closure candidates| Optimized poses/map; verifies and applies loop closures |
 | Typical algorithms | Feature tracking, VO, matching                   | BA, pose graph, factor graph            |
 | Focus              | Local/sequential                               | Global/accumulated                    |
+
+Why split: only the front-end depends on the sensor. It turns raw data (pixels, scans, IMU samples) into models the estimator can use (relative poses, pixel observations, IMU bundles, priors), and the back-end performs inference on those abstracted constraints (Cadena et al., 2016, §II). The factors in the back-end's problem can come from a wide variety of sensor models, such as inertial sensors, wheel encoders, and GPS (Cadena et al., 2016, §II).
 
 ### Front-end errors become constraints for the back-end
 If data association or motion estimation is wrong, a plain least-squares optimizer tries to satisfy the bad constraint and can converge to a wrong solution. Back-ends therefore often use robust costs ([glossary](glossary.md#outlier-and-robust-kernel); Huber, Cauchy, Dynamic Covariance Scaling (DCS)) that down-weight constraints that disagree strongly with the rest; see [optimization/pose_graph_optimization.md §16](optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures).

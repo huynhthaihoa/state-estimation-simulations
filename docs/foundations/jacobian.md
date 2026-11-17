@@ -69,6 +69,8 @@ That's the **Jacobian**. Notice the convention: each **row** is one output ($y_i
 
 *Figure: this example at $`\hat x = (1, 0.5)`$, plotted by `uv run python generator/make_figures.py jacobian_local_map_concept`.*
 
+**Numeric check at $`\hat x = (1, 0.5)`$:** $`J = \begin{bmatrix} 1 & 1 \\ 0.5 & 1 \end{bmatrix}`$. For the step $`\Delta x = (0.1, 0.1)`$, the true output change is $`(0.21, 0.16)`$ and $`J\,\Delta x = (0.20, 0.15)`$; the miss, $`(0.01, 0.01)`$, is second order in the step.
+
 ---
 
 ## 3. Think of it as a "sensitivity map"

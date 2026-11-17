@@ -599,7 +599,7 @@ It uses the residual and Jacobians from [§6.1](#61-the-ba-math-concretely), unw
 
 Diagonal entries of $H$ below $10^{-12}$ are floored to $10^{-12}$ before scaling. $\lambda$ starts at $10^{-3}$ in every call. A trial step is accepted only if it lowers the cost, and then $\lambda \leftarrow \max(\lambda/2, 10^{-7})$. Otherwise, $\lambda \leftarrow 2\lambda$ and the solve is retried, up to 10 times. The loop stops when no step is accepted after 10 retries, when the step norm drops below `gn_tol`, or after `gn_max_iters` iterations.
 
-**Tiny example (chirality):** **chirality** is the requirement that a point lie in front of the camera (positive depth). The pinhole $`u = f_x\,x/z + c_x`$ flips sign with $`z`$, so cheirality matters. Take $`f_x = 800`$, $`c_x = 320`$.
+**Tiny example (cheirality):** **cheirality** is the requirement that a point lie in front of the camera (positive depth). The pinhole $`u = f_x\,x/z + c_x`$ flips sign with $`z`$, so cheirality matters. Take $`f_x = 800`$, $`c_x = 320`$.
 - A point in front, $`P_c = (-1, 0, 5)`$, gives $`u = 160`$.
 - The point $`(1, 0, -5)`$ behind the camera gives the same $`u = 160`$.
 - So a point behind the camera can look like a valid mirrored pixel. The solver must reject it explicitly.

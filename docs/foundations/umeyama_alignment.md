@@ -33,7 +33,7 @@ The difference from pose graphs is scale:
 - Pose-graph edges are *relative rigid* constraints, so only the 6-[DoF](../glossary.md#degrees-of-freedom-dof) (degrees of freedom) rigid gauge exists.
 - Monocular [bundle adjustment](../glossary.md#bundle-adjustment-ba) (BA) edges are *projective*, so scale is unobservable too.
 
-While this ambiguity remains, "position error in meters" against ground truth is meaningless: the two sets live in different, differently scaled coordinate systems. Umeyama alignment solves for the one similarity transform that puts them in the same frame before we measure error.
+While this ambiguity remains, "position error in meters" against ground truth is meaningless: the two sets live in different, differently scaled coordinate systems. Umeyama alignment solves for the one similarity transform that puts them in the same frame before we measure error. For scale: in the repo's one-off Local-BA check (seed 0), aligning removes 65% of the position RMSE, 1.27 m down to 0.44 m ([bundle_adjustment.md §13.6](../optimization/bundle_adjustment.md#136-in-this-repo)).
 
 ### 1.1 Align only what's actually unobservable
 

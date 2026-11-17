@@ -237,6 +237,8 @@ $$R_{\text{new}}=R\exp(\delta\theta^\wedge)$$
 
 The optimizer sees an ordinary 3-vector, while the resulting rotation remains valid.
 
+The same holds for uncertainty: a rotation has 9 matrix entries but 3 degrees of freedom, so its covariance is a $`3\times 3`$ matrix on $`\delta\theta`$, not a $`9\times 9`$ matrix on $`R`$ ([jacobian.md §11.6](jacobian.md#116-where-this-actually-matters); for a pose it is $`6\times 6`$, [kf_ekf_iekf.md §5](../filtering/kf_ekf_iekf.md#5-the-really-important-difference-how-do-you-define-error)).
+
 ---
 
 ## 11. $SE(3)$: this is where robotics gets really interesting

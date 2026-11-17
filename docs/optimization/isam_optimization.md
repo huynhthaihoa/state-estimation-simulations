@@ -183,6 +183,8 @@ Original iSAM stops at §3's mechanism: Givens-rotation updates to the factoriza
 | Simple conceptual model         | More complicated implementation |
 | Example: standard Gauss-Newton ([glossary](../glossary.md#gauss-newton))  | Example: iSAM/iSAM2             |
 
+Both columns keep every variable in the problem; a third option, a sliding window, marginalizes old variables instead ([marginalization.md §7](marginalization.md#7-sliding-window-and-fixed-lag-smoothing-the-payoff)).
+
 ---
 
 ## 9. iSAM doesn't mean "never touch old variables"

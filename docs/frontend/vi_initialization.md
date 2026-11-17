@@ -102,7 +102,7 @@ That is a much larger undertaking than the other scripts in this repo.
 
 ## 6. One-sentence summary
 
-> **Visual-inertial initialization supplies the starting guess other docs assume: we align a short, sufficiently exciting vision-only window against preintegrated IMU bundles (a closed-form gyroscope-bias step, then a linear solve with a short gravity refinement) to recover scale, gravity direction, velocities, and gyroscope bias, then hand off to ordinary preintegration + factor-graph optimization.**
+> **Visual-inertial initialization supplies the starting guess other docs assume: we align a short, sufficiently exciting vision-only window against preintegrated IMU bundles (a closed-form gyroscope-bias step, then a linear solve with a short gravity refinement) to recover scale, gravity direction, velocities, and gyroscope bias, then hand off to ordinary preintegration + factor-graph optimization. It contributes no factor of its own; it only seeds the first linearization.**
 
 ---
 

@@ -13,9 +13,10 @@ A collection of from-scratch simulations exploring **pose/state estimation**, mo
  - How batch smoothing **scales** to a growing problem: incremental solving (iSAM, Bayes tree), sliding-window marginalization, and Local + Global bundle adjustment
  - How the **front-end** turns camera observations into poses for the estimator: Perspective-n-Point (PnP) pose recovery, and triangulation inside bundle adjustment
  - How a **[LiDAR](docs/glossary.md#lidar) front-end** registers scans: point-to-point and point-to-plane [ICP](docs/glossary.md#icp-iterative-closest-point) (iterative closest point) against fitted planes and cylinders, and what a corridor's degeneracy does to each
+ - How a **particle filter** keeps several position hypotheses where an EKF or UKF keeps one: global localization at an unknown start among look-alike places
  - How filtering copes with **non-smooth motion** (ground-contact events, anchor/extend gaits, slipping anchors, heading-dependent friction, uncertain touchdown times), checked with Monte Carlo NEES (normalized estimation error squared) consistency tests
 
-Two implementation styles run side by side for 11 of the 35 simulation scripts (the other 24 are NumPy-only; §C says which and why), split into sibling directories with matching filenames:
+Two implementation styles run side by side for 11 of the 36 simulation scripts (the other 25 are NumPy-only; §C says which and why), split into sibling directories with matching filenames:
 - [use_numpy/](use_numpy/): skew-symmetric matrices, $Exp$/$`Log`$ maps, and Jacobians written out by hand (Rodrigues' formula, the $SE(3)$ exponential/logarithm, the analytical inverse right Jacobian), shared across scripts via [use_numpy/lie_utils.py](use_numpy/lie_utils.py).
 - [use_manif/](use_manif/): the same math delegated to the [`manif`](https://github.com/artivis/manif) Lie-theory library's Python bindings (`T.rplus`, `T.rminus`, `T.act`, all with analytical Jacobians returned as out-parameters), so no manifold formula is hand-rolled.
 
@@ -26,7 +27,7 @@ Each `use_manif/<name>.py` is the manifpy counterpart of `use_numpy/<name>.py` o
 [docs/](docs/) has the conceptual write-ups behind these simulations:
 - **Math foundations:** Jacobian, Lie algebra, quaternions, Umeyama alignment, IMU noise identification (Allan variance), observability and an EKF's consistency (FEJ, the invariant EKF)
 - The **front-end:** triangulation and PnP, visual-inertial initialization, LiDAR primitives and scan registration
-- The **Kalman-filter** family: KF/EKF/IEKF (Kalman filter, extended KF, invariant EKF), telling linear from nonlinear systems (and when linearization holds), UKF/ESKF/[MSCKF](docs/glossary.md#msckf-multi-state-constraint-kalman-filter) (unscented, error-state and multi-state constraint KF) and other variants, left- vs. right-invariant errors, an empirical note on the point-cloud tracking results, and non-smooth-motion filters (saltation-matrix EKF, invariant saltation EKF, [ZUPT](docs/glossary.md#zupt-and-zaru), an interacting multiple model for anchor slip, the two-pad inchworm (and reading both pad sensors), friction-anisotropic process noise, hexapod leg odometry, contact-aided invariant EKF, gait-phase estimation)
+- The **Kalman-filter** family: KF/EKF/IEKF (Kalman filter, extended KF, invariant EKF), telling linear from nonlinear systems (and when linearization holds), UKF/ESKF/[MSCKF](docs/glossary.md#msckf-multi-state-constraint-kalman-filter) (unscented, error-state and multi-state constraint KF) and other variants, left- vs. right-invariant errors, an empirical note on the point-cloud tracking results, a particle filter against the EKF and UKF at an unknown start, and non-smooth-motion filters (saltation-matrix EKF, invariant saltation EKF, [ZUPT](docs/glossary.md#zupt-and-zaru), an interacting multiple model for anchor slip, the two-pad inchworm (and reading both pad sensors), friction-anisotropic process noise, hexapod leg odometry, contact-aided invariant EKF, gait-phase estimation)
 - The **factor-graph/smoothing** family: NLS, Gauss-Newton, Levenberg-Marquardt, factor graphs,
 pose-graph optimization (and robust kernels against false loop closures), bundle adjustment, sparse Cholesky factorization, IMU preintegration, iSAM/iSAM2, elimination and Bayes trees, marginalization
 
@@ -112,13 +113,14 @@ printers. `docs/frontend/lidar_primitives.md`.
 - [skid_steer_odometry_ekf.py](use_numpy/skid_steer_odometry_ekf.py): wheel odometry of a skid-steer Clearpath Husky A200 whose wheels slip in turns ([docs/filtering/skid_steer_odometry_ekf.md](docs/filtering/skid_steer_odometry_ekf.md)): the skid modeled by an ICR coefficient $`\chi`$ that widens the effective track; dead reckoning with $`\chi`$ = 1 or the driver's 1.875, an EKF on wheels + gyro with $`\chi`$ fixed, and the same EKF with $`\chi`$ as a state; Husky's track, encoder resolution and odometry rate and the MTi-30 gyro's noise from their sources, and a sweep of the true $`\chi`$.
 - [sliding_window_marginalization.py](use_numpy/sliding_window_marginalization.py): gives [docs/optimization/marginalization.md](docs/optimization/marginalization.md) its accompanying script - streams a pure odometry chain, marginalizes the oldest pose via the Schur complement whenever a `--window-size` cap would be exceeded, and compares the resulting bounded-memory solve against `run_full_batch_growing`'s unbounded re-solve-from-scratch baseline across a sweep of trajectory lengths, reusing `pose_graph.py`/`pose_graph_incremental.py`'s building blocks.
 - [rts_smoother.py](use_numpy/rts_smoother.py): a Kalman filter, its Rauch-Tung-Striebel (RTS) smoother and batch least squares on one data set ([docs/filtering_smoothing.md](docs/filtering_smoothing.md#the-same-picture-with-numbers-a-kalman-filter-and-its-rts-smoother-on-one-data-set)): the 1D inchworm of `inchworm_zupt_ekf.py`, reusing its model and filter steps; the smoother equals batch least squares to round-off, with per-window RMSE and NEES by Monte Carlo (three truths), a fixed-lag version and the cost of the backward pass.
+- [particle_filter_localization.py](use_numpy/particle_filter_localization.py): a particle filter against an EKF and a UKF on a 1D corridor of look-alike doors when the start is unknown ([docs/filtering/particle_filter.md](docs/filtering/particle_filter.md)): a scalar door-profile reading and open-loop odometry, with the start uniform over an 18 m zone. Compares the three by wrong-door rate, error, and NEES over 400 Monte Carlo trials, with the particle filter's effective sample size and time to one hill; sweeps of the particle count, sensor noise, door width, motion noise, resampling rule and door layout, a known-start check, and a labeled maximum-likelihood-association variant (EKF-ML, UKF-ML). Plain scalar state, so no manifold question.
 - `*_v2.py` ([pointcloud_pose_tracking_v2.py](use_numpy/pointcloud_pose_tracking_v2.py), [saltation_matrix_ekf_v2.py](use_numpy/saltation_matrix_ekf_v2.py), [inchworm_zupt_ekf_v2.py](use_numpy/inchworm_zupt_ekf_v2.py), [inchworm_zupt_zaru_ekf_v2.py](use_numpy/inchworm_zupt_zaru_ekf_v2.py), [inchworm_slip_gate_ekf_v2.py](use_numpy/inchworm_slip_gate_ekf_v2.py), [inchworm_two_pad_ekf_v2.py](use_numpy/inchworm_two_pad_ekf_v2.py), 
 [inchworm_two_pad_fusion_ekf_v2.py](use_numpy/inchworm_two_pad_fusion_ekf_v2.py), 
 [friction_anisotropic_ekf_v2.py](use_numpy/friction_anisotropic_ekf_v2.py), [invariant_saltation_ekf_v2.py](use_numpy/invariant_saltation_ekf_v2.py), [hexapod_gait_ekf_v2.py](use_numpy/hexapod_gait_ekf_v2.py), [eskf_imu_position_fix_v2.py](use_numpy/eskf_imu_position_fix_v2.py), [magnetic_inchworm_odometry_ekf_v2.py](use_numpy/magnetic_inchworm_odometry_ekf_v2.py), [gait_phase_ekf_v2.py](use_numpy/gait_phase_ekf_v2.py)): class-based versions of those scripts. Each recursive filter is a class with `predict`, `update` (not in `inchworm_two_pad_ekf_v2.py` and `inchworm_two_pad_fusion_ekf_v2.py`) and `get_state` (`get_estimate` in `gait_phase_ekf_v2.py`) methods, the ZUPT, ZUPT+ZARU and slip-gate inchworm classes adding `measurement_update_*` methods and the two two-pad ones `update_closure` instead; most also have `step`, and their `run_*` function is a short loop over `step()` (`eskf_imu_position_fix_v2.py`'s `ESKF` and `QEKF`, `invariant_saltation_ekf_v2.py`'s `Filter`, `magnetic_inchworm_odometry_ekf_v2.py`'s `MagneticInchwormEKF` and `gait_phase_ekf_v2.py`'s `PhaseEKF` have no `step`; their `run_*` functions, `starts_phase_ekf` for `PhaseEKF`, call `predict` and `update` directly); `pointcloud_pose_tracking_v2.py`'s batch Gauss-Newton smoother is a `BatchGNSmoother` class instead (`linearize` with one method per factor type, `retract`, `solve`). Everything else is unchanged: same command-line flags, outputs bit-identical to the original. `tests/` and `generator/make_figures.py` use the originals.
 
-### [use_manif/](use_manif/) - `manifpy` counterparts (11 of the 35 simulation scripts)
+### [use_manif/](use_manif/) - `manifpy` counterparts (11 of the 36 simulation scripts)
 
-The other 24 scripts are NumPy-only:
+The other 25 scripts are NumPy-only:
 - `bayes_tree_construction.py`: pure index/graph bookkeeping, so the result is structurally identical in either backend.
 - `saltation_matrix_ekf.py`, `inchworm_zupt_ekf.py`, `inchworm_slip_gate_ekf.py`, `inchworm_slip_imm.py`, `friction_anisotropic_ekf.py`, `hexapod_gait_ekf.py`, `gait_phase_ekf.py`, `gait_phase_torque_ekf.py`, `rts_smoother.py`: plain Euclidean states (no manifold question).
 - `inchworm_zupt_zaru_ekf.py`, `inchworm_two_pad_ekf.py`, `inchworm_two_pad_fusion_ekf.py`, `skid_steer_odometry_ekf.py`, `magnetic_inchworm_odometry_ekf.py`, `observability_fej.py`: plain vector states whose heading is a wrapped scalar angle (no manifold group helpers).
@@ -127,6 +129,7 @@ The other 24 scripts are NumPy-only:
 - `hexapod_joint_kinematics_inekf.py`, `hexapod_redundant_leg_inekf.py`, `hexapod_camera_fusion_inekf.py`: build on `hexapod_contact_inekf.py`'s filter, for the same reason.
 - `eskf_imu_position_fix.py`: no `use_manif/` counterpart yet.
 - `imu_allan_variance.py`: scalar IMU axes (no manifold question); its ESKF part reuses `eskf_imu_position_fix.py`.
+- `particle_filter_localization.py`: a scalar position (no manifold question).
 
 - [manif_utils.py](use_manif/manif_utils.py): manif versions of `camera_project` and `pose_errors`, shared by `bundle_adjustment.py`, `bundle_adjustment_advanced.py`, `pointcloud_pose_tracking.py`, `pose_graph.py` and `pose_graph_robust.py`.
 - [imu_integration_comparison.py](use_manif/imu_integration_comparison.py)
@@ -144,7 +147,7 @@ The other 24 scripts are NumPy-only:
 ### [generator/](generator/) - Scripts that draw the figures, GIFs and SVGs
 
 - [make_figures.py](generator/make_figures.py): one illustrative PNG per simulation in `assets/`, from the simulations' own output (same defaults, seed and draw order as each script's `main()`, so the numbers match what the script prints); `uv run python generator/make_figures.py [name]`.
-- `animate_*.py` ([animate_saltation_ekf.py](generator/animate_saltation_ekf.py), [animate_inchworm_zupt_ekf.py](generator/animate_inchworm_zupt_ekf.py), [animate_inchworm_zupt_zaru_ekf.py](generator/animate_inchworm_zupt_zaru_ekf.py), [animate_inchworm_slip_gate_ekf.py](generator/animate_inchworm_slip_gate_ekf.py), [animate_inchworm_two_pad_ekf.py](generator/animate_inchworm_two_pad_ekf.py), [animate_inchworm_two_pad_fusion_ekf.py](generator/animate_inchworm_two_pad_fusion_ekf.py), [animate_friction_anisotropic_ekf.py](generator/animate_friction_anisotropic_ekf.py), [animate_bundle_adjustment.py](generator/animate_bundle_adjustment.py), [animate_sliding_window_marginalization.py](generator/animate_sliding_window_marginalization.py), [animate_invariant_saltation_ekf.py](generator/animate_invariant_saltation_ekf.py), [animate_hexapod_gait_ekf.py](generator/animate_hexapod_gait_ekf.py), [animate_gait_phase_ekf.py](generator/animate_gait_phase_ekf.py), [animate_hexapod_contact_inekf.py](generator/animate_hexapod_contact_inekf.py), [animate_hexapod_joint_kinematics_inekf.py](generator/animate_hexapod_joint_kinematics_inekf.py), [animate_gait_phase_torque_ekf.py](generator/animate_gait_phase_torque_ekf.py), [animate_hexapod_redundant_leg_inekf.py](generator/animate_hexapod_redundant_leg_inekf.py), [animate_hexapod_camera_fusion_inekf.py](generator/animate_hexapod_camera_fusion_inekf.py), [animate_skid_steer_odometry_ekf.py](generator/animate_skid_steer_odometry_ekf.py), [animate_magnetic_inchworm_odometry_ekf.py](generator/animate_magnetic_inchworm_odometry_ekf.py), [animate_imu_integration_comparison.py](generator/animate_imu_integration_comparison.py), [animate_pose_graph.py](generator/animate_pose_graph.py), [animate_bundle_adjustment_advanced.py](generator/animate_bundle_adjustment_advanced.py), [animate_sparse_cholesky_fill_in.py](generator/animate_sparse_cholesky_fill_in.py), [animate_lidar_primitives.py](generator/animate_lidar_primitives.py), [animate_inchworm_slip_imm.py](generator/animate_inchworm_slip_imm.py), [animate_pose_graph_robust.py](generator/animate_pose_graph_robust.py), [animate_imu_allan_variance.py](generator/animate_imu_allan_variance.py), [animate_observability_fej.py](generator/animate_observability_fej.py), [animate_rts_smoother.py](generator/animate_rts_smoother.py)): each re-runs one simulation's default case and writes an animated GIF (the simulated system itself plus the quantity that separates the methods, e.g. reported uncertainty or NEES). The GIFs live in `assets/` and are embedded in the matching doc next to its static figure. They import the simulation's own functions from the installed package, `state_estimation_simulations.use_numpy` (the saltation one uses `saltation_matrix_ekf_v2.py`'s `HybridEKF`), take its scene/noise flags plus `--fps` and `--out` (and `--dpi`, except `animate_lidar_primitives.py`; `animate_pose_graph_robust.py` writes to `--gif-out`, since the simulation's `--out` (the figure) is among the flags it takes), and need no `ffmpeg` (matplotlib's Pillow writer). The four earlier inchworm ones, the slip-IMM one, the RTS-smoother one and the friction one re-run the 500-trial Monte Carlo and the invariant-saltation one the 200-trial one, about 1-1.5 min each; the two-pad fusion one re-runs a 300-trial Monte Carlo (about 2 min); the hexapod gait one animates a single run with the slip switched on (about 40 s), the gait phase one a single run (about 30 s), and the contact-aided InEKF one a single run with a 0.1 rad initial rotation error (seed 4, about 50 s). The joint-encoder one animates a single run at 2° joint offsets (seed 6, about 40 s), the torque-contact one one leg's window of a single run (seed 0, about 45 s), the redundant-leg one the first trial of its 2° case (seed 103, about 45 s), the camera-fusion one a single experiment-2 run with one pose jump and one dropout (seed 2), the skid-steer one a single run at a true ICR coefficient of 1.25 (seed 0, about 1 min), the magnetic-inchworm one the first trial of its experiment 1 (seed 0, about 45 s), the IMU-integration one the 20 s default run (seed 0, about 35 s; its copied loop is checked equal to `run_simulation`'s), the pose-graph one the default 4-pose loop iteration by iteration (seed 0, about 30 s), the robust pose-graph one a single run with 20% false closures, `l2` next to `cauchy`, iteration by iteration (seed 0, about 25 s), the Allan-variance one a 1 h static record built up over 45 record lengths (seed 0, about 35 s), the observability one the 50-trial Monte Carlo of the simulation's default run (seed 0, about 80 s), the Local-BA one the Local-only run keyframe by keyframe (seed 0, about 25 s), and the sparse-Cholesky one the fill-in of the bundle-adjustment scene of [sparse_cholesky_factorization.md](docs/optimization/sparse_cholesky_factorization.md) §5 under three orders (seed 0, about 30 s; not a simulation run). Six more run no simulation: [animate_left_right_invariant.py](generator/animate_left_right_invariant.py) and [animate_left_right_invariant_angular_velocity.py](generator/animate_left_right_invariant_angular_velocity.py) animate the frame-change pictures of [left_right_invariant.md](docs/filtering/left_right_invariant.md) §3 and §3.1 (a few seconds each); [animate_quaternion_double_cover.py](generator/animate_quaternion_double_cover.py) turns a box through 720° for [quaternion.md](docs/foundations/quaternion.md) §10 (exact math); [animate_kf_predict_update.py](generator/animate_kf_predict_update.py) repeats the 1D predict/update example of [kf_ekf_iekf.md](docs/filtering/kf_ekf_iekf.md) §1 (cycle 1 is the doc's example, later cycles illustrative); [animate_triangulation_baseline.py](generator/animate_triangulation_baseline.py) shrinks the stereo baseline of [triangulation_pnp.md](docs/frontend/triangulation_pnp.md) §2 (2000 `triangulate_landmark` solves per baseline, about 10 s); [animate_ekf_linearization.py](generator/animate_ekf_linearization.py) sweeps the heading uncertainty of [jacobian.md](docs/foundations/jacobian.md) §6 from 1° to 40° (the static figure's 200 000 draws, about 10 s). `tests/` does not cover them.
+- `animate_*.py` ([animate_saltation_ekf.py](generator/animate_saltation_ekf.py), [animate_inchworm_zupt_ekf.py](generator/animate_inchworm_zupt_ekf.py), [animate_inchworm_zupt_zaru_ekf.py](generator/animate_inchworm_zupt_zaru_ekf.py), [animate_inchworm_slip_gate_ekf.py](generator/animate_inchworm_slip_gate_ekf.py), [animate_inchworm_two_pad_ekf.py](generator/animate_inchworm_two_pad_ekf.py), [animate_inchworm_two_pad_fusion_ekf.py](generator/animate_inchworm_two_pad_fusion_ekf.py), [animate_friction_anisotropic_ekf.py](generator/animate_friction_anisotropic_ekf.py), [animate_bundle_adjustment.py](generator/animate_bundle_adjustment.py), [animate_sliding_window_marginalization.py](generator/animate_sliding_window_marginalization.py), [animate_invariant_saltation_ekf.py](generator/animate_invariant_saltation_ekf.py), [animate_hexapod_gait_ekf.py](generator/animate_hexapod_gait_ekf.py), [animate_gait_phase_ekf.py](generator/animate_gait_phase_ekf.py), [animate_hexapod_contact_inekf.py](generator/animate_hexapod_contact_inekf.py), [animate_hexapod_joint_kinematics_inekf.py](generator/animate_hexapod_joint_kinematics_inekf.py), [animate_gait_phase_torque_ekf.py](generator/animate_gait_phase_torque_ekf.py), [animate_hexapod_redundant_leg_inekf.py](generator/animate_hexapod_redundant_leg_inekf.py), [animate_hexapod_camera_fusion_inekf.py](generator/animate_hexapod_camera_fusion_inekf.py), [animate_skid_steer_odometry_ekf.py](generator/animate_skid_steer_odometry_ekf.py), [animate_magnetic_inchworm_odometry_ekf.py](generator/animate_magnetic_inchworm_odometry_ekf.py), [animate_imu_integration_comparison.py](generator/animate_imu_integration_comparison.py), [animate_pose_graph.py](generator/animate_pose_graph.py), [animate_bundle_adjustment_advanced.py](generator/animate_bundle_adjustment_advanced.py), [animate_sparse_cholesky_fill_in.py](generator/animate_sparse_cholesky_fill_in.py), [animate_lidar_primitives.py](generator/animate_lidar_primitives.py), [animate_inchworm_slip_imm.py](generator/animate_inchworm_slip_imm.py), [animate_pose_graph_robust.py](generator/animate_pose_graph_robust.py), [animate_imu_allan_variance.py](generator/animate_imu_allan_variance.py), [animate_observability_fej.py](generator/animate_observability_fej.py), [animate_rts_smoother.py](generator/animate_rts_smoother.py), [animate_particle_filter_localization.py](generator/animate_particle_filter_localization.py)): each re-runs one simulation's default case and writes an animated GIF (the simulated system itself plus the quantity that separates the methods, e.g. reported uncertainty or NEES). The GIFs live in `assets/` and are embedded in the matching doc next to its static figure. They import the simulation's own functions from the installed package, `state_estimation_simulations.use_numpy` (the saltation one uses `saltation_matrix_ekf_v2.py`'s `HybridEKF`), take its scene/noise flags plus `--fps` and `--out` (and `--dpi`, except `animate_lidar_primitives.py`; `animate_pose_graph_robust.py` writes to `--gif-out`, since the simulation's `--out` (the figure) is among the flags it takes), and need no `ffmpeg` (matplotlib's Pillow writer). The four earlier inchworm ones, the slip-IMM one, the RTS-smoother one and the friction one re-run the 500-trial Monte Carlo and the invariant-saltation one the 200-trial one, about 1-1.5 min each; the two-pad fusion one re-runs a 300-trial Monte Carlo (about 2 min); the hexapod gait one animates a single run with the slip switched on (about 40 s), the gait phase one a single run (about 30 s), and the contact-aided InEKF one a single run with a 0.1 rad initial rotation error (seed 4, about 50 s). The joint-encoder one animates a single run at 2° joint offsets (seed 6, about 40 s), the torque-contact one one leg's window of a single run (seed 0, about 45 s), the redundant-leg one the first trial of its 2° case (seed 103, about 45 s), the camera-fusion one a single experiment-2 run with one pose jump and one dropout (seed 2), the skid-steer one a single run at a true ICR coefficient of 1.25 (seed 0, about 1 min), the magnetic-inchworm one the first trial of its experiment 1 (seed 0, about 45 s), the IMU-integration one the 20 s default run (seed 0, about 35 s; its copied loop is checked equal to `run_simulation`'s), the pose-graph one the default 4-pose loop iteration by iteration (seed 0, about 30 s), the robust pose-graph one a single run with 20% false closures, `l2` next to `cauchy`, iteration by iteration (seed 0, about 25 s), the Allan-variance one a 1 h static record built up over 45 record lengths (seed 0, about 35 s), the observability one the 50-trial Monte Carlo of the simulation's default run (seed 0, about 80 s), the Local-BA one the Local-only run keyframe by keyframe (seed 0, about 25 s), the particle-filter one trial 0 of the default case next to the 400-trial Monte Carlo (seed 0, about 25 s), and the sparse-Cholesky one the fill-in of the bundle-adjustment scene of [sparse_cholesky_factorization.md](docs/optimization/sparse_cholesky_factorization.md) §5 under three orders (seed 0, about 30 s; not a simulation run). Six more run no simulation: [animate_left_right_invariant.py](generator/animate_left_right_invariant.py) and [animate_left_right_invariant_angular_velocity.py](generator/animate_left_right_invariant_angular_velocity.py) animate the frame-change pictures of [left_right_invariant.md](docs/filtering/left_right_invariant.md) §3 and §3.1 (a few seconds each); [animate_quaternion_double_cover.py](generator/animate_quaternion_double_cover.py) turns a box through 720° for [quaternion.md](docs/foundations/quaternion.md) §10 (exact math); [animate_kf_predict_update.py](generator/animate_kf_predict_update.py) repeats the 1D predict/update example of [kf_ekf_iekf.md](docs/filtering/kf_ekf_iekf.md) §1 (cycle 1 is the doc's example, later cycles illustrative); [animate_triangulation_baseline.py](generator/animate_triangulation_baseline.py) shrinks the stereo baseline of [triangulation_pnp.md](docs/frontend/triangulation_pnp.md) §2 (2000 `triangulate_landmark` solves per baseline, about 10 s); [animate_ekf_linearization.py](generator/animate_ekf_linearization.py) sweeps the heading uncertainty of [jacobian.md](docs/foundations/jacobian.md) §6 from 1° to 40° (the static figure's 200 000 draws, about 10 s). `tests/` does not cover them.
 - [make_frontend_backend_svgs.py](generator/make_frontend_backend_svgs.py): draws the two figures of [docs/frontend_backend.md](docs/frontend_backend.md) (`docs/images/frontend_backend.svg` and `frontend_backend_loop_closure.svg`); every label fits its box in the widest fallback font, checked when the script runs.
 - [make_factor_graph_svgs.py](generator/make_factor_graph_svgs.py): draws the two figures of [docs/optimization/factor_graph.md](docs/optimization/factor_graph.md) (`docs/images/factor_graph.svg` and `factor_graph_vs_pose_graph.svg`); same label-fit check as above.
 - [make_banner_svg.py](generator/make_banner_svg.py): draws `assets/banner.svg`, the banner at the top of this README.
@@ -190,7 +193,7 @@ for f in $(find tests -name 'test_*.py' | sort); do uv run pytest -q "$f"; done
 
 ## E. Simulations
 
-33 simulations in five groups. Each entry says what the simulation does, lists its scripts, and gives a command that runs it at its defaults; the full flag list is folded under **All flags**.
+34 simulations in five groups. Each entry says what the simulation does, lists its scripts, and gives a command that runs it at its defaults; the full flag list is folded under **All flags**.
 
 | Group | # | Simulation | What it shows | `use_manif/` twin | Doc |
 |---|---|---|---|---|---|
@@ -201,32 +204,33 @@ for f in $(find tests -name 'test_*.py' | sort); do uv run pytest -q "$f"; done
 | **Kalman filtering** | 5 | [Point-cloud pose tracking](#5-point-cloud-pose-tracking-ekf-vs-invariant-ekf-vs-batch-gauss-newton-vs-ukf-vs-vanilla-kf) | EKF, invariant EKF, UKF, vanilla KF and batch Gauss-Newton on the same $`SE(3)`$ tracking problem | yes | [pointcloud_pose_tracking_empirical_note.md](docs/filtering/pointcloud_pose_tracking_empirical_note.md) |
 |  | 6 | [Error-state Kalman filter](#6-error-state-kalman-filter-eskf-vs-a-quaternion-in-the-state) | An IMU-driven ESKF with a position fix, against the same filter without bias states and an EKF with a quaternion in its state |  | [eskf.md](docs/filtering/eskf.md) |
 |  | 7 | [EKF-SLAM observability](#7-ekf-slam-observability-standard-ekf-vs-fej-vs-invariant-ekf) | A standard EKF-SLAM gains information along the global rotation, which no measurement can determine; FEJ and the invariant EKF do not |  | [observability.md](docs/foundations/observability.md) |
-| **Front-end** | 8 | [Perspective-n-Point (PnP)](#8-perspective-n-point-pnp-recovering-a-camera-pose-from-known-3d-2d-correspondences) | A camera pose from known 3D-2D correspondences: closed form, then Gauss-Newton |  | [triangulation_pnp.md](docs/frontend/triangulation_pnp.md) |
-|  | 9 | [LiDAR primitives](#9-lidar-primitives-planes-and-cylinders-for-scan-registration) | Point-to-point vs. point-to-plane ICP against fitted planes and cylinders, and a corridor's degeneracy | yes | [lidar_primitives.md](docs/frontend/lidar_primitives.md) |
-| **Factor graphs and smoothing** | 10 | [RTS smoother](#10-rts-smoother-a-kalman-filter-its-smoother-and-batch-least-squares-on-one-data-set) | A Kalman filter's backward RTS pass compared with the filter and with batch least squares on the same data |  | [filtering_smoothing.md](docs/filtering_smoothing.md#the-same-picture-with-numbers-a-kalman-filter-and-its-rts-smoother-on-one-data-set) |
-|  | 11 | [3D pose graph](#11-3d-pose-graph-relaxation) | Odometry drift corrected by a loop closure, with gauge fixing | yes | [pose_graph_optimization.md](docs/optimization/pose_graph_optimization.md) |
-|  | 12 | [3D pose graph with false loop closures](#12-3d-pose-graph-with-false-loop-closures-plain-least-squares-vs-robust-kernels) | Plain least squares vs. Huber, Cauchy and DCS kernels as the false-closure fraction grows | yes | [robust_pose_graph.md](docs/optimization/robust_pose_graph.md) |
-|  | 13 | [Bundle adjustment](#13-bundle-adjustment-joint-pose--landmark-refinement) | Landmarks-only and poses-only refinement vs. joint refinement | yes | [bundle_adjustment.md](docs/optimization/bundle_adjustment.md) |
-|  | 14 | [Local + Global bundle adjustment](#14-local--global-bundle-adjustment-bounded-windows-vs-whole-map-re-solves) | Bounded local windows plus periodic whole-map passes | yes | [bundle_adjustment.md](docs/optimization/bundle_adjustment.md) |
-|  | 15 | [Incremental vs. batch pose graph](#15-incremental-square-root-sam-vs-batch-pose-graph-solving) | Square-root SAM updates vs. re-solving the whole graph at every new node | yes | [isam_optimization.md](docs/optimization/isam_optimization.md) |
-|  | 16 | [Bayes tree affected region](#16-bayes-tree-construction-and-affected-region-query) | Which variables a new edge invalidates: a loop closure vs. an ordinary edge |  | [bayes_tree.md](docs/optimization/bayes_tree.md) |
-|  | 17 | [Sliding-window marginalization](#17-sliding-window-marginalization-bounded-memory-pose-graph-smoothing) | A bounded window kept by the Schur complement vs. an unbounded re-solve |  | [marginalization.md](docs/optimization/marginalization.md) |
-| **Non-smooth, legged and wheeled motion** | 18 | [Saltation-matrix EKF](#18-saltation-matrix-ekf-tracking-a-point-mass-through-discrete-ground-contact-events) | Carrying a point mass's covariance through a bounce |  | [hybrid_saltation_ekf.md](docs/filtering/hybrid_saltation_ekf.md) |
-|  | 19 | [Invariant EKF through a bounce](#19-invariant-ekf-on-se_23-through-a-bounce) | The same bounce with a right-invariant EKF on $`SE_2(3)`$ | yes | [invariant_saltation_ekf.md](docs/filtering/invariant_saltation_ekf.md) |
-|  | 20 | [Inchworm ZUPT](#20-inchworm-zupt-exploiting-a-known-anchordwell-schedule) | Zero-velocity updates on a known anchor schedule: at the right ticks, always, or never |  | [inchworm_zupt_ekf.md](docs/filtering/inchworm_zupt_ekf.md) |
-|  | 21 | [Inchworm anchor slip, IMM](#21-inchworm-anchor-slip-an-imm-instead-of-a-hard-gate) | A probability for "still" and "moving" instead of a hard ZUPT gate, with and without the pad sensor |  | [inchworm_slip_imm.md](docs/filtering/inchworm_slip_imm.md) |
-|  | 22 | [Two-pad inchworm](#22-two-pad-inchworm-trusting-the-anchored-pad-without-a-position-fix) | No position fix: fusing the anchored pad's measured displacement keeps the estimate accurate through slips |  | [inchworm_two_pad_ekf.md](docs/filtering/inchworm_two_pad_ekf.md) |
-|  | 23 | [Two-pad inchworm, both sensors](#23-two-pad-inchworm-reading-both-pad-sensors) | Cross-checking the two pad sensors before fusing removes most sensor faults |  | [inchworm_two_pad_fusion_ekf.md](docs/filtering/inchworm_two_pad_fusion_ekf.md) |
-|  | 24 | [Friction-anisotropic process noise](#24-friction-anisotropic-process-noise-fixed-vs-heading-aware-q) | Fixed vs. heading-aware process noise for a pad that slips more sideways than forward |  | [friction_anisotropic_ekf.md](docs/filtering/friction_anisotropic_ekf.md) |
-|  | 25 | [Hexapod leg odometry](#25-hexapod-leg-odometry-what-the-gait-changes) | Stance feet as velocity sensors: what the gait changes, and a per-foot slip test |  | [hexapod_gait_ekf.md](docs/filtering/hexapod_gait_ekf.md) |
-|  | 26 | [Contact-aided invariant EKF](#26-contact-aided-invariant-ekf-on-a-hexapod-which-filter-knows-yaw-is-unobservable) | Stance feet in the state; only the invariant EKF keeps yaw unobservable |  | [hexapod_contact_inekf.md](docs/filtering/hexapod_contact_inekf.md) |
-|  | 27 | [Gait phase](#27-gait-phase-which-feet-are-on-the-ground-when-touchdowns-are-uncertain) | Which feet to read when touchdowns are late, or detectors fire falsely |  | [gait_phase_ekf.md](docs/filtering/gait_phase_ekf.md) |
-|  | 28 | [Joint-encoder kinematics](#28-joint-encoders-on-an-18-dof-hexapod-when-the-leg-kinematics-noise-model-matters) | HEBI Daisy's 18-DOF legs: the noise model's shape barely matters, fixed joint offsets do |  | [hexapod_joint_kinematics_inekf.md](docs/filtering/hexapod_joint_kinematics_inekf.md) |
-|  | 29 | [Torque contact detection](#29-torque-based-contact-detection-what-decides-it-and-when-the-gait-phase-helps) | A joint-torque detector as a signal: model error and load ramp decide it, the gait-phase filter fixes its false triggers |  | [gait_phase_torque_ekf.md](docs/filtering/gait_phase_torque_ekf.md) |
-|  | 30 | [Four joints per leg](#30-four-joints-per-leg-which-joint-offsets-a-walking-hexapod-can-learn) | HAntR's redundant legs: the null-direction offset is mostly learned while walking, the femur and tibia offsets are not |  | [hexapod_redundant_leg_inekf.md](docs/filtering/hexapod_redundant_leg_inekf.md) |
-|  | 31 | [Legs + tracking camera](#31-legs-plus-a-tracking-camera-how-to-use-a-pose-that-drifts) | A drifting camera pose as world pose is badly overconfident; its drift as states halves the position error and stays consistent through a position jump; a late reading needs its delay told to the filter or estimated |  | [hexapod_camera_fusion_inekf.md](docs/filtering/hexapod_camera_fusion_inekf.md) |
-|  | 32 | [Skid-steer wheel odometry](#32-skid-steer-wheel-odometry-slip-as-a-filter-state) | A wrong slip coefficient throws wheel odometry off by meters, and a wheels + gyro EKF keeps the error; with the coefficient as a state, it is learned in one turn |  | [skid_steer_odometry_ekf.md](docs/filtering/skid_steer_odometry_ekf.md) |
-|  | 33 | [Magnetic climbing inchworm](#33-magnetic-climbing-inchworm-odometry-that-cannot-see-the-slide) | Servo odometry cannot see a holding pad slide on a wall; one-sided slides are not noise, and only an outside fix bounds the error, and a slide-bias state keeps the filter from becoming overconfident |  | [magnetic_inchworm_odometry_ekf.md](docs/filtering/magnetic_inchworm_odometry_ekf.md) |
+|  | 8 | [Particle filter localization](#8-particle-filter-localization-several-hills-against-one-hill) | An unknown start among look-alike doors: a particle filter can hold one hypothesis per door, an EKF and a UKF hold one in all | | [particle_filter.md](docs/filtering/particle_filter.md) |
+| **Front-end** | 9 | [Perspective-n-Point (PnP)](#9-perspective-n-point-pnp-recovering-a-camera-pose-from-known-3d-2d-correspondences) | A camera pose from known 3D-2D correspondences: closed form, then Gauss-Newton |  | [triangulation_pnp.md](docs/frontend/triangulation_pnp.md) |
+|  | 10 | [LiDAR primitives](#10-lidar-primitives-planes-and-cylinders-for-scan-registration) | Point-to-point vs. point-to-plane ICP against fitted planes and cylinders, and a corridor's degeneracy | yes | [lidar_primitives.md](docs/frontend/lidar_primitives.md) |
+| **Factor graphs and smoothing** | 11 | [RTS smoother](#11-rts-smoother-a-kalman-filter-its-smoother-and-batch-least-squares-on-one-data-set) | A Kalman filter's backward RTS pass compared with the filter and with batch least squares on the same data |  | [filtering_smoothing.md](docs/filtering_smoothing.md#the-same-picture-with-numbers-a-kalman-filter-and-its-rts-smoother-on-one-data-set) |
+|  | 12 | [3D pose graph](#12-3d-pose-graph-relaxation) | Odometry drift corrected by a loop closure, with gauge fixing | yes | [pose_graph_optimization.md](docs/optimization/pose_graph_optimization.md) |
+|  | 13 | [3D pose graph with false loop closures](#13-3d-pose-graph-with-false-loop-closures-plain-least-squares-vs-robust-kernels) | Plain least squares vs. Huber, Cauchy and DCS kernels as the false-closure fraction grows | yes | [robust_pose_graph.md](docs/optimization/robust_pose_graph.md) |
+|  | 14 | [Bundle adjustment](#14-bundle-adjustment-joint-pose--landmark-refinement) | Landmarks-only and poses-only refinement vs. joint refinement | yes | [bundle_adjustment.md](docs/optimization/bundle_adjustment.md) |
+|  | 15 | [Local + Global bundle adjustment](#15-local--global-bundle-adjustment-bounded-windows-vs-whole-map-re-solves) | Bounded local windows plus periodic whole-map passes | yes | [bundle_adjustment.md](docs/optimization/bundle_adjustment.md) |
+|  | 16 | [Incremental vs. batch pose graph](#16-incremental-square-root-sam-vs-batch-pose-graph-solving) | Square-root SAM updates vs. re-solving the whole graph at every new node | yes | [isam_optimization.md](docs/optimization/isam_optimization.md) |
+|  | 17 | [Bayes tree affected region](#17-bayes-tree-construction-and-affected-region-query) | Which variables a new edge invalidates: a loop closure vs. an ordinary edge |  | [bayes_tree.md](docs/optimization/bayes_tree.md) |
+|  | 18 | [Sliding-window marginalization](#18-sliding-window-marginalization-bounded-memory-pose-graph-smoothing) | A bounded window kept by the Schur complement vs. an unbounded re-solve |  | [marginalization.md](docs/optimization/marginalization.md) |
+| **Non-smooth, legged and wheeled motion** | 19 | [Saltation-matrix EKF](#19-saltation-matrix-ekf-tracking-a-point-mass-through-discrete-ground-contact-events) | Carrying a point mass's covariance through a bounce |  | [hybrid_saltation_ekf.md](docs/filtering/hybrid_saltation_ekf.md) |
+|  | 20 | [Invariant EKF through a bounce](#20-invariant-ekf-on-se_23-through-a-bounce) | The same bounce with a right-invariant EKF on $`SE_2(3)`$ | yes | [invariant_saltation_ekf.md](docs/filtering/invariant_saltation_ekf.md) |
+|  | 21 | [Inchworm ZUPT](#21-inchworm-zupt-exploiting-a-known-anchordwell-schedule) | Zero-velocity updates on a known anchor schedule: at the right ticks, always, or never |  | [inchworm_zupt_ekf.md](docs/filtering/inchworm_zupt_ekf.md) |
+|  | 22 | [Inchworm anchor slip, IMM](#22-inchworm-anchor-slip-an-imm-instead-of-a-hard-gate) | A probability for "still" and "moving" instead of a hard ZUPT gate, with and without the pad sensor |  | [inchworm_slip_imm.md](docs/filtering/inchworm_slip_imm.md) |
+|  | 23 | [Two-pad inchworm](#23-two-pad-inchworm-trusting-the-anchored-pad-without-a-position-fix) | No position fix: fusing the anchored pad's measured displacement keeps the estimate accurate through slips |  | [inchworm_two_pad_ekf.md](docs/filtering/inchworm_two_pad_ekf.md) |
+|  | 24 | [Two-pad inchworm, both sensors](#24-two-pad-inchworm-reading-both-pad-sensors) | Cross-checking the two pad sensors before fusing removes most sensor faults |  | [inchworm_two_pad_fusion_ekf.md](docs/filtering/inchworm_two_pad_fusion_ekf.md) |
+|  | 25 | [Friction-anisotropic process noise](#25-friction-anisotropic-process-noise-fixed-vs-heading-aware-q) | Fixed vs. heading-aware process noise for a pad that slips more sideways than forward |  | [friction_anisotropic_ekf.md](docs/filtering/friction_anisotropic_ekf.md) |
+|  | 26 | [Hexapod leg odometry](#26-hexapod-leg-odometry-what-the-gait-changes) | Stance feet as velocity sensors: what the gait changes, and a per-foot slip test |  | [hexapod_gait_ekf.md](docs/filtering/hexapod_gait_ekf.md) |
+|  | 27 | [Contact-aided invariant EKF](#27-contact-aided-invariant-ekf-on-a-hexapod-which-filter-knows-yaw-is-unobservable) | Stance feet in the state; only the invariant EKF keeps yaw unobservable |  | [hexapod_contact_inekf.md](docs/filtering/hexapod_contact_inekf.md) |
+|  | 28 | [Gait phase](#28-gait-phase-which-feet-are-on-the-ground-when-touchdowns-are-uncertain) | Which feet to read when touchdowns are late, or detectors fire falsely |  | [gait_phase_ekf.md](docs/filtering/gait_phase_ekf.md) |
+|  | 29 | [Joint-encoder kinematics](#29-joint-encoders-on-an-18-dof-hexapod-when-the-leg-kinematics-noise-model-matters) | HEBI Daisy's 18-DOF legs: the noise model's shape barely matters, fixed joint offsets do |  | [hexapod_joint_kinematics_inekf.md](docs/filtering/hexapod_joint_kinematics_inekf.md) |
+|  | 30 | [Torque contact detection](#30-torque-based-contact-detection-what-decides-it-and-when-the-gait-phase-helps) | A joint-torque detector as a signal: model error and load ramp decide it, the gait-phase filter fixes its false triggers |  | [gait_phase_torque_ekf.md](docs/filtering/gait_phase_torque_ekf.md) |
+|  | 31 | [Four joints per leg](#31-four-joints-per-leg-which-joint-offsets-a-walking-hexapod-can-learn) | HAntR's redundant legs: the null-direction offset is mostly learned while walking, the femur and tibia offsets are not |  | [hexapod_redundant_leg_inekf.md](docs/filtering/hexapod_redundant_leg_inekf.md) |
+|  | 32 | [Legs + tracking camera](#32-legs-plus-a-tracking-camera-how-to-use-a-pose-that-drifts) | A drifting camera pose as world pose is badly overconfident; its drift as states halves the position error and stays consistent through a position jump; a late reading needs its delay told to the filter or estimated |  | [hexapod_camera_fusion_inekf.md](docs/filtering/hexapod_camera_fusion_inekf.md) |
+|  | 33 | [Skid-steer wheel odometry](#33-skid-steer-wheel-odometry-slip-as-a-filter-state) | A wrong slip coefficient throws wheel odometry off by meters, and a wheels + gyro EKF keeps the error; with the coefficient as a state, it is learned in one turn |  | [skid_steer_odometry_ekf.md](docs/filtering/skid_steer_odometry_ekf.md) |
+|  | 34 | [Magnetic climbing inchworm](#34-magnetic-climbing-inchworm-odometry-that-cannot-see-the-slide) | Servo odometry cannot see a holding pad slide on a wall; one-sided slides are not noise, and only an outside fix bounds the error, and a slide-bias state keeps the filter from becoming overconfident |  | [magnetic_inchworm_odometry_ekf.md](docs/filtering/magnetic_inchworm_odometry_ekf.md) |
 
 ### IMU and manifolds
 
@@ -539,9 +543,65 @@ uv run python use_numpy/observability_fej.py --out out.png
 
 </details>
 
+#### 8. Particle filter localization: several hills against one hill
+
+**Purpose:** Shows what a one-Gaussian filter cannot hold. A robot with an odometer and a door-profile sensor starts at an unknown position in a corridor of look-alike doors (global localization), and a particle filter, an EKF and a UKF estimate where it is from the same data. It also sweeps the particle count, sensor noise, door width, motion noise, resampling rule, and door layout, and runs a known-start check and a maximum-likelihood-association variant.
+
+| Input | Output |
+|---|---|
+| A 30 m corridor with five doors; 48 steps of commanded odometry (0.5 s at 0.5 m/s) and one scalar door-profile reading per step; the start drawn uniformly over the first 18 m; 400 Monte Carlo trials | Prints, per filter, the final RMSE, median error, wrong-door rate and [NEES](docs/glossary.md#consistency-and-nees) with its 95% bound, the particle filter's effective sample size and time to one hill, and time and memory per step; plots belief snapshots of one trial and the wrong-door fraction, NEES and effective sample size over time |
+
+| Filter | Meaning |
+|---|---|
+| **PF** | 1000 weighted particles: each moved by the motion model, weighted by the reading, resampled when $`N_{\text{eff}} < N/2`$ |
+| **EKF** | One Gaussian; the sensor linearized at the predicted mean |
+| **UKF** | One Gaussian; the sensor evaluated at sigma points |
+| `EKF-ML`, `UKF-ML` (`--ml-variant`) | The textbook maximum-likelihood door association; it needs a different sensor, so it is a labeled variant |
+
+**Details:** [particle_filter.md](docs/filtering/particle_filter.md)
+
+![Eight panels from particle_filter_localization.py: four belief snapshots of one example trial at 0, 4, 8 and 24 s, the particles of that trial over time, the wrong-door fraction over time, the NEES over time, and the effective sample size](assets/particle_filter_localization.png)
+
+Figure written by the script's own `--out` at the defaults (seed 0).
+
+**Scripts:**
+
+- [use_numpy/particle_filter_localization.py](use_numpy/particle_filter_localization.py)
+- [generator/animate_particle_filter_localization.py](generator/animate_particle_filter_localization.py): animated GIF; render with `uv run python generator/animate_particle_filter_localization.py --out assets/particle_filter_localization.gif`
+
+**Run** (about 6 s):
+
+```
+uv run python use_numpy/particle_filter_localization.py --ml-variant --out out.png
+```
+
+Each sweep runs only when named, e.g., `--sweep particles` (also `width`, `sigma_z`, `motion`, `resample`, `layout`; repeatable); all six together take about 90 s.
+
+<details>
+<summary>All flags</summary>
+
+- `--seed`, `--trials`: RNG seed and Monte Carlo trials (defaults `0`, `400`)
+- `--corridor-length`, `--doors`: corridor length m and door positions m (defaults `30.0`, `3 7 12 18 25`)
+- `--door-width`, `--sensor-noise`: profile bump width (std-dev of each door's Gaussian bump) m and sensor noise std-dev, with the profile height 1 (defaults `0.3`, `0.1`)
+- `--speed`, `--dt`, `--steps`: commanded speed m/s, step interval s and number of steps (defaults `0.5`, `0.5`, `48`)
+- `--motion-noise-factor`, `--motion-noise-floor`: motion noise per metre travelled m/m and independent of travel m per step (defaults `0.05`, `0.01`)
+- `--particles`: number of particles (default `1000`)
+- `--resample-threshold`: resample when the effective sample size is below this fraction of the particle count; above `1` resamples every step (default `0.5`)
+- `--ukf-alpha`, `--ukf-beta`, `--ukf-kappa`: UKF unscented-transform parameters (defaults `1.0`, `2.0`, `2.0`)
+- `--hill-mass`, `--hill-halfwidth`: weight fraction that must lie within the half-width m of the weighted mean for the belief to count as one hill (defaults `0.9`, a quarter of the smallest door spacing)
+- `--wrong-door-threshold`: a final error above this m is a wrong door (default half the smallest door spacing)
+- `--tail-steps`: number of final steps for the RMSE and NEES windows (default `10`)
+- `--prior-std`: known-start diagnostic: every filter starts from a Gaussian of this std-dev m centred on the true start plus a draw of that std (default: the uniform start zone)
+- `--ml-variant`, `--ml-range`, `--ml-noise`: also run EKF-ML and UKF-ML; the offset sensor's range m and noise std-dev m (defaults off, `3.0`, `0.1`)
+- `--sweep`: run one sweep (`particles`, `width`, `sigma_z`, `motion`, `resample` or `layout`; repeatable; default none)
+- `--example-trial`: trial index shown in the figure's snapshots (default `0`)
+- `--out`: save the figure to this path instead of showing it (default: show)
+
+</details>
+
 ### Front-end
 
-#### 8. Perspective-n-Point (PnP): recovering a camera pose from known 3D-2D correspondences
+#### 9. Perspective-n-Point (PnP): recovering a camera pose from known 3D-2D correspondences
 
 **Purpose:** Recovers a camera pose from known 3D points and their observed pixels, the reverse of triangulation. A closed-form linear guess (DLT) is refined by Gauss-Newton.
 
@@ -577,7 +637,7 @@ uv run python use_numpy/pnp_estimation.py --n-points 20 --pixel-noise-std 1.0 --
 
 </details>
 
-#### 9. LiDAR primitives: planes and cylinders for scan registration
+#### 10. LiDAR primitives: planes and cylinders for scan registration
 
 **Purpose:** Registers two simulated LiDAR scans three ways in one $`SE(3)`$ Gauss-Newton loop, after fitting planes and cylinders to each scan. Also tests extraction, degeneracy, and plane landmarks.
 
@@ -625,7 +685,7 @@ uv run python use_numpy/lidar_primitives.py --experiment all --n-trials 10 --n-p
 
 ### Factor graphs and smoothing
 
-#### 10. RTS smoother: a Kalman filter, its smoother, and batch least squares on one data set
+#### 11. RTS smoother: a Kalman filter, its smoother, and batch least squares on one data set
 
 **Purpose:** Runs the Kalman filter of the 1D inchworm and its Rauch-Tung-Striebel (RTS) smoother, a backward pass that also uses the measurements after each tick, on the same data, and checks that the smoother equals batch least squares over the whole trajectory.
 
@@ -676,7 +736,7 @@ uv run python use_numpy/rts_smoother.py --out out.png
 
 </details>
 
-#### 11. 3D pose-graph relaxation
+#### 12. 3D pose-graph relaxation
 
 **Purpose:** Shows how one loop-closure edge lets pose-graph optimization reduce the drift of a noisy odometry loop.
 
@@ -717,7 +777,7 @@ uv run python use_numpy/pose_graph.py --side-length 2.0 --pos-noise-std 0.05 --r
 
 </details>
 
-#### 12. 3D pose graph with false loop closures: plain least squares vs. robust kernels
+#### 13. 3D pose graph with false loop closures: plain least squares vs. robust kernels
 
 **Purpose:** Asks what false loop closures do to a multi-lap pose graph and how much a robust kernel limits the damage. Compares plain least squares with Huber, Cauchy, and DCS kernels, solved by iteratively reweighted least squares inside Levenberg-Marquardt.
 
@@ -768,7 +828,7 @@ uv run python use_numpy/pose_graph_robust.py --out out.png
 
 </details>
 
-#### 13. Bundle adjustment: joint pose + landmark refinement
+#### 14. Bundle adjustment: joint pose + landmark refinement
 
 **Purpose:** Compares refining only landmarks, only camera poses, or both together (bundle adjustment) from the same noisy start, to show why the joint solve is needed.
 
@@ -819,7 +879,7 @@ uv run python use_numpy/bundle_adjustment.py --n-cameras 8 --n-landmarks 60 --ca
 
 </details>
 
-#### 14. Local + Global bundle adjustment: bounded windows vs. whole-map re-solves
+#### 15. Local + Global bundle adjustment: bounded windows vs. whole-map re-solves
 
 **Purpose:** Compares Local BA (optimize only a small window of recent keyframes) with Local BA plus periodic Global BA (re-solve the whole map) as a keyframe path grows.
 
@@ -876,7 +936,7 @@ uv run python use_numpy/bundle_adjustment_advanced.py --n-keyframes 50 --path-ra
 uv run python use_numpy/bundle_adjustment_advanced.py --arc-span-deg 350 --n-keyframes 190 --seed 0 --out loop_closure.png
 ```
 
-#### 15. Incremental (square-root SAM) vs. batch pose-graph solving
+#### 16. Incremental (square-root SAM) vs. batch pose-graph solving
 
 **Purpose:** Compares incremental square-root SAM, which updates an existing factorization with each new node, against re-solving the whole pose graph at every node.
 
@@ -925,7 +985,7 @@ uv run python use_numpy/pose_graph_incremental.py --side-length 2.0 --nodes-per-
 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 uv run python use_numpy/pose_graph_incremental.py
 ```
 
-#### 16. Bayes tree construction and affected-region query
+#### 17. Bayes tree construction and affected-region query
 
 **Purpose:** Builds the elimination tree behind the Bayes tree for the pose-graph loop and shows which variables a new odometry edge or a loop-closure edge affects.
 
@@ -955,7 +1015,7 @@ uv run python use_numpy/bayes_tree_construction.py --nodes-per-side 4 --out out.
 
 </details>
 
-#### 17. Sliding-window marginalization: bounded-memory pose-graph smoothing
+#### 18. Sliding-window marginalization: bounded-memory pose-graph smoothing
 
 **Purpose:** Compares a sliding window that marginalizes out its oldest pose with a full batch re-solve at every new node, to show how memory scales with trajectory length.
 
@@ -996,7 +1056,7 @@ uv run python use_numpy/sliding_window_marginalization.py --nodes-per-side-sweep
 
 ### Non-smooth, legged and wheeled motion
 
-#### 18. Saltation-matrix EKF: tracking a point mass through discrete ground-contact events
+#### 19. Saltation-matrix EKF: tracking a point mass through discrete ground-contact events
 
 **Purpose:** Isolates how an EKF should treat its covariance at a bounce, the sudden jump in a point mass's velocity when it hits the ground. The saltation matrix corrects for the shifted impact time of a perturbed trajectory.
 
@@ -1049,9 +1109,9 @@ uv run python use_numpy/saltation_matrix_ekf.py --duration 5.0 --dt 0.02 --resti
 
 </details>
 
-#### 19. Invariant EKF on $SE_2(3)$ through a bounce
+#### 20. Invariant EKF on $SE_2(3)$ through a bounce
 
-**Purpose:** Extends §18's bouncing point mass to a tumbling rigid body with an IMU (gyro and accelerometer), tracked by a right-invariant EKF (RIEKF). Compares five filters that treat the bounce covariance differently.
+**Purpose:** Extends §19's bouncing point mass to a tumbling rigid body with an IMU (gyro and accelerometer), tracked by a right-invariant EKF (RIEKF). Compares five filters that treat the bounce covariance differently.
 
 | Input | Output |
 |---|---|
@@ -1105,7 +1165,7 @@ uv run python use_numpy/invariant_saltation_ekf.py --duration 5.0 --dt 0.01 --me
 
 </details>
 
-#### 20. Inchworm ZUPT: exploiting a known anchor/dwell schedule
+#### 21. Inchworm ZUPT: exploiting a known anchor/dwell schedule
 
 **Purpose:** Asks whether a filter should use the free zero-velocity update (ZUPT) during the stationary phases of a known anchor/extend gait. Compares three ZUPT policies on a 1D point mass.
 
@@ -1160,7 +1220,7 @@ uv run python use_numpy/inchworm_zupt_ekf.py --duration 10.0 --dt 0.05 --t-ancho
 
 </details>
 
-#### 21. Inchworm anchor slip: an IMM instead of a hard gate
+#### 22. Inchworm anchor slip: an IMM instead of a hard gate
 
 **Purpose:** Asks whether the slipping-anchor crawler of `inchworm_slip_gate_ekf.py` does better with a soft decision than with a gate. An interacting multiple model (IMM) filter keeps a probability for "still" and "moving" and blends two Kalman filters, with and without the pad reading.
 
@@ -1209,7 +1269,7 @@ uv run python use_numpy/inchworm_slip_imm.py --out out.png
 
 </details>
 
-#### 22. Two-pad inchworm: trusting the anchored pad without a position fix
+#### 23. Two-pad inchworm: trusting the anchored pad without a position fix
 
 **Purpose:** Asks how a planar inchworm with no position fix, whose two pads swap anchored and moving roles each phase, should treat its anchored pad when it can slip. Compares four policies, from assuming the pad is still to fusing its sensor.
 
@@ -1267,17 +1327,17 @@ uv run python use_numpy/inchworm_two_pad_ekf.py --duration 20.0 --dt 0.05 --t-ph
 
 </details>
 
-#### 23. Two-pad inchworm: reading both pad sensors
+#### 24. Two-pad inchworm: reading both pad sensors
 
-**Purpose:** Extends §22's `pad_fused` filter, which reads only the anchored pad's sensor, with the moving pad's sensor and sensor faults (spikes, dropouts). Compares five ways to move the moving pad, including a cross-check between the two sensors.
+**Purpose:** Extends §23's `pad_fused` filter, which reads only the anchored pad's sensor, with the moving pad's sensor and sensor faults (spikes, dropouts). Compares five ways to move the moving pad, including a cross-check between the two sensors.
 
 | Input | Output |
 |---|---|
-| §22's inchworm plus a moving-pad sensor and random sensor faults | Prints per-variant errors, Monte Carlo [NEES](docs/glossary.md#consistency-and-nees) (consistency check) and fault-detection counts; plots readings, error and NEES |
+| §23's inchworm plus a moving-pad sensor and random sensor faults | Prints per-variant errors, Monte Carlo [NEES](docs/glossary.md#consistency-and-nees) (consistency check) and fault-detection counts; plots readings, error and NEES |
 
 | Variant | Meaning |
 |---|---|
-| `random_walk` | No moving-pad model (§22's `pad_fused`) |
+| `random_walk` | No moving-pad model (§23's `pad_fused`) |
 | `encoder_model` | Anchored pad's motion plus the commanded stroke |
 | `moving_sensor` | The moving pad's own sensor reading |
 | `both` | Inverse-variance mix of the two above |
@@ -1334,7 +1394,7 @@ uv run python use_numpy/inchworm_two_pad_fusion_ekf.py --duration 20.0 --dt 0.05
 
 </details>
 
-#### 24. Friction-anisotropic process noise: fixed vs. heading-aware Q
+#### 25. Friction-anisotropic process noise: fixed vs. heading-aware Q
 
 **Purpose:** Compares three ways of building the process-noise covariance $Q$ for a robot whose pad grips along its forward axis and slips sideways. The question is whether $Q$ must follow the robot's heading as it turns.
 
@@ -1380,7 +1440,7 @@ uv run python use_numpy/friction_anisotropic_ekf.py --duration 20.0 --dt 0.05 --
 
 </details>
 
-#### 25. Hexapod leg odometry: what the gait changes
+#### 26. Hexapod leg odometry: what the gait changes
 
 **Purpose:** Shows how the gait (tripod, ripple, or wave) changes what a planar hexapod can estimate from its legs alone. It also tests slipping feet, foot drift, and uncertain contact timing.
 
@@ -1430,7 +1490,7 @@ uv run python use_numpy/hexapod_gait_ekf.py --duration 12.0 --dt 0.02 --cycle-pe
 
 </details>
 
-#### 26. Contact-aided invariant EKF on a hexapod: which filter knows yaw is unobservable
+#### 27. Contact-aided invariant EKF on a hexapod: which filter knows yaw is unobservable
 
 **Purpose:** Compares an invariant EKF with a world-frame error-state EKF on the same data. Both keep stance-foot positions in the state, and the question is which one respects that yaw is unobservable.
 
@@ -1471,9 +1531,9 @@ uv run python use_numpy/hexapod_contact_inekf.py --duration 12.0 --dt 0.02 --cyc
 
 </details>
 
-#### 27. Gait phase: which feet are on the ground, when touchdowns are uncertain
+#### 28. Gait phase: which feet are on the ground, when touchdowns are uncertain
 
-**Purpose:** Compares four ways of deciding which feet are on the ground when touchdown times are uncertain, with the true stance as a reference. This drops the assumption of §25 that the filter is told the stance.
+**Purpose:** Compares four ways of deciding which feet are on the ground when touchdown times are uncertain, with the true stance as a reference. This drops the assumption of §26 that the filter is told the stance.
 
 | Input | Output |
 |---|---|
@@ -1530,9 +1590,9 @@ uv run python use_numpy/gait_phase_ekf.py --duration 24.0 --dt 0.02 --cycle-peri
 - `--out`: save the figure to this path instead of showing it (default: show)
 
 </details>
-#### 28. Joint encoders on an 18-DOF hexapod: when the leg-kinematics noise model matters
+#### 29. Joint encoders on an 18-DOF hexapod: when the leg-kinematics noise model matters
 
-**Purpose:** Feeds §26's invariant EKF with foot readings computed from noisy joint encoders on the HEBI Daisy's real leg geometry. Compares kinematic-noise models (isotropic vs. the pose-dependent $`\sigma_q^2 J J^\top`$), then adds fixed joint zero offsets and compares three ways of handling them.
+**Purpose:** Feeds §27's invariant EKF with foot readings computed from noisy joint encoders on the HEBI Daisy's real leg geometry. Compares kinematic-noise models (isotropic vs. the pose-dependent $`\sigma_q^2 J J^\top`$), then adds fixed joint zero offsets and compares three ways of handling them.
 
 | Input | Output |
 |---|---|
@@ -1573,7 +1633,7 @@ uv run python use_numpy/hexapod_joint_kinematics_inekf.py --duration 12.0 --gait
 
 </details>
 
-#### 29. Torque-based contact detection: what decides it, and when the gait phase helps
+#### 30. Torque-based contact detection: what decides it, and when the gait phase helps
 
 | Input | Output |
 |---|---|
@@ -1603,7 +1663,7 @@ uv run python use_numpy/gait_phase_torque_ekf.py --body-mass 31.0 --load-ramp 0.
 <details>
 <summary>All flags</summary>
 
-- All of `gait_phase_ekf.py`'s flags (§27), same defaults
+- All of `gait_phase_ekf.py`'s flags (§28), same defaults
 - `--body-mass`: robot mass, kg (default `31.0`, HEBI `hex_config.xml`)
 - `--load-ramp`: time for a landed foot's load to reach its share, s (default `0.05`; an assumption)
 - `--model-err-std`: std of the swing-down model-error pulse in the force estimate, N (default `15.0`; an assumption)
@@ -1617,7 +1677,7 @@ uv run python use_numpy/gait_phase_torque_ekf.py --body-mass 31.0 --load-ramp 0.
 
 </details>
 
-#### 30. Four joints per leg: which joint offsets a walking hexapod can learn
+#### 31. Four joints per leg: which joint offsets a walking hexapod can learn
 
 | Input | Output |
 |---|---|
@@ -1658,7 +1718,7 @@ uv run python use_numpy/hexapod_redundant_leg_inekf.py --duration 12.0 --gait tr
 
 </details>
 
-#### 31. Legs plus a tracking camera: how to use a pose that drifts
+#### 32. Legs plus a tracking camera: how to use a pose that drifts
 
 | Input | Output |
 |---|---|
@@ -1716,7 +1776,7 @@ uv run python use_numpy/hexapod_camera_fusion_inekf.py --delay-experiment --out 
 
 </details>
 
-#### 32. Skid-steer wheel odometry: slip as a filter state
+#### 33. Skid-steer wheel odometry: slip as a filter state
 
 | Input | Output |
 |---|---|
@@ -1757,7 +1817,7 @@ uv run python use_numpy/skid_steer_odometry_ekf.py --chi 1.875 --speed 0.5 --dur
 
 </details>
 
-#### 33. Magnetic climbing inchworm: odometry that cannot see the slide
+#### 34. Magnetic climbing inchworm: odometry that cannot see the slide
 
 | Input | Output |
 |---|---|

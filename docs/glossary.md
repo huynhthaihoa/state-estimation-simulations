@@ -106,7 +106,7 @@ Reusing the same random draws in every case that is being compared (here, every 
 The square root of the mean squared error, $`\sqrt{\tfrac{1}{N}\sum_k \|e_k\|^2}`$, in the error's own units; it weights large errors more than the mean absolute error does. Each doc states what the mean runs over (ticks, Monte Carlo trials, poses or keyframes). **RMS** (root mean square) is the same average applied to any quantity, e.g. a timing lag. For a trajectory RMSE taken after aligning to ground truth, see Umeyama alignment and trajectory RMSE (§5).
 
 ### Observability
-A direction of the state is observable if some measurement can determine it, and unobservable if none can. A solver that wrongly gains information in an unobservable direction becomes overconfident; the problem FEJ (§4) addresses. See [marginalization.md §6](optimization/marginalization.md#6-the-consistency-gotcha-why-fej-exists), and [observability.md](foundations/observability.md) for a worked EKF-SLAM example.
+A direction of the state is observable if some measurement can determine it, and unobservable if none can. A solver that wrongly gains information in an unobservable direction becomes overconfident; the problem FEJ (§4) addresses. See [marginalization.md §6](optimization/marginalization.md#6-the-consistency-gotcha-why-fej-exists), and [observability.md](foundations/observability.md) for a worked EKF-SLAM example. For the shift and rotation of the whole world, see [Yaw and global rotation](#yaw-and-global-rotation) (below).
 
 ### Observability matrix
 The matrix of a filter's measurement Jacobians multiplied by its transition matrices over a window of steps. The directions it maps to zero (its null space) are the unobservable ones. For an EKF, it depends on where the Jacobians were evaluated, which is how an EKF can lose an unobservable direction. See [observability.md §1](foundations/observability.md#1-observable-and-unobservable-directions) and [§3](foundations/observability.md#3-why-the-standard-ekf-loses-the-rotation-direction).
@@ -249,7 +249,7 @@ Records which variables must be eliminated before which. See [elimination_tree.m
 A tree built from elimination whose nodes are **cliques** (groups of variables). It lets iSAM2 update only the part of the solution a new measurement affects. See [bayes_tree.md §13](optimization/bayes_tree.md#13-one-more-important-concept-cliques) and [isam2_optimization.md §7](optimization/isam2_optimization.md#7-bayes-tree---the-most-important-intuition).
 
 ### Batch vs. incremental
-Batch optimization re-solves the whole problem from scratch; incremental methods (iSAM, iSAM2: incremental smoothing and mapping) update the previous solution as new measurements arrive. See [isam_optimization.md §1](optimization/isam_optimization.md#1-the-problem-with-ordinary-batch-optimization) and [§2](optimization/isam_optimization.md#2-the-incremental-idea).
+Batch optimization re-solves the whole problem from scratch; incremental methods (iSAM, iSAM2: incremental smoothing and mapping) update the previous solution as new measurements arrive. Both keep every state; a sliding window instead marginalizes old ones (see Sliding window and fixed-lag smoothing). See [isam_optimization.md §1](optimization/isam_optimization.md#1-the-problem-with-ordinary-batch-optimization) and [§2](optimization/isam_optimization.md#2-the-incremental-idea).
 
 ### SAM, iSAM and iSAM2 (smoothing and mapping)
 Solving SLAM as one sparse least-squares problem over the whole trajectory and map. **Square-root SAM** factors the whitened Jacobian in batch (QR or Cholesky); **iSAM** (incremental SAM) updates that factor with each new measurement, with periodic batch steps that reorder and relinearize; **iSAM2** stores it as a Bayes tree and reorders and relinearizes only the affected part. See [isam_optimization.md §2](optimization/isam_optimization.md#2-the-incremental-idea) and [isam2_optimization.md §7](optimization/isam2_optimization.md#7-bayes-tree---the-most-important-intuition).
@@ -274,7 +274,7 @@ Filtering estimates only the current state and folds the past away; smoothing ke
 ## 5. SLAM system
 
 ### SLAM (Simultaneous Localization and Mapping)
-Estimating a robot's trajectory and a map of its environment at the same time. See [frontend_backend.md](frontend_backend.md).
+Estimating a robot's trajectory (its pose at each time) and a map of its environment (e.g., landmark positions) at the same time. Both are needed together: odometry alone drifts, and the map is only as good as the poses it is built from. See [frontend_backend.md](frontend_backend.md).
 
 ### Front-end and back-end
 The front-end turns raw sensor data into constraints (feature tracking, data association (matching measurements to the landmarks they observe), loop detection, keyframe selection); the back-end optimizes the trajectory and map from those constraints. See [frontend_backend.md §1](frontend_backend.md#1-slam-front-end---extracting-constraints) and [§2](frontend_backend.md#2-slam-back-end---solving-the-global-problem).
@@ -377,7 +377,25 @@ A visual-inertial ESKF whose state holds a sliding window of past camera poses b
 Pushes $2n+1$ deterministically chosen **sigma points** (for an $n$-dimensional state) through the nonlinear functions instead of linearizing them with Jacobians. See [extra_kf_variants.md §1](filtering/extra_kf_variants.md#1-unscented-kalman-filter-ukf).
 
 ### Particle filter (PF)
-A Bayes filter whose belief is a set of weighted samples (**particles**), each a full state hypothesis. Each particle is pushed through the motion model and reweighted by how well it explains the measurement, and the set is periodically resampled. It needs no Gaussian assumption, at a cost that grows with the number of particles. See [extra_kf_variants.md §6](filtering/extra_kf_variants.md#6-particle-filter-pf).
+A Bayes filter whose belief is a set of weighted samples (**particles**), each a full state hypothesis. Each particle is pushed through the motion model and reweighted by how well it explains the measurement, and the set is periodically resampled. It needs no Gaussian assumption, at a cost that grows with the number of particles. See [extra_kf_variants.md §6](filtering/extra_kf_variants.md#6-particle-filter-pf); a simulation against an EKF and a UKF at an unknown start is in [particle_filter.md](filtering/particle_filter.md).
+
+### Particle weight and resampling
+A particle's **weight** is its measurement likelihood (how well its guess explains the latest reading), scaled so all weights sum to 1. **Resampling** draws $`N`$ new particles with probability proportional to weight: heavy particles are copied, light ones disappear, and all weights reset to $`1/N`$. The **low-variance resampler** does this with one random offset and $`N`$ evenly spaced pointers, in $`O(N)`$ time. See [particle_filter.md §2](filtering/particle_filter.md#2-the-filters).
+
+### Effective sample size
+**Symbol:** $`N_{\text{eff}}`$. $`1/\sum_i w_i^2`$ for the normalized weights $`w_i`$: how many equally weighted particles the weighted set is worth. It is $`N`$ if all weights are equal and 1 if one particle holds all the weight; the usual rule resamples only when it falls below $`N/2`$, since each resampling loses diversity. See [particle_filter.md Intuition](filtering/particle_filter.md#intuition) and [§2](filtering/particle_filter.md#2-the-filters).
+
+### One hill and several hills
+A filter's belief drawn over the state is high where the robot probably is, so each separate group of likely positions is a **hill**. The Kalman-filter family keeps exactly one hill (a Gaussian); a particle filter can keep several. See [kf_ekf_iekf.md §8](filtering/kf_ekf_iekf.md#8-which-one-should-we-use) and [particle_filter.md](filtering/particle_filter.md#intuition).
+
+### Global localization
+Estimating the pose with no initial pose estimate: the start is anywhere in a zone, so the belief starts uniform and, among look-alike places, has several hills. See [particle_filter.md](filtering/particle_filter.md#intuition) and [kf_ekf_iekf.md §8](filtering/kf_ekf_iekf.md#8-which-one-should-we-use).
+
+### Maximum-likelihood correspondence
+Matching a measurement to the landmark that makes it most likely and updating with that landmark only; the textbook EKF's way to handle an unknown landmark identity. It is brittle when many landmarks are about equally likely. See [particle_filter.md §8](filtering/particle_filter.md#8-variant-the-textbook-workaround-maximum-likelihood-association).
+
+### Wrong-door rate
+The fraction of trials whose final error is larger than half the smallest door spacing (a larger error could be a shift to a neighbouring door): the particle-filter doc's score. See [particle_filter.md](filtering/particle_filter.md#intuition).
 
 ### RTS (Rauch-Tung-Striebel) smoother
 A Kalman smoother: a forward Kalman-filter pass followed by a backward pass that revises each state using the later measurements too. See [extra_kf_variants.md §9](filtering/extra_kf_variants.md#9-kalman-smoother), and [filtering_smoothing.md §8](filtering_smoothing.md#the-same-picture-with-numbers-a-kalman-filter-and-its-rts-smoother-on-one-data-set) for it runs next to the filter and batch least squares.

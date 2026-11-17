@@ -143,7 +143,7 @@ The full-state version of that workaround is the **error-state Kalman filter** (
 
 The real problem is more subtle: **the EKF's Jacobians are evaluated at the current, drifting state estimate**, which differs every run and every step.
 - Each time the filter linearizes at a slightly different point, it linearizes the system's symmetries slightly differently too.
-- **Picture:** some things no sensor can see, such as global yaw (the heading angle; every measurement is relative). Such a direction is **unobservable** ([observability](../glossary.md#observability)). An honest filter keeps its uncertainty wide there.
+- **Picture:** some things no sensor can see, such as [global yaw](../glossary.md#yaw-and-global-rotation) (the heading angle; every measurement is relative). Such a direction is **unobservable** ([observability](../glossary.md#observability)). An honest filter keeps its uncertainty wide there.
 - Each new linearization point acts like a slightly different ruler. Those small differences make the filter feel it measured yaw a little, so its covariance shrinks along a direction nobody observes. (Picture only here; [observability.md §5](../foundations/observability.md#5-simulation-results) measures it on a planar SLAM toy.)
 - **The result:** the EKF can inject spurious information into directions that should stay unobservable (for example, a global orientation offset no sensor can see). The filter is then overconfident in exactly those directions: its covariance claims less error than it really has, which makes it **inconsistent** ([consistency](../glossary.md#consistency-and-nees)). Huang, Mourikis, and Roumeliotis (2010) analyzed this consistency problem for EKF-SLAM. A planar EKF-SLAM simulation that measures it (the observability matrix's null space, the information gained along the rotation, first-estimate Jacobians, and the invariant EKF as fixes) is in [observability.md](../foundations/observability.md).
 - The Invariant EKF goes back to Bonnabel (2007), and Barrau and Bonnabel (2017) proved its stability. Barrau and Bonnabel (2015) showed that an invariant EKF-SLAM keeps the unobservable directions unobservable, which gives it better consistency properties than the standard EKF.
@@ -315,20 +315,67 @@ An IEKF can sometimes have **better convergence and consistency properties** tha
 
 ## 8. Which one should we use?
 
-The one-liners are in §4's table. As a decision procedure:
+The one-liners are in §4's table. To choose, first picture what a filter carries. Its **belief** is its answer to "where is the robot?" given as probabilities: high where the robot probably is, low elsewhere. Think of it as hills over the map. Filters differ in which hill shapes they can draw:
+
+- **KF, EKF, UKF, ESKF, IEKF:** exactly **one hill**, a Gaussian, stored as its center (the estimate $`\hat x`$) and its width (the covariance $`P`$; one standard deviation $`\sigma`$ is a typical distance from the center to the truth).
+- **Particle filter (PF):** many **particles**, each one a guess of the state with a weight; dense, heavy guesses make a hill. It can draw any shape, including several hills.
+
+Then ask four questions, in this order.
+
+**Question 1: how many hills?** If the robot could honestly be in several separate places, the true belief has several hills with nothing between them. A one-hill filter has to put its single hill between them, where the robot is not:
+
+```text
+ true belief: one of three identical rooms        what a one-hill filter can draw
+      ▲            ▲            ▲                            ▄▄▄▄▄▄▄▄
+     ▲ ▲          ▲ ▲          ▲ ▲                     ▄▄▄▄▄▄        ▄▄▄▄▄▄
+ ──────────────────────────────────────          ──────────────────────────────────────
+   room A       room B       room C                peak near B or between rooms, huge width
+```
+
+Signs of several hills: an unknown start among look-alike places (the **global localization** problem), an ambiguous data association ("is this the same landmark as before?"). Answer: **particle filter** ([extra_kf_variants.md §6](extra_kf_variants.md#6-particle-filter-pf)). A better one-hill filter (a UKF, a wider $`P`$) does not help: the problem is the number of hills, not their shape. Once one hill is left, a one-hill filter can take over.
+
+**Question 2: are the models linear?** If the motion and measurement models are linear (e.g., constant velocity with a directly measured position), a Gaussian stays Gaussian and the **KF** is exact.
+
+**Question 3: does the model bend within one hill width?** The filter pushes its hill through the model. An **EKF** replaces the model with its tangent line at the hill's center (the Jacobian). That works if the model is nearly straight across about $`\pm\sigma`$; it fails if the model visibly bends there. Every nonlinear model looks straight over a small enough region, and $`\sigma`$ sets the size, so "nonlinear" alone does not rule out an EKF.
+
+Example: the bearing $`\mathrm{atan}(s/d)`$ to a point $`d`$ ahead and $`s`$ sideways, with a sideways uncertainty $`\sigma`$. Compare the true bearing and the tangent line ($`s/d`$ in radians) one $`\sigma`$ from the center:
+
+| $`\sigma/d`$ | True bearing at $`s = \sigma`$ | Tangent line | Error | Choice |
+| --- | --- | --- | --- | --- |
+| 0.03 (e.g. 0.1 m uncertainty, point 3.3 m ahead) | 1.718° | 1.719° | 0.03% | EKF |
+| 0.5 (e.g. 2 m uncertainty, point 4 m ahead) | 26.6° | 28.6° | about 8% | UKF |
+
+For the bent case, the **UKF** places a few **sigma points** (sample states about $`\pm\sigma`$ around the center), pushes each through the exact model, and fits one new hill to where they land. [linear_nonlinear.md §4](linear_nonlinear.md#4-how-do-you-know-whether-its-nonlinear-over-your-uncertainty-region) gives tests.
+
+**Question 4: is the state on a Lie group (rotations, poses)?** No: **EKF**. Yes: define the error with the geometry, on the manifold (**ESKF**, MEKF) or on the whole group (**IEKF**, §5).
 
 ```mermaid
 flowchart LR
-    A["State estimation<br/>problem"] --> B{"Linear<br/>models?"}
-    B -->|Yes| KF["Standard KF"]
-    B -->|No| C{"Rotations or poses<br/>(a Lie group)?"}
-    C -->|No| EKF["EKF<br/>linearize locally"]
-    C -->|Yes| IEKF["IEKF<br/>linearize while respecting<br/>the geometry"]
+    A["State estimation<br/>problem"] --> P{"How many hills<br/>in the belief?"}
+    P -->|Several| PF["Particle filter<br/>weighted samples"]
+    P -->|One| B{"Linear<br/>models?"}
+    B -->|Yes| KF["Standard KF<br/>exact"]
+    B -->|No| C{"Model bends<br/>within ±σ?"}
+    C -->|Yes| UKF["UKF<br/>sigma points"]
+    C -->|No| G{"Rotations or poses<br/>(a Lie group)?"}
+    G -->|No| EKF["EKF<br/>linearize locally"]
+    G -->|Yes| IEKF["ESKF or IEKF<br/>error on the manifold<br/>or the group"]
 ```
 
-The last branch is a simplification. Rotations are also commonly handled by an EKF with a multiplicative error (ESKF, MEKF; §5). The IEKF's guarantees require group-affine dynamics (§5).
+The chart is a simplification in two places. Questions 3 and 4 are independent: a UKF can run on a Lie group too, with its sigma points spread in the tangent space (`run_ukf` in `pointcloud_pose_tracking.py`). And the IEKF's guarantees require group-affine dynamics (§5); with IMU biases in the state, they no longer hold exactly ([§6](#the-catch-is-the-biases)).
 
-The last distinction is the one to internalize: **a robot pose is not just a vector; it has geometry.** That is one of the main reasons the IEKF is attractive for inertial navigation, visual-inertial estimation, and SLAM.
+| Filter | Belief | Handles a nonlinear model by | Error (§5) | Pick it when | In this repo |
+| --- | --- | --- | --- | --- | --- |
+| **KF** | one Gaussian | - (linear models only) | additive | the models are linear | `rts_smoother.py` (1D inchworm, constant velocity) |
+| **EKF** | one Gaussian | a Jacobian at the estimate | additive (multiplicative for rotations) | the model is nearly straight within ±σ | `run_ekf` in `pointcloud_pose_tracking.py`, most filter scripts |
+| **UKF** | one Gaussian | sigma points through the exact model | additive, or in the tangent space on a manifold | the model bends within ±σ; several times slower per step here ([empirical note](pointcloud_pose_tracking_empirical_note.md)) | `run_ukf` in `pointcloud_pose_tracking.py` |
+| **ESKF** | one Gaussian on a small error state | a Jacobian of the error dynamics near zero | multiplicative for rotation, additive for the rest | an IMU-driven state with rotations and biases | `eskf_imu_position_fix.py` |
+| **IEKF** | one Gaussian on the group error | a Jacobian of the invariant error dynamics, independent of the estimate for group-affine dynamics | invariant, $`\eta = \hat X^{-1}X`$ or $`X\hat X^{-1}`$ | rotations or poses where unobservable directions must stay unobservable (§2) | `run_iekf` in `pointcloud_pose_tracking.py`, `hexapod_contact_inekf.py`, `observability_fej.py` |
+| **PF** | weighted samples, any shape | each particle through the exact model | none needed | several hills; a low-dimensional state, since the particle count grows fast with dimension | `particle_filter_localization.py` ([particle_filter.md](particle_filter.md); background in [extra_kf_variants.md §6](extra_kf_variants.md#6-particle-filter-pf)) |
+
+The MSCKF answers a different question, which states to keep (a window of camera poses, no landmarks; §9), so it is not on the chart.
+
+Question 4 is the one to internalize: **a robot pose is not just a vector; it has geometry.** That is one of the main reasons the IEKF is attractive for inertial navigation, visual-inertial estimation, and SLAM.
 
 ---
 
