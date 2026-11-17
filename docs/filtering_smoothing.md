@@ -280,7 +280,7 @@ So most updates in a typical SLAM graph (mostly odometry, occasionally a loop cl
 
 ## 7. This is where factor graphs fit
 
-A **[factor graph](glossary.md#factor-graph)** is the bridge between the two worlds. It is bipartite: variables (poses, landmarks) are one kind of node, and each **factor** is its own node connected to the variables it constrains. A SLAM factor graph typically contains **three kinds of factors** (■ = factor node, ● = variable node):
+A **[factor graph](glossary.md#factor-graph)** is the bridge between the two worlds. It is bipartite: **variables** (poses, landmarks) are one kind of node, and each **factor** is its own node connected to the variables it constrains. A SLAM factor graph typically contains **three kinds of factors** (■ = factor node, ● = variable node):
 
 - A **landmark factor** ties a pose to a landmark it observed (two such factors, from $x_0$ and $x_2$ to the same landmark):
 
