@@ -91,7 +91,7 @@ After linearization, the nonlinear optimization becomes approximately a linear l
 \min_{\Delta x} \lVert A\Delta x - b \rVert^2
 ```
 
-Here $`A`$ is the stacked, **noise-whitened** (each row scaled so its residual has unit noise covariance) Jacobian of all factors, $`b`$ is the stacked (negated) residual vector, and $`\Delta x`$ is the update step to the variables: 6 numbers per pose (3 translation, 3 rotation), the [degrees of freedom](../glossary.md#degrees-of-freedom-dof) of a 3D pose. (§14.1 writes the same step as $`\boldsymbol\delta`$.) Writing $`J`$ for the unwhitened stacked [Jacobian](../glossary.md#jacobian) (derivatives of all residuals with respect to the variables) and $`S`$ for the block-diagonal whitening factor with $`S^\top S = \Omega`$, $`A = SJ`$.
+Here $`A`$ is the stacked, **noise-whitened** (each row scaled so its residual has unit noise covariance) Jacobian of all factors, $`b`$ is the stacked (negated) residual vector, and $`\Delta x`$ is the update step to the variables: 6 numbers per pose (3 translation, 3 rotation), the [degrees of freedom](../glossary.md#degrees-of-freedom-dof) of a 3D pose. (§14.1 writes the same step as $`\boldsymbol\delta`$.) Writing $`J`$ for the unwhitened stacked [Jacobian](../glossary.md#jacobian) (derivatives of all residuals with respect to the variables) and $`S`$ for the block-diagonal whitening factor with $`S^\top S = \Omega`$, $`A = SJ`$. This $`b`$ is not the gradient $`b`$ of the glossary; in this notation, that gradient is $`-A^\top b`$.
 
 Instead of solving this from scratch every time, we factorize $A = QR$ (or work with a related factorization of the Hessian system).
 
@@ -181,9 +181,9 @@ Original iSAM stops at §3's mechanism: Givens-rotation updates to the factoriza
 | Full cost on every update       | Cheaper per update, except around loop closures |
 | Good for offline SLAM           | Good for online SLAM            |
 | Simple conceptual model         | More complicated implementation |
-| Example: standard Gauss-Newton ([glossary](../glossary.md#gauss-newton))  | Example: iSAM/iSAM2             |
+| Example: Gauss-Newton or LM re-run on the whole graph | Example: iSAM/iSAM2             |
 
-Both columns keep every variable in the problem; a third option, a sliding window, marginalizes old variables instead ([marginalization.md §7](marginalization.md#7-sliding-window-and-fixed-lag-smoothing-the-payoff)).
+Either column can take its steps with Gauss-Newton ([glossary](../glossary.md#gauss-newton)) or LM: the step rule and the solve strategy are separate choices ([levenberg_marquardt.md §11](levenberg_marquardt.md#11-where-lm-fits)). Both columns keep every variable in the problem; a third option, a sliding window, marginalizes old variables instead ([marginalization.md §7](marginalization.md#7-sliding-window-and-fixed-lag-smoothing-the-payoff)).
 
 ---
 
@@ -351,6 +351,7 @@ It starts from the read-out estimate $X$, not from ${\bar{X}}$. The script never
 - That makes 9 full relinearizations: the initial one, 7 periodic ones (${k = 8, 16, \ldots, 56}$) and the loop-closure one at ${k = 63}$.
 - The `run_batch_streaming` baseline instead runs `pose_graph.py`'s damped solver from scratch 63 times, starting at `--damping 0.01`.
 - With `--seed 0`, both solvers finish at the same final-node position error (0.0334 m) and rotation error (0.377 deg).
+- The script also prints the RMS over all 64 poses, each pose's error against ground truth without alignment: 0.398 m and 8.61 deg, against 0.598 m and 9.16 deg for odometry alone. It is much larger than the final-node error because the loop edge pins node 63 to the anchored node 0, but a chain held at both ends still sags in the middle: the error peaks at 0.636 m at node 32.
 - The `use_manif/` twin has the same flow, triggers, and defaults. It retracts with `x_lin[k] + manif.SE3Tangent(delta_k)`.
 
 ---

@@ -402,7 +402,7 @@ The concepts above organize into one map:
                   Iterative optimization
 ```
 
-The step rule (GN or LM) and the solve strategy are separate axes, and both start from the same NLS problem: **batch** re-solves everything with GN or LM, while **incremental** (iSAM/iSAM2) re-solves only what changed. See [levenberg_marquardt.md §11](levenberg_marquardt.md#11-where-lm-fits) for how the two axes combine.
+The step rule (GN or LM) and the solve strategy are separate axes. Both start from the same NLS problem: **batch** re-solves everything with GN or LM, **incremental** (iSAM/iSAM2) re-solves only what changed, and **bounded** (a sliding window) marginalizes old states so the problem stays a fixed size. See [levenberg_marquardt.md §11](levenberg_marquardt.md#11-where-lm-fits) for how the two axes combine.
 
 This is one corner of the repo-wide map in [slam_mental_map.md](../slam_mental_map.md), which places every doc and script on one picture.
 

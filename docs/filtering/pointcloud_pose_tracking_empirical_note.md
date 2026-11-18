@@ -415,6 +415,8 @@ The step $`R_{\text{big}}\,R_{\text{diag}}\,R_{\text{big}}^\top = R_{\text{diag}
 
 $H_{\text{body}}$ depends only on the object's known geometry, so it is computed once outside the step loop; $H_{\text{world}}$ depends on the current $R_{\text{pred}}$, so the EKF rebuilds it every step. Result: IEKF is ~30% faster per step (e.g., 260 vs 369 microseconds/step in one run) at nearly identical memory - the entire practical benefit on this benchmark.
 
+The two give equal results here because this problem has no unobservable direction (the known point cloud fixes the whole pose). With such a direction, the invariant filter's advantage is consistency, not accuracy or speed ([kf_ekf_iekf.md §5](kf_ekf_iekf.md#what-this-example-does-and-doesnt-show), [observability.md §6](../foundations/observability.md#6-every-observability-finding-in-the-repo)).
+
 ---
 
 ## 3. UKF vs. EKF/IEKF: close, but not exact

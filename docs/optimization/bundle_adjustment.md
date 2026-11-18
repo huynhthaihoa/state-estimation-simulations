@@ -412,9 +412,9 @@ Pts   │ coupling │     block-     │
 
 Real scenes usually have far more points than cameras, so solvers use the **Schur complement trick**:
 
-1. [Marginalize](../glossary.md#marginalization) out the point block (cheap, since it is block-diagonal and each point's small block inverts independently). With $c$ the camera block and $p$ the point block, this leaves the reduced camera matrix $`H_{cc} - H_{cp} H_{pp}^{-1} H_{pc}`$, the [Schur complement](../glossary.md#schur-complement).
+1. Eliminate the point block (cheap, since it is block-diagonal and each point's small block inverts independently). With $c$ the camera block and $p$ the point block, this leaves the reduced camera matrix $`H_{cc} - H_{cp} H_{pp}^{-1} H_{pc}`$, the [Schur complement](../glossary.md#schur-complement).
 2. Solve the much smaller reduced camera-only system.
-3. Back-substitute to recover the points.
+3. Back-substitute to recover the points. Unlike [marginalization](../glossary.md#marginalization), which drops a variable for good ([marginalization.md §3](marginalization.md#3-three-flavors-of-elimination-compared)), nothing is lost here.
 
 **Tiny example (Schur complement):** a toy with 2 cameras and 1 point, one number each, and no prior.
 - Let $`J = \begin{bmatrix}1 & 0 & 1\\ 0 & 1 & 1\end{bmatrix}`$ (columns: camera 1, camera 2, point). The point block is $`1 \cdot 1 + 1 \cdot 1 = 2`$.

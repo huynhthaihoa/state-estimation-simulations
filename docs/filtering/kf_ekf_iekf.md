@@ -306,10 +306,10 @@ An IEKF can sometimes have **better convergence and consistency properties** tha
 - **Accuracy: identical.** Under [isotropic](../glossary.md#isotropic-and-anisotropic) point-noise covariance, EKF and IEKF produce **exactly identical** corrections $K r$ and posterior $P$, so both converge to the same estimate.
   - Proof: the body-frame and world-frame residual/Jacobian pairs differ only by a per-point rotation, which cancels out of $K r$ and $P$ ($K$ itself differs by that rotation).
   - Numerical check: $`K r`$ and the poses agree to ~1e-14, and $`P`$ to round-off (typically ~1e-15 relative to its size, at most ~5e-13 on the default run).
-- **Speed: IEKF wins.** Its fixed Jacobian made it about 27-30% faster per step than EKF at nearly identical memory - [the empirical note's §2.4](pointcloud_pose_tracking_empirical_note.md#24-what-actually-differs-between-them-speed-not-accuracy) measured 260 vs. 369 µs/step. Timing is machine-dependent and noisy: in one re-run, the order flipped.
-- **Takeaway:** "geometry-aware" doesn't always mean "more accurate" - sometimes it means "cheaper to compute the same answer."
+- **Speed: IEKF was faster here, as a by-product.** Its body-frame $`H`$ is fixed, so it is built once, while `run_ekf` rebuilds its world-frame $`H`$ every step; the rest of the update is the same. That made the IEKF about 27-30% faster per step than EKF at nearly identical memory - [the empirical note's §2.4](pointcloud_pose_tracking_empirical_note.md#24-what-actually-differs-between-them-speed-not-accuracy) measured 260 vs. 369 µs/step. Timing is machine-dependent and noisy: in one re-run, the order flipped.
+- **Takeaway:** "geometry-aware" doesn't mean "more accurate", and the speed gap comes from this benchmark's fixed $`H`$, not from a general IEKF property. Choose an IEKF for consistency (§2, §6), not for accuracy or speed.
 - **Anisotropic noise does not open a gap.** The two stay identical as long as each filter gets the noise covariance in its own frame ([empirical note §5](pointcloud_pose_tracking_empirical_note.md#5-when-would-each-actually-diverge-more)); the IEKF only loses its fixed $H$.
-- **Where the IEKF can do better** is consistency, which needs a problem with unobservable directions (§5). This benchmark has none.
+- **Where the IEKF can do better** is consistency, which needs a problem with unobservable directions (§2, §6). This benchmark has none.
 
 ---
 

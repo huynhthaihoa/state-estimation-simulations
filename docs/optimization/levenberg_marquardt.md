@@ -265,10 +265,11 @@ The step rule and the solve strategy are two separate choices:
    │                             │
 Step rule                  Solve strategy
 ├── Gauss-Newton           ├── Batch (re-solve everything)
-└── Levenberg-Marquardt    └── Incremental (iSAM/iSAM2)
+└── Levenberg-Marquardt    ├── Incremental (iSAM/iSAM2)
+                           └── Bounded (sliding window)
 ```
 
-Any step rule can be paired with either strategy ([batch vs. incremental](../glossary.md#batch-vs-incremental)). [iSAM](isam_optimization.md) and [iSAM2](isam2_optimization.md) change *how* the linear system is re-solved as new measurements arrive; they still need a rule for the step itself (this repo's incremental solver, [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py), uses plain Gauss-Newton).
+Any step rule can be paired with any strategy ([batch vs. incremental](../glossary.md#batch-vs-incremental)). [iSAM](isam_optimization.md) and [iSAM2](isam2_optimization.md) change *how* the linear system is re-solved as new measurements arrive; they still need a rule for the step itself (this repo's incremental solver, [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py), uses plain Gauss-Newton).
 
 ---
 

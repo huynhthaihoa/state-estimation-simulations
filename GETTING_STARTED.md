@@ -80,6 +80,8 @@ After all nine phases (and, optionally, [Track L](#track-l---hybrid-and-bio-insp
 
 ## Phase 8 - Incremental solving (the iSAM lineage)
 
+**Read first:** [`docs/optimization/sparse_cholesky_factorization.md`](docs/optimization/sparse_cholesky_factorization.md) (why real solvers exploit sparsity and what fill-in is; this repo's solves are dense).
+
 **Read:** [`docs/optimization/isam_optimization.md`](docs/optimization/isam_optimization.md).
 
 **Run:** [README.md §16](README.md#16-incremental-square-root-sam-vs-batch-pose-graph-solving) - [`use_numpy/pose_graph_incremental.py`](use_numpy/pose_graph_incremental.py) - batch re-solve vs. incremental square-root SAM (Givens updates for odometry edges, a full rebuild at loop closure, no reordering), reusing `pose_graph.py`'s own solver as the baseline.
@@ -88,7 +90,7 @@ After all nine phases (and, optionally, [Track L](#track-l---hybrid-and-bio-insp
 
 **Run:** [README.md §17](README.md#17-bayes-tree-construction-and-affected-region-query) - [`use_numpy/bayes_tree_construction.py`](use_numpy/bayes_tree_construction.py) - builds the elimination tree underlying the Bayes tree over the same square-loop topology, and shows why a loop-closure edge invalidates the *whole* chain while an ordinary edge invalidates just 2 of 16 variables.
 
-**Read:** [`docs/optimization/isam2_optimization.md`](docs/optimization/isam2_optimization.md) (what selective relinearization + reordering buy you beyond what you just built - conceptual only, no accompanying script) and [`docs/optimization/sparse_cholesky_factorization.md`](docs/optimization/sparse_cholesky_factorization.md) (why real solvers exploit sparsity; this repo's solves are dense).
+**Read:** [`docs/optimization/isam2_optimization.md`](docs/optimization/isam2_optimization.md) (what selective relinearization + reordering buy you beyond what you just built - conceptual only, no accompanying script).
 
 **Then read:** [`docs/optimization/marginalization.md`](docs/optimization/marginalization.md) (sliding-window smoothing - ties VINS-Mono-style windows back to the elimination machinery you just learned).
 
@@ -99,7 +101,7 @@ After all nine phases (and, optionally, [Track L](#track-l---hybrid-and-bio-insp
 
 ## Track L - Hybrid and bio-inspired locomotion (optional)
 
-**Needs:** Phase 4. Every script in L1-L4 is a filter for motion that is *not* smooth between measurements: something switches (a bounce, an anchor, a foot touching down), and the question is what the filter may assume at that switch. The groups go from one contact event to one anchor, to many legs; L5 adds wheels that slip. Within a group, go top to bottom.
+**Needs:** Phase 4. Every script in L1-L4 is a filter for a robot that plain smooth motion does not describe: something switches (a bounce, an anchor, a foot touching down), or, from L3.3 on, a constant error the encoders or camera hides (an offset, a drift, a delay). The question is what the filter may assume at a switch, or whether to estimate the constant error as a state. The groups go from one contact event to one anchor, to many legs; L5 adds wheels that slip. Within a group, go from top to bottom.
 
 ### L1 - Contact events: a reset in the motion
 

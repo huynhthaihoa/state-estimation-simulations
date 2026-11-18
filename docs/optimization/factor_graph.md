@@ -77,6 +77,15 @@ That's the essence of factor-graph optimization.
 
 Worked number: the optimizer only sees the measurements, the three 1 m odometry steps and the 3.03 m loop closure (the true 1.02/0.97/1.05 m are unknown to it). Weighting all four equally, least squares lengthens each step by $`0.0075`$ m to 1.0075 m, so $`x_3 = 3.0225`$ m: a compromise between the odometry's 3.00 m and the loop closure's 3.03 m, and closer to the true 3.04 m than odometry alone.
 
+The weights decide who wins the conflict: a stiffer spring bends less, so the more trusted measurement moves less. Same four measurements; each measurement has a weight $`\Omega`$ (how much it is trusted; §4). Odometry steps stay at $`\Omega_{\text{odo}}=1`$ and the loop closure's $`\Omega_{\text{loop}}`$ varies:
+
+| $`\Omega_{\text{loop}}`$ | each step | $`x_3`$ | distance from odometry's 3.00 m | distance from loop's 3.03 m |
+|---|---|---|---|---|
+| 0.01 (trusted 100x less) | 1.0003 m | 3.0009 m | 0.0009 m | 0.0291 m |
+| 1 (equal weights) | 1.0075 m | 3.0225 m | 0.0225 m | 0.0075 m |
+| 100 (trusted 100x more) | 1.0100 m | 3.0299 m | 0.0299 m | 0.0001 m |
+
+Even equal weights do not split the 0.03 m conflict 50/50. It is shared among the four edges (0.0075 m each), and three of them are odometry steps, so odometry absorbs 0.0225 m of it and the loop closure only 0.0075 m.
 
 ![Two panels: top, poses x0 to x3 on a line for odometry only (0, 1, 2, 3 m), after least squares (0, 1.0075, 2.015, 3.0225 m) and the truth (0, 1.02, 1.99, 3.04 m), with the 3.03 m loop closure as an arrow; bottom, a zoom on x3: 3.0000 m, 3.0225 m and 3.0400 m against the loop closure's 3.03 m](../../assets/factor_graph_loop_concept.png)
 
