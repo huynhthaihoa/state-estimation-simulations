@@ -19,6 +19,10 @@ The **error-state Kalman filter** (**ESKF**) sidesteps this by splitting the job
 
 After each measurement update, the estimated error is **injected** into the nominal state and **reset** to zero.
 
+**In everyday terms:** the nominal state is the dot on a navigation app's map, the filter's current best guess of the full state, moved forward by the IMU between fixes. The error state is a small correction note attached to that dot ("probably 2 m too far left and 2° off in heading"). Each position fix produces a new note; the filter applies it to the dot and then tears it up (inject, reset), so the next cycle starts with a blank note.
+
+The split exists because the dot's rotation is delicate: it must always stay a valid rotation. A *small* rotation correction has no such rule; it is just three ordinary numbers. So the Kalman filter estimates only the easy part, and the correction is applied by composing rotations, $`\hat R \leftarrow \hat R\,\mathrm{Exp}(\delta\theta)`$, never by plain addition. $`\hat R`$ therefore stays a valid rotation, and nothing needs renormalizing.
+
 **Toy example (yaw only):**
 - Nominal yaw 30°. A position fix suggests the error is $`\delta\theta = 2°`$.
 - Inject: the nominal yaw becomes 32°.
