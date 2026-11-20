@@ -75,11 +75,23 @@ Isotropic noise or uncertainty is the same in every direction: a covariance $\si
 ### MAP (maximum a posteriori) estimate
 The state that is most probable given all measurements and priors: the peak of the posterior. With Gaussian noise and priors, it is the minimizer of the weighted least-squares cost, which is why factor-graph smoothing returns it (a local one, since the problem is nonlinear). See [filtering_smoothing.md §4](filtering_smoothing.md#4-smoothing-optimization-with-a-probabilistic-interpretation).
 
+### Bayes' rule: prior, likelihood, posterior
+$`p(x \mid y) = \eta\, p(y \mid x)\, p(x)`$: the **prior** $`p(x)`$ is the belief about the state $`x`$ before the measurement $`y`$, the **likelihood** $`p(y \mid x)`$ how probable that reading is if the state were $`x`$, the **posterior** $`p(x \mid y)`$ the belief after it, and $`\eta`$ the number that makes the posterior's area 1. For Gaussians, the product is the inverse-variance fusion below. Not the same as a prior factor in a factor graph (see Prior (unary factor)). See [probability_basics.md §5](foundations/probability_basics.md#5-bayes-rule).
+
 ### Covariance
 **Symbols:** $P$ or $\Sigma$. A matrix describing how uncertain an estimate or a measurement is, and how its errors are correlated. See [kf_ekf_iekf.md §1](filtering/kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear).
 
+### Uncertainty ellipse
+The curve where a 2D Gaussian's density is constant, $`(x-\mu)^\top P^{-1}(x-\mu) = M^2`$; $`M = 1, 2`$ give the 1σ and 2σ ellipses. Its axes lie along the eigenvectors of the covariance $`P`$, with half-lengths $`M`$ times the square roots of the eigenvalues. In 2D the 1σ ellipse holds 39% of the outcomes, not 68%. See [probability_basics.md §2](foundations/probability_basics.md#2-two-variables-at-once).
+
+### Linearized (Gaussian) propagation
+Pushing a Gaussian $`\mathcal{N}(\mu, P)`$ through a nonlinear map $`g`$ by replacing $`g`$ with its tangent at the mean: the result is approximated as $`\mathcal{N}(g(\mu), G P G^\top)`$, with $`G`$ the Jacobian of $`g`$ at $`\mu`$. Accurate only while $`g`$ stays close to its tangent over the spread of $`x`$. See [probability_basics.md §3](foundations/probability_basics.md#3-propagating-uncertainty-through-a-map).
+
 ### Information matrix
 **Symbol:** $\Omega = \Sigma^{-1}$. The inverse covariance. It weights each error so that precise measurements count more. [nonlinear_least_square.md](optimization/nonlinear_least_square.md) writes the same quantity as $W$. Not to be confused with the Gauss-Newton Hessian $H = J^\top \Omega J$ of the linearized problem ([entry](#normal-equations-and-hessian)), which some docs also call its information matrix. See [factor_graph.md §4](optimization/factor_graph.md#4-optimization-means-minimizing-all-those-errors).
+
+### Inverse-variance weighting
+Fusing independent estimates of one quantity with weights proportional to one over their variances; the information (inverse variance) adds, so the fused variance is below either input. For two 1D estimates the weight on the second is the 1D Kalman gain $`K = \sigma_1^2/(\sigma_1^2+\sigma_2^2)`$. See [probability_basics.md §4](foundations/probability_basics.md#4-combining-two-estimates).
 
 ### Mahalanobis distance
 **Symbol:** $d$. $`d^2 = r^\top \Omega\, r`$ for a residual $r$ with information matrix $\Omega$. Its square root $d$ is the error measured in standard deviations, accounting for the noise's shape. For isotropic noise with standard deviation $\sigma$, $\Omega = I/\sigma^2$, so it reduces to plain squared error divided by $\sigma^2$. See [pose_graph_optimization.md §15.3](optimization/pose_graph_optimization.md#153-objective-function) and [factor_graph.md §4](optimization/factor_graph.md#4-optimization-means-minimizing-all-those-errors).
@@ -89,6 +101,9 @@ A factor on a single variable, e.g. one that pins the first pose (to remove gaug
 
 ### Consistency and NEES
 An estimator is **consistent** when its reported covariance matches the errors it actually makes. **NEES** (Normalized Estimation Error Squared) is the squared error measured in units of the filter's own claimed uncertainty: $`(x_{\text{true}} - x_{\text{est}})^\top P^{-1}(x_{\text{true}} - x_{\text{est}})`$, with $`P`$ the reported covariance. A filter that claims a 0.02 m standard deviation but is off by 0.06 m scores $`(0.06/0.02)^2 = 9`$ in one dimension, against an expected 1. Averaged over many trials, it should equal $`n`$ (the state's DoF): persistently larger means overconfident, smaller means underconfident. It measures honesty, not accuracy: a large error with an equally large $`P`$ still gives NEES ≈ $`n`$, and RMSE is what measures accuracy. It needs the true state, so it is computed in simulation only; its no-truth counterpart is NIS. See [linear_nonlinear.md §4.4](filtering/linear_nonlinear.md#44-after-the-fact-consistency-tests) for the confidence band and [hybrid_saltation_ekf.md §6](filtering/hybrid_saltation_ekf.md#6-the-empirical-finding-a-modest-real-gap-not-a-dramatic-one).
+
+### Overconfident and underconfident
+An estimator is **overconfident** when its reported covariance is smaller than the covariance of its real errors (average NEES above the state dimension $`n`$), and **underconfident** when it is larger (average NEES below $`n`$). See [probability_basics.md §7](foundations/probability_basics.md#7-is-the-filter-honest).
 
 ### Chi-square distribution
 **Symbol:** $`\chi^2_k`$. The distribution of a sum of $k$ squared independent standard-normal values ($k$ degrees of freedom); its mean is $k$. A consistent filter's NEES and NIS follow it, and so, roughly, does a correctly weighted squared error $`e^\top \Omega\, e`$. That is why optimizers print their weighted cost as "chi-squared error", and why consistency bounds and outlier-gating thresholds are its quantiles (e.g. 6.63 is the 99% point for $k = 1$). See [linear_nonlinear.md §4.4](filtering/linear_nonlinear.md#44-after-the-fact-consistency-tests).

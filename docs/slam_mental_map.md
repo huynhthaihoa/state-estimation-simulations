@@ -49,7 +49,8 @@ Several docs already draw a partial map of their own corner. We treat those as z
   EVALUATION  Umeyama alignment → RMSE  ·  NEES consistency
 
   FOUNDATIONS (used at every layer above)
-  Jacobian · Lie groups SO(3)/SE(3) · quaternion · linear vs. nonlinear
+  probability (Gaussian, fusion, Bayes) · Jacobian · Lie groups SO(3)/SE(3)
+  quaternion · linear vs. nonlinear
 ```
 
 In the diagram, $`Q`$ is the **process-noise covariance** of the filter's predict step ([glossary](glossary.md#predict-and-update-steps)); **PGO** is pose-graph optimization; **contact/phase** signals (when a legged or crawling body touches the ground, and which gait phase it is in) are explained in the [appendix](#appendix-contact-and-phase-signals).
@@ -87,6 +88,7 @@ In words: a rotation or pose cannot be added like a vector (the sum is not a val
 
 | Concept | What it gives | Explained in | Used by |
 |---|---|---|---|
+| Probability basics | Describing, propagating, fusing and checking uncertainty: Gaussians and covariance, the Kalman filter's 70/30 weights, Bayes' rule, NEES | [probability_basics.md](foundations/probability_basics.md) | every filter and smoother |
 | Linear vs. nonlinear | When a first-order model is good enough | [linear_nonlinear.md §3](filtering/linear_nonlinear.md#3-how-nonlinear-matters-in-practice), [§4](filtering/linear_nonlinear.md#4-how-do-you-know-whether-its-nonlinear-over-your-uncertainty-region) | choosing KF vs. EKF vs. UKF |
 | Jacobian | The local linear model: how errors change when states move | [jacobian.md §2](foundations/jacobian.md#2-now-imagine-multiple-inputs-and-outputs), [§5](foundations/jacobian.md#5-why-does-ekf-need-it) | EKF, GN, LM, bias correction, saltation matrix |
 | Lie group/algebra | Updating rotations and poses without leaving the manifold | [lie_algebra.md §5-§9](foundations/lie_algebra.md#5-lie-group-the-space-of-valid-transformations), [§11](foundations/lie_algebra.md#11-se3-this-is-where-robotics-gets-really-interesting) | IEKF, PGO, BA, preintegration |
@@ -389,6 +391,7 @@ Accuracy and covariance calibration are separate properties, and NEES measures t
 | `imu_propagation_position_fix.py` | Back-end (toy) | Twist dead reckoning + 1 Hz GN position fix (no accel/bias) | [imu_preintegration.md §7](optimization/imu_preintegration.md#7-what-the-accompanying-scripts-actually-do-and-dont) |
 | `imu_preintegration.py` | Front-end → back-end | Bundle + bias Jacobians + $O(1)$ correction (no graph factor) | [imu_preintegration.md](optimization/imu_preintegration.md) |
 | `imu_allan_variance.py` | Foundations | Allan deviation of a static IMU gives its noise values; the ESKF fed a correct vs. a wrongly converted per-sample std | [noise_identification.md](foundations/noise_identification.md) |
+| `probability_basics.py` | Foundations | Fusing two estimates, a Gaussian through a linear and a range-bearing map, NEES of an honest vs. over- and underconfident estimator | [probability_basics.md](foundations/probability_basics.md) |
 | `pnp_estimation.py` | Front-end | Pose from known 3D points | [triangulation_pnp.md §3](frontend/triangulation_pnp.md#3-pnp-as-the-inverse-problem) |
 | `pointcloud_pose_tracking.py` | Back-end, both branches | EKF/IEKF/UKF/vanilla KF vs. batch GN | [pointcloud_pose_tracking_empirical_note.md](filtering/pointcloud_pose_tracking_empirical_note.md) |
 | `rts_smoother.py` | Back-end, both branches | 1D inchworm: Kalman filter vs. its RTS smoother vs. batch least squares, with a fixed-lag version | [filtering_smoothing.md §8](filtering_smoothing.md#the-same-picture-with-numbers-a-kalman-filter-and-its-rts-smoother-on-one-data-set) |
@@ -424,7 +427,7 @@ Accuracy and covariance calibration are separate properties, and NEES measures t
 
 `lie_utils.py` and `numpy_utils.py` (in `use_numpy/`), `manif_utils.py` (in `use_manif/`), and `utils.py` and `lidar_utils.py` (at the repo root) are shared helpers, not stops on the map; see [README.md §C](../README.md#c-library-structure).
 
-Not on the map: the thirteen `*_v2.py` files are class-based rewrites of `pointcloud_pose_tracking`, `saltation_matrix_ekf`, the five `inchworm_*` scripts, `magnetic_inchworm_odometry_ekf`, `friction_anisotropic_ekf`, `invariant_saltation_ekf`, `hexapod_gait_ekf`, `gait_phase_ekf` and `eskf_imu_position_fix`; the thirty-six `animate_*.py` scripts in [generator/](../generator/) render the GIF embedded in the matching doc (see [README.md §C](../README.md#c-library-structure)). All `Script` names above exist in `use_numpy/`; eleven also have a `use_manif/` twin (`imu_integration_comparison`, `imu_propagation_position_fix`, `imu_preintegration`, `pointcloud_pose_tracking`, `invariant_saltation_ekf`, `pose_graph`, `bundle_adjustment`, `bundle_adjustment_advanced`, `pose_graph_incremental`, `pose_graph_robust`, `lidar_primitives`), the rest are NumPy-only.
+Not on the map: the thirteen `*_v2.py` files are class-based rewrites of `pointcloud_pose_tracking`, `saltation_matrix_ekf`, the five `inchworm_*` scripts, `magnetic_inchworm_odometry_ekf`, `friction_anisotropic_ekf`, `invariant_saltation_ekf`, `hexapod_gait_ekf`, `gait_phase_ekf` and `eskf_imu_position_fix`; the thirty-seven `animate_*.py` scripts in [generator/](../generator/) render the GIF embedded in the matching doc (see [README.md §C](../README.md#c-library-structure)). All `Script` names above exist in `use_numpy/`; eleven also have a `use_manif/` twin (`imu_integration_comparison`, `imu_propagation_position_fix`, `imu_preintegration`, `pointcloud_pose_tracking`, `invariant_saltation_ekf`, `pose_graph`, `bundle_adjustment`, `bundle_adjustment_advanced`, `pose_graph_incremental`, `pose_graph_robust`, `lidar_primitives`), the rest are NumPy-only.
 
 ---
 

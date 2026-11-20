@@ -17,6 +17,7 @@ Conceptual notes on the state estimation and SLAM ideas behind the code in [`use
 - [umeyama_alignment.md](foundations/umeyama_alignment.md): the closed-form best-fit scale, rotation and translation between two point sets, used to align a reconstruction onto ground truth before measuring error.
 - [noise_identification.md](foundations/noise_identification.md): where the noise values an IMU filter assumes come from: the Allan deviation of a static recording gives the white-noise density (slope -1/2) and the bias random-walk density (slope +1/2), the conversion from density to per-sample std, and what a wrong conversion does to an ESKF's NEES; implemented in `imu_allan_variance.py`.
 - [observability.md](foundations/observability.md): what no sensor can see: the observability matrix and its null space, a table of every observability finding in the repo, and a planar EKF-SLAM toy where the standard EKF's linearized model loses the rotation direction (2 unobservable directions instead of 3) while first-estimate Jacobians (FEJ) and the invariant EKF keep all 3; implemented in `observability_fej.py`.
+- [probability_basics.md](foundations/probability_basics.md): the probability a learner needs before the Kalman filter: Gaussians and covariance, pushing them through linear and nonlinear maps, fusing two estimates (where the Kalman filter's 70/30 weights come from), Bayes' rule, why least squares, and what NEES checks; implemented in `probability_basics.py`.
 
 ## [`frontend/`](frontend/) - Turning raw sensor data into constraints for the back-end
 
