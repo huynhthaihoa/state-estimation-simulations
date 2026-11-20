@@ -1,5 +1,17 @@
 # Two-pad inchworm: reading both pad sensors
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| Intuition, §1.1-§1.2 | [inchworm_two_pad_ekf.md](inchworm_two_pad_ekf.md) §1.1-§1.2 (gait, slip pulses, sensors); the **NEES**: [probability_basics.md](../foundations/probability_basics.md) §7 | read |
+| §1.3-§1.4 (five variants, cross-check) | [inchworm_two_pad_ekf.md](inchworm_two_pad_ekf.md) §1.3-§1.4 (state, closure update, the `pad_fused` policy, the veto threshold); weighting two readings by their precision: [probability_basics.md](../foundations/probability_basics.md) §4; the **Mahalanobis distance** behind the disagreement test: [probability_basics.md](../foundations/probability_basics.md) §6 | read |
+| §2-§4 | §1 | read |
+| §5 (other sweeps) | §3 | skip |
+| §6-§7 | §1-§4 | read |
+
+The simulation is [`inchworm_two_pad_fusion_ekf.py`](../../use_numpy/inchworm_two_pad_fusion_ekf.py) ([README §24](../../README.md#24-two-pad-inchworm-reading-both-pad-sensors)). Sources are listed in [References](#8-references).
+
 ## Intuition
 
 [`inchworm_two_pad_ekf.md`](inchworm_two_pad_ekf.md) (**the two-pad doc** below) tracks a planar inchworm with a back pad and a front pad, a gyro, a **kinematic closure** (the front pad's position relative to the back pad, from the **motor encoders**, sensors that count how far each motor has turned) and no position fix. Its filter reads only the **anchored pad**'s optical displacement sensor (the pad that grips while the other moves), as the robot that motivates it does (Kubík & Faigl, reference 1). The **moving pad** has no motion model; the closure alone places it. Its best policy, `pad_fused`, moves the anchored pad by its sensor's reading. This doc keeps that and adds what the two-pad doc left out:

@@ -1,5 +1,16 @@
 # Particle filter localization: several hills against one hill
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| Intuition, §1-§3 (scene, filters, results) | the one-hill filters: [kf_ekf_iekf.md](kf_ekf_iekf.md) §1-§2 and §8 (the several-hills picture); the **UKF**: [extra_kf_variants.md](extra_kf_variants.md) §1; a **likelihood** and Bayes' rule: [probability_basics.md](../foundations/probability_basics.md) §5 | read |
+| §4-§6 (particle count, door layout, other sweeps) | §1-§3 | skip: §11 states the findings of §4-§5 |
+| §7 (known-start diagnostic), §9-§11 | §1-§3 | read |
+| §8 (maximum-likelihood association) | §3 | skip: a labeled variant |
+
+The script is [`particle_filter_localization.py`](../../use_numpy/particle_filter_localization.py) ([README §8](../../README.md#8-particle-filter-localization-several-hills-against-one-hill)); §3-§8 give the command for each of their tables. Sources are numbered [1]-[8] in [References](#12-references).
+
 ## Intuition
 
 A filter's **belief** is its answer to "where is the robot?", drawn as hills over the map: high where the robot probably is. The KF, EKF and UKF draw exactly **one hill** (a Gaussian). A **particle filter (PF)** draws any shape, including **several hills** ([kf_ekf_iekf.md §8](kf_ekf_iekf.md#8-which-one-should-we-use) has the picture).

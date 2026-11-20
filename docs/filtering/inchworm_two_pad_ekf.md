@@ -1,5 +1,16 @@
 # Two-pad inchworm: trusting the anchored pad without a position fix
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| Intuition, §1 (model) | [inchworm_zupt_ekf.md](inchworm_zupt_ekf.md) §1-§4 (the **ZUPT** and the anchor schedule) and §6 (the slipping anchor, sensor veto and fusion that this doc extends); the **NEES** and **overconfident**: [probability_basics.md](../foundations/probability_basics.md) §7; §1.3's closure update is an EKF step with a Jacobian: [kf_ekf_iekf.md](kf_ekf_iekf.md) §2, [jacobian.md](../foundations/jacobian.md) §1-§8 | read |
+| §2-§4 (sanity check, results with slip, tuning the veto) | §1 | read |
+| §5 (experiments left out) | §1-§4 | skip |
+| §6-§7 | §1-§4 | read |
+
+The simulation is [`inchworm_two_pad_ekf.py`](../../use_numpy/inchworm_two_pad_ekf.py) ([README §23](../../README.md#23-two-pad-inchworm-trusting-the-anchored-pad-without-a-position-fix)). Sources are listed in [References](#8-references).
+
 ## Intuition
 
 [`inchworm_zupt_ekf.md` §6](inchworm_zupt_ekf.md#6-side-extension-anchor-slip-and-a-measured-gate) (**inchworm §6** below) asked when a slipping anchor still justifies "$`v = 0`$", using a 1D point mass, one sensor that reads the body in every phase, and a noisy position measurement every **tick** (one filter step, 0.05 s). A real inchworm robot has none of those simplifications. This doc drops them:

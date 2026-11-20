@@ -4,6 +4,17 @@
 
 *Animation: the true motion of [`friction_anisotropic_ekf.py`](../../use_numpy/friction_anisotropic_ekf.py)'s truth generator (seed 0, no filters), made by `figures/make_locomotion_gifs.py friction_crawler` in the companion repo `bio-inspired-locomotion`.*
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| Intuition (except "Where the question comes from"), Scope | the **isotropic**/**anisotropic** noise argument that "Relation to the point-cloud note" recaps: [pointcloud_pose_tracking_empirical_note.md](pointcloud_pose_tracking_empirical_note.md) §2 and §5 | read |
+| Intuition, "Where the question comes from" | the **saltation matrix**: [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) | skip |
+| §1 (setup) | the predict and update steps: [kf_ekf_iekf.md](kf_ekf_iekf.md) §1-§2; the Jacobian $`F`$ of the motion model: [jacobian.md](../foundations/jacobian.md) §1-§8 | read |
+| §2-§4 | §1; the **NEES** and its 95% acceptance interval: [probability_basics.md](../foundations/probability_basics.md) §7 | read |
+
+The simulation is [`friction_anisotropic_ekf.py`](../../use_numpy/friction_anisotropic_ekf.py) ([README §25](../../README.md#25-friction-anisotropic-process-noise-fixed-vs-heading-aware-q)). Sources are listed in [References](#5-references).
+
 ## Intuition
 
 "Anisotropic friction" means **a surface grips well along one axis and slides easily along the perpendicular one**. The classic biological example is a snake's belly scales, which slide easily along the body and grip sideways (Hu et al. 2009). Our pad is the mirror image: it grips along its forward axis and slips sideways. Swapping the axes would only rotate the noise ellipse by 90°.

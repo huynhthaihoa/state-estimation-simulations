@@ -1,5 +1,16 @@
 # Contact-aided invariant EKF on a hexapod: which filter knows yaw is unobservable
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| Intuition, §1 | the gaits and stance feet: [hexapod_gait_ekf.md](hexapod_gait_ekf.md) (Intuition); observable and unobservable directions: [observability.md](../foundations/observability.md) §1; the exponential map and the extended pose $`SE_2(3)`$: [lie_algebra.md §8](../foundations/lie_algebra.md#8-the-exponential-map), [§11.1](../foundations/lie_algebra.md#111-extended-poses-pose-plus-velocity) | read |
+| §2 (two filters) | the invariant EKF: [kf_ekf_iekf.md](kf_ekf_iekf.md) §3-§7, [left_right_invariant.md](left_right_invariant.md) §1, [invariant_saltation_ekf.md](invariant_saltation_ekf.md) §1-§2; the error-state EKF: [eskf.md](eskf.md) | read |
+| §3-§4 (no biases, slipping leg) | §2; NEES: [probability_basics.md §7](../foundations/probability_basics.md#7-is-the-filter-honest), with its 95% bands in [linear_nonlinear.md §4.4](linear_nonlinear.md#44-after-the-fact-consistency-tests); §4's gate: [hexapod_gait_ekf.md §3](hexapod_gait_ekf.md#3-one-slipping-leg-the-gait-barely-matters-gating-does) | read |
+| §5 (IMU biases) | §2; the adjoint: [lie_algebra.md §11.2](../foundations/lie_algebra.md#112-the-adjoint-moving-a-small-motion-between-frames); the "imperfect" invariant EKF: [kf_ekf_iekf.md](kf_ekf_iekf.md) §6 | read |
+
+The simulation is [`hexapod_contact_inekf.py`](../../use_numpy/hexapod_contact_inekf.py) ([README §27](../../README.md#27-contact-aided-invariant-ekf-on-a-hexapod-which-filter-knows-yaw-is-unobservable)). Sources are numbered ref. 1-3 in [References](#7-references).
+
 ## Intuition
 
 An inertial measurement unit (IMU, [glossary](../glossary.md#imu-inertial-measurement-unit)) plus leg kinematics is the standard **proprioceptive** setup for a legged robot: sensors that measure only the robot's own motion and joints, not its surroundings. The IMU drives the body forward in time. Each foot on the ground stays put, and the leg's joint encoders say where that foot is relative to the body. If the filter keeps the **world position** of every **stance foot** (a foot on the ground, as opposed to a **swing** foot in the air) in its state, each kinematic reading ties the body to a point that isn't moving. Hartley et al. (ref. 1) built this as an invariant extended Kalman filter (EKF, [glossary](../glossary.md#iekf-invariant-ekf)), and this toy reproduces it on a hexapod.

@@ -1,5 +1,16 @@
 # IMM: estimating "anchored or slipping" instead of thresholding it
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| [Intuition](#intuition), [Model](#model) | [inchworm_zupt_ekf.md](inchworm_zupt_ekf.md) §1-§4 and §6: the 1D point mass, the slip pulses and the policies (`schedule`, `sensor_gate`, `sensor_fused`) this doc reuses | read |
+| [The IMM in one table](#the-imm-in-one-table), [Transition matrix](#transition-matrix-a-design-choice) | the Kalman filter's predict and update steps: [kf_ekf_iekf.md](kf_ekf_iekf.md) §1; the Gaussian likelihood and the **Mahalanobis distance**: [probability_basics.md](../foundations/probability_basics.md) §5-§6 | read |
+| [Results](#results) A-C, [Slip detection](#slip-detection), [What this toy does not show](#what-this-toy-does-not-show), [Takeaway](#takeaway) | the **NEES** and its consistent interval: [probability_basics.md](../foundations/probability_basics.md) §7 | read |
+| [Switch-rate sensitivity](#switch-rate-sensitivity), [Ablations](#ablations) | the Results above | skip |
+
+The simulation is [`inchworm_slip_imm.py`](../../use_numpy/inchworm_slip_imm.py) ([README §22](../../README.md#22-inchworm-anchor-slip-an-imm-instead-of-a-hard-gate)). Sources are numbered 1-2 in [References](#references).
+
 ## Intuition
 
 When the anchor may slip, the filter has to decide whether "velocity = 0" is true right now. [`inchworm_zupt_ekf.md` §6](inchworm_zupt_ekf.md#6-side-extension-anchor-slip-and-a-measured-gate) decides with a hard rule: the schedule, a threshold gate on the pad reading, or no decision at all (use the reading as a velocity). An **interacting multiple model (IMM)** filter decides softly. It runs two Kalman filters side by side, one that assumes the body is **still** and one that assumes it is **moving**, and keeps a probability for each. Each tick, the mode that predicted the new measurements better gains probability, and the output is the probability-weighted blend of the two.

@@ -2,10 +2,18 @@
 
 An [IMU](../glossary.md#imu-inertial-measurement-unit) sampled at 100-1000 Hz produces **tens to hundreds of raw samples between two [keyframes](../glossary.md#keyframe)**. IMU preintegration compresses them into **one relative-motion factor**. When the [bias](../glossary.md#bias) estimate changes, the factor is corrected instantly, without re-touching a single raw sample.
 
-It builds on two earlier ideas:
+**How to read it.**
 
-- The **node/edge language** from [pose_graph_optimization.md](pose_graph_optimization.md#2-where-do-the-edges-come-from): an edge is a relative-motion constraint between two nodes.
-- The **right Jacobian** from [jacobian.md §11](../foundations/jacobian.md#11-left-and-right-jacobians-sensitivity-on-a-curved-space): $`\text{Exp}(\varphi+\delta\varphi) \approx \text{Exp}(\varphi)\cdot\text{Exp}\big(J_r(\varphi)\,\delta\varphi\big)`$, where the extra rotation is composed on the right, i.e., in the object's own body frame. Here $`\text{Exp}`$ turns a rotation vector (an axis times an angle) into a rotation matrix ([glossary](../glossary.md#exp-and-log-maps)).
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| §1-§2 (problem, analogy) | the **node/edge** language of a pose graph: [pose_graph_optimization.md](pose_graph_optimization.md) §2 | read |
+| §3-§5 (the bundle, bias Jacobians, correction) | the **right Jacobian** $`J_r`$ and $`\text{Exp}`$ on rotations: [jacobian.md](../foundations/jacobian.md) §11 (§11.1, §11.2 and §11.4 are used), plus its §3 (sensitivity map) and §8 (a Jacobian is local); $`\text{Exp}`$ itself: [lie_algebra.md](../foundations/lie_algebra.md) §8; the **adjoint** used in §4: lie_algebra.md §11.2 | read right after jacobian.md §11 |
+| §6 (fit in a back-end) | the "measured vs. predicted, then `Log`" residual: pose_graph_optimization.md §7 | read |
+| §7 (the three IMU scripts) | §3-§5 | read the `imu_preintegration.py` parts; skip the other two scripts |
+| §7.1 (math of those two other scripts) | $`\text{Exp}`$ and a damped Gauss-Newton step ([gauss_newton.md](gauss_newton.md)) | skip |
+| §8 (summary) | §3-§5 | read |
+
+§3-§5 are what [`imu_preintegration.py`](../../use_numpy/imu_preintegration.py) implements ([README §3](../../README.md#3-imu-preintegration-with-bias-jacobians)). Sources are listed in [References](#9-references).
 
 ---
 

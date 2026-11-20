@@ -1,5 +1,7 @@
 # iSAM2
 
+**How to read it.** §1-§6 introduce iSAM2 and compare it with the original iSAM, taught in [isam_optimization.md](isam_optimization.md) §1-§14; §4 also uses one Gauss-Newton step as a linear solve ([gauss_newton.md](gauss_newton.md)). §7 and §12 use $`H=LL^\top`$, fill-in and variable ordering ([sparse_cholesky_factorization.md](sparse_cholesky_factorization.md) §1-§5), and §7 needs only a rough picture of the Bayes tree, which [bayes_tree.md](bayes_tree.md) develops in full. §11 and §19 quote counts from [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) ([README §17](../../README.md#17-bayes-tree-construction-and-affected-region-query)), the only part of iSAM2 this repo builds; [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) implements iSAM instead ([README §16](../../README.md#16-incremental-square-root-sam-vs-batch-pose-graph-solving)). No script runs iSAM2 as a whole. Sources are listed in [References](#20-references).
+
 ## 1. The big idea
 
 **iSAM2 = Incremental Smoothing and Mapping 2**

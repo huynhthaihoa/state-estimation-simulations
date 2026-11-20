@@ -2,11 +2,6 @@
 
 For **robotics, [SLAM](../glossary.md#slam-simultaneous-localization-and-mapping) (simultaneous localization and mapping), visual-inertial estimation, and embedded systems**, several Kalman filter variants are worth knowing. We focus on **why each one exists**.
 
-This builds directly on:
-- The **standard [Kalman filter (KF)](../glossary.md#kalman-filter-kf), [Extended KF (EKF)](../glossary.md#ekf-extended-kalman-filter), and [Invariant EKF (IEKF)](../glossary.md#iekf-invariant-ekf)** foundations from [kf_ekf_iekf.md](kf_ekf_iekf.md) - this doc surveys the wider family those three sit inside.
-- **Lie groups and $`SO(3)`$/$`SE(3)`$** ([glossary](../glossary.md#so3-and-se3)) from [lie_algebra.md §5, §11](../foundations/lie_algebra.md#5-lie-group-the-space-of-valid-transformations) - the structure §2's ESKF and §3's IEKF sections both lean on.
-- **Robust loss functions (Huber, etc.)** from [pose_graph_optimization.md §16](../optimization/pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures) - referenced directly in §8's Robust KF discussion.
-
 A good mental map is:
 
 ```text
@@ -33,6 +28,17 @@ Standard KF  ┌───┴───────┐
 The chain is the lineage this doc follows: the IEKF is an error-state filter (§2). [slam_mental_map.md](../slam_mental_map.md) instead draws ESKF and IEKF as two sibling variants of the EKF.
 
 The remaining variants deal with **noise, time, robustness, and computational constraints**. This is one corner of the repo-wide map in [slam_mental_map.md](../slam_mental_map.md), which places every doc and script in one picture.
+
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| §1 (UKF) | the **standard KF** and **EKF**, including the EKF's Jacobian linearization: [kf_ekf_iekf.md](kf_ekf_iekf.md) §1-§2 | read right after [linear_nonlinear.md](linear_nonlinear.md) |
+| §2-§3 (ESKF, IEKF) | **Lie groups and $`SO(3)`$/$`SE(3)`$**: [lie_algebra.md](../foundations/lie_algebra.md) §5, §11 (the structure both sections lean on); the **standard KF, EKF and IEKF** foundations: [kf_ekf_iekf.md](kf_ekf_iekf.md) | skip: they summarize [eskf.md](eskf.md) and [kf_ekf_iekf.md](kf_ekf_iekf.md) §3-§7 |
+| §4-§10 (square-root, ensemble, particle filter, adaptive, robust, smoother, multi-rate) | the KF's predict and update: [kf_ekf_iekf.md](kf_ekf_iekf.md) §1; §8 also needs **robust loss functions (Huber, etc.)**: [pose_graph_optimization.md](../optimization/pose_graph_optimization.md) §16 | skip |
+| §11-§13 (what to learn first, filtering vs. optimization, summary) | §1-§10 | skip |
+
+§1 points to `run_ukf` in [`pointcloud_pose_tracking.py`](../../use_numpy/pointcloud_pose_tracking.py) ([README §5](../../README.md#5-point-cloud-pose-tracking-ekf-vs-invariant-ekf-vs-batch-gauss-newton-vs-ukf-vs-vanilla-kf)). Sources are listed in [References](#14-references).
 
 ---
 

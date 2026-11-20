@@ -1,5 +1,16 @@
 # Robust pose-graph optimization against false loop closures
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| Intuition, §1-§3 | the pose graph and loop closure: [pose_graph_optimization.md](pose_graph_optimization.md) §1-§14 (§12 for the **information matrix**); the kernels (Huber, Cauchy, DCS) and the kernel scale: [§16](pose_graph_optimization.md#16-robust-loss-functions-used-to-handle-false-loop-closures); the damped step: [levenberg_marquardt.md](levenberg_marquardt.md) §1-§9 | read |
+| §4 (kernel scale) | §1-§3 | read |
+| §5 (variants, failure cases) | §1-§4 | skip |
+| §6-§7 | §1-§4 | read |
+
+The results come from [`pose_graph_robust.py`](../../use_numpy/pose_graph_robust.py) ([README §13](../../README.md#13-3d-pose-graph-with-false-loop-closures-plain-least-squares-vs-robust-kernels)), which reuses the solver of [`pose_graph.py`](../../use_numpy/pose_graph.py) ([README §12](../../README.md#12-3d-pose-graph-relaxation)). Sources are numbered 1-5 in [References](#8-references).
+
 ## Intuition
 
 A **false loop closure** is an edge that claims "I have been here before" about two places that are not the same. Plain least squares ($`L_2`$) believes it as strongly as every other edge, and drags the whole map together to satisfy it.

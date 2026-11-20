@@ -4,6 +4,8 @@ The **Jacobian** has a very intuitive meaning:
 
 > **A Jacobian tells us how a small change in the input causes a small change in the output.**
 
+**How to read it.** §1-§8 need only derivatives and matrix-vector products. §5 uses the EKF and the bell curve only as motivation; the Kalman filter itself is taught in [kf_ekf_iekf.md](../filtering/kf_ekf_iekf.md) §1-§2. §9 compares KF, EKF and IEKF, so read it after [kf_ekf_iekf.md](../filtering/kf_ekf_iekf.md) §1-§3. §11 (left and right Jacobians) needs rotations and the exponential map ([lie_algebra.md §8](lie_algebra.md#8-the-exponential-map)) and can wait until [IMU preintegration](../optimization/imu_preintegration.md). Sources are listed in [References](#12-references).
+
 ---
 
 ## 1. Start with a simple function

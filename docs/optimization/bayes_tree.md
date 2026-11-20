@@ -2,6 +2,18 @@
 
 The name sounds probabilistic, but for SLAM, a Bayes tree is mainly a **tree representation of the factorization of your optimization problem**.
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| §1-§2 (factor graph, normal equations) | [factor_graph.md](factor_graph.md); one Gauss-Newton step as a linear solve ([gauss_newton.md](gauss_newton.md)); $`H=LL^\top`$ and triangular solves: [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md) §1-§2 | read |
+| §3-§5 (elimination, why a tree) | **variable elimination**, fill-in and the elimination tree: [elimination_tree.md](elimination_tree.md) §1-§3 | read |
+| §6 (probabilistic interpretation) | the notation $`p(x \mid y)`$: [probability_basics.md](../foundations/probability_basics.md) §5 | read |
+| §7-§14 (iSAM2 use, loop closure, cliques) | §3-§5; they name **iSAM2** and say what they need of it, and §9 contrasts the older [isam_optimization.md](isam_optimization.md), which uses no Bayes tree; [isam2_optimization.md](isam2_optimization.md) is the full algorithm and comes after this doc | read |
+| §15 (this repo) | §3-§4 | read |
+
+§4.1 and §15 describe [`bayes_tree_construction.py`](../../use_numpy/bayes_tree_construction.py) ([README §17](../../README.md#17-bayes-tree-construction-and-affected-region-query)). Sources are listed in [References](#16-references).
+
 ---
 
 ## 1. Start with the factor graph

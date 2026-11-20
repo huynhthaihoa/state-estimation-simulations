@@ -14,6 +14,8 @@ SLAM outputs two things: the **trajectory** (the robot's pose at each time) and 
 
 *Figure: the two stages and what passes between them, drawn from §1-§5 (regenerate with `uv run python generator/make_frontend_backend_svgs.py`). The back-end is drawn through its optimization form (§2); filtering is the other back-end strategy ([filtering_smoothing.md](filtering_smoothing.md)). **IMU bundles** are preintegrated IMU measurements between keyframes ([glossary](glossary.md#imu-preintegration)), front-end work whose output is a back-end factor; **priors** are single-variable constraints such as one that pins the first pose ([glossary](glossary.md#prior-unary-factor)). **PnP** is Perspective-n-Point, **iSAM** incremental smoothing and mapping, **DCS** dynamic covariance scaling (a robust cost).*
 
+**How to read it.** Read it first: §1-§5 need nothing from other docs, since the terms they use are explained in place or linked to the [glossary](glossary.md). The links to the front-end docs (§1) and the optimization docs (§2, §4) point to later reading; a first pass does not follow them. Sources are listed in [References](#6-references).
+
 ---
 
 ## 1. SLAM Front-end - extracting constraints

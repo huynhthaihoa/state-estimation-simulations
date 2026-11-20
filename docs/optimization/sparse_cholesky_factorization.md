@@ -30,6 +30,8 @@ L = \begin{bmatrix} 2 & 0 & 0\\
 
 The key observation is that **large optimization problems often contain mostly zeros**.
 
+**How to read it.** §1-§2 need one Gauss-Newton step written as the linear system $`H\Delta x=-b`$ ([gauss_newton.md](gauss_newton.md)) and the measurement information matrix $`\Omega`$ ([factor_graph.md](factor_graph.md) §4); §2's gauge-freedom paragraph also points to [pose_graph_optimization.md](pose_graph_optimization.md) §7 and [bundle_adjustment.md](bundle_adjustment.md) §14. §3-§10 build on §1-§2. §5's figure, animation and tables use the default scene of [`bundle_adjustment.py`](../../use_numpy/bundle_adjustment.py) ([README §14](../../README.md#14-bundle-adjustment-joint-pose--landmark-refinement)), and its list of ordering heuristics ends with iSAM2's choice, which [isam2_optimization.md](isam2_optimization.md) §12 explains. Sources are listed in [References](#11-references).
+
 ---
 
 ## 1. Why does sparsity matter?

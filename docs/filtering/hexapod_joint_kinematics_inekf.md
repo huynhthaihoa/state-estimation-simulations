@@ -1,5 +1,7 @@
 # Joint encoders on an 18-DOF hexapod: when the leg-kinematics noise model matters
 
+**How to read it.** §1-§2 need the filter of [hexapod_contact_inekf.md](hexapod_contact_inekf.md) (Intuition, §1-§2, and §5 for its "imperfect" invariant EKF with biases) and the Jacobian ([jacobian.md](../foundations/jacobian.md) §1-§8), since the leg's own Jacobian shapes the foot error. §3-§4 need §2's five filters and its scores (NEES: [probability_basics.md §7](../foundations/probability_basics.md#7-is-the-filter-honest)). The simulation is [`hexapod_joint_kinematics_inekf.py`](../../use_numpy/hexapod_joint_kinematics_inekf.py) ([README §29](../../README.md#29-joint-encoders-on-an-18-dof-hexapod-when-the-leg-kinematics-noise-model-matters)). Sources are numbered ref. 1-5 in [References](#7-references).
+
 ## Intuition
 
 [`hexapod_contact_inekf.md`](hexapod_contact_inekf.md) (**the contact doc** below) tracks a hexapod from an IMU (inertial measurement unit) and its stance feet (the feet on the ground). Each stance foot's position in the body frame is a reading with the same small error in every direction. On a real robot, that reading comes from the leg's **joint encoders** (the sensors that measure each joint's angle) through the leg's **forward kinematics** (FK: the map from joint angles to the foot's position). So its error is not a fixed sphere:

@@ -11,6 +11,16 @@ The same closed-form fit also runs *inside* SLAM pipelines:
 - point-to-point **[ICP](../glossary.md#icp-iterative-closest-point)** (iterative closest point: repeatedly match each point to its nearest neighbor, then re-align) uses it as the per-iteration alignment step (scale fixed to 1); this is general background, as this repo's ICP (`lidar_primitives.py`) does not call it
 - **monocular** (single-camera) systems use the similarity version to align two maps at a [loop closure](../glossary.md#loop-closure)
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| §1-§1.1 | the tiny example is self-contained; the comparison with pose graphs: [pose_graph_optimization.md](../optimization/pose_graph_optimization.md) (the gauge note); bundle adjustment is only named | read |
+| §2-§5 | a rotation matrix in $`SO(3)`$: [lie_algebra.md](lie_algebra.md) §5; least squares: [nonlinear_least_square.md](../optimization/nonlinear_least_square.md) §1 (SVD is explained in §2) | read |
+| §6 | the BA scripts it names: [bundle_adjustment.md](../optimization/bundle_adjustment.md) §1-§11 and §14 | read after those |
+
+§6 lists where the repo calls `umeyama_alignment`: [`bundle_adjustment.py`](../../use_numpy/bundle_adjustment.py) ([README §14](../../README.md#14-bundle-adjustment-joint-pose--landmark-refinement)), [`bundle_adjustment_advanced.py`](../../use_numpy/bundle_adjustment_advanced.py) ([README §15](../../README.md#15-local--global-bundle-adjustment-bounded-windows-vs-whole-map-re-solves), which does not call it) and [`lidar_primitives.py`](../../use_numpy/lidar_primitives.py) ([README §10](../../README.md#10-lidar-primitives-planes-and-cylinders-for-scan-registration)). Sources are listed in [References](#8-references).
+
 ---
 
 ## 1. Why an alignment step is needed at all

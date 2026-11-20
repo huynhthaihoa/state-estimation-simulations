@@ -1,5 +1,16 @@
 # Invariant EKF on $`SE_2(3)`$ through a bounce: the saltation matrix on a Lie group
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| Intuition, §1-§2 (the system, the RIEKF between bounces) | the bounce and the **saltation matrix**: [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) §1-§3; the **right-invariant error**: [left_right_invariant.md](left_right_invariant.md) §1-§3, on top of the **IEKF** in [kf_ekf_iekf.md](kf_ekf_iekf.md) §3-§5; $`SE_2(3)`$: [lie_algebra.md](../foundations/lie_algebra.md) §11.1 | read |
+| §3-§5 (what the bounce breaks, the saltation matrix on the group, verification) | §1-§2 | read |
+| §6-§7 (consistency, contact-detection jitter) | **NEES**: [probability_basics.md](../foundations/probability_basics.md) §7; §7 uses the detection-jitter model of [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) §8 | read |
+| §8 (scope) | §1-§7 | read |
+
+The script is [`invariant_saltation_ekf.py`](../../use_numpy/invariant_saltation_ekf.py) ([README §20](../../README.md#20-invariant-ekf-on-se_23-through-a-bounce)), with a [`use_manif/`](../../use_manif/invariant_saltation_ekf.py) twin. Sources are listed in [References](#9-references).
+
 ## Intuition
 
 [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) tracks a bouncing **point mass**: a plain vector state, where the only subtlety at a bounce is timing - a perturbed trajectory hits the ground a little earlier or later, and the saltation matrix ([glossary](../glossary.md#saltation-matrix)) handles it. This note lifts the same system to a **tumbling rigid body carrying an inertial measurement unit (IMU)** ([glossary](../glossary.md#imu-inertial-measurement-unit)), whose state lives on the Lie group ([glossary](../glossary.md#lie-group)) $`SE_2(3)`$, and tracks it with a **right-invariant extended Kalman filter (RIEKF)**, a kind of invariant EKF ([glossary](../glossary.md#iekf-invariant-ekf)) built on the right-invariant error of §2. Between bounces, the RIEKF's error dynamics do not depend on the trajectory at all (**trajectory independence**), which is why invariant filters are a common choice for IMU-driven robots.

@@ -1,5 +1,7 @@
 # Legs plus a tracking camera: how to use a pose that drifts
 
+**How to read it.** Intuition-§2 need [hexapod_contact_inekf.md](hexapod_contact_inekf.md) (Intuition, §1-§2: the filter, and why legs and an IMU cannot observe position or yaw) and Exp and Log ([lie_algebra.md §8](../foundations/lie_algebra.md#8-the-exponential-map), [§9](../foundations/lie_algebra.md#9-the-logarithm-map)). §3-§4 need §2's four filters and its scores. §5 needs §2 and §3's `cam_pose_drift`. The simulation is [`hexapod_camera_fusion_inekf.py`](../../use_numpy/hexapod_camera_fusion_inekf.py) ([README §32](../../README.md#32-legs-plus-a-tracking-camera-how-to-use-a-pose-that-drifts)). Sources are numbered ref. 1-8 in [References](#8-references).
+
 ## Intuition
 
 [`hexapod_contact_inekf.md`](hexapod_contact_inekf.md) (**the contact doc** below) tracks a walking hexapod from an IMU and its stance feet. That combination cannot observe the robot's absolute position or its **yaw** (heading about gravity): both drift without bound.

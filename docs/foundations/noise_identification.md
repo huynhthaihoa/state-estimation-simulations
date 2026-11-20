@@ -1,5 +1,7 @@
 # Noise identification: where Q and R come from (Allan variance)
 
+**How to read it.** The Intuition and §1-§5 need only the mean, the variance and the standard deviation ([probability_basics.md](probability_basics.md) §1). §6 also needs the ESKF ([eskf.md](../filtering/eskf.md); §2.2 introduces $`Q`$ and $`L`$) and NEES (probability_basics.md §7). §5 is `--part 1` and §6 is `--part 2` of [`imu_allan_variance.py`](../../use_numpy/imu_allan_variance.py) ([README §4](../../README.md#4-imu-noise-from-a-static-recording-allan-deviation)); §6 also runs [`eskf_imu_position_fix.py`](../../use_numpy/eskf_imu_position_fix.py) ([README §6](../../README.md#6-error-state-kalman-filter-eskf-vs-a-quaternion-in-the-state)) without editing it. Sources are numbered 1-7 in [References](#9-references).
+
 ## Intuition
 
 Every IMU filter in this repo is given noise values, such as `--gyro-noise-std 0.01`. A datasheet or calibration file gives them in other units, and you can read them off a recording of a motionless sensor.

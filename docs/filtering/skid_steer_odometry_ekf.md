@@ -1,5 +1,7 @@
 # Skid-steer wheel odometry: slip as a filter state
 
+**How to read it.** The doc needs an EKF with a Jacobian ([kf_ekf_iekf.md](kf_ekf_iekf.md) §1-§2, [jacobian.md](../foundations/jacobian.md) §1-§8) and the **NEES** with its consistent value ([probability_basics.md](../foundations/probability_basics.md) §7), which the Short answer already uses. §2 turns the gyro's noise density into a per-sample standard deviation and keeps a gyro bias in the state ([noise_identification.md](../foundations/noise_identification.md) §1-§2), and it argues that both the bias and the ICR coefficient can be learned, an **observability** argument ([observability.md](../foundations/observability.md) §1). The simulation is [`skid_steer_odometry_ekf.py`](../../use_numpy/skid_steer_odometry_ekf.py) ([README §33](../../README.md#33-skid-steer-wheel-odometry-slip-as-a-filter-state)). Sources are numbered 1-10 in [References](#7-references).
+
 ## Intuition
 
 A **skid-steer** robot ([glossary](../glossary.md#skid-steering-and-the-icr-coefficient)) has fixed wheels and turns by driving its left and right wheels at different speeds. Its wheels must skid sideways to do that, so it turns slower than the wheel speeds suggest. [Odometry](../glossary.md#odometry) that assumes ideal wheels then overestimates every turn.

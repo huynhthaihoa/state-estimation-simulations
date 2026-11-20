@@ -8,6 +8,15 @@ x_{k+1} = f(x_k, u_k) + w_k \qquad z_k = h(x_k) + v_k
 
 The system is linear only if both $f$ and $h$ are linear in the state $x$, meaning they can be written as $f = F x + G u$ and $h = H x$, where $F$, $G$, $H$ don't depend on $x$. Here $`u_k`$ is the control input and $`v_k`$ the measurement noise ([glossary](../glossary.md#ekf-extended-kalman-filter)), $`w_k`$ is the process noise ([glossary](../glossary.md#predict-and-update-steps)), and $`G`$ maps the input into the state. If either $f$ or $h$ isn't linear, the system is nonlinear, and the plain Kalman filter (KF) is no longer the exact answer.
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| Intro, §1-§3 | the **Kalman filter** and the **EKF** (the EKF recomputes its Jacobians at every step): [kf_ekf_iekf.md](kf_ekf_iekf.md) §1-§2; the **Jacobian**: [jacobian.md](../foundations/jacobian.md) §1-§8 | read |
+| §2, third bullet (poses, the IEKF, the vanilla KF) | the invariant EKF: [kf_ekf_iekf.md](kf_ekf_iekf.md) §3-§5; the exponential map: [lie_algebra.md](../foundations/lie_algebra.md) §8 | skip until you know the invariant EKF |
+| §4.1-§4.3 (analytic, numerical and Jacobian-drift checks) | the mean and covariance of a Gaussian pushed through a map: [probability_basics.md](../foundations/probability_basics.md) §3; §4.2's last paragraph (sigma points) makes sense after [extra_kf_variants.md](extra_kf_variants.md) §1 | read |
+| §4.4 (consistency tests) | none: **NIS** and **NEES** are defined in the section ([probability_basics.md](../foundations/probability_basics.md) §7 covers NEES in full and can wait) | read |
+
 ## 1. Three ways to tell
 
 1. **Superposition.** $f(a x_1 + b x_2) = a f(x_1) + b f(x_2)$ must hold for every $x_1, x_2, a, b$. A constant offset (making $f$ **affine**: linear plus a constant) fails this test but is still fine for a KF, since it just adds to the mean.

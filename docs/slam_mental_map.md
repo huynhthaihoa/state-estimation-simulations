@@ -10,6 +10,14 @@ Several docs already draw a partial map of their own corner. We treat those as z
 - [isam_optimization.md §11](optimization/isam_optimization.md#11-where-isam-fits-into-the-slam-mental-map): where iSAM sits, and the $SE(3)$ → Jacobian → factorization chain beneath it.
 - [elimination_tree.md §11](optimization/elimination_tree.md#11-the-big-picture): factor graph → Jacobian → sparse linear algebra → elimination tree.
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| §1 | the front-end/back-end split ([frontend_backend.md](frontend_backend.md)) and filtering vs. smoothing ([filtering_smoothing.md](filtering_smoothing.md) §1-§3) | skim for the layout |
+| §2-§6, §8-§9, Appendix | the docs each node points to (the map adds no new theory) | read after the main route; follow a node's link to learn it |
+| §7 | the doc of the script you look up | look up |
+
 ---
 
 ## 1. The whole picture

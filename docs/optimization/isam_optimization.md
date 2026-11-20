@@ -2,6 +2,8 @@
 
 Instead of solving the entire factor graph from scratch every time a new measurement arrives, update the existing solution intelligently.
 
+**How to read it.** §1-§13 need a [factor graph](factor_graph.md) and one Gauss-Newton step as a linear least-squares solve ([gauss_newton.md](gauss_newton.md)); QR and Givens rotations are explained in §3. §7 only previews iSAM2, which [isam2_optimization.md](isam2_optimization.md) covers. §14 maps the ideas onto [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) ([README §16](../../README.md#16-incremental-square-root-sam-vs-batch-pose-graph-solving)); §14.1 also needs the pose-graph residual from [pose_graph_optimization.md](pose_graph_optimization.md) §15, and its count of 9 full relinearizations is what the script prints at its defaults. Sources are listed in [References](#15-references).
+
 ---
 
 ## 1. The problem with ordinary batch optimization

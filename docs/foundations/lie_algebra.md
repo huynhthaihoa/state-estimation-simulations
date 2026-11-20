@@ -1,5 +1,16 @@
 # Lie Algebra
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| §1-§10, §13-§14 | 3D vectors, matrix multiplication and the cross product (§7 recalls it as a matrix); nothing from other docs | read |
+| §11 ($`SE(3)`$) | §1-§10 | read after §1-§10 |
+| §11.1-§11.2 (extended poses, adjoint) | §11; §11.1 also the invariant error of the **invariant EKF**: [kf_ekf_iekf.md](../filtering/kf_ekf_iekf.md) §3-§7 | read once you reach the invariant EKF |
+| §12, §15-§16 | §15 needs the Jacobian: [jacobian.md](jacobian.md) §1-§8 | skip |
+
+Sources are listed in [References](#17-references).
+
 ## 1. The big idea
 
 > **[Lie group](../glossary.md#lie-group) = the actual transformations we can perform.**

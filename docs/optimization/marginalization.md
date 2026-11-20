@@ -2,9 +2,16 @@
 
 Marginalizing a variable permanently removes it from the optimization and keeps everything it taught us about its neighbors, packaged as one new **prior factor** (see [Prior](../glossary.md#prior-unary-factor); unary only in the pure-chain case of §8; in general, it spans all of $x_a$'s neighbors). A real-time estimator can then bound its problem size without discarding what it used to know.
 
-This doc builds on two earlier ones:
-- **Variable elimination** from [`bayes_tree.md`](bayes_tree.md) §3 ("eliminate $x_1$ → its info gets summarized into a new constraint on $x_2$"). We reuse that mechanic for a different purpose.
-- **Filtering vs. smoothing** from [filtering_smoothing.md §9](../filtering_smoothing.md#9-the-precise-distinction) (filtering marginalizes old information, smoothing keeps it). This doc is the mechanical middle ground, [fixed-lag smoothing](../glossary.md#sliding-window-and-fixed-lag-smoothing), that the diagram in [§10](../filtering_smoothing.md#10-where-the-modern-systems-fit) only names.
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| §1-§4 (the problem, elimination, three flavors, the math) | **variable elimination**: §2 redraws it and §4 works a 2x2 example, so [bayes_tree.md](bayes_tree.md) §3 and [bundle_adjustment.md](bundle_adjustment.md) §12 (the same Schur complement on landmarks) can wait; **filtering vs. smoothing**: [filtering_smoothing.md](../filtering_smoothing.md) §1-§3, then §9; $`H=J^\top\Omega J`$: [gauss_newton.md](gauss_newton.md) and [factor_graph.md](factor_graph.md) §4 | read |
+| §5-§6 (fill-in, why FEJ exists) | **fill-in**: [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md) §3-§5; §6 also needs **unobservable** directions and **FEJ**: [observability.md](../foundations/observability.md) §1 and §4.1 | skip; [GETTING_STARTED](../../GETTING_STARTED.md#d3---sparse-solvers) reads them in the sparse-solver deep dive (D3) |
+| §7-§9 (sliding window, this repo's script, results) | §7: filtering_smoothing.md §10 (the fixed-lag smoothing box); §8.1: Gauss-Newton, [levenberg_marquardt.md](levenberg_marquardt.md) (the baseline's damping), `linearize_edge` from [`pose_graph_incremental.py`](../../use_numpy/pose_graph_incremental.py) ([isam_optimization.md](isam_optimization.md) §14), and the $`SE(3)`$ residual and Jacobians derived in [pose_graph_optimization.md](pose_graph_optimization.md) §15 (§8.1 states the formulas) | read |
+| §10 (summary) | §1-§9 | read last |
+
+§8-§9 are about [`sliding_window_marginalization.py`](../../use_numpy/sliding_window_marginalization.py) ([README §18](../../README.md#18-sliding-window-marginalization-bounded-memory-pose-graph-smoothing)). Sources are listed in [References](#11-references).
 
 ---
 

@@ -1,5 +1,17 @@
 # Error-state Kalman filter (ESKF): estimate the correction, not the state
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| Intuition, §1-§2 (setup, one ESKF cycle) | the Kalman filter's predict and update: [kf_ekf_iekf.md](kf_ekf_iekf.md) §1-§2; first-order error propagation: [jacobian.md](../foundations/jacobian.md) §1-§8; rotation matrices, the skew-symmetric matrix and $`\mathrm{Exp}`$/$`\mathrm{Log}`$: [lie_algebra.md](../foundations/lie_algebra.md) §1-§10 | read |
+| §3-§4.2 (comparison filters, results, quaternion EKF) | a unit **quaternion** ([glossary](../glossary.md#quaternion)); **NEES** is defined in §3 ([probability_basics.md](../foundations/probability_basics.md) §7 covers it in full and can wait) | read |
+| §4.3 (larger initial attitude errors) | §4.1-§4.2 | skip |
+| §5 (ESKF vs. invariant EKF) | the invariant EKF: [kf_ekf_iekf.md](kf_ekf_iekf.md) §3-§5; $`SE_2(3)`$: [lie_algebra.md](../foundations/lie_algebra.md) §11.1 | read after [kf_ekf_iekf.md](kf_ekf_iekf.md) §3-§7 |
+| §6-§7 (limits, takeaway) | §1-§4 | read |
+
+§4 reports runs of [`eskf_imu_position_fix.py`](../../use_numpy/eskf_imu_position_fix.py) ([README §6](../../README.md#6-error-state-kalman-filter-eskf-vs-a-quaternion-in-the-state)). Sources are listed in [References](#8-references).
+
 ## Intuition
 
 An [IMU](../glossary.md#imu-inertial-measurement-unit)-driven filter has to carry an **orientation**, and an orientation is not an ordinary vector. Every way to store it has a catch:

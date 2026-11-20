@@ -2,6 +2,8 @@
 
 Gauss-Newton and its damped variants, like [Levenberg-Marquardt](levenberg_marquardt.md), are the core optimizers behind **SLAM, [bundle adjustment (BA)](bundle_adjustment.md), and [pose-graph optimization](pose_graph_optimization.md)** ([glossary](../glossary.md#slam-simultaneous-localization-and-mapping)). This doc builds the intuition for Gauss-Newton.
 
+**How to read it.** §1-§6 need the Jacobian ([jacobian.md](../foundations/jacobian.md) §1-§8) and the linearize-then-solve step of [nonlinear_least_square.md](nonlinear_least_square.md) §1-§8; §6 is the worked number. §7-§13 can wait: §7 and §10 compare Gauss-Newton with Newton's method and gradient descent, §9 repeats the tangent picture of [nonlinear_least_square.md §7](nonlinear_least_square.md#7-the-key-trick-make-the-nonlinear-problem-locally-linear), §11 leads to [levenberg_marquardt.md](levenberg_marquardt.md), and §8 applies Gauss-Newton to poses on $`SE(3)`$, which needs the exponential map and $`SE(3)`$ from [lie_algebra.md](../foundations/lie_algebra.md) ([§8](../foundations/lie_algebra.md#8-the-exponential-map), §11). Sources are listed in [References](#13-references).
+
 ---
 
 ## 1. The basic idea

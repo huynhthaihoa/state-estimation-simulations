@@ -1,5 +1,17 @@
 # LiDAR geometric primitives: planes and cylinders for scan registration
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| Intuition, §1-§2 | **RANSAC**: [triangulation_pnp.md](triangulation_pnp.md) §5; context: the point-cloud toy that skips the correspondence step ([note](../filtering/pointcloud_pose_tracking_empirical_note.md)) | read; skip §2.1-§2.2 |
+| §3-§4 | **Gauss-Newton**: [gauss_newton.md](../optimization/gauss_newton.md) §1-§6; the Jacobian: [jacobian.md](../foundations/jacobian.md) §1-§8; the $`SE(3)`$ update $`T\,\mathrm{Exp}(\xi)`$: [lie_algebra.md](../foundations/lie_algebra.md) §11 | read |
+| §5 | §3; the Hessian $`J^\top J`$ of the Gauss-Newton step (gauss_newton.md) | read |
+| §6 | §3; the factor graph: [factor_graph.md](../optimization/factor_graph.md); the pose-graph odometry residual: [pose_graph_optimization.md](../optimization/pose_graph_optimization.md) §7 | read after the pose-graph docs |
+| §7-§8 | §1-§6 | read |
+
+§2, §4, §5 and §6 are experiments 1-4 of [`lidar_primitives.py`](../../use_numpy/lidar_primitives.py) ([README §10](../../README.md#10-lidar-primitives-planes-and-cylinders-for-scan-registration)). Sources are numbered 1-9 in [References](#9-references).
+
 ## Intuition
 
 A LiDAR scan is a cloud of points. To turn two scans into a relative pose, the front-end ([glossary](../glossary.md#front-end-and-back-end)) has to say which part of one scan corresponds to which part of the other. [`pointcloud_pose_tracking.py`](../../use_numpy/pointcloud_pose_tracking.py) ([note](../filtering/pointcloud_pose_tracking_empirical_note.md)) skips that step: every measured point arrives paired with its body point. This doc does it for real, three ways:

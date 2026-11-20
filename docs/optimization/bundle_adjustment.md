@@ -6,6 +6,18 @@
 
 The key word is **jointly**.
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| §1-§5 | only the pinhole projection, explained in §1 | read |
+| §6-§11 | the residual and one Gauss-Newton step: [nonlinear_least_square.md](nonlinear_least_square.md) §1-§8, [gauss_newton.md](gauss_newton.md) §1-§6; the projection Jacobian ([jacobian.md](../foundations/jacobian.md) §1-§8); poses as $`SE(3)`$ and $`\mathrm{Exp}`$: [lie_algebra.md](../foundations/lie_algebra.md) [§8](../foundations/lie_algebra.md#8-the-exponential-map), §11; §8 recalls [filtering_smoothing.md](../filtering_smoothing.md) §1-§3; §9 compares with [pose_graph_optimization.md](pose_graph_optimization.md) §8 | read |
+| §12 (Schur complement) | §6.1 and §10 | read later (deep dive) |
+| §13 (Local vs. Global BA) | §10; §13.2 and §13.4 use §12's result that cameras sharing a landmark get a nonzero coupling block | read after running `bundle_adjustment.py` |
+| §14 (gauge freedom) | **Umeyama alignment**: [umeyama_alignment.md](../foundations/umeyama_alignment.md) | read |
+
+[`bundle_adjustment.py`](../../use_numpy/bundle_adjustment.py) ([README §14](../../README.md#14-bundle-adjustment-joint-pose--landmark-refinement)) is the script of §6-§11 and §14; [`bundle_adjustment_advanced.py`](../../use_numpy/bundle_adjustment_advanced.py) ([README §15](../../README.md#15-local--global-bundle-adjustment-bounded-windows-vs-whole-map-re-solves)) is the one of §13 (see §13.6). Sources are listed in [References](#16-references).
+
 ---
 
 ## 1. Start with a simple camera + 3D point

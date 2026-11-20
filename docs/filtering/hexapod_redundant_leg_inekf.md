@@ -1,5 +1,7 @@
 # Four joints per leg: which joint offsets a walking hexapod can learn
 
+**How to read it.** §1 needs the leg Jacobian ([jacobian.md](../foundations/jacobian.md) §1-§8), the [null space](../glossary.md#null-space), and the encoder model of [hexapod_joint_kinematics_inekf.md](hexapod_joint_kinematics_inekf.md) (§1.2). §2-§4 reuse that doc's five filters and scores (its §2) and compare their results with its §3 and §4, so read it through §4 first. The simulation is [`hexapod_redundant_leg_inekf.py`](../../use_numpy/hexapod_redundant_leg_inekf.py) ([README §31](../../README.md#31-four-joints-per-leg-which-joint-offsets-a-walking-hexapod-can-learn)). Sources are numbered ref. 1-2 in [References](#7-references).
+
 ## Intuition
 
 [`hexapod_joint_kinematics_inekf.md`](hexapod_joint_kinematics_inekf.md) (**the 3-joint doc** below) reads each stance foot's position from the leg's joint encoders, on a hexapod with three joints per leg. Its main finding is that fixed **joint zero offsets** ([glossary](../glossary.md#joint-encoder-and-zero-offset): an encoder whose zero is off by a constant angle) make the filter overconfident, and that estimating the offsets as filter states fixes the body's velocity.

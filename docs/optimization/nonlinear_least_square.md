@@ -2,6 +2,15 @@
 
 We have several imperfect measurements, and we want to find the unknown parameters that make the total measurement error as small as possible.
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| §1-§8 | derivatives and matrix products; §7 uses the Jacobian: [jacobian.md](../foundations/jacobian.md) §1-§8 | read |
+| §9-§17 | §9-§10 name **Gauss-Newton** and **Levenberg-Marquardt**: [gauss_newton.md](gauss_newton.md) §1-§6, [levenberg_marquardt.md](levenberg_marquardt.md); §11 and §15-§16 name factor graphs: [factor_graph.md](factor_graph.md); §12 weights use the covariance: [probability_basics.md](../foundations/probability_basics.md) §2 | read later |
+
+Sources are listed in [References](#17-references).
+
 ---
 
 ## 1. Start with ordinary least squares

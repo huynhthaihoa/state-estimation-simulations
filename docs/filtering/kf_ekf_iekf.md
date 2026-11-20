@@ -6,9 +6,16 @@ Start with one idea:
 
 The three filters differ in **what kind of system they assume** and **how they deal with nonlinear motion**.
 
-This builds directly on:
-- **Lie groups and $`SO(3)`$/$`SE(3)`$** from [lie_algebra.md](../foundations/lie_algebra.md) - the geometric structure §3-§5's IEKF discussion is built around.
-- The **exponential map** from [lie_algebra.md §8](../foundations/lie_algebra.md#8-the-exponential-map) - the $\exp(\delta\theta^\wedge)$ / $\mathrm{Exp}$ notation used in §5.
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| §1-§2 (KF, EKF) | mean, variance and fusion: [probability_basics.md](../foundations/probability_basics.md) §1-§5 (§1's 70%/30% example is worked there); the Jacobian: [jacobian.md](../foundations/jacobian.md) §1-§8 | read |
+| §8 (which filter to use) | §1-§2 | read right after §1-§2 |
+| §3-§7 (invariant EKF) | **Lie groups and $`SO(3)`$/$`SE(3)`$**: [lie_algebra.md](../foundations/lie_algebra.md); §5 also uses its **exponential map** ([§8](../foundations/lie_algebra.md#8-the-exponential-map)), the $\exp(\delta\theta^\wedge)$ / $\mathrm{Exp}$ notation | read once you know rotations |
+| §9 (further variants) | §1-§3 | skip |
+
+§7's data point comes from [`pointcloud_pose_tracking.py`](../../use_numpy/pointcloud_pose_tracking.py) ([README §5](../../README.md#5-point-cloud-pose-tracking-ekf-vs-invariant-ekf-vs-batch-gauss-newton-vs-ukf-vs-vanilla-kf)). Sources are listed in [References](#11-references).
 
 ---
 

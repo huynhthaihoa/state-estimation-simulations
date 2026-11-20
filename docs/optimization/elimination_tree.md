@@ -2,6 +2,8 @@
 
 > An elimination tree tells us **which variables depend on which other variables during sparse [Cholesky](../glossary.md#cholesky-factorization) elimination**.
 
+**How to read it.** §1-§11 need the sparse Hessian $`H`$, its Cholesky factor $`L`$, fill-in and elimination order, taught in [sparse_cholesky_factorization.md](sparse_cholesky_factorization.md) §1-§5 (§6 revisits its fill-in example). §9 also uses the Schur-complement trick of [bundle_adjustment.md](bundle_adjustment.md) §12 and the nonzero counting of sparse_cholesky_factorization.md §5. §7 only previews the Bayes tree and iSAM2, which [bayes_tree.md](bayes_tree.md) and [isam2_optimization.md](isam2_optimization.md) teach later. Sources are listed in [References](#12-references).
+
 ---
 
 ## 1. Start with the simplest example

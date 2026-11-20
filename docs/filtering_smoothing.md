@@ -2,6 +2,17 @@
 
 The key to **Filtering vs. Optimization/Smoothing in [SLAM](glossary.md#slam-simultaneous-localization-and-mapping)** is **when the robot is allowed to change its mind about the past**.
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| §1-§3 | nothing from other docs (Kalman filter, Gauss-Newton and bundle adjustment are only named, with [glossary](glossary.md) links) | read |
+| §11 | §1-§3 | skim; its terms are taught in [hybrid_saltation_ekf.md](filtering/hybrid_saltation_ekf.md) and [inchworm_zupt_ekf.md](filtering/inchworm_zupt_ekf.md) |
+| §4-§7, §8 up to "The same picture with numbers", §9-§10 | §4 uses the Jacobian ([jacobian.md](foundations/jacobian.md) §1-§8); §7 the factor graph ([factor_graph.md](optimization/factor_graph.md)) | skip |
+| §8 from "The same picture with numbers" | the Kalman filter: [kf_ekf_iekf.md](filtering/kf_ekf_iekf.md) §1-§2; NEES: [probability_basics.md](foundations/probability_basics.md) §7; batch least squares: [nonlinear_least_square.md](optimization/nonlinear_least_square.md) §1 | skip; read once you know those |
+
+That part of §8 is [`rts_smoother.py`](../use_numpy/rts_smoother.py) ([README §11](../README.md#11-rts-smoother-a-kalman-filter-its-smoother-and-batch-least-squares-on-one-data-set)). Sources are numbered 1-10 in [References](#12-references).
+
 ---
 
 ## 1. The core idea

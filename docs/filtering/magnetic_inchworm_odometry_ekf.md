@@ -1,5 +1,15 @@
 # Magnetic climbing inchworm: odometry that cannot see the slide
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| Intuition, §1-§3 | the EKF: [kf_ekf_iekf.md](kf_ekf_iekf.md) §1-§2; the Jacobian that maps servo rounding into the covariance (§2): [jacobian.md](../foundations/jacobian.md) §1-§8; the **NEES**, its consistent value and its 95% band (used from the Short answer on): [probability_basics.md](../foundations/probability_basics.md) §7; the slide-bias state of §2, which only the external fix makes **observable**: [observability.md](../foundations/observability.md) §1 | read |
+| §4 (sweeps) | §3 | skip |
+| §5-§6 | §1-§3 | read |
+
+The simulation is [`magnetic_inchworm_odometry_ekf.py`](../../use_numpy/magnetic_inchworm_odometry_ekf.py) ([README §34](../../README.md#34-magnetic-climbing-inchworm-odometry-that-cannot-see-the-slide)). Sources are numbered 1-4 in [References](#7-references).
+
 ## Intuition
 
 **MinchW** is a magnetic climbing **inchworm** ([glossary](../glossary.md#inchworm-gait-and-anchor)) of the Computational Robotics Laboratory of the Czech Technical University in Prague (CTU) (ref. 1). It has two feet, each held to steel by a **hybrid electromagnet** ([glossary](../glossary.md#hybrid-electromagnet)), and six servos, three per leg. It walks by holding one foot while the other moves, then swapping. It has no IMU and no external sensors: it "relies solely on proprioceptive feedback from its servo motors" (ref. 2).

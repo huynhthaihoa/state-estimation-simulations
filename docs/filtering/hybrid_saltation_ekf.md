@@ -1,5 +1,17 @@
 # Saltation matrices: propagating uncertainty through a hybrid/discontinuous event
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| Intuition, §1-§3 (core idea: why the reset Jacobian is not enough, plus a worked example) | the **EKF** and its covariance propagation: [kf_ekf_iekf.md](kf_ekf_iekf.md) §2; the **Jacobian**: [jacobian.md](../foundations/jacobian.md) §1-§8 | read (enough for a first read) |
+| §4 (derivation of $`\Xi`$, including a wrong turn) | §3 | skip if you take the formula on faith |
+| §5-§8 (a structural property, the empirical finding, tuning gotchas, detection jitter) | §4's formula for $`\Xi`$ (not its derivation); §6-§8 report **NEES**: [probability_basics.md](../foundations/probability_basics.md) §7 | read |
+| §9 (Poincaré maps) | §4 | skip: the script never needs it |
+| §10 (a related quantity, worked by hand) | §4 | skip if you skip §4 |
+
+The script is [`saltation_matrix_ekf.py`](../../use_numpy/saltation_matrix_ekf.py) ([README §19](../../README.md#19-saltation-matrix-ekf-tracking-a-point-mass-through-discrete-ground-contact-events)). Sources are listed in [References](#11-references).
+
 ## Intuition
 
 A [hybrid system](../glossary.md#hybrid-system-guard-and-reset-map) alternates **ordinary smooth motion** (falling) with **sudden, instantaneous jumps** (bouncing), triggered the instant some condition is hit (touching the ground). The tricky part is not the jump itself: two nearby trajectories do not hit that condition at the same moment.
@@ -33,12 +45,6 @@ The concrete example is the bouncing-point-mass toy problem in [`saltation_matri
 ![Three panels from saltation_matrix_ekf.py: height and vertical velocity of the default bouncing run with the guard crossings and velocity resets marked; two balls from the §3 worked example, the second starting 5 cm higher and landing 4.94 ms later; and the change each approach predicts at T = 1 s, where the naive reset Jacobian predicts no velocity change and the saltation matrix matches the re-simulated answer](../../assets/saltation_matrix_ekf_concept.png)
 
 *Figure: the default run of `use_numpy/saltation_matrix_ekf.py` and the [§3](#3-a-worked-example-naive-vs-saltation-in-numbers) worked example, plotted by `uv run python generator/make_figures.py saltation_matrix_ekf_concept`.*
-
-> **Reading order**
-> - **§1-§3, core idea:** why the reset Jacobian isn't enough, plus a worked example showing it's wrong by a real amount. Enough for a first read.
-> - **§4, derivation:** from scratch, including a tempting but wrong approach that we check against finite differences. Skippable if we take the formula on faith.
-> - **§5-§8, practical payoff:** a structural property, a modest but real empirical finding, tuning gotchas, and what uncertain contact detection costs.
-> - **§9, tangent:** periodic-orbit stability, which this script never needs. Safe to skip.
 
 ---
 

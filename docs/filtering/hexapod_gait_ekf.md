@@ -1,5 +1,15 @@
 # Hexapod leg odometry: what the gait changes
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| §1-§2 (model, no slip) | the Kalman filter's predict and update: [kf_ekf_iekf.md](kf_ekf_iekf.md) §1-§2; the Jacobian: [jacobian.md](../foundations/jacobian.md) §1-§8; NEES: [probability_basics.md §7](../foundations/probability_basics.md#7-is-the-filter-honest); a planted foot as a free zero-velocity reading: [inchworm_zupt_ekf.md](inchworm_zupt_ekf.md) §1-§4 | read |
+| §1, "No saltation matrix here" | the saltation matrix: [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) §1 and §4 | skip |
+| §3-§5 (slip, drift, timing) | §1-§2 | read |
+
+The simulation is [`hexapod_gait_ekf.py`](../../use_numpy/hexapod_gait_ekf.py) ([README §26](../../README.md#26-hexapod-leg-odometry-what-the-gait-changes)). Sources are numbered ref. 1-4 in [References](#7-references).
+
 ## Intuition
 
 A planted foot doesn't move. So if the joint encoders (angle sensors in each leg joint) say a stance foot is sliding backward under the body at 0.1 m/s, the body is moving forward at 0.1 m/s. That is **leg odometry**: every foot on the ground is a velocity sensor for the body ([glossary](../glossary.md#odometry)).

@@ -1,5 +1,7 @@
 # Torque-based contact detection: what decides it, and when the gait phase helps
 
+**How to read it.** §1 needs the leg Jacobian and Daisy's geometry ([hexapod_joint_kinematics_inekf.md](hexapod_joint_kinematics_inekf.md) §1.1; the Jacobian itself: [jacobian.md](../foundations/jacobian.md) §1-§8). §2-§4 reuse the stance-flag rows of [gait_phase_ekf.md](gait_phase_ekf.md) (§1.3) and compare with its results (§3), and they score with NEES ([probability_basics.md §7](../foundations/probability_basics.md#7-is-the-filter-honest)). §2's fused probability uses [log-odds](../glossary.md#log-odds) and the [logistic function](../glossary.md#logistic-function-and-logistic-regression), which no doc teaches. The simulation is [`gait_phase_torque_ekf.py`](../../use_numpy/gait_phase_torque_ekf.py) ([README §30](../../README.md#30-torque-based-contact-detection-what-decides-it-and-when-the-gait-phase-helps)). Sources are numbered ref. 1-6 in [References](#7-references).
+
 ## Intuition
 
 [`gait_phase_ekf.md`](gait_phase_ekf.md) (**the gait-phase doc** below) decides which feet of a hexapod are on the ground when touchdowns come late or early. Its **contact detector** follows the servo **position error** (the gap between the commanded and the measured joint angle) of Faigl & Čížek (ref. 1): it fires some time after touchdown and sometimes fires falsely early in the **swing-down** (the last third of a leg's swing, when the foot moves down toward the ground). The doc models that detector by its outputs only: a delay and a false-trigger rate, both assumed.

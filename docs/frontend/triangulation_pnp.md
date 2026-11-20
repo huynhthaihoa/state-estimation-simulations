@@ -7,9 +7,16 @@
   - Our own DLT (Direct Linear Transform, §3) implementation needs at least 6 points (derived in §3).
 - **Same recipe for both:** both reduce to the same reprojection residual. We solve each with a **closed-form** (direct formula, no iteration) linear initial guess, then a few [Gauss-Newton](../glossary.md#gauss-newton) iterations.
 
-This builds directly on:
-- The **[reprojection error](../glossary.md#reprojection-error)** and **"bundle of rays"** intuition from [bundle_adjustment.md §5](../optimization/bundle_adjustment.md#5-why-is-it-called-bundle-adjustment).
-- **Gauss-Newton** from [gauss_newton.md](../optimization/gauss_newton.md).
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| §1-§2 (triangulation) | the **[reprojection error](../glossary.md#reprojection-error)** and **"bundle of rays"** intuition: [bundle_adjustment.md](../optimization/bundle_adjustment.md) §5; **Gauss-Newton**: [gauss_newton.md](../optimization/gauss_newton.md) | read |
+| §3 (PnP) | §2; the pose Jacobian $`J_{\text{pose}}`$: bundle_adjustment.md §6.1; the $`SE(3)`$ update $`T\,\mathrm{Exp}(\delta)`$: [lie_algebra.md](../foundations/lie_algebra.md) §11 (SVD is recalled in §3) | read after §2 |
+| §4-§5 | §2-§3 | read |
+| §6 | §1-§5 | read |
+
+§1-§2 describe `triangulate_landmark` and `refine_landmark_gn` of [`bundle_adjustment_advanced.py`](../../use_numpy/bundle_adjustment_advanced.py) ([README §15](../../README.md#15-local--global-bundle-adjustment-bounded-windows-vs-whole-map-re-solves)); §3 and §5 describe [`pnp_estimation.py`](../../use_numpy/pnp_estimation.py) ([README §9](../../README.md#9-perspective-n-point-pnp-recovering-a-camera-pose-from-known-3d-2d-correspondences)). Sources are listed in [References](#7-references).
 
 ---
 

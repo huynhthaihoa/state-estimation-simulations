@@ -4,6 +4,16 @@
 
 > **Gauss-Newton is fast but can be unstable. Gradient descent is stable but can be slow. LM tries to get the best of both.**
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| §1-§7 | the Gauss-Newton step: [nonlinear_least_square.md](nonlinear_least_square.md) §1-§8, [gauss_newton.md](gauss_newton.md) §1-§6 (§2 restates it) | read |
+| §8-§9 | the factor graph and its weights: [factor_graph.md](factor_graph.md) §4-§5 | read |
+| §10-§13 | §10 builds on §3-§5; §13 maps the solvers onto the scripts | read later |
+
+§13 names [`pose_graph.py`](../../use_numpy/pose_graph.py) ([README §12](../../README.md#12-3d-pose-graph-relaxation)), [`bundle_adjustment_advanced.py`](../../use_numpy/bundle_adjustment_advanced.py) ([README §15](../../README.md#15-local--global-bundle-adjustment-bounded-windows-vs-whole-map-re-solves)) and [`lidar_primitives.py`](../../use_numpy/lidar_primitives.py) ([README §10](../../README.md#10-lidar-primitives-planes-and-cylinders-for-scan-registration)). Sources are listed in [References](#14-references).
+
 ---
 
 ## 1. Start with the problem

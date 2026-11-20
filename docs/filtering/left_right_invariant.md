@@ -1,6 +1,8 @@
 # Left-invariant vs. Right-invariant errors in IEKF
 
-What "left-invariant" and "right-invariant" errors mean in the **Invariant EKF** (**IEKF**, [glossary](../glossary.md#iekf-invariant-ekf)). This builds on the IEKF treatment in [kf_ekf_iekf.md §3-§5](kf_ekf_iekf.md#3-invariant-ekf-lets-respect-the-geometry-of-the-problem) (short overview: [extra_kf_variants.md §3](extra_kf_variants.md#3-invariant-ekf-iekf)).
+What "left-invariant" and "right-invariant" errors mean in the **Invariant EKF** (**IEKF**, [glossary](../glossary.md#iekf-invariant-ekf)).
+
+**How to read it.** §1-§3 build on the **IEKF** treatment in [kf_ekf_iekf.md](kf_ekf_iekf.md) §3-§5 (short overview: [extra_kf_variants.md](extra_kf_variants.md) §3) and need the pose in $`SE(3)`$ and $`\mathrm{Exp}`$ from [lie_algebra.md](../foundations/lie_algebra.md) §8 and §11. §3.1 repeats the idea on rotations alone and can be skipped on a first pass. §4 also needs the Jacobian ([jacobian.md](../foundations/jacobian.md) §1-§8) and refers to `run_iekf` in [`pointcloud_pose_tracking.py`](../../use_numpy/pointcloud_pose_tracking.py) ([README §5](../../README.md#5-point-cloud-pose-tracking-ekf-vs-invariant-ekf-vs-batch-gauss-newton-vs-ukf-vs-vanilla-kf)), which §1 names too. Sources are listed in [References](#5-references).
 
 ---
 

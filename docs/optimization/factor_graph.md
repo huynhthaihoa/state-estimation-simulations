@@ -1,5 +1,7 @@
 # Factor-graph Optimization
 
+**How to read it.** §1-§2 need only odometry and drift, both explained there. §3 needs poses as $`SE(3)`$ elements and the Log map ([lie_algebra.md](../foundations/lie_algebra.md) [§9](../foundations/lie_algebra.md#9-the-logarithm-map) and §11); §4 and §8 need the squared-error cost, the Jacobian and one Gauss-Newton step ([nonlinear_least_square.md](nonlinear_least_square.md) §1-§8, [gauss_newton.md](gauss_newton.md) §1-§6). §7 contrasts a factor graph with a pose graph, which [pose_graph_optimization.md](pose_graph_optimization.md) teaches in full. Sources are listed in [References](#12-references).
+
 ## 1. The core idea
 
 A **factor graph** represents:

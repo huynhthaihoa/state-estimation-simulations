@@ -1,5 +1,18 @@
 # Observability: what no sensor can see, and why a standard EKF forgets it
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| Intuition, §1-§3 | the EKF: [kf_ekf_iekf.md](../filtering/kf_ekf_iekf.md) §1-§2; its Jacobians: [jacobian.md](jacobian.md) §1-§8 (§1 defines the observability matrix and the null space itself) | read |
+| §4.1 (FEJ) | §3 | read |
+| §4.2 (invariant EKF) | §3; the **right-invariant error**: kf_ekf_iekf.md §3-§7 | read once you know the invariant EKF |
+| §4.3, §5 | §3-§4.2; NEES and its 95% band: [probability_basics.md](probability_basics.md) §7 | read |
+| §6 | the docs its rows link (most are Track L and optimization docs) | read later, as a lookup |
+| §7-§8 | §1-§5 | read |
+
+§3's null-space table and §5's results are runs of [`observability_fej.py`](../../use_numpy/observability_fej.py) ([README §7](../../README.md#7-ekf-slam-observability-standard-ekf-vs-fej-vs-invariant-ekf)). Sources are numbered 1-3 in [References](#9-references).
+
 ## Intuition
 
 Take a robot and the landmarks it measures, and move everything by 1 m. The robot is still in the same place relative to every landmark, so no measurement changes. Rotate everything by 90° about the origin and the same holds:

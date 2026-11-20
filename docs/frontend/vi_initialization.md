@@ -4,9 +4,7 @@
 
 Before a visual-inertial estimator can run its normal loop ([preintegrate](../glossary.md#imu-preintegration) IMU, optimize against camera constraints), it has to solve a chicken-and-egg bootstrapping problem. It must find **metric scale** (real-world units such as meters), gravity direction, initial velocity, and [IMU bias](../glossary.md#bias). A **monocular** (single) camera or a bias-corrupted IMU cannot give all of these on its own.
 
-This builds on:
-- **IMU preintegration** ($\Delta R, \Delta v, \Delta p$, the relative rotation, velocity, and position between keyframes computed from the IMU samples, and their bias [Jacobians](../glossary.md#jacobian)) from [imu_preintegration.md](../optimization/imu_preintegration.md). This doc covers what must happen *before* that machinery can be trusted.
-- **Factor graphs** from [factor_graph.md](../optimization/factor_graph.md), the optimizer we hand off to (§4).
+**How to read it.** §1, §2 and §4 build on **IMU preintegration** ($`\Delta R, \Delta v, \Delta p`$, the relative rotation, velocity, and position between keyframes computed from the IMU samples, and their bias [Jacobians](../glossary.md#jacobian)) from [imu_preintegration.md](../optimization/imu_preintegration.md); §2's gyroscope-bias step uses its §3-§5 directly. This doc covers what must happen *before* that machinery can be trusted. §4 hands off to **factor graphs** ([factor_graph.md](../optimization/factor_graph.md)), the optimizer that takes over. §5 says no script accompanies it (conceptual only). Sources are listed in [References](#7-references).
 
 ---
 

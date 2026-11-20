@@ -1,5 +1,15 @@
 # Phase-conditional ZUPT: exploiting a known anchor/dwell schedule
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| Intuition, §1-§4 | the predict and update steps and the covariance: [kf_ekf_iekf.md](kf_ekf_iekf.md) §1; the **NEES** and its consistent value (§3 reports results in it): [probability_basics.md](../foundations/probability_basics.md) §7 | read |
+| §5 (heading and ZARU) | §1-§4; an EKF whose motion model is nonlinear: [kf_ekf_iekf.md](kf_ekf_iekf.md) §2, [jacobian.md](../foundations/jacobian.md) §1-§8; what **observable** means: [observability.md](../foundations/observability.md) §1 | skip, read after §1-§4 |
+| §6 (anchor slip and a measured gate) | §1-§4; it reuses §5's matched process noise value (0.5 m/s²) but not its heading model | skip, read after §1-§4 |
+
+§1-§4 use [`inchworm_zupt_ekf.py`](../../use_numpy/inchworm_zupt_ekf.py), §5 uses [`inchworm_zupt_zaru_ekf.py`](../../use_numpy/inchworm_zupt_zaru_ekf.py) and §6 uses [`inchworm_slip_gate_ekf.py`](../../use_numpy/inchworm_slip_gate_ekf.py), all three under [README §21](../../README.md#21-inchworm-zupt-exploiting-a-known-anchordwell-schedule). Sources are listed in [References](#7-references).
+
 ## Intuition
 
 An inchworm (real or robotic) doesn't move continuously - it cycles between two phases:

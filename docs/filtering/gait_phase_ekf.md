@@ -1,5 +1,15 @@
 # Gait phase: which feet are on the ground, when touchdowns are uncertain
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| §1-§3 (model, sanity check, results) | the stance flags and the body filter: [hexapod_gait_ekf.md](hexapod_gait_ekf.md) §1-§2; the Kalman filter's predict and update, which `phase_ekf` uses: [kf_ekf_iekf.md](kf_ekf_iekf.md) §1; NEES: [probability_basics.md §7](../foundations/probability_basics.md#7-is-the-filter-honest) | read |
+| §4 (the acceptance window) | §1.3 and §3 | read |
+| §5 (mistiming) | §1.3 and §4 | skip |
+
+The simulation is [`gait_phase_ekf.py`](../../use_numpy/gait_phase_ekf.py) ([README §28](../../README.md#28-gait-phase-which-feet-are-on-the-ground-when-touchdowns-are-uncertain)). Sources are listed in [References](#8-references).
+
 ## Intuition
 
 [`hexapod_gait_ekf.md`](hexapod_gait_ekf.md) tracks a hexapod from its legs: every foot on the ground reads the body's velocity. The filter is told which feet those are on every **tick** (one filter step, 0.02 s); even its §5 timing jitter is noise around a correct clock. On a real robot, that is the hard part:

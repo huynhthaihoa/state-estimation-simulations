@@ -10,6 +10,18 @@ Applies to both [`use_numpy/pointcloud_pose_tracking.py`](../../use_numpy/pointc
 
 We keep the three claims separate and explain the mechanism behind each.
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| §1 (setup; §1.1 maps the math to the script's functions) | the **EKF**: [kf_ekf_iekf.md](kf_ekf_iekf.md) §2; the pose in $`SE(3)`$ and $`\mathrm{Exp}`$: [lie_algebra.md](../foundations/lie_algebra.md) §8, §11 | read; skip §1.1's "Batch Gauss-Newton" part (§2-§5 do not use it) |
+| §2 (EKF vs. IEKF) | the **IEKF**: [kf_ekf_iekf.md](kf_ekf_iekf.md) §3-§5 and [left_right_invariant.md](left_right_invariant.md) | read |
+| §3 (UKF vs. EKF/IEKF) | the **UKF**: [extra_kf_variants.md](extra_kf_variants.md) §1 | read |
+| §4 (vanilla KF vs. the rest) | why a pose can be exactly linear in $`\mathrm{vec}(R)`$: [linear_nonlinear.md](linear_nonlinear.md) §2 | read |
+| §5 (when would each diverge more) | §2 | read |
+
+The note applies to [`pointcloud_pose_tracking.py`](../../use_numpy/pointcloud_pose_tracking.py) ([README §5](../../README.md#5-point-cloud-pose-tracking-ekf-vs-invariant-ekf-vs-batch-gauss-newton-vs-ukf-vs-vanilla-kf)), and [GETTING_STARTED.md](../../GETTING_STARTED.md#phase-4---filters-on-rotations) has you read it after running that script. Sources are listed in [References](#6-references).
+
 ---
 
 ## 1. The setup

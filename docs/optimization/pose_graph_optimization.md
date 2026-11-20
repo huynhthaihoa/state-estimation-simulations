@@ -6,6 +6,18 @@
 
 Think of it as **"fixing the robot's entire trajectory using a network of geometric constraints."**
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| §1-§6 | odometry, drift and loop closure on a small chain: [factor_graph.md](factor_graph.md) §1-§2 | read |
+| §7 | the Log map and $`SE(3)`$: [lie_algebra.md](../foundations/lie_algebra.md) [§9](../foundations/lie_algebra.md#9-the-logarithm-map), §11 | read |
+| §8-§14 | §12 uses the **information matrix**: [factor_graph.md](factor_graph.md) §4; §14 names Gauss-Newton and LM: [gauss_newton.md](gauss_newton.md) §1-§6, [levenberg_marquardt.md](levenberg_marquardt.md) §1-§9; §8 only names bundle adjustment, which [bundle_adjustment.md](bundle_adjustment.md) teaches later | read |
+| §15 | Exp, Log and $`SE(3)`$: [lie_algebra.md](../foundations/lie_algebra.md) §8-§9, §11; §15.7 walks through the solver | read later |
+| §16 | §7's residual and §12's weights; the kernels are used in [robust_pose_graph.md](robust_pose_graph.md) | read right before [robust_pose_graph.md](robust_pose_graph.md) |
+
+[`pose_graph.py`](../../use_numpy/pose_graph.py) ([README §12](../../README.md#12-3d-pose-graph-relaxation)) produces the figure and animation of §5 and is walked through in §15.7. Sources are listed in [References](#17-references).
+
 ---
 
 ## 1. First: what is a "pose"?

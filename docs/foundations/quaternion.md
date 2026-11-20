@@ -2,6 +2,18 @@
 
 For [SLAM](../glossary.md#slam-simultaneous-localization-and-mapping), state estimation and robotics, a quaternion is best understood as a way to represent **3D orientation** without the problems of Euler angles.
 
+**How to read it.**
+
+| Sections | Need first | First pass |
+| --- | --- | --- |
+| §1-§10 | what a rotation matrix is and why rotation order matters: [lie_algebra.md](lie_algebra.md) §2-§5; the dot and cross product | read |
+| §11-§12 | the EKF: [kf_ekf_iekf.md](../filtering/kf_ekf_iekf.md) §1-§2; the **error-state** idea: [eskf.md](../filtering/eskf.md); left- and right-invariant errors: [left_right_invariant.md](../filtering/left_right_invariant.md) §1 | read once you know those |
+| §13 Steps 1-2 | the dot and cross product; §2's note and §6 and §11 use the product $`\otimes`$, the conjugate and the pure quaternion defined here | read |
+| §13 Step 3 (the proof) | Steps 1-2 | skip |
+| §13 Step 4, the 2D comparison | Steps 1-2 | read |
+
+Sources are listed in [References](#14-references).
+
 ---
 
 ## 1. First: what problem is a quaternion solving?
