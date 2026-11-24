@@ -15,7 +15,7 @@ Before starting, follow [README.md § D. Installation](README.md#d-installation)
 ```text
 Main route:   Phase 0 → 1 → 2 → 3 → 4 → 5 ──→ Track L (the destination)
  │
-SLAM track:                  └─(after Phase 2)─→ S1 → S2 → S3     (optional, parallel)
+Smoothing track:             └─(after Phase 2)─→ S1 → S2 → S3     (optional, parallel)
 Deep dives:   D1-D5, each when its "Needs" are met                (optional)
 ```
 
@@ -30,7 +30,7 @@ Deep dives:   D1-D5, each when its "Needs" are met                (optional)
 | [Track L](#track-l---hybrid-and-bio-inspired-locomotion-the-destination) | How do you track a robot that bounces, crawls on anchors, walks, or slips? | a first pass of 5 scripts, then 11 more |
 
 - **Main route (Phases 0-5):** everything [Track L](#track-l---hybrid-and-bio-inspired-locomotion-the-destination) builds on. Every Track L script is a filter, and every Track L doc checks whether its filter is honest about its own uncertainty (Phase 5's topic).
-- **SLAM track (S1-S3):** building maps by re-solving the whole history. Track L does not need it; skip it on a first pass.
+- **Smoothing track (S1-S3):** building maps by re-solving the whole history (the SLAM back-end used by graph-based systems). Track L does not need it; skip it on a first pass.
 - **Deep dives (D1-D5):** more depth on one topic. Skip them on a first pass too.
 
 ## How to work through each step
@@ -194,7 +194,7 @@ A new locomotion type goes in the group whose question it shares, or in a new gr
 
 ---
 
-## SLAM track (optional, parallel)
+## Smoothing track (optional, parallel)
 
 **Needs:** Phase 2, plus [`lie_algebra.md`](docs/foundations/lie_algebra.md) §11 ($`SE(3)`$). This track keeps the whole history and re-solves it: the smoothing side of Phase 0's fork.
 
@@ -292,4 +292,4 @@ Each one adds depth on one topic. Start one once its **Needs** are met.
 
 [`docs/slam_mental_map.md`](docs/slam_mental_map.md) shows where each step sits in the overall picture; read its later sections once you've finished the main route. [`docs/README.md`](docs/README.md) is the full index for non-sequential reference.
 
-**Why this order:** each step's docs are mostly the prerequisites for its script. The main route ramps up as rotations → linearization → filters → filters on rotations → consistency, which is exactly what Track L's filters use. Smoothing (the SLAM track) and the deep dives branch off where their prerequisites are met.
+**Why this order:** each step's docs are mostly the prerequisites for its script. The main route ramps up as rotations → linearization → filters → filters on rotations → consistency, which is exactly what Track L's filters use. The smoothing track and the deep dives branch off where their prerequisites are met.
