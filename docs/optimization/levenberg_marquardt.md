@@ -97,9 +97,9 @@ where $\alpha$ is the **step size**. It uses only the **slope**, with no $J^\top
 
 **Slow:** $\alpha$ must stay small enough not to overshoot in the steepest direction, so in a long, narrow valley the steps zigzag across it and crawl along it.
 
-For example, $f = \tfrac12(x^2 + 100y^2)$ is 100× steeper in $y$, so $\alpha$ must stay below $2/100 = 0.02$. Starting from $(10, 1)$:
+For example, $f = \tfrac12(x^2 + 100y^2)$ is 100× steeper in $y$, so $\alpha$ must stay below $2/100 = 0.02$. Here $x, y$ are the two components of the state, the minimum is at $(0, 0)$, and each step is $(x, y) \leftarrow (x, y) - \alpha\,(x,\ 100y)$. Starting from $(10, 1)$:
 
-- $\alpha = 0.019$ needs **361 steps** to get within $0.01$ of the minimum.
+- $\alpha = 0.019$ needs **361 steps** to get within $0.01$ of the minimum (Euclidean distance, $\sqrt{x^2+y^2} < 0.01$).
 - $\alpha = 0.021$ **diverges**.
 - Gauss-Newton gets there in **one step**, because $J^\top J$ rescales each direction by its own curvature. Here the errors are $e = (x,\ 10y)$, so $J = \text{diag}(1, 10)$ and $J^\top J = \text{diag}(1, 100)$.
 

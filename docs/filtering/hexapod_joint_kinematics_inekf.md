@@ -66,8 +66,8 @@ All filters are the contact doc's right-invariant EKF (the contact-aided invaria
 
 | Filter | Foot-reading error it assumes | Used in |
 | --- | --- | --- |
-| `iso` | a sphere, per-axis variance = the mean of the three eigenvalues of $`\sigma_q^2 J J^\top`$ at the nominal stance (0.37 mm std at 1 mrad): the right total size, no shape | §3 |
-| `iso_max` | a sphere sized by the largest eigenvalue (0.52 mm std at 1 mrad): never too small | §3 |
+| `iso` | a sphere, per-axis variance = the mean of the three eigenvalues of $`\sigma_q^2 J J^\top`$ at the nominal stance (0.37 mm std at 1 mrad; the variance is averaged over the six legs): the right total size, no shape | §3 |
+| `iso_max` | a sphere sized by the largest eigenvalue (0.52 mm std at 1 mrad; the variance is averaged over the six legs): never too small | §3 |
 | `joint` | $`\sigma_q^2 J J^\top`$, with $`J`$ at the reading's own angles $`\tilde q`$ | §3, §4 |
 | `joint_inflated` | $`(\sigma_q^2 + \sigma_b^2) J J^\top`$: the offset treated as more white noise | §4 |
 | `joint_offsets` | $`\sigma_q^2 J J^\top`$, plus the 18 offsets as filter states | §4 |

@@ -314,7 +314,7 @@ It stops when ${\lVert \boldsymbol{\delta} \rVert <}$ `--gn-tol` (default $10^{-
 - The rotated entries are $`(\gamma \cdot 3 + \sigma \cdot 4,\; -\sigma \cdot 3 + \gamma \cdot 4) = (5, 0)`$. The new row's entry is zeroed, and $`R_{cc}`$ grows to 5.
 - Nothing is lost: $`3^2 + 4^2 = 5^2`$. A rotation only mixes rows, so the information is kept.
 
-**Givens row insertion** (`qr_insert_row` in `utils.py`): this absorbs one new whitened row ${(\mathbf{a}, \beta)}$ into ${(R, d)}$ without refactoring. For each column $c$ where ${\lvert a_c \rvert \ge 10^{-14}}$, a plane rotation mixes row $c$ of the system with the new row so that $a_c$ becomes 0:
+**Givens row insertion** (`qr_insert_row` in `utils.py`): this absorbs one new whitened row ${(\mathbf{a}, \beta)}$ ($`\mathbf{a}`$ is a column vector, so the row itself is $`\mathbf{a}^\top`$) into ${(R, d)}$ without refactoring. For each column $c$ where ${\lvert a_c \rvert \ge 10^{-14}}$, a plane rotation mixes row $c$ of the system with the new row so that $a_c$ becomes 0:
 
 $$\rho = \sqrt{R_{cc}^2 + a_c^2}, \qquad \gamma = \frac{R_{cc}}{\rho}, \qquad \sigma = \frac{a_c}{\rho}$$
 

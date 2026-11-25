@@ -84,7 +84,7 @@ This is a simplified version of the idea of Bledt et al. (ref. 5), who fuse a fo
 - trigger ticks, re-arming, and dropping triggers after liftoff;
 - the noise-free torque delay equals the delay the filter knows;
 - the logistic fit recovers known weights;
-- the position rows are identical to the gait-phase doc's for the same seed: the torque draws come last.
+- the position rows of one trial are identical to the gait-phase doc's for the same seed: the torque draws come last in the trial.
 
 ---
 
@@ -106,6 +106,8 @@ The two count columns are per trial, summed over the 6 legs and the run's 1200 t
 | `torque_detector` | 14.09 | 0.0063 | 0.0156 | 31.2 | 117.1 |
 | `torque_phase_ekf` | 6.30 | 0.0038 | 0.0105 | 0.1 | 122.6 |
 | `torque_fused` | 6.91 | 0.0040 | 0.0108 | 21.3 | 115.8 |
+
+The five position rows use the same settings as the gait-phase doc's §3 but different random draws: the torque draws shift the random stream after the first trial, so the 100-trial numbers differ from that table (for example, `detector` NEES 58.45 here against 49.8 there).
 
 Early triggers (a trigger before the true touchdown) hit 10.2% of steps for position and 2.4% for torque.
 
@@ -158,7 +160,7 @@ Each sweep varies one quantity from the defaults and scores only the stance flag
 | `torque_fused`: wrong ticks | 138.0 | 137.8 | 139.8 | 1035.8 |
 
 - **Model error sets the false triggers.** Below about a quarter of the threshold (7.5 N), the raw threshold did not fire early in these 30 trials. At 45 N, it fires early on a quarter of the steps. Throughout, `torque_phase_ekf` stays at about 123 wrong ticks.
-- **The load ramp sets the delay.** Up to 50 ms, the force crosses 30% of the share within one tick (≤ 15 ms), so 10, 25 and 50 ms score the same. At 100 ms and 200 ms, it needs 2 and 3 ticks. That is where fusion pays off: once the prior is high, the fused rule passes 0.5 at a force below the threshold, so `torque_fused` misses far fewer ticks (194.6 against 412.0 for `torque_phase_ekf` at 200 ms).
+- **The load ramp sets the delay.** Up to 50 ms, the force crosses 30% of the share within one tick (≤ 15 ms), so 10, 25, and 50 ms score the same. At 100 ms and 200 ms, it needs 2 and 3 ticks. That is where fusion pays off: once the prior is high, the fused rule passes 0.5 at a force below the threshold, so `torque_fused` misses far fewer stance ticks (194.6 against 412.0 for `torque_phase_ekf` at 200 ms; its wrong-tick total in the table, 219.2, adds 24.6 swinging-foot reads).
 - **Torque noise matters only when large.** Up to 1 Nm, with Daisy's 4.27 N/Nm, the force noise (≤ 4.3 N) stays well below the 30 N threshold, and `torque_phase_ekf` and `torque_fused` stay flat. The raw threshold does not: at 1 Nm the noise adds to the model-error pulses, and early triggers rise from 2.2% to 7.0% of steps. At 3 Nm (12.8 N std), with the 1 kHz signal thresholded unfiltered, nearly every swing crosses it, and every row fails. A real detector would low-pass the signal first; this one does not.
 
 ---

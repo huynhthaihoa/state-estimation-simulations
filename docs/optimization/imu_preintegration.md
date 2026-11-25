@@ -118,7 +118,7 @@ J_{R,b_g} \leftarrow dR^\top J_{R,b_g} - J_r\,dt
 
 ### Tiny example (toy case: one axis, constant rate)
 $N=100$, $dt=0.01$ s, so the window lasts $`t_{\text{total}} = N\,dt = 1`$ s.
-- On one axis $dR^\top = I$ and $J_r \approx I$, so each step is just $J \leftarrow J - dt$.
+- Look only at the component along the rotation axis. A rotation about that axis leaves that component unchanged, so there $dR^\top$ and $J_r$ act as 1, and each step is just $J \leftarrow J - dt$.
 - After 100 steps $J_{R,b_g} \approx -t_{\text{total}} = -1$ rad per (rad/s).
 - A bias error of 0.01 rad/s then changes $\Delta R$ by 0.01 rad (0.57°) after 1 s.
 - The minus sign: a larger bias estimate subtracts more rotation, so the correction in §5 points opposite the bias change.

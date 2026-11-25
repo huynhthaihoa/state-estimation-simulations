@@ -7,6 +7,7 @@ from state_estimation_simulations.lidar_utils import (
     LidarConfig,
     Rect,
     Scene,
+    circle_range_residuals,
     corridor_scene,
     cylinder_residuals,
     cylinder_to_frame,
@@ -15,12 +16,16 @@ from state_estimation_simulations.lidar_utils import (
     plane_to_frame,
     random_sensor_pose,
     raycast,
+    refine_circle,
+    refine_circle_range,
     refine_cylinder,
     refine_cylinder_range,
     cylinder_range_residuals,
     s2_basis,
     s2_exp,
+    run_circle_experiment,
     s2_log,
+    scan_circle,
     score_extraction,
     simulate_scan,
 )
@@ -171,6 +176,22 @@ def test_refine_cylinder_range_recovers_truth_noise_free():
     assert np.isclose(r_e, r, atol=1e-6)
 
 
+def test_cylinder_range_fit_multistart_escapes_the_local_minimum_of_a_single_start():
+    """Noise-free pillar (pose 7), start 3 cm low in radius: the single start stops about 2 cm below the
+    truth in a local minimum; the multi-start reaches the truth's cost, 0."""
+    (P, (a, c, r)), *_ = pillar_scan(0.0, 7, 0)
+    rays, ranges = P / np.linalg.norm(P, axis=1, keepdims=True), np.linalg.norm(P, axis=1)
+
+    def cost(a_e, c_e, r_e):
+        x = np.concatenate([np.zeros(2), s2_basis(a_e).T @ c_e, [r_e]])
+        return 0.5 * np.sum(cylinder_range_residuals(x, a_e, rays, ranges) ** 2)
+
+    a_s, c_s, r_s = refine_cylinder_range(P, a, c, r - 0.03, offsets=(0.0,))
+    assert r - r_s > 0.01 and cost(a_s, c_s, r_s) > 1e-3
+    a_m, c_m, r_m = refine_cylinder_range(P, a, c, r - 0.03)
+    assert np.isclose(r_m, r, atol=1e-6) and cost(a_m, c_m, r_m) < 1e-12
+
+
 def test_range_fit_reduces_the_orthogonal_fit_radius_bias():
     """Range noise along the ray biases the orthogonal-distance radius low;
     the range-space fit, started from it, removes most of that bias."""
@@ -182,3 +203,50 @@ def test_range_fit_reduces_the_orthogonal_fit_radius_bias():
             rng_fit.append(refine_cylinder_range(P, a1, c1, r1)[2] - r)
     assert np.mean(odr) < -0.01                     # about -17 mm at 4 cm noise
     assert abs(np.mean(rng_fit)) < 0.5 * abs(np.mean(odr))
+
+
+def test_circle_fits_have_zero_error_noise_free():
+    """Noise-free near-side hits: both 2D fits return the circle exactly, from the truth and from a small offset."""
+    centre, r = np.array([4.0, 0.0]), 0.5
+    rays, ranges = scan_circle(centre, r, 1440, 0.0, np.random.default_rng(0))
+    pts = rays * ranges[:, None]
+    for c0, r0 in ((centre, r), (centre + [0.005, -0.005], r - 0.005)):
+        for c_e, r_e in (refine_circle(pts, c0, r0), refine_circle_range(pts, c0, r0)):
+            assert np.isclose(r_e, r, atol=1e-8) and np.allclose(c_e, centre, atol=1e-8)
+
+
+def test_circle_range_fit_multistart_escapes_the_local_minimum_of_a_single_start():
+    """Noise-free circle, start 3 cm low in radius: the single start stops in a local minimum (the rays
+    that miss the shrunken circle have a closest-approach residual independent of r); the multi-start
+    reaches the truth's cost, 0."""
+    centre, r = np.array([4.0, 0.0]), 0.5
+    rays, ranges = scan_circle(centre, r, 1440, 0.0, np.random.default_rng(0))
+    pts = rays * ranges[:, None]
+
+    def cost(c_e, r_e):
+        return 0.5 * np.sum(circle_range_residuals(np.append(c_e, r_e), rays, ranges) ** 2)
+
+    c_s, r_s = refine_circle_range(pts, centre, r - 0.03, offsets=(0.0,))
+    assert r - r_s > 0.03 and cost(c_s, r_s) > 1e-3                 # stalled at r = 0.460
+    c_m, r_m = refine_circle_range(pts, centre, r - 0.03)
+    assert np.isclose(r_m, r, atol=1e-6) and np.allclose(c_m, centre, atol=1e-6) and cost(c_m, r_m) < 1e-12
+
+
+def test_circle_range_residual_is_continuous_at_tangency():
+    """A ray just inside and just outside tangency gives the same residuals up to the sqrt of the tiny change."""
+    centre, r = np.array([4.0, 0.0]), 0.5
+    phi = np.arcsin(r / centre[0])                  # this ray is tangent to the circle
+    ray = np.array([[np.cos(phi), np.sin(phi)]])
+    rng_t = np.array([np.sqrt(centre @ centre - r ** 2)])
+    res = [circle_range_residuals(np.append(centre, r + d), ray, rng_t) for d in (-1e-12, 0.0, 1e-12)]
+    assert np.max(np.abs(res[0] - res[1])) < 1e-5 and np.max(np.abs(res[2] - res[1])) < 1e-5
+    assert res[1][1] == 0.0 and res[2][1] >= 0.0    # the miss gap starts at zero
+
+
+def test_circle_experiment_is_deterministic_for_a_seed():
+    args = ([0.5], [0.02], 1440, 4, 4.0)
+    a, b, c = run_circle_experiment(*args, 0), run_circle_experiment(*args, 0), run_circle_experiment(*args, 1)
+    assert a["hits"][0, 0] == 57
+    for key in a:
+        assert np.array_equal(a[key], b[key], equal_nan=True)
+    assert a["orth_median_mm"][0, 0] != c["orth_median_mm"][0, 0]

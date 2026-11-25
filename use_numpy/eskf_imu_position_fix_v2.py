@@ -37,9 +37,18 @@ reports attitude and position error and NEES. The quaternion EKF's NEES uses
 its 16x16 covariance mapped to the same 15-dim error as the ESKF's
 (dtheta = 2 vec(q_hat^* (x) dq)). A smaller sweep repeats the Monte Carlo for
 several initial attitude errors.
+
+Option --lambda-scan: ESKF only, at the sweep's largest initial attitude error,
+every uncertainty (IMU noise, constant-bias priors, the filter's bias random walk,
+position-fix noise, initial errors) is multiplied by lambda, in the truth and in
+the filter alike, for each lambda of --lambdas; the motion is not scaled. Each
+lambda draws the same standard normals as that sweep row, scaled by lambda, so
+lambda = 1 gives the row's ESKF NEES. The table lists the excess of each
+lambda's NEES over the smallest lambda's.
 '''
 
 import argparse
+import copy
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -439,6 +448,33 @@ def run_monte_carlo(n_trials, trial_kwargs, P0, Q_imu, pos_noise_std, rng, reset
                 "nees": np.mean(a["nees"], axis=0)} for f, a in acc.items()}
 
 
+def lambda_scan_nees(n_trials, trial_kwargs, lam, accel_bias_rw, gyro_bias_rw, rng, reset_jacobian=True):
+    """Averaged ESKF NEES with every uncertainty multiplied by lam, in truth and filter.
+    Arguments:
+        n_trials: number of trials
+        trial_kwargs: keyword arguments of generate_trial except rng (the values at lam = 1)
+        lam: factor on the IMU noise, the constant-bias stds (also the filter's prior), the position-fix
+            noise, the initial errors and the filter's bias random walk (1 = the values of run_monte_carlo);
+            the motion (duration, dt, fix_rate, rate_amp, accel_amp) is not an uncertainty and is not scaled
+        accel_bias_rw, gyro_bias_rw: bias random walk of the filter at lam = 1
+        rng: numpy random Generator
+        reset_jacobian: passed to the ESKF
+    Returns:
+        (n,) NEES averaged over trials, per step
+    """
+    kw = {k: v * lam if k.endswith("_std") else v for k, v in trial_kwargs.items()}
+    P0 = initial_covariance(kw["init_pos_noise_std"], kw["init_vel_noise_std"], kw["init_att_noise_std"],
+                            kw["accel_bias_std"], kw["gyro_bias_std"])
+    Q_imu = imu_noise_covariance(kw["accel_noise_std"], kw["gyro_noise_std"], accel_bias_rw * lam,
+                                 gyro_bias_rw * lam)
+    runs = []
+    for _ in range(n_trials):
+        trial = generate_trial(rng=rng, **kw)
+        runs.append(trial_errors(trial, run_filter("eskf", trial, P0, Q_imu, kw["pos_noise_std"], reset_jacobian),
+                                 DOF["eskf"])[2])
+    return np.mean(runs, axis=0)
+
+
 def second_half_mean(series):
     """Mean of the second half of a per-step series (after the filters have settled).
     Arguments:
@@ -477,6 +513,12 @@ def main():
     parser.add_argument("--sweep-att-deg", type=float, nargs="*", default=[0.5, 5.0, 10.0],
                         help="Extra initial attitude errors for the sweep (deg); none = no sweep")
     parser.add_argument("--n-sweep-trials", type=int, default=10, help="Monte Carlo trials per sweep value")
+    parser.add_argument("--lambda-scan", action="store_true",
+                        help="Also scale every uncertainty by lambda (--lambdas) in truth and filter for the ESKF at "
+                             "the largest initial attitude error of the sweep, on that row's draws, and print the "
+                             "NEES and its excess over the smallest lambda")
+    parser.add_argument("--lambdas", type=float, nargs="+", default=[1.0, 0.5, 0.25, 0.1, 0.01],
+                        help="Scale factors for --lambda-scan")
     parser.add_argument("--no-reset-jacobian", action="store_true",
                         help="Use G = I at the ESKF reset instead of I - 0.5 [dtheta]x")
     parser.add_argument("--seed", type=int, default=0, help="RNG seed")
@@ -514,6 +556,7 @@ def main():
         timing[f] = (t, mem)
         print(f"  {f:<15s} final attitude error={att[-1]:7.3f} deg | final position error={pos[-1]:6.3f} m")
 
+    streams = {args.init_att_noise_deg: copy.deepcopy(rng)}   # rng at the start of each row, for --lambda-scan
     print(f"\nRunning Monte Carlo ({args.n_mc_trials} trials)...")
     mc = run_monte_carlo(args.n_mc_trials, trial_kwargs(args.init_att_noise_deg), P0, Q_imu, args.pos_noise_std,
                          rng, reset_jacobian)
@@ -536,10 +579,26 @@ def main():
             if att_deg == args.init_att_noise_deg:
                 res = mc
             else:
+                streams[att_deg] = copy.deepcopy(rng)
                 res = run_monte_carlo(args.n_sweep_trials, trial_kwargs(att_deg), prior(att_deg), Q_imu,
                                       args.pos_noise_std, rng, reset_jacobian)
             sweep[att_deg] = {f: second_half_mean(res[f]["nees"]) for f in FILTERS}
             print(f"  {att_deg:<15g}" + "".join(f"{sweep[att_deg][f]:16.2f}" for f in FILTERS))
+
+    if args.lambda_scan:
+        scan_att = max(streams)
+        n_scan = args.n_mc_trials if scan_att == args.init_att_noise_deg else args.n_sweep_trials
+        scan = {lam: second_half_mean(lambda_scan_nees(n_scan, trial_kwargs(scan_att), lam, args.accel_bias_rw,
+                                                       args.gyro_bias_rw, copy.deepcopy(streams[scan_att]),
+                                                       reset_jacobian))
+                for lam in args.lambdas}
+        base = scan[min(args.lambdas)]
+        print(f"\nLambda scan: ESKF, initial attitude error {scan_att:g} deg, {n_scan} trials (the draws of that "
+              f"row), seed {args.seed}; excess over lambda = {min(args.lambdas):g} (NEES {base:.2f}):")
+        for lam in args.lambdas:
+            excess = scan[lam] - base
+            print(f"  lambda {lam:5g}: NEES {scan[lam]:7.3f}  excess {excess:+7.3f}  "
+                  f"excess/lambda^2 {excess / lam ** 2:7.3f}")
 
     print("\nAverage time (per-step) and peak memory (whole-run) per filter, empirical:")
     for f in FILTERS:

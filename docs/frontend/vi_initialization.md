@@ -41,9 +41,9 @@ Hand off to IMU preintegration + factor-graph optimization
 
 With a single (monocular) camera, SfM translations and structure are correct only up to an unknown scale factor, while rotations are not affected. That is why §1 lists scale, not rotation, as an unknown.
 
-**Intuition for Step 1** (toy case: one keyframe pair, 1 s apart):
+**Intuition for Step 1** (toy case: one keyframe pair 1 s apart, rotation about a single axis, the gyroscope integrated with $`b_g=0`$, and the bias constant):
 - SfM says the camera turned 10.0°. The preintegrated gyroscope says 10.5°.
-- The 0.5° gap, spread over 1 s, is a gyroscope bias of about 0.5°/s.
+- The gyroscope reads the true rate plus its bias, so the 0.5° gap accumulated over 1 s is the bias: $`b_g\approx0.5`$°/s.
 - The real step is to fit this jointly over all keyframe pairs in the window.
 
 **Step 1 - gyroscope bias.**
@@ -53,7 +53,7 @@ With a single (monocular) camera, SfM translations and structure are correct onl
 - It is solved once, in closed form, with no iteration, for the linearized (first-order) model.
 
 **Step 2 - gravity, scale, and velocities.**
-- **Tiny example (toy case: ignores gravity and starting velocity):** vision says the camera moved 2 units, and the IMU says the same move was 1 m. So the scale is $`s = 1\,\text{m} / 2\,\text{units} = 0.5`$ m/unit.
+- **Tiny example (toy case: ignores gravity and starting velocity):** vision says the camera moved 2 units, and the IMU's preintegrated displacement $`\Delta p`$ over the same interval says the move was 1 m (in this toy, with zero starting velocity and gravity already removed). So the scale is $`s = 1\,\text{m} / 2\,\text{units} = 0.5`$ m/unit.
 - The real solve repeats this match over many keyframe pairs. That also pins down gravity and the velocities.
 - With the gyroscope bias corrected, $\Delta v$ and $\Delta p$ are IMU measurements (they depend only on the raw samples and the bias). The unknown scale $s$ sits in the vision positions, and gravity $g$ enters the equations that link the two. Each keyframe pair therefore gives equations tying the measured $\Delta v$, $\Delta p$ to $s$, $g$, and the velocities, and together with the vision-only relative poses, these form a second linear system.
 - It is solved jointly for $s$, $g$, and every keyframe's velocity.

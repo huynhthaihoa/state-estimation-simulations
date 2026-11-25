@@ -184,7 +184,7 @@ Two consequences follow directly from these formulas:
 
 ## 2. The dominant finding: `fixed_anisotropic` is dramatically worse, everywhere
 
-[Monte Carlo](../glossary.md#monte-carlo-trials) NEES over 500 trials (seed 0, $`dt = 0.05\,\text{s}`$, one full loop over $`20\,\text{s}`$, all script defaults), binned by how far the true heading has rotated away from `fixed_anisotropic`'s fixed reference heading. Each trial draws a fresh slip realization, initial error, and measurement noise. Redrawing the slip matters because slip is the process noise whose model $Q$ is being tested.
+[Monte Carlo](../glossary.md#monte-carlo-trials) NEES over 500 trials (seed 0, $`dt = 0.05\,\text{s}`$, one full loop over $`20\,\text{s}`$, all script defaults), binned by how far the true heading has rotated away from `fixed_anisotropic`'s fixed reference heading (the wrapped angular distance, 0-180°, so a heading of 270° counts as 90°). Each trial draws a fresh slip realization, initial error, and measurement noise. Redrawing the slip matters because slip is the process noise whose model $Q$ is being tested.
 
 ![Two panels from friction_anisotropic_ekf.py: the circular path with the per-step slip covariance ellipse turning with the heading, and Monte Carlo NEES over one full turn for isotropic, frozen anisotropic and heading-aware process noise](../../assets/friction_anisotropic_ekf.png)
 

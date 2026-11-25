@@ -15,7 +15,7 @@ The simulation is [`inchworm_slip_imm.py`](../../use_numpy/inchworm_slip_imm.py)
 
 When the anchor may slip, the filter has to decide whether "velocity = 0" is true right now. [`inchworm_zupt_ekf.md` §6](inchworm_zupt_ekf.md#6-side-extension-anchor-slip-and-a-measured-gate) decides with a hard rule: the schedule, a threshold gate on the pad reading, or no decision at all (use the reading as a velocity). An **interacting multiple model (IMM)** filter decides softly. It runs two Kalman filters side by side, one that assumes the body is **still** and one that assumes it is **moving**, and keeps a probability for each. Each tick, the mode that predicted the new measurements better gains probability, and the output is the probability-weighted blend of the two.
 
-Worked number. A pad reading of $`-0.05`$ m/s arrives on an anchored tick (a mid-slip speed). If the body were still, the filter expects 0 with a spread of $`\sqrt{0.01^2 + 0.01^2} = 0.014`$ m/s (the still mode's own velocity spread plus the reading noise, both 0.01 m/s). The reading is $`0.05 / 0.014 = 3.5`$ spreads away, which scales the still mode's likelihood by $`e^{-3.5^2/2} \approx 0.002`$ against its best case. The moving mode does not expect 0, so it is not surprised, and the probability moves to it. At the defaults, this takes 0.08 s on average (table in [Slip detection](#slip-detection)).
+Worked number. A pad reading of $`-0.05`$ m/s ($`d_k = -2.5`$ mm per tick, divided by $`\Delta t`$) arrives on an anchored tick (a mid-slip speed). If the body were still, the filter expects 0 with a spread of $`\sqrt{0.01^2 + 0.01^2} = 0.014`$ m/s (the still mode's own velocity spread plus the reading noise, both 0.01 m/s). The reading is $`0.05 / 0.014 = 3.5`$ spreads away, which scales the still mode's likelihood by $`e^{-3.5^2/2} \approx 0.002`$ against its best case. The moving mode does not expect 0, so it is not surprised (its likelihood is not computed here, and step 4 also weighs the predicted mode probabilities), and the probability moves toward it over the next ticks. Averaged over the trials, the first flagged tick comes 0.081 s after a slip pulse starts (table in [Slip detection](#slip-detection)).
 
 Question: does this beat the hard rules, and in which regime? Measured answer, in the order of the sections below:
 
@@ -91,7 +91,7 @@ P = \sum_j \mu_j\Big[P_j + (\hat x_j - \hat x)(\hat x_j - \hat x)^\top\Big]
 
 ## Transition matrix: a design choice
 
-$`\Pi`$ is not measured: it is a **filter design choice**, derived here from the simulation's own parameters (all printed by the script). Two rules:
+$`\Pi`$ is not measured; it is a **filter design choice**, derived here from the simulation's own parameters (all printed by the script). A row of $`\Pi`$ is written as $`[P(\text{still}),\ P(\text{moving})]`$ for the next tick. Two rules:
 
 Symbols: $`t_{\text{anchor}} = t_{\text{extend}} = 1`$ s are the anchor and extend durations per cycle, $`t_{\text{slip}} = 0.6`$ s the slip pulse duration and $`p_{\text{slip}} = 0.5`$ the probability that an anchor phase contains a pulse. "Still to moving" is the probability of switching from S to M within one tick.
 

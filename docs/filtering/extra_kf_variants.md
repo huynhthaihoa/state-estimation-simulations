@@ -81,7 +81,7 @@ Instead of approximating the nonlinear function with a tangent line like the EKF
 
 ![Two panels: left, a range-and-bearing Gaussian (range 1 m plus or minus 0.02 m, bearing 90 degrees plus or minus 20 degrees) with its 5 sigma points; right, the samples and sigma points pushed through x = r cos(bearing), y = r sin(bearing), forming a curved band; the true mean (y = 0.940 m) and the UKF mean (y = 0.941 m) sit below the band's top, while the EKF mean (y = 1.000 m) sits on it; 2-sigma ellipses for the true, EKF and UKF covariances](../../assets/ukf_sigma_points_concept.png)
 
-*Figure: the unscented transform with this repo's `unscented_weights` and `unscented_sigma_offsets` (n = 2, α = 1, β = 2, κ = 1, so n + λ = 3) against the EKF's tangent, plotted by `uv run python generator/make_figures.py ukf_sigma_points_concept`.*
+*Figure: the unscented transform with this repo's `unscented_weights` and `unscented_sigma_offsets` (n = 2, α = 1, β = 2, κ = 1, so n + λ = 3) against the EKF's tangent, plotted by `uv run python generator/make_figures.py ukf_sigma_points_concept`. The "true mean" is a 20,000-sample Monte Carlo estimate (0.940 m); its exact value is 0.9406 m, the same as the UKF's to the digits shown.*
 
 
 **Why care?**
@@ -178,8 +178,8 @@ Carrying $L$ avoids this in two ways:
 - $L$'s **condition number** (ratio of its largest to smallest singular value; large means numerically fragile) is the square root of $P$'s, so the same arithmetic keeps roughly twice as many significant digits.
 
 **Tiny example** (toy case: two independent states):
-- $P$ has variances 1 and $10^{-8}$, so the spread of its entries is $10^8$. That is too much for float32 (about 7 digits).
-- $L$ has 1 and $10^{-4}$, so the spread is only $10^4$.
+- $P$ has variances 1 and $10^{-8}$, so its condition number (largest over smallest) is $10^8$. That is more than float32's about 7 digits can hold, so the small variance is lost in rounding.
+- $L$ has 1 and $10^{-4}$, so its condition number is only $10^4$.
 
 A cheaper, common partial fix is the **Joseph form** of the update (a rounding-robust rewrite: equal to $`(I-KH)P`$ for the optimal gain, and still correct for any other gain), $`P \leftarrow (I-KH)P(I-KH)^\top + KRK^\top`$ ($`R`$ is the measurement noise covariance), which keeps $P$ symmetric positive semi-definite for any gain.
 

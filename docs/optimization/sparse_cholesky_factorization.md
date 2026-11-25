@@ -28,6 +28,8 @@ L = \begin{bmatrix} 2 & 0 & 0\\
 0 & 1.5 & \sqrt{3.75} \end{bmatrix}
 ```
 
+For example, $`L_{32}=(A_{32}-L_{31}L_{21})/L_{22}=(3-0\cdot1)/2=1.5`$ and $`L_{33}=\sqrt{6-1.5^2}=\sqrt{3.75}`$. The only zero of $`A`$ below the diagonal is $`A_{31}=0`$, and $`L_{31}=A_{31}/L_{11}=0`$ stays zero (column 1 has no earlier column to create fill-in), so there is no fill-in here; §3 shows a case where there is.
+
 The key observation is that **large optimization problems often contain mostly zeros**.
 
 **How to read it.** §1-§2 need one Gauss-Newton step written as the linear system $`H\Delta x=-b`$ ([gauss_newton.md](gauss_newton.md)) and the measurement information matrix $`\Omega`$ ([factor_graph.md](factor_graph.md) §4); §2's gauge-freedom paragraph also points to [pose_graph_optimization.md](pose_graph_optimization.md) §7 and [bundle_adjustment.md](bundle_adjustment.md) §14. §3-§10 build on §1-§2. §5's figure, animation and tables use the default scene of [`bundle_adjustment.py`](../../use_numpy/bundle_adjustment.py) ([README §14](../../README.md#14-bundle-adjustment-joint-pose--landmark-refinement)), and its list of ordering heuristics ends with iSAM2's choice, which [isam2_optimization.md](isam2_optimization.md) §12 explains. Sources are listed in [References](#11-references).
@@ -78,10 +80,10 @@ $$H\Delta x = -b$$
 
 We need $H$ to be symmetric positive definite, and that isn't automatic. If every factor is relative (odometry, loop closures, reprojections with no prior), some motion of the whole solution leaves the cost unchanged (a [gauge freedom](../glossary.md#gauge-freedom)). $H$ is then only positive *semi*-definite, and Cholesky breaks down on a zero **pivot** (the quantity under the square root in $`L_{jj}`$).
 
-**Tiny example (toy case):** two poses joined by one odometry factor give $`H=\begin{bmatrix}1&-1\\-1&1\end{bmatrix}`$.
+**Tiny example (toy case):** two scalar poses joined by one unit-weight odometry factor ($`e=x_2-x_1-z`$, so $`J=[-1\ \ 1]`$ and $`\Omega=1`$) give $`H=J^\top J=\begin{bmatrix}1&-1\\-1&1\end{bmatrix}`$.
 - Moving both poses together changes nothing, so $`H`$ has rank 1.
 - Cholesky's second pivot is $`H_{22}-L_{21}^2=1-1=0`$, so it fails.
-- Anchoring pose 1 adds 1 to $`H_{11}`$: the first pivot becomes 2, the second becomes $`1-(1/\sqrt2)^2=0.5`$, and the factorization works.
+- Anchoring pose 1 (a unit-weight prior on it) adds 1 to $`H_{11}`$: the first pivot becomes 2, the second becomes $`1-(1/\sqrt2)^2=0.5`$, and the factorization works.
 
 Gauge in practice:
 

@@ -84,8 +84,8 @@ Across the reset, only the position-rate component of $`f`$ changes directly ($`
 
 **Timing correction.** The second term of $`\Xi_{\text{world}}`$. $`DR`$ alone assumes every nearby trajectory bounces at the same instant, but a body that is slightly higher lands slightly later. Worked number, for a vertical drop at 7 m/s with $`e = 0.8`$ and the truth 1 cm above the estimate:
 - the truth lands 1 cm / 7 m/s ≈ 1.4 ms later;
-- by then the estimate has already bounced and risen 5.6 m/s × 1.4 ms ≈ 0.8 cm;
-- so after both have bounced, the truth is about 0.8 cm *below* the estimate: the height error goes from +1 cm to about −0.8 cm ($`-e`$ times it, to first order), and a vertical-velocity error of about $`(1+e)\,g \times 1.4`$ ms ≈ 0.025 m/s appears.
+- by then the estimate has already bounced and risen $`e \times 7 = 5.6`$ m/s × 1.4 ms ≈ 0.8 cm;
+- so after both have bounced, the truth is about 0.8 cm *below* the estimate: the height error goes from +1 cm to about −0.8 cm ($`-e`$ times it, to first order), and a vertical-velocity error of about $`(1+e)\,g \times 1.4`$ ms ≈ 0.025 m/s appears: the truth's vertical velocity ends above the estimate's, because it rebounds faster by $`e\,g\,\delta t`$ and has had $`g\,\delta t`$ less time to slow, as in [hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) §3.
 
 $`DR`$ alone would keep +1 cm. In the fraction, $`Dg \cdot \delta \,/\, Dg \cdot f^-`$ turns the state error into that shift of the impact time, and $`f^+ - DR\,f^-`$ (how the motion differs just after versus just before the bounce) turns the time shift back into a state error. This timing error is *caused by the state*. §7's **timing term** handles an error in the *detected* impact time.
 
@@ -127,7 +127,7 @@ The saltation matrix is exact up to the finite-difference step; the other two ar
 
 ## 6. Results: consistency through the bounces
 
-Defaults: 5 m drop, restitution 0.8, body rate $`(1.0, -0.6, 2.0)`$ rad/s, IMU at 100 Hz (gyro noise 0.02 rad/s, accel noise 0.3 m/s² per sample), landmarks at 10 Hz (0.05 m noise), four true bounces at 1.01, 2.63, 3.92 and 4.96 s. A fourth filter is the non-invariant baseline: an error-state EKF ([glossary](../glossary.md#eskf-error-state-kalman-filter)) in world-perturbation coordinates with $`\Xi_{\text{world}}`$ at bounces. (The fifth filter of §7, saltation + timing noise, is identical to the saltation one with exact contact detection, so it is left out of this section's tables.)
+Defaults: 5 m drop, restitution 0.8, body rate $`(1.0, -0.6, 2.0)`$ rad/s, IMU at 100 Hz (gyro noise 0.02 rad/s, accel noise 0.3 m/s² per sample), landmarks at 10 Hz (0.05 m noise), four true bounces, at ticks 1.01, 2.63, 3.92 and 4.96 s (the first tick after each impact; the exact crossings are 1.010, 2.625, 3.917 and 4.951 s). A fourth filter is the non-invariant baseline: an error-state EKF ([glossary](../glossary.md#eskf-error-state-kalman-filter)) in world-perturbation coordinates with $`\Xi_{\text{world}}`$ at bounces. (The fifth filter of §7, saltation + timing noise, is identical to the saltation one with exact contact detection, so it is left out of this section's tables.)
 
 **Mode matching.** At one or two ticks around each impact, the truth has bounced, and the estimate has not yet (or vice versa); there the velocity error is of order $`(1+e)|v_z|`$ - tens of m/s - and **NEES** (normalized estimation error squared, [glossary](../glossary.md#consistency-and-nees)) reaches about $`10^5`$ for every filter alike. That is an artifact of comparing a hybrid estimate with a hybrid truth at fixed ticks, not of the covariance treatment ([hybrid_saltation_ekf.md](hybrid_saltation_ekf.md) reports the same shared spike). `run_monte_carlo_consistency` therefore scores a tick only when the filter has resolved the same number of bounces as the truth, and reports the excluded fraction: 0.14-0.16% of (trial, tick) pairs here, for all four filters.
 

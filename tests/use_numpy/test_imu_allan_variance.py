@@ -168,3 +168,18 @@ def test_block_check_joint_nees_equals_the_experiment_nees_on_the_same_trials(im
     for c in m.CONVERSIONS:
         assert np.isclose(blocks[c]["joint"], m.second_half_mean(res[c]["nees"]), rtol=1e-9)
         assert blocks[c]["position"] > 0.0
+
+
+def test_lambda_scan_at_one_is_the_conversion_experiment_and_the_excess_shrinks_with_lambda(imu_allan_variance):
+    m = imu_allan_variance
+    preset = m.scaled_preset(m.PRESETS["euroc"], 1.0, 0.0)           # scenario 1:0
+
+    def fresh():
+        return np.random.default_rng(np.random.SeedSequence(11))
+
+    res = m.eskf_conversion_experiment(preset, 0.01, 10.0, 3, fresh())
+    scan = {lam: m.second_half_mean(m.lambda_scan_nees(preset, lam, 0.01, 10.0, 3, fresh()))
+            for lam in (1.0, 0.5, 0.1, 0.01)}
+    assert scan[1.0] == m.second_half_mean(res["correct"]["nees"])
+    excess = [scan[lam] - scan[0.01] for lam in (1.0, 0.5, 0.1)]
+    assert excess[0] > excess[1] > excess[2] > 0.0

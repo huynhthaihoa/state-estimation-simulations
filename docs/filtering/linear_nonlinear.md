@@ -89,9 +89,9 @@ Compare both with the noise the model already carries: the measurement noise cov
 - **Small:** the bias and the extra spread $`\sqrt{\tfrac12\mathrm{tr}(\nabla^2 f_i\,P\,\nabla^2 f_i\,P)}`$ are both much smaller than $`\sqrt{R_{ii}}`$ (the sensor's own standard deviation; or $`\sqrt{Q_{ii}}`$ for $f$), so the linearization is adequate.
 - **Comparable or larger**, in either: the model is effectively nonlinear at this uncertainty.
 
-**Range sensor example (2D):** the Hessian of $`h = \lVert p - L\rVert`$ is $`(I - uu^\top)/r`$. Here $u$ is the unit line-of-sight vector (not the control input), $`p`$ the position, $`L`$ the landmark, $`r`$ the range $`\lVert p-L\rVert`$ and $`\sigma_p`$ the position standard deviation. It has curvature $1/r$ across the line of sight, so the bias is about $\sigma_p^2 / (2r)$ (in 3D there are two perpendicular directions, which gives $\sigma_p^2 / r$). With $\sigma_p = 1$ m and $\sigma_{\text{range}} = 0.1$ m:
+**Range sensor example (2D):** the Hessian of $`h = \lVert p - L\rVert`$ is $`(I - uu^\top)/r`$. Here $u$ is the unit line-of-sight vector (not the control input), $`p`$ the position, $`L`$ the landmark, $`r`$ the range $`\lVert p-L\rVert`$ and $`\sigma_p`$ the position standard deviation. It has curvature $1/r$ across the line of sight, so the bias is about $\sigma_p^2 / (2r)$ (in 3D there are two perpendicular directions, which gives $\sigma_p^2 / r$). Likewise the extra spread is $`\sqrt{\tfrac12\mathrm{tr}(\nabla^2 h\,P\,\nabla^2 h\,P)} = \sigma_p^2/(\sqrt2\,r)`$ in 2D. With $\sigma_p = 1$ m and $\sigma_{\text{range}} = 0.1$ m:
 
-| Range $r$ | Bias | Extra spread $\sqrt{\tfrac12 / r^2}$ | vs. 0.1 m noise |
+| Range $r$ | Bias | Extra spread $\sigma_p^2/(\sqrt2\,r)$ | vs. 0.1 m noise |
 | --- | --- | --- | --- |
 | 2 m | 0.25 m | 0.354 m | 2.5× (bias), 3.5× (spread) → nonlinear |
 | 50 m | 0.01 m | 0.014 m | 0.1× and 0.14× → effectively linear |

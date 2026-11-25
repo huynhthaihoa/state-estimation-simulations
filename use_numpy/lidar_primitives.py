@@ -38,6 +38,10 @@ Experiments (run with --experiment):
      chained scan-to-scan odometry (primitive registration) vs. a factor
      graph of poses + world plane landmarks (odometry factors + plane
      measurement factors), solved by Levenberg-Marquardt
+
+Not an experiment 1-4 (run with --circle-2d instead; the others are then skipped):
+the 2D circle check of the orthogonal and range cylinder fits (lidar_utils.run_circle_experiment):
+radius error of both fits on a circle seen from a given distance, vs. rays per turn.
 '''
 
 import argparse
@@ -46,10 +50,10 @@ import numpy as np
 
 from state_estimation_simulations.use_numpy.lie_utils import skew, se3_exp, se3_log, se3_inv, se3_adjoint, compute_se3_inv_right_jacobian
 from state_estimation_simulations.lidar_utils import (METHODS, RELATIVE_MOTION, ExtractionConfig, LidarConfig, RegistrationConfig,  # noqa: F401
-                         Scan, associate_planes, print_basin, print_degeneracy, print_extraction, print_landmarks,
-                         corridor_scene, inlier_threshold, l_corridor_scene, l_corridor_trajectory,
+                         Scan, associate_planes, print_basin, print_circle_check, print_degeneracy, print_extraction,
+                         print_landmarks, corridor_scene, inlier_threshold, l_corridor_scene, l_corridor_trajectory,
                          match_primitives, pair_gate, plane_fit_information, prepare_scan, random_perturbation,
-                         random_sensor_pose, run_extraction_experiment, s2_basis, s2_exp, simulate_scan)
+                         random_sensor_pose, run_circle_experiment, run_extraction_experiment, s2_basis, s2_exp, simulate_scan)
 from state_estimation_simulations.utils import umeyama_alignment
 
 def make_pose(R, t):
@@ -488,7 +492,25 @@ def main():
     parser.add_argument("--n-runs", type=int, default=5, help="Experiment 4: noise realizations of the trajectory")
     parser.add_argument("--noise", type=float, default=0.01, help="Experiments 2-4: range noise std (m)")
     parser.add_argument("--seed", type=int, default=0, help="RNG seed")
+    parser.add_argument("--circle-2d", action="store_true",
+                        help="run only the 2D circle check of the two cylinder fits (options below)")
+    parser.add_argument("--circle-trials", type=int, default=300, help="--circle-2d: noise realizations per cell")
+    parser.add_argument("--circle-rays", type=int, default=1440,
+                        help="--circle-2d: rays per full turn (1440 = 0.25 deg; 360 = the simulated LiDAR's 1 deg)")
+    parser.add_argument("--circle-dist", type=float, default=4.0, help="--circle-2d: sensor-to-centre distance (m)")
+    parser.add_argument("--circle-radii", type=float, nargs="+", default=[0.25, 0.5, 1.0],
+                        help="--circle-2d: circle radii (m)")
+    parser.add_argument("--circle-sigmas", type=float, nargs="+", default=[0.02, 0.04],
+                        help="--circle-2d: range noise std values (m)")
     args = parser.parse_args()
+
+    if args.circle_2d:
+        print("2D circle check of the cylinder fits")
+        print_circle_check(run_circle_experiment(args.circle_radii, args.circle_sigmas, args.circle_rays,
+                                                 args.circle_trials, args.circle_dist, args.seed),
+                           args.circle_radii, args.circle_sigmas, args.circle_rays, args.circle_trials,
+                           args.circle_dist, args.seed)
+        return
 
     if args.experiment in ("1", "all"):
         noise_levels, azimuth_counts = [0.005, 0.01, 0.02, 0.04], [180, 360, 720]

@@ -434,24 +434,40 @@ def cylinder_range_residuals(x, a0, rays, ranges):
     return np.concatenate([ranges - s_hit, np.maximum(gap, 0.0)])
 
 
-def refine_cylinder_range(points, a, c, r):
+# Start offsets (m) of the range fits below: a start moves the radius out by d and the axis away from the sensor by d
+RANGE_START_OFFSETS = (0.0, 0.01, 0.02, 0.03, 0.04, 0.05)
+
+
+def refine_cylinder_range(points, a, c, r, offsets=RANGE_START_OFFSETS):
     """Maximum-likelihood cylinder fit for range-only noise: minimizes the
     measured-vs-predicted range along each ray (cylinder_range_residuals)
     instead of the orthogonal point-to-surface distance. LiDAR noise lies
     along the ray, which near a pillar's silhouette is almost tangent to
     the surface, so the orthogonal fit (refine_cylinder) underestimates
-    the radius by a bias that grows with the square of the noise. Starts
-    from (a, c, r), normally refine_cylinder's result; uses scipy's
-    least_squares with a finite-difference Jacobian.
+    the radius by a bias that grows with the square of the noise. Uses
+    scipy's least_squares with a finite-difference Jacobian.
+    A start with the radius too low, as refine_cylinder's result is, can stop
+    in a local minimum: a ray that misses the cylinder has a closest-approach
+    residual that does not depend on r. So the fit is started from
+    (c + d u, r + d) for every d in `offsets` (u: unit direction from the sensor
+    to the axis, which keeps the near surface in place) and the lowest cost wins.
     Arguments:
         points: (N,3) cylinder inliers, sensor frame (the sensor is the origin)
-        a, c, r: starting axis, axis point (a . c = 0), radius
+        a, c, r: starting axis, axis point (a . c = 0), radius, normally refine_cylinder's result
+        offsets: radius increases (m) of the starts; (0.0,) is the single start from (a, c, r)
     Returns:
         (a, c, r) with a . c = 0
     """
     ranges = np.linalg.norm(points, axis=1)
-    x0 = np.concatenate([np.zeros(2), s2_basis(a).T @ c, [r]])
-    x = least_squares(cylinder_range_residuals, x0, args=(a, points / ranges[:, None], ranges)).x
+    rays = points / ranges[:, None]
+    u = c / max(np.linalg.norm(c), 1e-12)
+    best = None
+    for d in offsets:
+        x0 = np.concatenate([np.zeros(2), s2_basis(a).T @ (c + d * u), [r + d]])
+        fit = least_squares(cylinder_range_residuals, x0, args=(a, rays, ranges))
+        if best is None or fit.cost < best.cost:
+            best = fit
+    x = best.x
     a_new = s2_exp(a, x[:2])
     c_new = s2_basis(a) @ x[2:4]
     return a_new, c_new - (a_new @ c_new) * a_new, x[4]
@@ -754,6 +770,124 @@ def run_extraction_experiment(scene, noise_levels, azimuth_counts, n_trials, see
 
 
 # ---------------------------------------------------------------------------
+# 2D circle check of the two cylinder fits (a cross-section of a pillar)
+# ---------------------------------------------------------------------------
+
+def scan_circle(center, r, n_rays, sigma, rng):
+    """Near-side hits of a circle by rays cast from the origin (the sensor), with range
+    noise along each ray; only the rays that hit the true circle are kept.
+    Arguments:
+        center: (2,) circle centre; r: radius (m)
+        n_rays: rays per full turn (equally spaced); sigma: range noise std (m)
+        rng: numpy Generator
+    Returns:
+        rays (N,2) unit directions, ranges (N,) noisy measured ranges
+    """
+    ang = np.arange(n_rays) * 2.0 * np.pi / n_rays
+    rays = np.column_stack([np.cos(ang), np.sin(ang)])
+    b = rays @ center                       # |s d - c|^2 = r^2  ->  s^2 - 2 b s + |c|^2 - r^2 = 0
+    disc = b ** 2 - (center @ center - r ** 2)
+    hit = (disc > 0) & (b > 0)
+    s = b[hit] - np.sqrt(disc[hit])         # near intersection
+    return rays[hit], s + sigma * rng.standard_normal(hit.sum())
+
+
+def refine_circle(points, c, r, n_iters=20):
+    """2D version of refine_cylinder: Gauss-Newton on ||x_i - c|| - r, centre and radius free.
+    Returns:
+        (c, r)
+    """
+    for _ in range(n_iters):
+        w = points - c
+        rho = np.maximum(np.linalg.norm(w, axis=1), 1e-12)
+        J = np.column_stack([-w / rho[:, None], -np.ones(len(points))])
+        delta = np.linalg.lstsq(J, -(rho - r), rcond=None)[0]
+        c, r = c + delta[:2], r + delta[2]
+        if np.linalg.norm(delta) < 1e-12:
+            break
+    return c, r
+
+
+def circle_range_residuals(x, rays, ranges):
+    """2D version of cylinder_range_residuals: measured range minus the range at which the ray
+    meets the circle; a ray that misses it gets its closest-approach range plus a second
+    residual, its gap to the circle (both continuous at tangency).
+    Arguments:
+        x: (3,) centre (2) and radius (1); rays: (N,2) unit directions; ranges: (N,)
+    Returns:
+        (2N,) residuals: [range residuals, miss gaps (0 for a hit)]
+    """
+    c, r = x[:2], x[2]
+    b = rays @ c
+    disc = b ** 2 - (c @ c - r ** 2)
+    s_hit = b - np.sqrt(np.maximum(disc, 0.0))
+    gap = np.sqrt(np.maximum(c @ c - b ** 2, 0.0)) - r
+    return np.concatenate([ranges - s_hit, np.maximum(gap, 0.0)])
+
+
+def refine_circle_range(points, c, r, offsets=RANGE_START_OFFSETS):
+    """2D version of refine_cylinder_range: maximum-likelihood circle fit for range-only noise,
+    started from (c + d u, r + d) for every d in `offsets` (u: unit direction from the sensor to
+    the centre), lowest cost wins, because a single start can stop in a local minimum.
+    Arguments:
+        points: (N,2) points, sensor at the origin; c, r: starting centre and radius
+        offsets: radius increases (m) of the starts; (0.0,) is the single start from (c, r)
+    Returns:
+        (c, r)
+    """
+    ranges = np.linalg.norm(points, axis=1)
+    rays = points / ranges[:, None]
+    u = c / max(np.linalg.norm(c), 1e-12)
+    best = None
+    for d in offsets:
+        fit = least_squares(circle_range_residuals, np.append(c + d * u, r + d), args=(rays, ranges))
+        if best is None or fit.cost < best.cost:
+            best = fit
+    return best.x[:2], best.x[2]
+
+
+def run_circle_experiment(radii, sigmas, n_rays, n_trials, dist, seed):
+    """2D circle check: radius error of the orthogonal fit (refine_circle) and the range fit
+    (refine_circle_range) on a circle whose centre is `dist` from the sensor. Both fits keep
+    centre and radius free and start from the truth, so the result measures the estimator, not
+    the initialization. Every (radius, sigma) cell has its own generator, seeded by
+    [seed, radius index, sigma index].
+    Arguments:
+        radii, sigmas: circle radii and range noise standard deviations (m)
+        n_rays: rays per full turn (the simulated LiDAR's default is 360, 1 deg)
+        n_trials: noise realizations per cell; dist: sensor-to-centre distance (m)
+    Returns:
+        dict of (len(radii), len(sigmas)) arrays: 'hits' (rays on the circle), and for each
+        fit f in ('orth', 'range'): '<f>_median_mm' (all trials), '<f>_mean_mm' (fits that did
+        not diverge) and '<f>_diverged' (count; |error| > radius or not finite)
+    """
+    centre = np.array([dist, 0.0])
+    shape = (len(radii), len(sigmas))
+    out = {"hits": np.zeros(shape, dtype=int)}
+    for f in ("orth", "range"):
+        out.update({f"{f}_median_mm": np.full(shape, np.nan), f"{f}_mean_mm": np.full(shape, np.nan),
+                    f"{f}_diverged": np.zeros(shape, dtype=int)})
+    for i, r in enumerate(radii):
+        out["hits"][i, :] = len(scan_circle(centre, r, n_rays, 0.0, np.random.default_rng(seed))[0])
+        for j, sigma in enumerate(sigmas):
+            rng = np.random.default_rng([seed, i, j])
+            err = {"orth": [], "range": []}
+            for _ in range(n_trials):
+                rays, ranges = scan_circle(centre, r, n_rays, sigma, rng)
+                pts = rays * ranges[:, None]
+                with np.errstate(all="ignore"):         # a 3-hit fit may blow up; it is counted below
+                    err["orth"].append(refine_circle(pts, centre.copy(), r)[1] - r)
+                    err["range"].append(refine_circle_range(pts, centre.copy(), r)[1] - r)
+            for f, e in err.items():
+                e = 1e3 * np.asarray(e)
+                bad = ~(np.abs(e) <= 1e3 * r)           # also catches NaN
+                out[f"{f}_median_mm"][i, j] = np.median(e[~np.isnan(e)]) if np.any(~np.isnan(e)) else np.nan
+                out[f"{f}_mean_mm"][i, j] = e[~bad].mean() if np.any(~bad) else np.nan
+                out[f"{f}_diverged"][i, j] = bad.sum()
+    return out
+
+
+# ---------------------------------------------------------------------------
 # Scans and registration settings (shared by both backends)
 # ---------------------------------------------------------------------------
 
@@ -906,6 +1040,20 @@ def print_extraction(out, noise_levels, azimuth_counts):
                 "cyl_radius_mm_rmse", "cyl_radius_mm_range_rmse"):
         print(f"\n{key}  (rows: range noise {noise_levels} m; cols: points per ring {azimuth_counts})")
         print(np.array2string(out[key], precision=3, suppress_small=True))
+
+
+def print_circle_check(out, radii, sigmas, n_rays, n_trials, dist, seed, min_hits=10):
+    print(f"circle centre {dist:g} m from the sensor, {n_rays} rays per turn ({360.0 / n_rays:g} deg), "
+          f"{n_trials} trials, seed {seed}; radius error in mm (median of all trials; mean of the fits that "
+          f"did not diverge; diverged = |error| > radius)")
+    print(f"  {'radius':>7s}  {'sigma':>6s}  {'hits':>4s}  {'orth median':>11s} {'mean':>8s} {'div':>4s}  "
+          f"{'range median':>12s} {'mean':>8s} {'div':>4s}")
+    for i, r in enumerate(radii):
+        for j, s in enumerate(sigmas):
+            cells = "  ".join(f"{out[f + '_median_mm'][i, j]:{w}.1f} {out[f + '_mean_mm'][i, j]:8.1f} "
+                              f"{out[f + '_diverged'][i, j]:4d}" for f, w in (("orth", 11), ("range", 12)))
+            flag = f"  <- fewer than {min_hits} hits: unreliable" if out["hits"][i, j] < min_hits else ""
+            print(f"  {r:6.2f}m  {s * 100:4g}cm  {out['hits'][i, j]:4d}  {cells}{flag}")
 
 
 def print_basin(out, levels):

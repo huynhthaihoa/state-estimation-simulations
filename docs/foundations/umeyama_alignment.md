@@ -30,7 +30,7 @@ A monocular camera looking at a static scene can recover the *shape* of the scen
 - **absolute position/orientation:** the whole reconstruction could be picked up and rigidly moved anywhere, and every [reprojection error](../glossary.md#reprojection-error) would stay identical
 - **absolute scale:** shrinking the entire scene and every camera-to-point distance by the same factor, while changing nothing else, leaves every projected pixel where it was
 
-**Tiny example (toy case: pinhole camera, ignoring the principal point, the pixel where the optical axis lands):** a point at $`(X, Z) = (1, 5)`$ and another at $`(2, 10)`$ both land at $`u = f_x X / Z = f_x/5`$ (where $`f_x`$ is the focal length in pixels, $`u`$ the horizontal pixel coordinate, and $`X, Z`$ the point's lateral and depth coordinates). Doubling the whole scene changes no pixel.
+**Tiny example (toy case: pinhole camera, ignoring the principal point, the pixel where the optical axis lands):** a point at $`(X, Z) = (1, 5)`$ and the same point after the whole scene is doubled about the camera (at the origin), $`(2, 10)`$, both land at $`u = f_x X / Z = f_x/5`$ (where $`f_x`$ is the focal length in pixels, $`u`$ the horizontal pixel coordinate, and $`X, Z`$ the point's lateral and depth coordinates). Doubling the whole scene changes no pixel.
 
 ![Two side-view panels: one camera whose ray passes through (X, Z) = (1, 5) and (2, 10), both landing at u = 160 px; and two cameras 1 m apart viewing a point, overlaid with the whole scene doubled (cameras 2 m apart, point twice as far), giving the same pixels in both cameras](../../assets/umeyama_scale_concept.png)
 
@@ -163,7 +163,14 @@ X = \begin{bmatrix} 0 & 0 & 0\\
 \qquad Y = s\,(R_{\text{true}} X^\top)^\top + t
 ```
 
-Here $X$ and $Y$ are the raw points (one per row); step 1 centers them. Running `umeyama_alignment(X, Y)` recovers $\hat{s} = 2.0$, $\hat{R} = R_{\text{true}}$ and $\hat{t} = (1, 2, 3)$ to floating-point precision ($< 10^{-15}$ max error), since the 4 noise-free points are consistent with exactly one similarity transform. With real (noisy) data, the same four steps return the *least-squares best* $s, R, t$, like fitting a line through noisy points.
+Here, $X$ and $Y$ are the raw points (one per row); step 1 centers them. $Y$ has rows $(1,2,3)$, $(1,4,3)$, $(-1,2,3)$, $(1,2,5)$. The four steps of §3 give:
+
+- Step 1: $`\mu_{\text{est}} = (0.25,\ 0.25,\ 0.25)`$, $`\mu_{\text{true}} = (0.5,\ 2.5,\ 3.5)`$ and $`\text{var}(X) = 0.5625`$.
+- Step 2: $`\Sigma = \begin{bmatrix}0.125&-0.375&0.125\\0.375&-0.125&-0.125\\-0.125&-0.125&0.375\end{bmatrix}`$, with singular values $`(0.5,\ 0.5,\ 0.125)`$.
+- Step 3: $`UV^\top = R_{\text{true}}`$ and $`\det = +1`$, so $`S = I`$.
+- Step 4: $`s = 1.125/0.5625 = 2`$ and $`t = \mu_{\text{true}} - sR\mu_{\text{est}} = (1,\ 2,\ 3)`$.
+
+Running `umeyama_alignment(X, Y)` recovers $\hat{s} = 2.0$, $\hat{R} = R_{\text{true}}$, and $\hat{t} = (1, 2, 3)$ to floating-point precision ($< 10^{-15}$ max error), since the 4 noise-free points are consistent with exactly one similarity transform. With real (noisy) data, the same four steps return the *least-squares best* $s, R, t$, like fitting a line through noisy points.
 
 ---
 

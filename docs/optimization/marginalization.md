@@ -122,7 +122,7 @@ $(\Lambda_b', \eta_b')$ is computed by linearizing at the *current* estimates of
 **Intuition (toy 2D range example):** a range factor between pose $`p`$ and landmark $`l`$ only measures their distance.
 - Move both by the same shift and the range does not change. So that shift is [unobservable](../glossary.md#observability).
 - Consistent linearization: the Jacobian is the unit vector $`u`$ from $`p`$ to $`l`$ on the $`l`$ side and $`-u`$ on the $`p`$ side. For a common shift, they cancel, so the information along it is 0.
-- Mixed points: $`p = (0,0)`$, $`l = (3,4)`$ give $`u = (0.6, 0.8)`$. Now linearize the pose side at $`p' = (0,1)`$, which gives $`u' = (0.707, 0.707)`$.
+- Mixed linearization points: the landmark-side Jacobian was built with the pose at $`p = (0,0)`$ (frozen), so with $`l = (3,4)`$ it uses $`u = (0.6, 0.8)`$. The pose-side Jacobian is rebuilt at the pose's newer estimate $`p' = (0,1)`$, so it uses $`u' = (0.707, 0.707)`$.
 - A common shift of $`(1,0)`$ then predicts a range change of $`0.6 - 0.707 = -0.107`$ m. The true change is 0.
 - So the system "sees" information where there is none, and becomes overconfident (a [consistency](../glossary.md#consistency-and-nees) failure).
 

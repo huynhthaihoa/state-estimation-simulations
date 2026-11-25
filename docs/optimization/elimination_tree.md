@@ -98,7 +98,7 @@ parent
 child
 ```
 
-For example:
+For example, take the elimination order Landmark 1, Pose 1, Pose 2, Pose 3, where Landmark 1 is observed by Pose 1 and consecutive poses are linked by odometry:
 
 ```text
  Pose 3
@@ -244,6 +244,7 @@ The tree depends on the elimination ordering:
 
 > **There isn't one universally fixed elimination tree for a problem. Change the ordering, and you can change the tree.**
 
+For comparison, the order $`x_1,\dots,x_5,l_1,l_2,l_3`$ (poses first) gives a single chain of 8 nodes with 10 fill-in edges and a largest separator of 4. The order above has no fill-in and separators of size 1.
 
 ![Two elimination trees of the same SLAM graph: with the doc's order the tree has height 5, no fill-in and separators of 1, with x2 holding x1, l1 and l2 as children and x4 holding x3 and l3; with poses first it is a single chain of 8, with 10 fill-in edges and a largest separator of 4](../../assets/elimination_tree_orderings_concept.png)
 

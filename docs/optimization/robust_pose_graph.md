@@ -188,7 +188,7 @@ Classification at convergence (all seeds pooled):
 | `--outlier-policy local` | 1.4020 (1.6718) | 0.7256 (0.9934) | 0.1054 (0.1292) | 0.1022 (0.1357) |
 | local, group 10, identity | 1.3113 (1.6143) | 1.0893 (1.4851) | 0.1247 (0.1632) | 0.1020 (0.1345) |
 
-More false closures, `--outlier-fracs 0.6 1.0` (60% and 100% of the true count; 48 and 80 false edges against 40 true):
+More false closures, `--outlier-fracs 0.6 1.0` (60% and 100% of the true count: 24 and 40 false edges against 40 true):
 
 | False fraction | `l2` | `huber` | `cauchy` | `dcs` |
 | --- | --- | --- | --- | --- |

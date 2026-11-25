@@ -94,7 +94,7 @@ Here $`R(\theta)`$ is the 2×2 rotation from the body frame to the world frame, 
 | `schedule_and_sensor` | As `schedule`, unless the pad sensor reads more than the **veto threshold**; then as `never` for that tick | Tight, or loose on a veto |
 | `pad_fused` | It moved by the sensor reading, rotated into the world frame: $`b \mathrel{+}= R(\theta)\, d_k`$ (or $`f`$) | The sensor noise, 0.5 mm |
 
-The veto threshold is 3 standard deviations of a still pad's reading (sensor noise plus micro-slip): 2.12 mm per tick, a speed of 0.042 m/s.
+The veto threshold is 3 standard deviations of a still pad's reading (sensor noise plus micro-slip): 2.12 mm per tick, a speed of 0.042 m/s. The veto tests the length of the 2-vector reading, so a still pad crosses it on about $`e^{-4.5}=1.1\%`$ of ticks.
 
 The last two rows differ in the way inchworm §6's gate and fusion do: a veto uses the reading as a yes/no flag; fusion uses its value.
 
@@ -131,7 +131,7 @@ Defaults (`p_slip` 0.5), 500 trials per seed. "Final error" is the single run's 
 The heading [RMSE](../glossary.md#rmse-root-mean-square-error) is the same for all four policies in every seed (0.008-0.037 rad): the heading comes only from the gyro, and no policy changes it.
 
 #### One slip, in numbers
-Before the four mechanisms below, one pulse: seed 0's first slip (1.0-1.6 s, a 3.2 cm backward slide), averaged over 300 trials. "Error" is the body midpoint's mean error along the body axis just after the pulse; "reported σ" is the filter's own standard deviation in that direction. Before the pulse, every policy is within about 5-7 mm. (Computed with the script's functions; not part of its printout.)
+Before the four mechanisms below, one pulse: seed 0's first slip (1.0-1.6 s, a 3.2 cm backward slide), averaged over 300 trials. "Error" is the mean over the trials of (estimated minus true) body-midpoint position, projected on the true body axis, at 1.7 s (0.1 s after the pulse ends); "reported σ" is the filter's own standard deviation in that direction. Before the pulse, every policy is within about 5-7 mm. (Computed with the script's functions; not part of its printout.)
 
 | Policy | Error after the pulse | Reported σ | Error / σ | Reading |
 | --- | --- | --- | --- | --- |
@@ -148,7 +148,7 @@ This is also why the "clean" and "slip" NEES windows used in inchworm §6 no lon
 #### A veto stops trusting the pad, but cannot say where it went
 `schedule_and_sensor` sees the pulse (the reading jumps to 4-5 mm per tick, figure top right) and loosens the anchored pad on those ticks. That reduces the overconfidence (NEES 10-28 instead of 58-483), but the position error is almost as large as `schedule`'s. Loosening admits "I don't know where the pad is". It gives the filter no information about where the pad actually went, and with no position fix, nothing else does either. In inchworm §6, the veto removed most of the damage (slip-window NEES about 47 → 3.5) only because the position measurements could correct the estimate afterward.
 
-The veto also misses the start and end of each pulse. At the threshold speed (0.042 m/s) and the ramp's acceleration (0.08 m/s over 0.2 s), each ramp spends about 0.1 s below the threshold. That leaves about 2 mm of unflagged slide per ramp, about 4.5 mm per pulse, against the 0.5 mm per tick the filter allows (a computed estimate, ignoring sensor noise).
+The veto also misses the start and end of each pulse. At the threshold speed (0.042 m/s) and the ramp's acceleration (0.08 m/s over 0.2 s), each ramp spends about 0.1 s below the threshold. That leaves about 2 mm of unflagged slide per ramp, about 4.5 mm per pulse over about 4 unflagged ticks, against the 0.5 mm per tick (1 mm over 4 ticks, as independent steps) the filter allows (a computed estimate, ignoring sensor noise).
 
 #### Fusing the reading keeps the position
 `pad_fused` moves the anchored pad by what its sensor measured, so a slide is followed, not just flagged. Its NEES stays at 4.84-5.01 in every seed, and its final error is 1.3-4.1% of the distance, whatever the number of pulses. This is the step the paper lists as future work: Kalman fusion of the pad sensor with motor and inertial data.
@@ -175,7 +175,7 @@ The veto has two knobs: **how loose it makes the pad** (`--free-noise-std`) and 
 | Much looser: 1.0 m/s | 3.12 | 4.8% |
 | Lower threshold: 1.5σ (1.06 mm per tick) | 4.33 | 14.6% |
 
-- **Consistency can be tuned.** Loosening more, or catching more of the ramps with a lower threshold, removes its overconfidence (NEES 3.1-4.3, now slightly below the band: cautious rather than overconfident).
+- **Consistency can be tuned.** Loosening more, or catching more of the ramps with a lower threshold, removes its overconfidence (NEES 3.1-4.3, below the band [4.57, 5.45]: cautious rather than overconfident).
 - **The low error at 1.0 m/s should not be read as a property of the veto.** When the anchored pad is made much looser than the moving pad (2 cm per tick), the closure update hands the body's position to the moving pad's estimate. In this toy, the moving pad has no motion model, so the result depends on how far the moving pad happens to travel during a pulse. A slower slip (0.04 m/s) gives 3.6%, a faster one (0.15 m/s) gives 12.9% (both at 1.0 m/s). A real filter would predict the moving pad from the encoders, and this effect would change.
 - **Fusion needs no such tuning.** Its process noise is the sensor's own noise.
 

@@ -50,7 +50,7 @@ x1 ── 1.02 m ── x2 ── 0.97 m ── x3 ── 1.05 m ── x4
 └─────────────────── 2.90 m ────────────────────┘
 ```
 
-The chain adds up to 3.04 m, but the direct measurement says 2.90 m. They can't all be exactly right, so optimization finds the poses that make **all measurements reasonably happy at once**, weighting each by how much it is trusted. Doing this from scratch at every step is the batch approach that iSAM and iSAM2 replace ([`isam_optimization.md` §1-§3](isam_optimization.md#1-the-problem-with-ordinary-batch-optimization)).
+The chain adds up to 3.04 m, but the direct measurement says 2.90 m. They can't all be exactly right, so optimization finds the poses that make **all measurements reasonably happy at once**, weighting each by how much it is trusted. With equal trust in all four measurements ($`\Omega_i = 1`$) and $`x_1`$ held fixed at 0, the best-fit steps are 0.985, 0.935 and 1.015 m, so $`x_4 = 2.935`$ m. The 0.14 m disagreement is shared equally: each of the four measurements is off by 0.035 m. A measurement trusted more would move less. Doing this from scratch at every step is the batch approach that iSAM and iSAM2 replace ([`isam_optimization.md` §1-§3](isam_optimization.md#1-the-problem-with-ordinary-batch-optimization)).
 
 ---
 

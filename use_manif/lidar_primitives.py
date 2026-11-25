@@ -18,6 +18,8 @@ factors, a handful per pose, use manif's Jacobian out-parameters directly.
 
 Experiments (run with --experiment): 1 extraction accuracy, 2 convergence
 basin, 3 degeneracy, 4 planes as landmarks; see the use_numpy script.
+The 2D circle-fit check (--circle-2d) has no pose, so it is only in the
+use_numpy script (functions in lidar_utils.py).
 '''
 
 import argparse

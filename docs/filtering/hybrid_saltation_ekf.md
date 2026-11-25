@@ -217,11 +217,11 @@ $DR$ has no notion of time: it only transforms a state already on the guard, and
 ## 4. Deriving $\Xi$ - including a wrong turn, caught by verification
 
 ### Intuition (tiny example, §3's setup)
-Ball A is nominal; ball B starts 5 cm higher.
+Ball A is nominal; ball B starts 5 cm higher. Restitution is §3's $`e = 0.5`$.
 - At impact speed 10.10 m/s, B needs $`0.05/10.10 \approx 4.95`$ ms more to reach the ground (a first-order estimate; the exact delay is 4.94 ms, §3). So B bounces about 4.95 ms late.
 - At the shared clock time, A has already bounced, and B has not. The two states are in different "phases".
 - The correction term below fixes exactly this: $`\delta t \times`$ (how the state moves after the bounce minus how the mapped pre-bounce state was moving).
-- In the height slot that gap is $`+5.05 - (-10.10) = 15.15`$ m/s, so the term is about $`15.15 \times 0.00495 \approx 0.075`$ m. It subtracts: the height offset becomes $`0.05 - 0.075 = -0.025`$ m (see §5).
+- In the height slot of $`f`$ (the vertical velocity) that gap is $`v_z^+ - v_z^- = 5.05 - (-10.10) = 15.15`$ m/s, so the term is about $`15.15 \times 0.00495 \approx 0.075`$ m. It subtracts: the height offset becomes $`0.05 - 0.075 = -0.025`$ m (see §5).
 - The naive $DR$ has no such term. It acts as if both balls bounced at the same instant.
 
 ### A formula that looks right and is right for a different question
@@ -433,7 +433,7 @@ This script doesn't build or verify that composition: it propagates one covarian
 §3's fixed-time comparison needs three composed matrices. $\Xi_{\text{own-time}}$ from §4 is a different quantity from what `saltation_matrix` computes, but it is correct for the event-to-event question it answers, and it reduces to a single scalar correction that we can work by hand with a calculator.
 
 ### Setup
-Same as §3's opening, before it moves to a fixed comparison time: $x^{-}_0=(0,0,5,0,0,-2)$ (so $p_z^0=5$, $v_z^0=-2$), $\delta x_0=(0,0,0.05,0,0,0)$ (so $\delta p_z^0 = 0.05$), $e=0.5$, $g=9.81$. Each trajectory is compared at its *own* post-bounce moment (no shared fixed time, unlike §3).
+Same as §3's opening, before it moves to a fixed comparison time: $x_0=(0,0,5,0,0,-2)$, the initial state, not a pre-bounce $x^{-}$ (so $p_z^0=5$, $v_z^0=-2$), $\delta x_0=(0,0,0.05,0,0,0)$ (so $\delta p_z^0 = 0.05$), $e=0.5$, $g=9.81$. Each trajectory is compared at its *own* post-bounce moment (no shared fixed time, unlike §3).
 
 ### Nominal crossing
 Free-fall height is $p_z(t) = p_z^0 + v_z^0 t - \tfrac12 g t^2$. Solve $5 - 2t - 4.905t^2 = 0$ for the positive root:
@@ -461,7 +461,7 @@ $$\text{True change} = 5.0764-5.0522 \approx +0.02421\ \text{m/s}$$
 (Note this is a *different* true answer from §3's $`+0.0726\,\text{m/s}`$ - that one compares both balls at a fixed later time $`T=1.0\,\text{s}`$, including whatever post-bounce flow happens before $T$; this one compares each ball right at its own bounce, with no post-bounce flow at all. Different questions, different true answers - which is exactly §4's point about $\Xi_{\text{own-time}}$ and $\Xi$ not being interchangeable.)
 
 ### $`\Xi_{\text{own-time}}`$ prediction ($`+0.0243`$)
-From §4's formula $\Xi_{\text{own-time}} = DR\left[I - \dfrac{f(x^{-})\otimes Dg}{Dg\cdot f(x^{-})}\right]$, the scalar $\dfrac{Dg\cdot\delta x_0}{Dg\cdot f(x^{-})} = \dfrac{0.05}{-10.1045}\approx -0.004948$ is the *negative* of §4's linearized crossing-time shift: $`dt^{*}/dp = -\dfrac{Dg\cdot\delta x_0}{Dg\cdot f(x^{-})} \approx +0.004948\ \text{s}`$. Compare it to the true $\delta t \approx +0.004936$ s just above: close but not identical, since it's only a first-order estimate of the shift.
+From §4's formula $\Xi_{\text{own-time}} = DR\left[I - \dfrac{f(x^{-})\otimes Dg}{Dg\cdot f(x^{-})}\right]$, the scalar $\dfrac{Dg\cdot\delta x_0}{Dg\cdot f(x^{-})} = \dfrac{0.05}{-10.1045}\approx -0.004948$ is the *negative* of §4's linearized crossing-time shift: $`dt^{*}/dp = -\dfrac{Dg\cdot\delta x_0}{Dg\cdot f(x^{-})} \approx +0.004948\ \text{s}`$. Compare it to the true $\delta t \approx +0.004936$ s just above: close but not identical, since it's only a first-order estimate of the shift. (Here $`S(t^{*}) = \Phi_{\text{before}}\,\delta x_0 = \delta x_0`$: free fall's $\Phi$ adds $t^{*}$ times the velocity part of $\delta x_0$ to the position, and that part is $0$, so a pure position offset passes through unchanged. That is why $\delta x_0$ can be used directly below.)
 
 Write $B(x^{-}) = I - \dfrac{f(x^{-})\otimes Dg}{Dg\cdot f(x^{-})}$ for the rank-one projector in brackets above (so $`\Xi_{\text{own-time}} = DR\,B`$) - the $B$-projector step turns that position offset into an *equivalent velocity offset*, using that the $v_z$ component of $f$ is $-g$ (gravity, constant):
 

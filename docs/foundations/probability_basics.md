@@ -92,7 +92,7 @@ The script's check (a) pushes 200,000 samples of $`x \sim \mathcal{N}([1, 2], P)
 | Formula | [2.0, 4.0] | [[1.3125, 0.75], [0.75, 1.0]] |
 | 200,000 samples | [1.9966, 3.9956] | [[1.3059, 0.7457], [0.7457, 1.0014]] |
 
-The relative Frobenius error (matrix norm of the difference over that of the formula) is 0.0047. By hand, the top-left entry is $`1\cdot1\cdot1 + 2\cdot(1\cdot0.5\cdot0.25) + 0.5^2\cdot0.25 = 1.3125`$. Drawing many random samples and measuring their statistics, as here, is a **Monte Carlo** check.
+The relative Frobenius error (matrix norm of the difference over that of the formula) is 0.0047. By hand, with $`(a_1, a_2) = (1, 0.5)`$ the first row of $`A`$, the top-left entry is $`a_1^2 P_{11} + 2a_1a_2 P_{12} + a_2^2 P_{22} = 1\cdot1 + 2\cdot0.5\cdot0.25 + 0.25\cdot0.25 = 1.3125`$. Drawing many random samples and measuring their statistics, as here, is a **Monte Carlo** check.
 
 **Independent noise adds covariances.** If $`y = x + w`$ with noise $`w \sim \mathcal{N}(0, Q)`$ independent of $`x`$, then $`P_y = P + Q`$ [2, eq. 2.90, p. 28]. With $`P = 3`$ m² and $`Q = 1`$ m², $`P_y = 4`$ m²: **adding noise only ever grows the uncertainty.** The Kalman filter's predict step is $`P^- = F P F^\top + Q`$: this rule with a linear motion map $`F`$ and process noise $`Q`$ ([kf_ekf_iekf.md §1](../filtering/kf_ekf_iekf.md#1-standard-kalman-filter-everything-is-nicely-linear)).
 
@@ -104,7 +104,7 @@ y \approx \mathcal{N}\left(g(\mu),\; G P G^\top\right)
 
 It is only as good as the tangent is close to $`g`$ over the spread of $`x`$. The test below is the sample-and-compare check of [linear_nonlinear.md §4.2](../filtering/linear_nonlinear.md#42-numerical-sample-and-compare-works-for-any-model); the filter docs call this Jacobian $`F`$ (motion model) or $`H`$ (measurement model).
 
-**Example: a range-bearing sensor.** A sensor reports range $`r = 10`$ m ($`\pm 0.2`$ m) and bearing $`\theta = 0°`$ ($`\pm \sigma_\theta`$), independent errors; the position is $`(x, y) = (r\cos\theta,\ r\sin\theta)`$. At $`\theta = 0`$ the Jacobian is $`G = [[1, 0], [0, 10 \text{ m}]]`$, so the linearized cloud has $`y`$ standard deviation $`10\ \text{m} \cdot \sigma_\theta`$ and $`x`$ standard deviation 0.2 m. Script check (b), 200,000 samples per row (the Monte Carlo cloud, with the same random numbers rescaled for every row):
+**Example: a range-bearing sensor.** A sensor reports range $`r = 10`$ m ($`\pm 0.2`$ m) and bearing $`\theta = 0°`$ ($`\pm \sigma_\theta`$), independent errors; the position is $`(x, y) = (r\cos\theta,\ r\sin\theta)`$. At $`\theta = 0`$ the Jacobian with respect to $`(r, \theta)`$, in that column order, is $`G = [[1, 0], [0, 10 \text{ m}]]`$, so the linearized cloud has $`y`$ standard deviation $`10\ \text{m} \cdot \sigma_\theta`$ ($`\sigma_\theta`$ in radians: 5° is 0.087 rad, so 0.87 m) and $`x`$ standard deviation 0.2 m. Script check (b): 200,000 samples per row (the Monte Carlo cloud, with the same random numbers rescaled for every row):
 
 | Bearing std $`\sigma_\theta`$ | Mean offset (m) | Mean offset ($`\sigma`$) | Covariance error | Sample NEES |
 | --- | --- | --- | --- | --- |
@@ -122,7 +122,7 @@ Columns, in words:
 Reading (measured):
 - Up to 5°, the tangent is almost exact. At 1°, the covariance error (0.002) is below the 0.0047 that sampling noise alone gives in check (a), where the formula is exact.
 - Then it breaks, and the sample NEES notices first: 10.2 at 15°, although the covariance error is only 0.076. At $`\theta = 0`$ the tangent has zero slope in $`x`$ ($`\partial x/\partial\theta = -r\sin\theta = 0`$), so the linearized $`x`$ variance stays at $`0.2^2 = 0.04`$ m² while the true cloud bends toward the sensor, $`x = r\cos\theta \approx r(1 - \theta^2/2)`$.
-- At 30° the cloud is a crescent (figure panel 2b), whose true mean has moved to $`10\,e^{-\sigma_\theta^2/2} = 8.72`$ m; the linearized mean stays at 10 m (offset 1.28 m, as printed).
+- At 30° the cloud is a crescent (figure panel 2b), whose true mean has moved to $`10\,e^{-\sigma_\theta^2/2} = 8.72`$ m (for Gaussian $`\theta`$ with $`\sigma_\theta`$ in radians, $`E[\cos\theta] = e^{-\sigma_\theta^2/2}`$; here $`\sigma_\theta = 0.524`$ rad); the linearized mean stays at 10 m (offset 1.28 m, as printed).
 
 ---
 
@@ -233,7 +233,7 @@ The second direction is the one the estimate knows well ($`\sigma_2 = 0.2`$ m), 
 
 **Averaging over Monte Carlo trials.** Repeat $`N`$ independent trials (each redraws the error) and average the NEES. For an honest estimator, $`N`$ times the average is chi-square with $`Nn`$ degrees of freedom, which gives a 95% acceptance band around $`n`$ [3, eqs. 5.4.2-4 to 5.4.2-6, p. 235]. It is roughly $`n \pm 1.96\sqrt{2n/N}`$ (the variance of the average is $`2n/N`$); for $`n = 2`$ and $`N = 1000`$ the repo's `averaged_nees_bounds` gives [1.878, 2.126]. The same function reproduces the book's example, $`n = 2`$, $`N = 50`$: [1.5, 2.6] [3, p. 235].
 
-**Result.** Reporting $`c\,P_{\text{true}}`$ divides every NEES by $`c`$ (algebra: $`e^\top (cP)^{-1} e = e^\top P^{-1} e / c`$), so the average NEES is $`n/c`$. The error is the same in all three rows; only the claim changes. 1000 trials, seed 0:
+**Result.** Reporting $`c\,P_{\text{true}}`$ divides every NEES by $`c`$ (algebra: $`e^\top (c\,P_{\text{true}})^{-1} e = e^\top P_{\text{true}}^{-1} e / c`$), so the average NEES is $`n/c`$. The error is the same in all three rows; only the claim changes. 1000 trials, seed 0:
 
 | $`c`$ | Reported | Average NEES | Expected $`n/c`$ | Inside [1.878, 2.126] | Trials above 5.991 | Predicted |
 | --- | --- | --- | --- | --- | --- | --- |

@@ -77,6 +77,8 @@ so that **all measurements are as consistent as possible**.
 
 That's the essence of factor-graph optimization.
 
+For this worked example, take the poses as positions on a line with $`x_0 = 0`$ held fixed, so the errors are plain differences: $`e_{k,k+1} = (x_{k+1}-x_k) - 1`$ and $`e_{03} = (x_3 - x_0) - 3.03`$ (§3 gives the general SE(3) form). By symmetry, all three steps equal $`1+\delta`$, so with unit weight on each odometry error and weight $`\Omega_{\text{loop}}`$ on the loop closure (1 for the equal weighting below) we minimize $`3\delta^2 + \Omega_{\text{loop}}(3\delta - 0.03)^2`$. This gives $`\delta = 0.03\,\Omega_{\text{loop}}/(1+3\Omega_{\text{loop}})`$ (0.0075 for $`\Omega_{\text{loop}}=1`$) and $`x_3 = 3+3\delta`$.
+
 Worked number: the optimizer only sees the measurements, the three 1 m odometry steps and the 3.03 m loop closure (the true 1.02/0.97/1.05 m are unknown to it). Weighting all four equally, least squares lengthens each step by $`0.0075`$ m to 1.0075 m, so $`x_3 = 3.0225`$ m: a compromise between the odometry's 3.00 m and the loop closure's 3.03 m, and closer to the true 3.04 m than odometry alone.
 
 The weights decide who wins the conflict: a stiffer spring bends less, so the more trusted measurement moves less. Same four measurements; each measurement has a weight $`\Omega`$ (how much it is trusted; §4). Odometry steps stay at $`\Omega_{\text{odo}}=1`$ and the loop closure's $`\Omega_{\text{loop}}`$ varies:

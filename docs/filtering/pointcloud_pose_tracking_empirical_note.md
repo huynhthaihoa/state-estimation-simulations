@@ -385,7 +385,7 @@ Both filters answer the same question - "how far off is my predicted point cloud
 | Point noise as seen in these axes | $\sigma_p^2 I$ | $`R^\top(\sigma_p^2 I)R = \sigma_p^2 I`$, the same sphere |
 | Pose correction $K r$ | the same | the same |
 
-Converting between them applies the current rotation estimate, a rigid relabeling of axes that preserves lengths. If both the *error* and the *sensitivity* (how a pose tweak moves the points) are converted consistently, the correction we get back is the same: it is the same arrow described in different axes.
+Converting between them applies the current rotation estimate, a rigid relabeling of axes that preserves lengths. The residual is the same arrow described in different axes; $`H`$ is relabeled the same way, so the two rotations cancel in $`Kr`$, and the correction is the very same 6-vector.
 
 The one thing that could break this is measurement noise that "looks different" depending on the direction we face (e.g. a sensor noisier sideways than in depth). Here the noise is **isotropic**, a sphere of uncertainty around each point, and a sphere looks the same however we rotate it. That is the ingredient that makes the two filters land on identical corrections (to round-off) every step: $`R\,(\sigma_p^2 I)\,R^\top = \sigma_p^2 I`$ for any rotation $R$.
 

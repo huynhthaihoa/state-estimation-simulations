@@ -22,10 +22,10 @@ This doc runs one toy where the honest belief has several hills: a robot in a co
  doors                 ▌    ▌          ▌         ▌         ▌
  robot, t = 4 s                         ●  (truth 12.15 m, sensor reads 0.98 = "a door")
  PF belief             .18  .385      .263      .172       0     weight within 1 m of each door
- EKF belief           one hill at 22.6 m, width ±5.0 m  (between two doors, 10 m from the truth)
+ EKF belief           one hill at 22.6 m, width ±5.0 m (1σ)  (between two doors, 10 m from the truth)
 ```
 
-*Worked number: example trial 0 (seed 0), 4 s after the start. The PF has four hills, one per door the robot could be at, and puts 0.263 of its weight on the true one. The EKF has one hill, in the wrong place. If the PF is forced to give one number, it also lands between hills (weighted mean 9.58 m, std 4.91 m): the hills are the answer, not their mean.*
+*Worked number: example trial 0 (seed 0), 4 s after the start. The PF has four hills, one per door the robot could be at, and puts 0.263 of its weight on the true one. The EKF has one hill, in the wrong place. If the PF is forced to give one number, it also lands between hills (weighted mean 9.58 m, std 4.91 m): the hills are the answer, not their mean. Horizontal distances in the picture are not to scale.*
 
 Same data, 400 random starts: after 24 s the PF is at the wrong door in **0.5%** of trials (2 of 400), the EKF in **84.0%**, the UKF in **69.8%**. Same code, but start the filters within 0.1 m of the truth: all three have RMSE 0.057 m and no wrong door (§7). So what breaks the EKF and UKF is the one-hill belief at an unknown start, not the sensor model.
 

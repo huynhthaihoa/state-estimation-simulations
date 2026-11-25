@@ -506,8 +506,8 @@ The more precise distinction is:
 ### Tiny example (toy case, 1D)
 - Prior: $`x_0\sim N(0,1)`$, and $`x_1 = x_0 + 1`$ with extra noise of variance 1. So $`x_1`$ has mean 1 and variance 2.
 - Later we learn $`x_0 = 0.4`$ with variance 0.01 (a sharp reading).
-- Smoother (still holds $`x_0`$): $`x_0 = 40/101 \approx 0.396`$, so $`x_1 \approx 1.396`$, and var($`x_1`$) drops from 2 to about 1.01.
-- Filter that already dropped $`x_0`$: it only has $`x_1\sim N(1,2)`$, so it cannot use a reading of $`x_0`$.
+- Smoother (still holds $`x_0`$): combine the prior and the reading by their precisions (1 / variance), $`1/1 + 1/0.01 = 101`$, so $`x_0 = (0/1 + 0.4/0.01)/101 = 40/101 \approx 0.396`$ with variance $`1/101`$. Then $`x_1 = x_0 + 1 + w`$ ($`w`$ is the extra noise) has mean $`\approx 1.396`$ and variance $`1/101 + 1 \approx 1.01`$ (down from 2).
+- Filter that already dropped $`x_0`$: it only has $`x_1\sim N(1,2)`$, so it cannot use a reading of $`x_0`$. Its estimate stays at mean 1, variance 2.
 
 ---
 

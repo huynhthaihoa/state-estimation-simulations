@@ -67,8 +67,10 @@ $K_k$ is the "prediction versus measurement" weighting above:
 
 ### Tiny example (1D, toy numbers)
 The 15 m prediction vs. 14 m GPS from the start of this doc.
+- The 15 m prediction is the previous 10 m plus the known motion, 5 m/s $`\times`$ 1 s. That motion is a known input $`u`$, which the model above leaves out; with it, the prediction is $`\hat x^- = F\hat x + u = 1 \cdot 10 + 5 = 15`$ m. The example starts from this prediction.
 - Say the prediction variance is $`P=3`$ and the GPS variance is $`R=7`$.
-- Then $`K = P/(P+R) = 3/10 = 0.3`$. That is the 30% on GPS (and 70% on the prediction) from before.
+- The state is just the car's position, and GPS measures it directly ($`z = x + v`$), so $`H = 1`$. The general gain $`K = PH^\top(HPH^\top + R)^{-1}`$ then reduces to $`K = P/(P+R)`$.
+- So $`K = 3/10 = 0.3`$. That is the 30% on GPS (and 70% on the prediction) from before.
 - Estimate: $`15 + 0.3\,(14-15) = 14.7`$ m, same as the 70%/30% blend.
 - New variance: $`(1-K)P = 0.7 \cdot 3 = 2.1`$, smaller than both $`3`$ and $`7`$. A measurement never leaves us less sure.
 - The prediction step does the opposite: $P$ grows by $`Q`$, so we get less sure while we coast.
@@ -112,7 +114,7 @@ Think of a curved road: we don't need to understand the whole curve, only to app
 
 ![Left: cos θ with its tangent at the estimate θ̂ = 30° and ±5° and ±40° bands; the tangent is 0.3 cm off at +5° and 17.5 cm off at +40°. Right: Monte Carlo distribution of cos θ versus the EKF's Gaussian, matching for σ = 5° and clearly different for σ = 40°](../../assets/ekf_linearization_concept.png)
 
-*Figure: the tangent is an excellent stand-in when the uncertainty is small (σ = 5°: 0.3 cm gap, means 0.863 vs. 0.866 m) and a poor one when it is large (σ = 40°: 17.5 cm gap, true mean 0.678 m vs. the EKF's 0.866 m). Plotted by `uv run python generator/make_figures.py ekf_linearization_concept`.*
+*Figure: plotted for the x-step $`v\,\Delta t\cos\theta`$ with $`v\,\Delta t = 1`$ m, so lengths are in metres (gaps below are quoted in cm). The tangent is an excellent stand-in when the uncertainty is small (σ = 5°: 0.3 cm gap, means 0.863 vs. 0.866 m) and a poor one when it is large (σ = 40°: 17.5 cm gap, true mean 0.678 m (Monte Carlo; exactly 0.679) vs. the EKF's 0.866 m). Plotted by `uv run python generator/make_figures.py ekf_linearization_concept`.*
 
 An animation of the same figure, with $`\sigma`$ sweeping from 1° to 40°, is in [the Jacobian doc, §6](../foundations/jacobian.md#6-the-mountain-picture).
 

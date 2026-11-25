@@ -224,17 +224,17 @@ For [iSAM2](isam2_optimization.md) ([incremental](../glossary.md#batch-vs-increm
 
 ## 7. Here's where it becomes powerful for [iSAM2](isam2_optimization.md)
 
-Suppose we have:
+Suppose we have the chain $x_1, \dots, x_4$ with $x_4$ as the newest pose, and the robot moves to a new pose $x_5$:
 
 ```text
 x1 ─ x2 ─ x3 ─ x4 ─ x5
 ```
 
-The robot adds the odometry factor $(x_4, x_5)$. iSAM2 doesn't rebuild everything; with the Bayes tree, it asks
+The robot adds the odometry factor $(x_4, x_5)$, the last edge in the drawing. iSAM2 doesn't rebuild everything; with the Bayes tree, it asks
 
 > "Which part of my factorization is affected by this new factor?"
 
-The tree has the shape of §4's chain, with $x_5$ as the root (new information arrives there) and $x_1$ as the leaf. An update only has to redo the path from the touched variables up to the root. The new factor touches $x_4$ and $x_5$, so the affected path is $`\{x_4, x_5\}`$ and $x_1$ to $x_3$ are left alone (the script's 2/16 case, §15). Only a factor on $x_5$ alone would change $x_5$ only.
+The tree is a chain like §4's, now with five nodes, with $x_5$ as the root (new information arrives there) and $x_1$ as the leaf. An update only has to redo the path from the touched variables up to the root. The new factor touches $x_4$ and $x_5$, so the affected path is $`\{x_4, x_5\}`$ and $x_1$ to $x_3$ are left alone (the script's 2/16 case, §15). Only a factor on $x_5$ alone would change $x_5$ only.
 
 ### Why the path goes up, not down
 - Each node's numbers are computed only from the factors in its own subtree (itself and everything below it). It never reads anything above.

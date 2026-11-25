@@ -314,7 +314,7 @@ Suppose we have $x_0 - x_1 - x_2$ and noisy measurements. Optimization isn't dis
 
 > **the trajectory that best satisfies the available constraints according to the chosen error model and weights.**
 
-For example, if one measurement is highly reliable (weight $w_1 = 100$) and another is noisy ($w_2 = 1$), the optimizer cares much more about satisfying the first constraint. So the complete objective is:
+For example, if one measurement is highly reliable (information $\Omega_1 = 100$, i.e., weight $w_1 = 100$, in a 1D case, a standard deviation of 0.1) and another is noisy ($\Omega_2 = 1$, standard deviation 1), the optimizer cares much more about satisfying the first constraint. So the complete objective is:
 
 $${\min_X \sum_{(i,j) \in \mathcal{E}} e_{ij}^\top \Omega_{ij} e_{ij}}$$
 

@@ -126,7 +126,7 @@ On average, 12 of the 40 wall steps slide by 4.0 mm each, so the expected drift 
 | `ext_fix` | 1.01 / +0.01 | 3.63 | 2.97 |
 | `ext_fix_bias` | 1.02 / +0.01 | 2.54 | 2.81 |
 
-With the side made random, `hall_flag` becomes consistent (2.87) and the mean drift vanishes (+1.34 mm), so it is the one direction, not the slide size, that defeats slide noise. With no mean slide to learn, `ext_fix_bias` gains nothing over `ext_fix` (position RMSE 6.39 mm against 5.86 mm).
+With the side made random, `hall_flag` becomes consistent (2.87) and the mean drift vanishes (+1.34 mm), so it is the direction, not the slide size, that defeats slide noise. With no mean slide to learn, `ext_fix_bias` gains nothing over `ext_fix` (position RMSE 6.39 mm for `ext_fix_bias`, 5.86 mm for `ext_fix`).
 
 #### The encoders drift too
 Each step adds a heading error of 0.036° (std, from the two yaw joints), and a heading error grows into a sideways error with every step after it. Without slides, this alone gives 23 mm sideways RMS at the end (§4); the filter covers it.
@@ -137,6 +137,8 @@ The fix pulls the error back every 10 steps (figure, top right). Between fixes, 
 ---
 
 ## 4. Sweeps (100 trials each)
+
+Each sweep uses its own random seed, so the same setting (5 mm slides, no missed flags, a fix every 10 steps) gives slightly different values in different tables, e.g., `hall_flag` 5.51 in the slide-scale sweep and 6.08 in the miss-rate sweep. Differences of this size are Monte Carlo noise.
 
 **True slide scale** (the filters still assume 5 mm), NEES on wall steps:
 

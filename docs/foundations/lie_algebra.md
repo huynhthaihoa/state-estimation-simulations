@@ -298,9 +298,9 @@ Just like $\mathfrak{so}(3)$ has a hat operator (§7), $\mathfrak{se}(3)$ has it
 - $V$ is a $3\times3$ matrix, built purely from $\phi$, that "bends" the raw translation $\rho$ to account for the coupling. It equals $`J_l(\phi)`$, the $SO(3)$ **left Jacobian**: the matrix that says how $`\mathrm{Exp}(\phi)`$ moves when $\phi$ is nudged, as an extra rotation on the left ($`J_r`$, the right Jacobian: on the right; [jacobian.md §11.2](jacobian.md#112-the-actual-question-being-asked)). Its closed form is in [jacobian.md §11.4](jacobian.md#114-closed-form-for-so3); the exact formula isn't needed here.
 - The log map has the mirror-image subtlety: recovering $\rho$ from a pose needs $V^{-1}$, not just the translation column.
 
-**Tiny example:** drive forward at 1 m/s while turning left at 90°/s, for 1 s.
+**Tiny example:** a robot starting at the origin, heading $`+x`$ ($`z`$ up), drives forward at 1 m/s while turning left at 90°/s, for 1 s.
 
-- Here $`\rho = (1,0,0)`$ and $`\phi = (0,0,\pi/2)`$. The robot traces a quarter circle.
+- Over 1 s the twist integrates to $`\rho = (1\text{ m/s})(1\text{ s}) = (1,0,0)`$ and $`\phi = (90°/\text{s})(1\text{ s}) = (0,0,\pi/2)`$ ($`+z`$ is left). The robot traces a quarter circle.
 - It ends at $`V\rho = (2/\pi,\ 2/\pi,\ 0) \approx (0.637,\ 0.637,\ 0)`$, and its heading has turned by 90°.
 - So $`V`$ bends the straight line $`\rho`$ into an arc. The endpoint is not $`(1,0,0)`$.
 - For small $`\phi`$ the arc is almost straight, so $`V \approx I`$.
@@ -375,7 +375,7 @@ So a nudge applied on the right of $`T`$ (in the robot frame) equals the nudge $
 
 **Tiny example:** the robot stands at $`t = (2, 0, 0)`$, facing world $`+y`$ (yawed by 90°).
 - "1 cm forward" in its frame, $`\rho = (0.01, 0, 0)`$, becomes 1 cm along world $`+y`$: the $`R`$ blocks only relabel the axes.
-- "Turn 0.01 rad in place", $`\phi = (0, 0, 0.01)`$, becomes the same turn plus a 2 cm shift along world $`-y`$. A point at the world origin, rigidly attached and 2 m from the pivot, swings sideways, like a door handle swinging about its hinge. That is the $`t^\wedge R`$ block.
+- "Turn 0.01 rad in place", $`\phi = (0, 0, 0.01)`$, becomes the same turn plus a 2 cm shift along world $`-y`$. A point at the world origin, rigidly attached to the robot (2 m from the pivot), swings 0.01 rad $`\times`$ 2 m = 2 cm toward world $`-y`$, like a door handle swinging about its hinge. That is the $`t^\wedge R`$ block.
 
 Filters use $`\mathrm{Ad}`$ to carry a covariance from one frame to another, and pose-graph Jacobians use it to move a perturbation from one pose to another.
 

@@ -340,6 +340,8 @@ $$(x-10.0)^2+0.1(x-10.5)^2+(x-9.8)^2$$
 
 B now has less influence, and the solution moves toward A and C: $`x = (10.0 + 0.1\cdot 10.5 + 9.8)/2.1 \approx 9.93`$ m.
 
+Here the weights are $`W_A=W_C=1`$ and $`W_B=0.1=\Sigma_B^{-1}`$ (§12), so B's variance is 10 times that of A and C. Setting the derivative to zero gives $`\sum_i W_i(x-z_i)=0`$, so the solution is the weighted average $`x=\sum_i W_iz_i/\sum_i W_i`$. The denominator $`2.1=1+0.1+1`$ is the sum of the weights. With equal weights, this is the plain average above.
+
 That's the intuition behind weighted least squares in SLAM.
 
 ---

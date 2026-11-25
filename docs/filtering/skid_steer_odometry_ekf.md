@@ -21,7 +21,7 @@ One established way to model the skid is to scale the track by an **ICR coeffici
 
 - **A wrong $`\chi`$ ruins wheel odometry.** On a 60 m run, ideal differential drive (`odo_chi1`) on a robot whose true $`\chi`$ is 1.875 has a position [RMSE](../glossary.md#rmse-root-mean-square-error) of 5.5 m and a heading RMSE of 102°. The driver's 1.875 on a robot whose true $`\chi`$ is 1.47 gives 10.4 m.
 - **With the right $`\chi`$, the wheels are nearly perfect here.** 0.01 cm RMSE. The only wheel error in this model is the encoder's rounding, and a constant, known skid adds nothing.
-- **A gyro in an EKF does not rescue a wrong $`\chi`$.** `ekf_fixed` follows the wheels (10.4 m RMSE at a true $`\chi`$ of 1.47) and reports millimeters ([NEES](../glossary.md#consistency-and-nees) 2.4 × 10⁷, where 3 is consistent). In its model, the gyro reading is 31 times noisier, in variance, than the wheels' yaw reading (about 108 times per unit of yaw rate, at $`\chi`$ = 1.875), so it trusts the wheels over the gyro.
+- **A gyro in an EKF does not rescue a wrong $`\chi`$.** `ekf_fixed` follows the wheels (10.4 m RMSE at a true $`\chi`$ of 1.47) and reports millimeters ([NEES](../glossary.md#consistency-and-nees) 2.4 × 10⁷, where 3 is consistent). In its model, the gyro reading is 31 times noisier, in variance, than the wheels' yaw reading (about 108 times per unit of yaw rate: the wheels' reading is $`\chi\omega`$, so at $`\chi = 1.875`$ its variance per unit of $`\omega`$ is $`1.875^2 = 3.5`$ times smaller), so it trusts the wheels over the gyro.
 - **Estimating $`\chi`$ works.** `ekf_chi` learns $`\chi`$ within about 2 s of the first turn (to 0.001 by the end), for every true $`\chi`$ from 1.0 to 2.0. Its position RMSE stays at about 3 cm, made in those first seconds: starting with the true $`\chi`$, it drops to 0.05 cm.
 - **Real Husky wheel odometry drifts 2.6-4.9%** ([RPE](../glossary.md#rpe-relative-pose-error) over path segments of 1-100 m; measured, ref. 9). This model's odometry with the correct $`\chi`$ drifts almost nothing. So the real drift comes from a $`\chi`$ that is wrong or changes with the path and the ground, or from what the model leaves out (sideways slip, rough ground); ref. 9 does not say which $`\chi`$ its odometry used.
 
@@ -82,8 +82,8 @@ Also **assumed**: no sideways slip (the symmetric case of ref. 6's model), an ex
   - the wheels' yaw reading, $`z_w = (v_r - v_l)/B = \chi\,\omega`$ + noise.
 - **Why both parameters can be learned** ([observability](../glossary.md#observability)): on a straight part $`\omega \approx 0`$, so the gyro shows its bias alone. In a turn, the wheels' reading is $`\chi`$ times the yaw rate.
 - **Noise levels:**
-  - gyro 0.0037 rad/s per sample, from the noise density;
-  - wheels' yaw reading 0.00067 rad/s, from the encoder step (0.00064 m/s per 20 ms) treated as white **[quantization noise](../glossary.md#quantization-noise)**;
+  - gyro 0.0037 rad/s per sample, from the noise density ($`0.03\,^\circ/\text{s}/\sqrt{\text{Hz}} / \sqrt{0.02\ \text{s}} = 0.21\,^\circ/\text{s}`$);
+  - wheels' yaw reading 0.00067 rad/s, from the encoder step treated as white **[quantization noise](../glossary.md#quantization-noise)**: the step is $`1/78000/0.02 = 0.00064`$ m/s per 20 ms; each wheel speed is the difference of two roundings, so its variance is $`2\,(0.00064)^2/12`$ (std 0.00026 m/s); the yaw reading is $`(v_r - v_l)/B`$, so its std is $`\sqrt{2} \times 0.00026 / 0.555 = 0.00067`$ rad/s;
   - in variance, the gyro is 31 times noisier.
 - **Priors:**
   - start pose known (std 10⁻⁴ m and rad);

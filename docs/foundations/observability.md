@@ -85,7 +85,7 @@ The worked line for $`n_3`$: the measurement Jacobian of landmark $`j`$ is $`H_j
 | --- | --- | --- |
 | speed, turn rate | 1 m/s, 9°/s | ref. 3 Sec. 7.1 |
 | laps, landmarks | 10 (400 steps), 20 | ref. 3 Sec. 7.1 |
-| odometry noise | each wheel 2% of the speed; forward $`\sigma/\sqrt2`$ = 1.41 cm per step, rotation $`\sqrt2\sigma/a`$ = 3.24° per step, wheel base $`a`$ = 0.5 m | ref. 3 Sec. 7.1 |
+| odometry noise | each wheel 2% of the speed, i.e. $`\sigma = 0.02`$ m per 1 s step per wheel; forward $`\sigma/\sqrt2`$ = 1.41 cm per step, rotation $`\sqrt2\sigma/a`$ = 3.24° per step, wheel base $`a`$ = 0.5 m | ref. 3 Sec. 7.1 |
 | measurement | relative position, noise 0.1 m per axis, landmark seen if within 5 m of the true robot, once per second | ref. 3 Sec. 7.1 |
 | initial pose uncertainty | zero | ref. 3 Sec. 7.1 |
 | new landmark | initialized from the first measurement with a prior std of 100 m ("very high compared to the size of the map") and then updated like the others | ref. 3 Sec. 7.1; the 100 m is a design choice |
@@ -160,7 +160,7 @@ Their $`G_n`$ (the Jacobian of the error with respect to the odometry noise; eqs
 | invariant | latest estimates (they do not matter for the rotation) | $`\xi`$ above | yes | 3 | 0.73 ms |
 | ideal (reference) | the true state | $`X - \hat X`$ | no | 3 | 0.58 ms |
 
-Times are from the default run on a laptop shared with other jobs, so only the ratio (the invariant EKF about 1.5 times the others; not profiled) is meaningful. All four use the same prediction of the state and are scored in the same error $`X - \hat X`$ (the invariant EKF's covariance is mapped back with the first-order map $`\xi \mapsto X - \hat X`$, so its NEES is comparable).
+Times are from the default run on a laptop shared with other jobs, so only the ratio (the invariant EKF about 1.5 times the standard EKF and FEJ, and 1.3 times the ideal one; not profiled) is meaningful. All four use the same prediction of the state and are scored in the same error $`X - \hat X`$ (the invariant EKF's covariance is mapped back with the first-order map $`\xi \mapsto X - \hat X`$, so its NEES is comparable).
 
 ## 5. Simulation results
 
@@ -240,7 +240,7 @@ The odometry noise draws are the same in every row (they are scaled afterwards),
 
 - **The NEES gap depends on the map and the noise.** With the paper's noise, it is 0.1 to 0.9 on the three seeds (the paired difference of seed 1 is 0.11 ± 0.07 for FEJ and 0.16 ± 0.07 for the invariant EKF), 2.4 with 12 landmarks, and it grows with the rotation noise.
 - **More information along the rotation does not by itself mean a worse NEES.** With range-bearing measurements, the standard EKF adds the most information (2.7e5) and its NEES (2.95) is inside the band. The reason is not tested.
-- **The invariant EKF is within 0.2 of the ideal EKF in every row.** At 4× noise, both are above the band (8.6 and 8.3): the linearization error of large heading errors is then a second source of inconsistency that neither fix removes.
+- **The invariant EKF is within 0.25 of the ideal EKF in every row.** At 4× noise, both are above the band (8.6 and 8.3): the linearization error of large heading errors is then a second source of inconsistency that neither fix removes.
 - **FEJ breaks down before the others at large noise.** At 4× its mean NEES is 4942 (median trial 25.4): a few trials diverge. Its Jacobians use first estimates, taken before later measurements improved them (ref. 1 notes they are less accurate); whether that is the cause is not tested.
 
 ## 6. Every observability finding in the repo

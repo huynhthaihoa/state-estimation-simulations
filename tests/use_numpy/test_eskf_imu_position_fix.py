@@ -135,3 +135,14 @@ def test_eskf_is_consistent_and_no_bias_filter_is_not(eskf_imu_position_fix):
     assert 10.0 < eskf_nees < 22.0
     assert m.second_half_mean(res["eskf_no_bias"]["nees"]) > 10 * 9
     assert m.second_half_mean(res["eskf_no_bias"]["att_rmse"]) > m.second_half_mean(res["eskf"]["att_rmse"])
+
+
+def test_lambda_scan_at_one_is_the_sweep_row_and_the_excess_shrinks_with_lambda(eskf_imu_position_fix):
+    m = eskf_imu_position_fix
+    kw = _trial_kwargs(init_att_noise_std=np.deg2rad(10.0))
+    row = m.second_half_mean(_mc(m, 10.0, 3, 8)["eskf"]["nees"])
+    scan = {lam: m.second_half_mean(m.lambda_scan_nees(3, kw, lam, 1e-4, 1e-5, np.random.default_rng(8)))
+            for lam in (1.0, 0.5, 0.1, 0.01)}
+    assert scan[1.0] == row
+    excess = [scan[lam] - scan[0.01] for lam in (1.0, 0.5, 0.1)]
+    assert excess[0] > excess[1] > excess[2] > 0.0

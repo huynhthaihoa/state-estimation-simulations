@@ -76,6 +76,14 @@ Scores: Monte Carlo NEES of the 15-state error, averaged over trials, with its
 trial redraws motion, biases, bias walk, IMU noise, position-fix noise and the
 initial error.
 
+Option --lambda-scan (Part 2): on scenario 1:0 with the correct conversion, every
+uncertainty (IMU white noise, constant-bias priors, position-fix noise, initial
+errors) is multiplied by lambda, in the truth and in the filter alike, for each
+lambda of --lambdas; the motion is not scaled. The trials draw the same standard
+normals as the script's own scenario 1:0, scaled by lambda, so lambda = 1 gives
+that scenario's NEES. The table lists the excess of each lambda's NEES over the
+smallest lambda's.
+
 Findings are in docs/foundations/noise_identification.md (written after the
 numbers were in).
 '''
@@ -467,6 +475,33 @@ def block_nees_experiment(preset, dt, duration, n_trials, rng, fix_rate=1.0):
     return {c: {b: float(np.mean(v)) for b, v in blocks.items()} for c, blocks in acc.items()}
 
 
+def lambda_scan_nees(preset, lam, dt, duration, n_trials, rng, fix_rate=1.0):
+    """Averaged NEES of the correct filter with every uncertainty multiplied by lam, in truth and filter.
+    Arguments:
+        preset: dict from PRESETS, already scaled for the scenario (walk_scale 0 for scenario 1:0)
+        lam: factor on the IMU white noise and bias walk, the constant-bias stds, the position-fix
+            noise and the initial errors (1 = the values of eskf_conversion_experiment); the motion
+            amplitudes are not uncertainties and are not scaled
+        dt, duration, n_trials, rng, fix_rate: as eskf_conversion_experiment
+    Returns:
+        (n_steps,) NEES averaged over trials, per step
+    """
+    sc = scaled_preset(preset, lam, 1.0)
+    g, a = conversion_noise_stds(sc, dt, "correct")
+    kw = dict(duration=duration, dt=dt, fix_rate=fix_rate, rate_amp=0.4, accel_amp=0.5,
+              gyro_noise_std=g, accel_noise_std=a, gyro_bias_std=0.01 * lam, accel_bias_std=0.05 * lam,
+              pos_noise_std=0.1 * lam, init_pos_noise_std=0.1 * lam, init_vel_noise_std=0.1 * lam,
+              init_att_noise_std=np.deg2rad(2.0) * lam)
+    P0 = initial_covariance(kw["init_pos_noise_std"], kw["init_vel_noise_std"], kw["init_att_noise_std"],
+                            kw["accel_bias_std"], kw["gyro_bias_std"])
+    Q = imu_noise_covariance(a, g, sc["accel"]["walk"], sc["gyro"]["walk"])
+    runs = []
+    for _ in range(n_trials):
+        trial = add_bias_walk(generate_trial(rng=rng, **kw), sc, rng)
+        runs.append(trial_errors_walk(trial, run_eskf(trial, P0, Q, kw["pos_noise_std"]))[2])
+    return np.mean(runs, axis=0)
+
+
 def second_half_mean(series):
     """Mean of the second half of a per-step series.
     Arguments:
@@ -496,6 +531,12 @@ def main():
     parser.add_argument("--block-check", action="store_true",
                         help="Part 2: also print the NEES of each 3-state block next to the joint NEES "
                              "(runs every scenario once more)")
+    parser.add_argument("--lambda-scan", action="store_true",
+                        help="Part 2: also scale every uncertainty by lambda (--lambdas) in truth and filter on "
+                             "scenario 1:0, correct conversion, and print the NEES and its excess over the "
+                             "smallest lambda")
+    parser.add_argument("--lambdas", type=float, nargs="+", default=[1.0, 0.5, 0.25, 0.1, 0.01],
+                        help="Scale factors for --lambda-scan")
     parser.add_argument("--scenarios", nargs="+", default=["1:1", "1:0", "10:1", "100:1"],
                         help="Part 2 scenarios as noise_scale:bias_walk_scale; noise_scale multiplies N and K "
                              "of the preset, bias_walk_scale multiplies K only (0 = no bias walk in truth or Q)")
@@ -602,6 +643,21 @@ def main():
                 print(f"    {'':<18s}" + "".join(f"{b:>13s}" for b in BLOCKS))
                 for c in CONVERSIONS:
                     print(f"    {c:<18s}" + "".join(f"{blocks[c][b]:13.2f}" for b in BLOCKS))
+        if args.lambda_scan:
+            # scenario 1:0 is child 1 of root_eskf in the default --scenarios list; built from root_eskf's key
+            # (not spawned) it is the same stream whatever --scenarios is, and each lambda starts from it afresh
+            scan_stream = np.random.SeedSequence(root_eskf.entropy, spawn_key=root_eskf.spawn_key + (1,))
+            scan_preset = scaled_preset(preset, 1.0, 0.0)
+            scan = {lam: second_half_mean(lambda_scan_nees(scan_preset, lam, args.dt, args.duration, args.mc_trials,
+                                                           np.random.default_rng(scan_stream), args.fix_rate))
+                    for lam in args.lambdas}
+            base = scan[min(args.lambdas)]
+            print(f"\n  lambda scan: scenario 1:0, correct filter, {args.mc_trials} trials, seed {args.seed}; "
+                  f"excess over lambda = {min(args.lambdas):g} (NEES {base:.2f})")
+            for lam in args.lambdas:
+                excess = scan[lam] - base
+                print(f"    lambda {lam:5g}: NEES {scan[lam]:7.3f}  excess {excess:+7.3f}  "
+                      f"excess/lambda^2 {excess / lam ** 2:7.3f}")
 
     fig, axes = plt.subplots(2, 2, figsize=(13, 9))
     if res is not None:

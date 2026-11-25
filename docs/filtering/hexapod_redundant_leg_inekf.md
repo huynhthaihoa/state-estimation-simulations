@@ -136,7 +136,7 @@ Each leg's four offset errors at the end of the run, split three ways:
 
 - **Actual:** RMSE over 30 trials × 6 legs.
 - **Reported:** the square root of the mean variance the filter reports along the same direction.
-- **Other three directions:** per direction, i.e., the total over the three directions orthogonal to $`n`$, divided by three.
+- **Other three directions:** the RMS per direction, i.e., the square root of (the total mean-square error over the three directions orthogonal to $`n`$, divided by three).
 - **Null direction:** each leg's $`n`$ at the default foothold.
 - **Largest-error direction:** the direction of the four offsets with the largest actual error, pooled over legs and trials. Because it is picked after the fact as the worst, its actual RMSE is biased upward (2.12° at 2° is slightly above the prior for that reason). It is mostly tibia, against femur: (0.03, −0.08, −0.55, 0.83) at 2°, (0, −0.03, −0.38, 0.92) at 1° and (0, 0.06, −0.28, 0.96) at 0.5°. It moves the foot 85 mm per radian at 2° (125 and 149 mm at 1° and 0.5°).
 

@@ -311,7 +311,7 @@ The last one is the frame-conversion identity: $R(\varphi)$ turns a body-frame p
 
 ### 11.5 A worked example: 90° yaw
 
-We take $\varphi = (0, 0, \theta)$, a pure rotation about $z$, with $\theta = \pi/2$. For a single-axis rotation, $[\varphi]_\times^2 = \theta^2(kk^\top - I) = \text{diag}(-\theta^2, -\theta^2, 0)$ with $k=(0,0,1)$, which keeps the algebra clean. Plugging $\theta=\pi/2$ ($\cos\theta=0$, $\sin\theta=1$) into the formulas above gives:
+We take $\varphi = (0, 0, \theta)$, a pure rotation about $z$, with $\theta = \pi/2$. For a single-axis rotation, $[\varphi]_\times^2 = \theta^2(kk^\top - I) = \text{diag}(-\theta^2, -\theta^2, 0)$ with $k=(0,0,1)$, which keeps the algebra clean. Plugging $\theta=\pi/2$ ($\cos\theta=0$, $\sin\theta=1$) into the formulas above gives the two coefficients $`\frac{1-\cos\theta}{\theta^2} = \frac{4}{\pi^2} \approx 0.405`$ and $`\frac{\theta-\sin\theta}{\theta^3} = \frac{4(\pi-2)}{\pi^3} \approx 0.147`$. The first multiplies $`[\varphi]_\times = \begin{bmatrix}0&-\theta&0\\ \theta&0&0\\0&0&0\end{bmatrix}`$ and gives the off-diagonal entries $`\pm 2/\pi \approx 0.637`$. The second multiplies $`[\varphi]_\times^2 = \text{diag}(-\theta^2, -\theta^2, 0)`$ and turns the first two diagonal 1s into $`1 - (\pi-2)/\pi = 2/\pi \approx 0.637`$. So:
 
 ```math
 J_l \approx \begin{bmatrix} 0.637 & -0.637 & 0\\ 
